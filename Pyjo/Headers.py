@@ -794,7 +794,9 @@ class Pyjo_Headers(Pyjo.Base.object, Pyjo.String.Mixin.object):
         lines = self.max_lines
         pos = 0
 
-        for m in re_line.finditer(self._buffer):
+        # Iterate over a copy: on PyPy the iterator keeps the buffer exported
+        # until it is collected, and an exported bytearray cannot be resized
+        for m in re_line.finditer(bytes(self._buffer)):
             chunk = m.group(0)
             pos += len(chunk)
             line = m.group(1)

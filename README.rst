@@ -19,8 +19,8 @@ Node.JS programmers.
 It provides tool set for parsing and creating HTTP messages and HTML documents.
 It also supports WSGI interface.
 
-Pyjoyment requires Python 3.14 or newer. It doesn't require any external
-libraries or compilers.
+Pyjoyment requires Python 3.12 or newer and runs on PyPy. It doesn't require
+any external libraries or compilers.
 
 See http://www.pyjoyment.net/
 
