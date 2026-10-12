@@ -1,7 +1,7 @@
 .. image:: https://img.shields.io/pypi/v/Pyjoyment.png
    :target: https://pypi.python.org/pypi/Pyjoyment
-.. image:: https://travis-ci.org/dex4er/Pyjoyment.png?branch=master
-   :target: https://travis-ci.org/dex4er/Pyjoyment
+.. image:: https://github.com/dex4er/Pyjoyment/actions/workflows/tests.yaml/badge.svg?branch=master
+   :target: https://github.com/dex4er/Pyjoyment/actions/workflows/tests.yaml
 .. image:: https://readthedocs.org/projects/pyjoyment/badge/?version=latest
    :target: http://pyjoyment.readthedocs.org/en/latest/
 
