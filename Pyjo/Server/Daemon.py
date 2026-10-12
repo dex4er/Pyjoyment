@@ -67,7 +67,7 @@ import platform
 import signal
 import weakref
 
-from Pyjo.Util import convert, getenv, notnone, warn
+from Pyjo.Util import convert, getenv, isalive, notnone, warn
 
 
 DEBUG = getenv('PYJO_DAEMON_DEBUG', False)
@@ -265,7 +265,7 @@ class Pyjo_Server_Daemon(Pyjo.Server.Base.object):
         ticker = loop.recurring(ticker_cb, 1)
 
         def signal_cb(signal, frame):
-            if dir(loop):
+            if isalive(loop):
                 loop.stop()
 
         for sig in signal.SIGINT, signal.SIGTERM:
@@ -334,13 +334,13 @@ class Pyjo_Server_Daemon(Pyjo.Server.Base.object):
 
         @tx.on
         def upgrade(tx, ws):
-            if dir(daemon):
+            if isalive(daemon):
                 ws.server_handshake()
                 daemon._connections[cid]['ws'] = ws
 
         @tx.on
         def request(tx):
-            if dir(daemon):
+            if isalive(daemon):
                 daemon.emit('request', daemon._connections[cid].get('ws', tx))
 
                 def resume_cb(tx):
@@ -436,33 +436,33 @@ class Pyjo_Server_Daemon(Pyjo.Server.Base.object):
 
         @self.ioloop.server(**options)
         def server(loop, stream, cid):
-            if dir(daemon):
+            if isalive(daemon):
                 c = daemon._connections[cid] = {'tls': tls}
                 if DEBUG:
                     warn("-- Accept {0} {1}\n".format(cid, stream.handle.getpeername()))
                 stream.timeout = daemon.inactivity_timeout
 
                 def close_cb(stream):
-                    if daemon and dir(daemon):
+                    if isalive(daemon):
                         daemon._close(cid)
 
                 stream.on(close_cb, 'close')
 
                 def error_cb(stream, err):
-                    if daemon and dir(daemon):
+                    if isalive(daemon):
                         daemon.app.log.error(err)
                         daemon._close(cid)
 
                 stream.on(error_cb, 'error')
 
                 def read_cb(stream, chunk):
-                    if dir(daemon):
+                    if isalive(daemon):
                         daemon._read(cid, chunk)
 
                 stream.on(read_cb, 'read')
 
                 def timeout_cb(stream):
-                    if dir(daemon) and c and c['tx']:
+                    if isalive(daemon) and c and c['tx']:
                         self.app.log.debug('Inactivity timeout')
 
                 stream.on(timeout_cb, 'timeout')
@@ -529,7 +529,7 @@ class Pyjo_Server_Daemon(Pyjo.Server.Base.object):
         daemon = weakref.proxy(self)
 
         def write_cb(stream):
-            if dir(daemon):
+            if isalive(daemon):
                 return daemon._write(cid)
 
         cb = write_cb

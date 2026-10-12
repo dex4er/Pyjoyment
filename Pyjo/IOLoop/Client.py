@@ -57,7 +57,7 @@ Classes
 import Pyjo.EventEmitter
 import Pyjo.IOLoop
 
-from Pyjo.Util import getenv, notnone, warn
+from Pyjo.Util import getenv, isalive, notnone, warn
 
 import socket
 import weakref
@@ -228,14 +228,14 @@ class Pyjo_IOLoop_Client(Pyjo.EventEmitter.object):
         client = weakref.proxy(self)
 
         def timeout_cb(reactor):
-            if dir(client):
+            if isalive(client):
                 client.emit('error', 'Connect timeout')
 
         self._timer = reactor.timer(timeout_cb, timeout)
 
         # Blocking name resolution
         def resolved_cb(reactor):
-            if dir(client):
+            if isalive(client):
                 client._connect(**kwargs)
 
         return reactor.next_tick(resolved_cb)
@@ -254,7 +254,7 @@ class Pyjo_IOLoop_Client(Pyjo.EventEmitter.object):
     def _cleanup(self):
         reactor = self.reactor
 
-        if not dir(reactor):
+        if not isalive(reactor):
             return
 
         if self._timer:
@@ -289,7 +289,7 @@ class Pyjo_IOLoop_Client(Pyjo.EventEmitter.object):
         client = weakref.proxy(self)
 
         def ready_cb(reactor, write):
-            if dir(client):
+            if isalive(client):
                 client._ready(**kwargs)
 
         self.reactor.io(ready_cb, handle).watch(handle, False, True)

@@ -87,7 +87,7 @@ if __name__ == '__main__':
 
     # at
     is_ok(Pyjo.DOM.new('<svg xmlns:svg="http://www.w3.org/2000/svg" width="520" height="350"></svg>')
-          .at('[xmlns\:svg]').attr('xmlns:svg'),
+          .at('[xmlns\\:svg]').attr('xmlns:svg'),
           "http://www.w3.org/2000/svg", 'at result')
 
     # attr
@@ -142,7 +142,7 @@ if __name__ == '__main__':
                  ['a', 'b', 'c'], 'find result')
 
     is_deeply_ok(dom.parse('<div class="foo.bar">baz</div>')
-                 .find('div.foo\.bar').map('content').to_list(),
+                 .find('div.foo\\.bar').map('content').to_list(),
                  ['baz'], 'find result')
 
     # following
@@ -164,7 +164,7 @@ if __name__ == '__main__':
 
     # namespace
     is_ok(dom.parse('<svg xmlns:svg="http://www.w3.org/2000/svg"><svg:circle cx="1" cy="2" r="3"/></svg>')
-          .at('svg > svg\:circle').namespace,
+          .at('svg > svg\\:circle').namespace,
           "http://www.w3.org/2000/svg", 'namespace result')
 
     is_ok(dom.parse('<svg xmlns:svg="http://www.w3.org/2000/svg"><svg:circle cx="1" cy="2" r="3"/></svg>')

@@ -83,7 +83,7 @@ import Pyjo.IOLoop.Server
 import Pyjo.IOLoop.Stream
 import Pyjo.Reactor.Base
 
-from Pyjo.Util import decorator, decoratormethod, getenv, md5_sum, notnone, steady_time, rand, warn
+from Pyjo.Util import decorator, decoratormethod, getenv, isalive, md5_sum, notnone, steady_time, rand, warn
 
 import importlib
 import traceback
@@ -242,7 +242,7 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
         loop = weakref.proxy(self)
 
         def connect_cb(client, handle):
-            if dir(loop):
+            if isalive(loop):
                 del loop._connections[cid]['client']
                 stream = Pyjo.IOLoop.Stream.new(handle)
                 loop._stream(stream, cid)
@@ -251,7 +251,7 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
         client.on(connect_cb, 'connect')
 
         def error_cb(client, err):
-            if dir(loop):
+            if isalive(loop):
                 loop._remove(cid)
                 cb(loop, err, None)
 
@@ -372,7 +372,7 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
         loop = weakref.proxy(self)
 
         def next_tick_cb(reactor):
-            if dir(loop):
+            if isalive(loop):
                 cb(loop)
 
         return self.reactor.next_tick(next_tick_cb)
@@ -668,7 +668,7 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
         loop = weakref.proxy(self)
 
         def close_cb(stream):
-            if dir(loop):
+            if isalive(loop):
                 loop._remove(cid)
 
         stream.on(close_cb, 'close')
@@ -680,7 +680,7 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
         loop = weakref.proxy(self)
 
         def timer_cb(reactor):
-            if dir(loop):
+            if isalive(loop):
                 cb(loop)
 
         return getattr(self.reactor, method)(timer_cb, after)

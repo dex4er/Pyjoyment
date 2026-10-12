@@ -59,7 +59,7 @@ Classes
 
 import Pyjo.Base
 
-from Pyjo.Util import getenv, warn
+from Pyjo.Util import getenv, isalive, warn
 
 import weakref
 
@@ -181,7 +181,7 @@ class Pyjo_EventEmitter(Pyjo.Base.object):
         emitter = weakref.proxy(self)
 
         def wrap_cb(*args, **kwargs):
-            if dir(emitter):
+            if isalive(emitter):
                 emitter.unsubscribe(name, wrap_cb)
                 return cb(*args, **kwargs)
 
