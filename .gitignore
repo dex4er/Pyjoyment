@@ -1,13 +1,20 @@
 /build
 /dist
 .DS_Store
-.project
-.pydevproject
-.settings
+.venv
+.ruff_cache
 __pycache__
-*.class
-*.egg
 *.egg-info
-*.exe
 *.pyc
-*.whl
+.env
+.env.*
+.envrc
+.pypirc
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+# Default self-signed certificate for TLS servers, like in Mojo
+!/Pyjo/IOLoop/certs/server.key
