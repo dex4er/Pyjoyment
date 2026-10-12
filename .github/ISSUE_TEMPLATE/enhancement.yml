@@ -1,0 +1,26 @@
+name: Enhancement Request
+description: Suggest an enhancement to Pyjoyment
+labels: [enhancement]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What would you like to be added?
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why is this needed?
+    validations:
+      required: false
+
+  - type: input
+    id: mojolicious
+    attributes:
+      label: Mojolicious counterpart
+      description: |
+        The Mojolicious module or feature this corresponds to, if any.
+    validations:
+      required: false

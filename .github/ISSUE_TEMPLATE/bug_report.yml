@@ -1,0 +1,67 @@
+name: Bug Report
+description: Create a report to help us improve
+labels: [bug]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the bug
+      description: What is the problem? A clear and concise description of the bug.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: |
+        The smallest script that shows the problem, ideally runnable as is.
+      render: python
+    validations:
+      required: false
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: |
+        A clear and concise description of what you expected to happen. If
+        Mojolicious behaves differently for the same input, say how.
+    validations:
+      required: false
+
+  - type: input
+    id: pyjoyment-version
+    attributes:
+      label: Pyjoyment version
+      description: |
+        Release version, or commit SHA when installed from Git.
+    validations:
+      required: true
+
+  - type: input
+    id: python-version
+    attributes:
+      label: Python version
+      description: |
+        Output of `python --version`.
+    validations:
+      required: true
+
+  - type: input
+    id: os-version
+    attributes:
+      label: Operating system type and version
+      description: |
+        e.g. macOS 26, Ubuntu 24.04, Windows 11
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: |
+        Tracebacks, logs, or anything else that helps.
+    validations:
+      required: false
