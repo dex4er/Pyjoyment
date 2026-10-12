@@ -236,6 +236,20 @@ else:
         return isinstance(obj, (bytearray, str))
 
 
+def isalive(obj):
+    """::
+
+        boolean = isalive(weakref.proxy(obj))
+
+    Check if object behind weak reference proxy still exists.
+    """
+    try:
+        obj.__class__
+        return True
+    except ReferenceError:
+        return False
+
+
 def isiterable(obj):
     """::
 
@@ -592,7 +606,7 @@ re_url_allow_chars = r(br'([^A-Za-z0-9\-._~])')
 
 
 def url_escape(bstring, pattern=None):
-    """::
+    r"""::
 
         escaped = url_escape(string)
         escaped = url_escape(string, r'^A-Za-z0-9\-._~')

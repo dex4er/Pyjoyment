@@ -297,7 +297,7 @@ class Pyjo_DOM(Pyjo.Base.object, Pyjo.String.Mixin.object):
             self.tree[1] = value
 
     def find(self, pattern):
-        """::
+        r"""::
 
             collection = dom.find('div > p')
 

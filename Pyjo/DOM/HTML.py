@@ -125,8 +125,8 @@ TOKEN_1_PAT = r'''
 
 RAW_PAT = r'''
       \s*(?P<rawtag>
-        (?P<rawtagname>''' + '|'.join(RAW | RCDATA) + ''')\s*
-        (?:''' + ATTR_PAT + ''')*
+        (?P<rawtagname>''' + '|'.join(RAW | RCDATA) + r''')\s*
+        (?:''' + ATTR_PAT + r''')*
       )>
       (?P<raw>.*?)                                    # Raw
       <\s*/\s*(?P=rawtagname)\s*

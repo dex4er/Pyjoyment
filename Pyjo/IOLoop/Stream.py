@@ -105,7 +105,7 @@ Classes
 import Pyjo.EventEmitter
 import Pyjo.IOLoop
 
-from Pyjo.Util import getenv, notnone, warn
+from Pyjo.Util import getenv, isalive, notnone, warn
 
 import errno
 import socket
@@ -181,17 +181,17 @@ class Pyjo_IOLoop_Stream(Pyjo.EventEmitter.object):
 
         Close stream immediately. Used by context manager.
         """
-        if not dir(self):
+        if not isalive(self):
             return
 
         reactor = self.reactor
-        if not dir(reactor):
+        if not isalive(reactor):
             return
 
         self.timeout = 0
         handle = self.handle
         self.handle = None
-        if not dir(handle):
+        if not isalive(handle):
             return
 
         if handle:
@@ -264,7 +264,7 @@ class Pyjo_IOLoop_Stream(Pyjo.EventEmitter.object):
         stream = weakref.proxy(self)
 
         def read_write_cb(reactor, write):
-            if dir(stream):
+            if isalive(stream):
                 if write:
                     stream._write()
                 else:
@@ -323,7 +323,7 @@ class Pyjo_IOLoop_Stream(Pyjo.EventEmitter.object):
         stream = weakref.proxy(self)
 
         def timeout_cb(reactor):
-            if bool(dir(stream)):
+            if isalive(stream):
                 stream.emit('timeout').close()
 
         self._timer = reactor.timer(timeout_cb, value)

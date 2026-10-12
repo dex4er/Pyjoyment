@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-"""
+r"""
 Pyjo.DOM.CSS - CSS selector engine
 ==================================
 ::
@@ -692,11 +692,11 @@ class Pyjo_DOM_CSS(Pyjo.Base.object):
 
         value = Pyjo.Regexp.re.escape(self._unescape(value))
         if insensitive:
-            value = '(?i)' + value
+            value = '(?i:' + value + ')'
 
         # "~=" (word)
         if op == '~':
-            return r'(?:^|\s+)' + value + '(?:\s+|$)'
+            return r'(?:^|\s+)' + value + r'(?:\s+|$)'
 
         # "*=" (contains)
         if op == '*':

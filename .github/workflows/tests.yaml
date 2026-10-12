@@ -1,0 +1,67 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - "*"
+  schedule:
+    # Weekly run catches breakage from new Python releases even when the code
+    # did not change.
+    - cron: "17 5 * * 1"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  prove:
+    name: prove (${{ matrix.os }}, python ${{ matrix.python }})
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-24.04-arm
+          - macos-15
+        # "mise" is the version pinned in mise.toml and verified against
+        # mise.lock; other entries are newer Pythons from setup-python.
+        python:
+          - mise
+        include:
+          - os: ubuntu-24.04-arm
+            python: "3.15"
+
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+
+    env:
+      PYTHONPATH: .
+      # Invalid escape sequences become errors in a future Python.
+      PYTHONWARNINGS: error::SyntaxWarning
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up mise
+        if: matrix.python == 'mise'
+        uses: jdx/mise-action@v5
+        with:
+          version: 2026.10.4 # datasource=github-releases depName=jdx/mise
+
+      - name: Set up Python
+        if: matrix.python != 'mise'
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+          allow-prereleases: true
+
+      # prove reads --ext and --exec from .proverc. Perl and prove come with
+      # the runner images.
+      - name: Run tests
+        run: |
+          python --version
+          prove t/Pyjo t/docs t/examples

@@ -1722,8 +1722,8 @@ if __name__ == '__main__':
     is_ok(req.method, 'POST', 'right method')
     is_ok(req.version, '1.1', 'right version')
     is_ok(req.url, '/', 'right URL')
-    is_ok(req.upload('foo \%22bar%22 baz\\').filename, 'fo\%22o%22.txt\\', 'right filename')
-    is_ok(req.upload('foo \%22bar%22 baz\\').slurp(), b'test', 'right content')
+    is_ok(req.upload('foo \\%22bar%22 baz\\').filename, 'fo\\%22o%22.txt\\', 'right filename')
+    is_ok(req.upload('foo \\%22bar%22 baz\\').slurp(), b'test', 'right content')
 
     # Firefox 24 multipart/form-data request (with quotation marks)
     req = Pyjo.Message.Request.new()
@@ -1915,7 +1915,7 @@ if __name__ == '__main__':
               b'Cookie: mojolicious=BAcIMTIzNDU2NzgECAgIAwIAAAAXDGFsZXgudm9yb25vdgQ'
               b'AAAB1c2VyBhaIjksAAAAABwAAAGV4cGlyZXM=--78a58a94f98ae5b75a489be1189f'
               b"2672\x0d\x0a"
-              b"Cookie2: \$Version=1\x0d\x0a"
+              b"Cookie2: \\$Version=1\x0d\x0a"
               b"TE: deflate, gzip, chunked, identity, trailers\x0d\x0a"
               b"Content-Length: " + b(str(len(opera))) + b"\x0d\x0a"
               b'Content-Type: multipart/form-data; boundary=----------IWq9cR9mYYG66'

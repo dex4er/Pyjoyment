@@ -77,7 +77,7 @@ class Pyjo_String_Bytes(base_object):
         return Pyjo_String_Bytes(value, charset)
 
     def url_escape(self):
-        """::
+        r"""::
 
             string = string.url_escape()
             string = string.url_escape(br'^A-Za-z0-9\-._~')

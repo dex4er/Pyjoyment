@@ -229,7 +229,7 @@ latex_elements = {
 #'pointsize': '10pt',
 
 # Additional stuff for the LaTeX preamble.
-'preamble': """
+'preamble': r"""
 \usepackage{fontspec}
 \setsansfont{Liberation Sans}
 \setromanfont{Liberation Serif}

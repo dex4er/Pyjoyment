@@ -226,7 +226,7 @@ if __name__ == '__main__':
     is_deeply_ok(path.clone().parts, [u"foob\xe4r", '-._~!$&\'()*+,;=:@'], 'right structure')
     ok(path.contains(u"/foob\xe4r"), 'contains path')
     ok(path.contains(u"/foob\xe4r/-._~!$&'()*+,;=:@"), 'contains path')
-    ok(not path.contains(u"/foob\xe4r/-._~!\$&'()*+,;=:."), 'does not contain path')
+    ok(not path.contains(u"/foob\xe4r/-._~!\\$&'()*+,;=:."), 'does not contain path')
     is_ok(str(path), '/foob%E4r/-._~!$&\'()*+,;=:@', 'right path')
     is_ok(path.to_abs_str(), '/foob%E4r/-._~!$&\'()*+,;=:@', 'right absolute path')
     is_ok(path.to_route(), u"/foob\xe4r/-._~!$&'()*+,;=:@", 'right route')

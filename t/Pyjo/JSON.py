@@ -157,7 +157,7 @@ if __name__ == '__main__':
     bstring = encode_json(["123abc"])
     is_ok(bstring, b'["123abc"]', 'encode ["123abc"]')
     bstring = encode_json(["\x00\x1f \a\b/\f\r"])
-    is_ok(bstring, b'["\\u0000\\u001f \\u0007\\b\/\\f\\r"]', r'encode ["\x00\x1f \a\b/\f\r"]')
+    is_ok(bstring, b'["\\u0000\\u001f \\u0007\\b\\/\\f\\r"]', r'encode ["\x00\x1f \a\b/\f\r"]')
     bstring = encode_json('')
     is_ok(bstring, b'""', 'encode ""')
     bstring = encode_json("hell\no")
