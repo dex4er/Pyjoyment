@@ -1,4 +1,3 @@
-
 """
 Pyjo.Server.CGI - CGI server
 ============================
@@ -40,11 +39,11 @@ Classes
 
 import Pyjo.Server.Base
 
+from Pyjo.Util import convert
+
 import os
 import sys
 import time
-
-from Pyjo.Util import convert
 
 
 class Pyjo_Server_CGI(Pyjo.Server.Base.object):
@@ -99,7 +98,7 @@ class Pyjo_Server_CGI(Pyjo.Server.Base.object):
         code = res.code or 404
         msg = res.message or res.default_message()
         if not self.nph:
-            res.headers.status = f"{code} {msg}"
+            res.headers.status = f'{code} {msg}'
         if not self._write(res, 'get_header_chunk'):
             return
 

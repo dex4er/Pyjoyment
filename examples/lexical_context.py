@@ -10,5 +10,6 @@ class C:
 
         return context.v
 
+
 o = C()
 print(o.m())

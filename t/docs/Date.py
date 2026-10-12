@@ -1,4 +1,3 @@
-
 import Pyjo.Test
 
 
@@ -12,7 +11,6 @@ class UnitTest(Pyjo.Test.UnitTest):
 
 
 if __name__ == '__main__':
-
     from Pyjo.Test import *  # noqa
 
     import time
@@ -65,12 +63,12 @@ if __name__ == '__main__':
 
     # isoformat
     string = Pyjo.Date.new(784111777).isoformat()
-    is_ok(string, "1994-11-06T08:49:37Z", 'date')
+    is_ok(string, '1994-11-06T08:49:37Z', 'date')
 
     string = Pyjo.Date.new(784111777.21).isoformat(sep='T')
-    is_ok(string, "1994-11-06T08:49:37.21Z", 'date')
+    is_ok(string, '1994-11-06T08:49:37.21Z', 'date')
 
     string = Pyjo.Date.new(784111777).to_str()
-    is_ok(string, "Sun, 06 Nov 1994 08:49:37 GMT", 'date')
+    is_ok(string, 'Sun, 06 Nov 1994 08:49:37 GMT', 'date')
 
     done_testing()

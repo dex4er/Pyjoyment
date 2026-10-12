@@ -1,4 +1,3 @@
-
 """
 Pyjo.String.Unicode - Unicode string
 ====================================
@@ -28,10 +27,8 @@ Classes
 -------
 """
 
-
 import Pyjo.String.Bytes
 import Pyjo.Util
-
 
 
 DEFAULT_CHARSET = 'utf-8'
@@ -47,7 +44,7 @@ class Pyjo_String_Unicode(str):
         return super().__new__(cls, Pyjo.Util.u(value, charset))
 
     def __repr__(self):
-        return f"{self.__module__}.new({super().__repr__()})"
+        return f'{self.__module__}.new({super().__repr__()})'
 
     def html_unescape(self):
         """::

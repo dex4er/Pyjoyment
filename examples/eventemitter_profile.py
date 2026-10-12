@@ -1,7 +1,7 @@
+import Pyjo.EventEmitter
 
 from Pyjo.Collection import c
 
-import Pyjo.EventEmitter
 import sys
 
 

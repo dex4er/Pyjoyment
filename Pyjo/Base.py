@@ -1,4 +1,3 @@
-
 """
 Pyjo.Base - Minimal base class
 ==============================

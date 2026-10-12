@@ -1,4 +1,3 @@
-
 """
 Pyjo.DOM.HTML - HTML/XML engine
 ===============================
@@ -13,7 +12,6 @@ Pyjo.DOM.HTML - HTML/XML engine
 Classes
 -------
 """
-
 
 import Pyjo.Base
 import Pyjo.DOM
@@ -32,62 +30,227 @@ RCDATA = {'title', 'textarea'}
 END = {'body': 'head', 'optgroup': 'optgroup', 'option': 'option'}
 
 # HTML elements that break paragraphs
-for _ in ('address', 'article', 'aside', 'blockquote', 'dir', 'div', 'dl',
-          'fieldset', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-          'header', 'hr', 'main', 'menu', 'nav', 'ol', 'p', 'pre', 'section',
-          'table', 'ul'):
+for _ in (
+    'address',
+    'article',
+    'aside',
+    'blockquote',
+    'dir',
+    'div',
+    'dl',
+    'fieldset',
+    'footer',
+    'form',
+    'h1',
+    'h2',
+    'h3',
+    'h4',
+    'h5',
+    'h6',
+    'header',
+    'hr',
+    'main',
+    'menu',
+    'nav',
+    'ol',
+    'p',
+    'pre',
+    'section',
+    'table',
+    'ul',
+):
     END[_] = 'p'
 
 # HTML table elements with optional end tags
 TABLE = {'colgroup', 'tbody', 'td', 'tfoot', 'th', 'thead', 'tr'}
 
 # HTML elements with optional end tags and scoping rules
-CLOSE = {'li': ({'li'}, {'ul', 'ol'}),
-         'tr': ({'tr'}, {'table'}),
-         'colgroup': (TABLE, {'table'}),
-         'tbody': (TABLE, {'table'}),
-         'tfoot': (TABLE, {'table'}),
-         'thead': (TABLE, {'table'}),
-         'dd': ({'dd', 'dt'}, {'dl'}),
-         'dt': ({'dd', 'dt'}, {'dl'}),
-         'rp': ({'rp', 'rt'}, {'ruby'}),
-         'rt': ({'rp', 'rt'}, {'ruby'}),
-         'td': ({'th', 'td'}, {'table'}),
-         'th': ({'th', 'td'}, {'table'}),
-         }
+CLOSE = {
+    'li': ({'li'}, {'ul', 'ol'}),
+    'tr': ({'tr'}, {'table'}),
+    'colgroup': (TABLE, {'table'}),
+    'tbody': (TABLE, {'table'}),
+    'tfoot': (TABLE, {'table'}),
+    'thead': (TABLE, {'table'}),
+    'dd': ({'dd', 'dt'}, {'dl'}),
+    'dt': ({'dd', 'dt'}, {'dl'}),
+    'rp': ({'rp', 'rt'}, {'ruby'}),
+    'rt': ({'rp', 'rt'}, {'ruby'}),
+    'td': ({'th', 'td'}, {'table'}),
+    'th': ({'th', 'td'}, {'table'}),
+}
 
 # HTML elements without end tags
-EMPTY = {'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
-         'keygen', 'link', 'menuitem', 'meta' 'param', 'source', 'track',
-         'wbr'}
+EMPTY = {
+    'area',
+    'base',
+    'br',
+    'col',
+    'embed',
+    'hr',
+    'img',
+    'input',
+    'keygen',
+    'link',
+    'menuitem',
+    'metaparam',
+    'source',
+    'track',
+    'wbr',
+}
 
 # HTML elements categorized as phrasing content (and obsolete inline elements)
-PHRASING = {'a', 'abbr', 'area', 'audio', 'b', 'bdi', 'bdo', 'br', 'button',
-            'canvas', 'cite', 'code', 'data', 'datalist', 'del', 'dfn', 'em',
-            'embed', 'i', 'iframe', 'img', 'input', 'ins', 'kbd', 'keygen',
-            'label', 'link', 'map', 'mark', 'math', 'meta', 'meter',
-            'noscript', 'object', 'output', 'picture', 'progress', 'q',
-            'ruby', 's', 'samp', 'script', 'select', 'small', 'span',
-            'strong', 'sub', 'sup', 'svg', 'template', 'textarea', 'time',
-            'u', 'var', 'video', 'wbr'}
+PHRASING = {
+    'a',
+    'abbr',
+    'area',
+    'audio',
+    'b',
+    'bdi',
+    'bdo',
+    'br',
+    'button',
+    'canvas',
+    'cite',
+    'code',
+    'data',
+    'datalist',
+    'del',
+    'dfn',
+    'em',
+    'embed',
+    'i',
+    'iframe',
+    'img',
+    'input',
+    'ins',
+    'kbd',
+    'keygen',
+    'label',
+    'link',
+    'map',
+    'mark',
+    'math',
+    'meta',
+    'meter',
+    'noscript',
+    'object',
+    'output',
+    'picture',
+    'progress',
+    'q',
+    'ruby',
+    's',
+    'samp',
+    'script',
+    'select',
+    'small',
+    'span',
+    'strong',
+    'sub',
+    'sup',
+    'svg',
+    'template',
+    'textarea',
+    'time',
+    'u',
+    'var',
+    'video',
+    'wbr',
+}
 
 OBSOLETE = {'acronym', 'applet', 'basefont', 'big', 'font', 'strike', 'tt'}
 PHRASING = OBSOLETE | PHRASING
 
 # HTML elements that don't get their self-closing flag acknowledged
-BLOCK = {'a', 'address', 'applet', 'article', 'aside', 'b', 'big',
-         'blockquote', 'body', 'button', 'caption', 'center', 'code', 'col',
-         'colgroup', 'dd', 'details', 'dialog', 'dir', 'div', 'dl', 'dt',
-         'em', 'fieldset', 'figcaption', 'figure', 'font', 'footer', 'form',
-         'frameset', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'head', 'header',
-         'hgroup', 'html', 'i', 'iframe', 'li', 'listing', 'main', 'marquee',
-         'menu', 'nav', 'nobr', 'noembed', 'noframes', 'noscript', 'object',
-         'ol', 'optgroup', 'option', 'p', 'plaintext', 'pre', 'rp', 'rt',
-         's', 'script', 'section', 'select', 'small', 'strike', 'strong',
-         'style', 'summary', 'table', 'tbody', 'td', 'template', 'textarea',
-         'tfoot', 'th', 'thead', 'title', 'tr', 'tt', 'u', 'ul', 'xmp'}
+BLOCK = {
+    'a',
+    'address',
+    'applet',
+    'article',
+    'aside',
+    'b',
+    'big',
+    'blockquote',
+    'body',
+    'button',
+    'caption',
+    'center',
+    'code',
+    'col',
+    'colgroup',
+    'dd',
+    'details',
+    'dialog',
+    'dir',
+    'div',
+    'dl',
+    'dt',
+    'em',
+    'fieldset',
+    'figcaption',
+    'figure',
+    'font',
+    'footer',
+    'form',
+    'frameset',
+    'h1',
+    'h2',
+    'h3',
+    'h4',
+    'h5',
+    'h6',
+    'head',
+    'header',
+    'hgroup',
+    'html',
+    'i',
+    'iframe',
+    'li',
+    'listing',
+    'main',
+    'marquee',
+    'menu',
+    'nav',
+    'nobr',
+    'noembed',
+    'noframes',
+    'noscript',
+    'object',
+    'ol',
+    'optgroup',
+    'option',
+    'p',
+    'plaintext',
+    'pre',
+    'rp',
+    'rt',
+    's',
+    'script',
+    'section',
+    'select',
+    'small',
+    'strike',
+    'strong',
+    'style',
+    'summary',
+    'table',
+    'tbody',
+    'td',
+    'template',
+    'textarea',
+    'tfoot',
+    'th',
+    'thead',
+    'title',
+    'tr',
+    'tt',
+    'u',
+    'ul',
+    'xmp',
+}
 
-ATTR_PAT = r'''
+ATTR_PAT = r"""
   ([^<>=\s\/]+|\/)   # Key
   (?:
     \s*=\s*
@@ -100,9 +263,9 @@ ATTR_PAT = r'''
     )
   )?
   \s*
-'''
+"""
 
-TOKEN_1_PAT = r'''
+TOKEN_1_PAT = r"""
   (?P<text>[^<]+)?                                     # Text
   (?:
     <(?:
@@ -120,24 +283,34 @@ TOKEN_1_PAT = r'''
     |
       \?(?P<pi>.*?)\?                                 # Processing Instruction
     |
-'''
+"""
 
-RAW_PAT = r'''
+RAW_PAT = (
+    r"""
       \s*(?P<rawtag>
-        (?P<rawtagname>''' + '|'.join(RAW | RCDATA) + r''')\s*
-        (?:''' + ATTR_PAT + r''')*
+        (?P<rawtagname>"""
+    + '|'.join(RAW | RCDATA)
+    + r""")\s*
+        (?:"""
+    + ATTR_PAT
+    + r""")*
       )>
       (?P<raw>.*?)                                    # Raw
       <\s*/\s*(?P=rawtagname)\s*
     |
-'''
+"""
+)
 
-TOKEN_2_PAT = r'''
-      \s*(?P<tag>[^<>\s]+\s*(?:''' + ATTR_PAT + ''')*) # Tag
+TOKEN_2_PAT = (
+    r"""
+      \s*(?P<tag>[^<>\s]+\s*(?:"""
+    + ATTR_PAT
+    + """)*) # Tag
     )>
     | (?P<runaway><)                                  # Runaway "<"
   )?
-'''
+"""
+)
 
 XML_TOKEN_PAT = TOKEN_1_PAT + TOKEN_2_PAT
 
@@ -204,7 +377,9 @@ class Pyjo_DOM_HTML(Pyjo.Base.object):
             re_token = re_html_token
 
         for m in re_token.finditer(html):
-            text, doctype, comment, cdata, pi, tag, runaway = m.group('text', 'doctype', 'comment', 'cdata', 'pi', 'tag', 'runaway')
+            text, doctype, comment, cdata, pi, tag, runaway = m.group(
+                'text', 'doctype', 'comment', 'cdata', 'pi', 'tag', 'runaway'
+            )
             raw = m.group('raw') if not xml else None
             rawtag = m.group('rawtag') if not xml else None
             if rawtag is not None:
@@ -223,7 +398,6 @@ class Pyjo_DOM_HTML(Pyjo.Base.object):
 
             # Tag
             if tag is not None:
-
                 # End
                 m = re_end_tag.search(tag)
                 if m:

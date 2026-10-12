@@ -1,4 +1,3 @@
-
 import Pyjo.Test
 
 
@@ -120,7 +119,7 @@ if __name__ == '__main__':
 
     # Parse HTTP 1.1 response start-line, no headers and body
     res = Pyjo.Message.Response.new()
-    res.parse(b"HTTP/1.1 200 OK\x0d\x0a\x0d\x0a")
+    res.parse(b'HTTP/1.1 200 OK\x0d\x0a\x0d\x0a')
     ok(res.is_finished, 'response is finished')
     is_ok(res.code, 200, 'right status')
     is_ok(res.message, 'OK', 'right message')
@@ -158,13 +157,13 @@ if __name__ == '__main__':
     ok(not res.is_finished, 'response is not finished')
     res.parse(b'K')
     ok(not res.is_finished, 'response is not finished')
-    res.parse(b"\x0d")
+    res.parse(b'\x0d')
     ok(not res.is_finished, 'response is not finished')
-    res.parse(b"\x0a")
+    res.parse(b'\x0a')
     ok(not res.is_finished, 'response is not finished')
-    res.parse(b"\x0d")
+    res.parse(b'\x0d')
     ok(not res.is_finished, 'response is not finished')
-    res.parse(b"\x0a")
+    res.parse(b'\x0a')
     ok(res.is_finished, 'response is finished')
     is_ok(res.code, 200, 'right status')
     is_ok(res.message, 'OK', 'right message')
@@ -172,7 +171,7 @@ if __name__ == '__main__':
 
     # Parse HTTP 1.1 response start-line, no headers and body (no message)
     res = Pyjo.Message.Response.new()
-    res.parse(b"HTTP/1.1 200\x0d\x0a\x0d\x0a")
+    res.parse(b'HTTP/1.1 200\x0d\x0a\x0d\x0a')
     ok(res.is_finished, 'response is finished')
     is_ok(res.code, 200, 'right status')
     is_ok(res.message, None, 'no message')
@@ -180,9 +179,9 @@ if __name__ == '__main__':
 
     # Parse HTTP 1.0 response start-line and headers but no body
     res = Pyjo.Message.Response.new()
-    res.parse(b"HTTP/1.0 404 Damn it\x0d\x0a")
-    res.parse(b"Content-Type: text/plain\x0d\x0a")
-    res.parse(b"Content-Length: 0\x0d\x0a\x0d\x0a")
+    res.parse(b'HTTP/1.0 404 Damn it\x0d\x0a')
+    res.parse(b'Content-Type: text/plain\x0d\x0a')
+    res.parse(b'Content-Length: 0\x0d\x0a\x0d\x0a')
     ok(res.is_finished, 'response is finished')
     is_ok(res.code, 404, 'right status')
     is_ok(res.message, 'Damn it', 'right message')
@@ -192,38 +191,38 @@ if __name__ == '__main__':
 
     # Parse full HTTP 1.0 response
     res = Pyjo.Message.Response.new()
-    res.parse(b"HTTP/1.0 500 Internal Server Error\x0d\x0a")
-    res.parse(b"Content-Type: text/plain\x0d\x0a")
-    res.parse(b"Content-Length: 27\x0d\x0a\x0d\x0a")
-    res.parse(b"Hello World!\n1234\nlalalala\n")
+    res.parse(b'HTTP/1.0 500 Internal Server Error\x0d\x0a')
+    res.parse(b'Content-Type: text/plain\x0d\x0a')
+    res.parse(b'Content-Length: 27\x0d\x0a\x0d\x0a')
+    res.parse(b'Hello World!\n1234\nlalalala\n')
     ok(res.is_finished, 'response is finished')
     is_ok(res.code, 500, 'right status')
     is_ok(res.message, 'Internal Server Error', 'right message')
     is_ok(res.version, '1.0', 'right version')
     is_ok(res.headers.content_type, 'text/plain', 'right "Content-Type" value')
     is_ok(res.headers.content_length, '27', 'right "Content-Length" value')
-    is_ok(res.body, b"Hello World!\n1234\nlalalala\n", 'right content')
+    is_ok(res.body, b'Hello World!\n1234\nlalalala\n', 'right content')
 
     # Parse full HTTP 1.0 response (keep-alive)
     res = Pyjo.Message.Response.new()
-    res.parse(b"HTTP/1.0 500 Internal Server Error\x0d\x0a")
-    res.parse(b"Connection: keep-alive\x0d\x0a\x0d\x0a")
-    res.parse(b"HTTP/1.0 200 OK\x0d\x0a\x0d\x0a")
+    res.parse(b'HTTP/1.0 500 Internal Server Error\x0d\x0a')
+    res.parse(b'Connection: keep-alive\x0d\x0a\x0d\x0a')
+    res.parse(b'HTTP/1.0 200 OK\x0d\x0a\x0d\x0a')
     ok(res.is_finished, 'response is finished')
     is_ok(res.code, 500, 'right status')
     is_ok(res.message, 'Internal Server Error', 'right message')
     is_ok(res.version, '1.0', 'right version')
     is_ok(res.body, b'', 'no content')
-    is_ok(res.content.leftovers, b"HTTP/1.0 200 OK\x0d\x0a\x0d\x0a", 'next response in leftovers')
+    is_ok(res.content.leftovers, b'HTTP/1.0 200 OK\x0d\x0a\x0d\x0a', 'next response in leftovers')
 
     # Parse full HTTP 1.0 response (no limit)
     setenv('PYJO_MAX_MESSAGE_SIZE', '0')
     res = Pyjo.Message.Response.new()
     is_ok(res.max_message_size, 0, 'right size')
-    res.parse(b"HTTP/1.0 500 Internal Server Error\x0d\x0a")
-    res.parse(b"Content-Type: text/plain\x0d\x0a")
-    res.parse(b"Content-Length: 27\x0d\x0a\x0d\x0a")
-    res.parse(b"Hello World!\n1234\nlalalala\n")
+    res.parse(b'HTTP/1.0 500 Internal Server Error\x0d\x0a')
+    res.parse(b'Content-Type: text/plain\x0d\x0a')
+    res.parse(b'Content-Length: 27\x0d\x0a\x0d\x0a')
+    res.parse(b'Hello World!\n1234\nlalalala\n')
     ok(res.is_finished, 'response is finished')
     ok(not res.error, 'no error')
     is_ok(res.code, 500, 'right status')
@@ -231,50 +230,50 @@ if __name__ == '__main__':
     is_ok(res.version, '1.0', 'right version')
     is_ok(res.headers.content_type, 'text/plain', 'right "Content-Type" value')
     is_ok(res.headers.content_length, '27', 'right "Content-Length" value')
-    is_ok(res.body, b"Hello World!\n1234\nlalalala\n", 'right content')
+    is_ok(res.body, b'Hello World!\n1234\nlalalala\n', 'right content')
     setenv('PYJO_MAX_MESSAGE_SIZE', None)
 
     # Parse broken start-line
     res = Pyjo.Message.Response.new()
-    res.parse(b"12345\x0d\x0a")
+    res.parse(b'12345\x0d\x0a')
     ok(res.is_finished, 'response is finished')
     is_deeply_ok(res.error, {'message': 'Bad response start-line', 'code': None}, 'right error')
 
     # Parse full HTTP 1.0 response (missing Content-Length)
     res = Pyjo.Message.Response.new()
-    res.parse(b"HTTP/1.0 500 Internal Server Error\x0d\x0a")
-    res.parse(b"Content-Type: text/plain\x0d\x0a")
-    res.parse(b"Connection: close\x0d\x0a\x0d\x0a")
-    res.parse(b"Hello World!\n1234\nlalalala\n")
+    res.parse(b'HTTP/1.0 500 Internal Server Error\x0d\x0a')
+    res.parse(b'Content-Type: text/plain\x0d\x0a')
+    res.parse(b'Connection: close\x0d\x0a\x0d\x0a')
+    res.parse(b'Hello World!\n1234\nlalalala\n')
     ok(not res.is_finished, 'response is not finished')
     is_ok(res.code, 500, 'right status')
     is_ok(res.message, 'Internal Server Error', 'right message')
     is_ok(res.version, '1.0', 'right version')
     is_ok(res.headers.content_type, 'text/plain', 'right "Content-Type" value')
     is_ok(res.headers.content_length, None, 'no "Content-Length" value')
-    is_ok(res.body, b"Hello World!\n1234\nlalalala\n", 'right content')
+    is_ok(res.body, b'Hello World!\n1234\nlalalala\n', 'right content')
 
     # Parse full HTTP 1.0 response (missing Content-Length and Connection)
     res = Pyjo.Message.Response.new()
-    res.parse(b"HTTP/1.0 500 Internal Server Error\x0d\x0a")
-    res.parse(b"Content-Type: text/plain\x0d\x0a\x0d\x0a")
-    res.parse(b"Hello World!\n1")
-    res.parse(b"234\nlala")
-    res.parse(b"lala\n")
+    res.parse(b'HTTP/1.0 500 Internal Server Error\x0d\x0a')
+    res.parse(b'Content-Type: text/plain\x0d\x0a\x0d\x0a')
+    res.parse(b'Hello World!\n1')
+    res.parse(b'234\nlala')
+    res.parse(b'lala\n')
     ok(not res.is_finished, 'response is not finished')
     is_ok(res.code, 500, 'right status')
     is_ok(res.message, 'Internal Server Error', 'right message')
     is_ok(res.version, '1.0', 'right version')
     is_ok(res.headers.content_type, 'text/plain', 'right "Content-Type" value')
     is_ok(res.headers.content_length, None, 'no "Content-Length" value')
-    is_ok(res.body, b"Hello World!\n1234\nlalalala\n", 'right content')
+    is_ok(res.body, b'Hello World!\n1234\nlalalala\n', 'right content')
 
     # Parse full HTTP 1.1 response (missing Content-Length)
     res = Pyjo.Message.Response.new()
-    res.parse(b"HTTP/1.1 500 Internal Server Error\x0d\x0a")
-    res.parse(b"Content-Type: text/plain\x0d\x0a")
-    res.parse(b"Connection: close\x0d\x0a\x0d\x0a")
-    res.parse(b"Hello World!\n1234\nlalalala\n")
+    res.parse(b'HTTP/1.1 500 Internal Server Error\x0d\x0a')
+    res.parse(b'Content-Type: text/plain\x0d\x0a')
+    res.parse(b'Connection: close\x0d\x0a\x0d\x0a')
+    res.parse(b'Hello World!\n1234\nlalalala\n')
     ok(not res.is_finished, 'response is not finished')
     ok(not res.is_empty, 'response is not empty')
     ok(not res.content.skip_body, 'body has not been skipped')
@@ -284,12 +283,12 @@ if __name__ == '__main__':
     is_ok(res.version, '1.1', 'right version')
     is_ok(res.headers.content_type, 'text/plain', 'right "Content-Type" value')
     is_ok(res.headers.content_length, None, 'no "Content-Length" value')
-    is_ok(res.body, b"Hello World!\n1234\nlalalala\n", 'right content')
+    is_ok(res.body, b'Hello World!\n1234\nlalalala\n', 'right content')
 
     # Parse full HTTP 1.1 response (broken Content-Length)
     res = Pyjo.Message.Response.new()
-    res.parse(b"HTTP/1.1 200 OK\x0d\x0a")
-    res.parse(b"Content-Length: 123test\x0d\x0a\x0d\x0a")
+    res.parse(b'HTTP/1.1 200 OK\x0d\x0a')
+    res.parse(b'Content-Length: 123test\x0d\x0a\x0d\x0a')
     res.parse(b'Hello World!')
     ok(res.is_finished, 'response is finished')
     is_ok(res.code, 200, 'right status')
@@ -304,7 +303,7 @@ if __name__ == '__main__':
     res.content.on(lambda content: content.headers.header('X-Body', 'one'), 'body')
     res.on(lambda res, state, offset: res.headers.header('X-Progress', 'two'), 'progress')
     res.on(lambda res: res.headers.header('X-Finish', 'three'), 'finish')
-    res.parse(b"HTTP/1.1 100 Continue\x0d\x0a\x0d\x0a")
+    res.parse(b'HTTP/1.1 100 Continue\x0d\x0a\x0d\x0a')
     ok(res.is_finished, 'response is finished')
     ok(res.is_empty, 'response is empty')
     ok(res.content.skip_body, 'body has been skipped')
@@ -319,10 +318,10 @@ if __name__ == '__main__':
 
     # Parse full HTTP 1.1 response (304 Not Modified)
     res = Pyjo.Message.Response.new()
-    res.parse(b"HTTP/1.1 304 Not Modified\x0d\x0a")
-    res.parse(b"Content-Type: text/html\x0d\x0a")
-    res.parse(b"Content-Length: 9000\x0d\x0a")
-    res.parse(b"Connection: keep-alive\x0d\x0a\x0d\x0a")
+    res.parse(b'HTTP/1.1 304 Not Modified\x0d\x0a')
+    res.parse(b'Content-Type: text/html\x0d\x0a')
+    res.parse(b'Content-Length: 9000\x0d\x0a')
+    res.parse(b'Connection: keep-alive\x0d\x0a\x0d\x0a')
     ok(res.is_finished, 'response is finished')
     ok(res.is_empty, 'response is empty')
     ok(res.content.skip_body, 'body has been skipped')
@@ -338,10 +337,10 @@ if __name__ == '__main__':
     res = Pyjo.Message.Response.new()
     res.content.on(lambda content: content.headers.header('X-Body', 'one'), 'body')
     res.on(lambda req: req.headers.header('X-Finish', 'two'), 'finish')
-    res.parse(b"HTTP/1.1 204 No Content\x0d\x0a")
-    res.parse(b"Content-Type: text/html\x0d\x0a")
-    res.parse(b"Content-Length: 9001\x0d\x0a")
-    res.parse(b"Connection: keep-alive\x0d\x0a\x0d\x0a")
+    res.parse(b'HTTP/1.1 204 No Content\x0d\x0a')
+    res.parse(b'Content-Type: text/html\x0d\x0a')
+    res.parse(b'Content-Length: 9001\x0d\x0a')
+    res.parse(b'Connection: keep-alive\x0d\x0a\x0d\x0a')
     ok(res.is_finished, 'response is finished')
     ok(res.is_empty, 'response is empty')
     ok(res.content.skip_body, 'body has been skipped')
@@ -357,10 +356,12 @@ if __name__ == '__main__':
 
     # Parse HTTP 1.1 response (413 error in one big chunk)
     res = Pyjo.Message.Response.new()
-    res.parse(b"HTTP/1.1 413 Request Entity Too Large\x0d\x0a"
-              b"Connection: Close\x0d\x0a"
-              b"Date: Tue, 09 Feb 2010 16:34:51 GMT\x0d\x0a"
-              b"Server: Mojolicious (Perl)\x0d\x0a\x0d\x0a")
+    res.parse(
+        b'HTTP/1.1 413 Request Entity Too Large\x0d\x0a'
+        b'Connection: Close\x0d\x0a'
+        b'Date: Tue, 09 Feb 2010 16:34:51 GMT\x0d\x0a'
+        b'Server: Mojolicious (Perl)\x0d\x0a\x0d\x0a'
+    )
     ok(not res.is_finished, 'response is not finished')
     is_ok(res.code, 413, 'right status')
     is_ok(res.message, 'Request Entity Too Large', 'right message')
@@ -371,9 +372,9 @@ if __name__ == '__main__':
     setenv('PYJO_MAX_BUFFER_SIZE', '12')
     res = Pyjo.Message.Response.new()
     is_ok(res.content.max_buffer_size, 12, 'right size')
-    res.parse(b"HTTP/1.1 200 OK\x0d\x0a")
-    res.parse(b"Content-Type: text/plain\x0d\x0a")
-    res.parse(b"Transfer-Encoding: chunked\x0d\x0a\x0d\x0a")
+    res.parse(b'HTTP/1.1 200 OK\x0d\x0a')
+    res.parse(b'Content-Type: text/plain\x0d\x0a')
+    res.parse(b'Transfer-Encoding: chunked\x0d\x0a\x0d\x0a')
     ok(not res.is_limit_exceeded, 'limit is not exceeded')
     res.parse(b'a' * 1000)
     ok(res.is_finished, 'response is finished')
@@ -390,10 +391,10 @@ if __name__ == '__main__':
     setenv('PYJO_MAX_BUFFER_SIZE', '12')
     res = Pyjo.Message.Response.new()
     is_ok(res.content.max_buffer_size, 12, 'right size')
-    res.parse(b"HTTP/1.1 200 OK\x0d\x0a")
-    res.parse(b"Content-Length: 420\x0d\x0a")
+    res.parse(b'HTTP/1.1 200 OK\x0d\x0a')
+    res.parse(b'Content-Length: 420\x0d\x0a')
     res.parse(b'Content-Type: multipart/form-data; bo')
-    res.parse(b"undary=----------0xKhTmLbOuNdArY\x0d\x0a\x0d\x0a")
+    res.parse(b'undary=----------0xKhTmLbOuNdArY\x0d\x0a\x0d\x0a')
     ok(not res.content.is_limit_exceeded, 'limit is not exceeded')
     res.parse(b'a' * 200)
     ok(res.content.is_limit_exceeded, 'limit is exceeded')
@@ -403,7 +404,11 @@ if __name__ == '__main__':
     is_ok(res.code, 200, 'right status')
     is_ok(res.message, 'OK', 'right message')
     is_ok(res.version, '1.1', 'right version')
-    is_ok(res.headers.content_type, 'multipart/form-data; boundary=----------0xKhTmLbOuNdArY', 'right "Content-Type" value')
+    is_ok(
+        res.headers.content_type,
+        'multipart/form-data; boundary=----------0xKhTmLbOuNdArY',
+        'right "Content-Type" value',
+    )
     setenv('PYJO_MAX_BUFFER_SIZE', None)
 
     if platform.python_implementation() == 'PyPy':
@@ -413,9 +418,9 @@ if __name__ == '__main__':
         setenv('PYJO_MAX_BUFFER_SIZE', '12')
         res = Pyjo.Message.Response.new()
         is_ok(res.content.max_buffer_size, 12, 'right size')
-        res.parse(b"HTTP/1.1 200 OK\x0d\x0a")
-        res.parse(b"Content-Length: 1000\x0d\x0a")
-        res.parse(b"Content-Encoding: gzip\x0d\x0a\x0d\x0a")
+        res.parse(b'HTTP/1.1 200 OK\x0d\x0a')
+        res.parse(b'Content-Length: 1000\x0d\x0a')
+        res.parse(b'Content-Encoding: gzip\x0d\x0a\x0d\x0a')
         res.parse(b'a' * 5)
         ok(not res.content.is_limit_exceeded, 'limit is not exceeded')
         res.parse(b'a' * 995)
@@ -431,14 +436,14 @@ if __name__ == '__main__':
 
     # Parse HTTP 1.1 chunked response
     res = Pyjo.Message.Response.new()
-    res.parse(b"HTTP/1.1 500 Internal Server Error\x0d\x0a")
-    res.parse(b"Content-Type: text/plain\x0d\x0a")
-    res.parse(b"Transfer-Encoding: chunked\x0d\x0a\x0d\x0a")
-    res.parse(b"4\x0d\x0a")
-    res.parse(b"abcd\x0d\x0a")
-    res.parse(b"9\x0d\x0a")
-    res.parse(b"abcdefghi\x0d\x0a")
-    res.parse(b"0\x0d\x0a\x0d\x0a")
+    res.parse(b'HTTP/1.1 500 Internal Server Error\x0d\x0a')
+    res.parse(b'Content-Type: text/plain\x0d\x0a')
+    res.parse(b'Transfer-Encoding: chunked\x0d\x0a\x0d\x0a')
+    res.parse(b'4\x0d\x0a')
+    res.parse(b'abcd\x0d\x0a')
+    res.parse(b'9\x0d\x0a')
+    res.parse(b'abcdefghi\x0d\x0a')
+    res.parse(b'0\x0d\x0a\x0d\x0a')
     ok(res.is_finished, 'response is finished')
     is_ok(res.code, 500, 'right status')
     is_ok(res.message, 'Internal Server Error', 'right message')
@@ -450,104 +455,113 @@ if __name__ == '__main__':
 
     # Parse HTTP 1.1 multipart response
     res = Pyjo.Message.Response.new()
-    res.parse(b"HTTP/1.1 200 OK\x0d\x0a")
-    res.parse(b"Content-Length: 420\x0d\x0a")
+    res.parse(b'HTTP/1.1 200 OK\x0d\x0a')
+    res.parse(b'Content-Length: 420\x0d\x0a')
     res.parse(b'Content-Type: multipart/form-data; bo')
-    res.parse(b"undary=----------0xKhTmLbOuNdArY\x0d\x0a\x0d\x0a")
-    res.parse(b"\x0d\x0a------------0xKhTmLbOuNdArY\x0d\x0a")
-    res.parse(b"Content-Disposition: form-data; name=\"text1\"\x0d\x0a")
-    res.parse(b"\x0d\x0ahallo welt test123\n")
-    res.parse(b"\x0d\x0a------------0xKhTmLbOuNdArY\x0d\x0a")
-    res.parse(b"Content-Disposition: form-data; name=\"text2\"\x0d\x0a")
-    res.parse(b"\x0d\x0a\x0d\x0a------------0xKhTmLbOuNdArY\x0d\x0a")
+    res.parse(b'undary=----------0xKhTmLbOuNdArY\x0d\x0a\x0d\x0a')
+    res.parse(b'\x0d\x0a------------0xKhTmLbOuNdArY\x0d\x0a')
+    res.parse(b'Content-Disposition: form-data; name="text1"\x0d\x0a')
+    res.parse(b'\x0d\x0ahallo welt test123\n')
+    res.parse(b'\x0d\x0a------------0xKhTmLbOuNdArY\x0d\x0a')
+    res.parse(b'Content-Disposition: form-data; name="text2"\x0d\x0a')
+    res.parse(b'\x0d\x0a\x0d\x0a------------0xKhTmLbOuNdArY\x0d\x0a')
     res.parse(b'Content-Disposition: form-data; name="upload"; file')
-    res.parse(b"name=\"hello.pl\"\x0d\x0a\x0d\x0a")
-    res.parse(b"Content-Type: application/octet-stream\x0d\x0a\x0d\x0a")
-    res.parse(b"#!/usr/bin/perl\n\n")
-    res.parse(b"use strict;\n")
-    res.parse(b"use warnings;\n\n")
-    res.parse(b"print \"Hello World :)\\n\"\n")
-    res.parse(b"\x0d\x0a------------0xKhTmLbOuNdArY--")
+    res.parse(b'name="hello.pl"\x0d\x0a\x0d\x0a')
+    res.parse(b'Content-Type: application/octet-stream\x0d\x0a\x0d\x0a')
+    res.parse(b'#!/usr/bin/perl\n\n')
+    res.parse(b'use strict;\n')
+    res.parse(b'use warnings;\n\n')
+    res.parse(b'print "Hello World :)\\n"\n')
+    res.parse(b'\x0d\x0a------------0xKhTmLbOuNdArY--')
     ok(res.is_finished, 'response is finished')
     is_ok(res.code, 200, 'right status')
     is_ok(res.message, 'OK', 'right message')
     is_ok(res.version, '1.1', 'right version')
-    is_ok(res.headers.content_type, 'multipart/form-data; boundary=----------0xKhTmLbOuNdArY', 'right "Content-Type" value')
+    is_ok(
+        res.headers.content_type,
+        'multipart/form-data; boundary=----------0xKhTmLbOuNdArY',
+        'right "Content-Type" value',
+    )
     isa_ok(res.content.parts[0], Pyjo.Content.Single.object, 'right part')
     isa_ok(res.content.parts[1], Pyjo.Content.Single.object, 'right part')
     isa_ok(res.content.parts[2], Pyjo.Content.Single.object, 'right part')
-    is_ok(res.content.parts[0].asset.slurp(), b"hallo welt test123\n", 'right content')
+    is_ok(res.content.parts[0].asset.slurp(), b'hallo welt test123\n', 'right content')
 
     # Parse HTTP 1.1 chunked multipart response with leftovers (at once)
     res = Pyjo.Message.Response.new()
-    multipart = \
-        b"HTTP/1.1 200 OK\x0d\x0a" \
-        b"Transfer-Encoding: chunked\x0d\x0a" \
-        b'Content-Type: multipart/form-data; bo' \
-        b"undary=----------0xKhTmLbOuNdArY\x0d\x0a\x0d\x0a" \
-        b"19f\x0d\x0a------------0xKhTmLbOuNdArY\x0d\x0a" \
-        b"Content-Disposition: form-data; name=\"text1\"\x0d\x0a" \
-        b"\x0d\x0ahallo welt test123\n" \
-        b"\x0d\x0a------------0xKhTmLbOuNdArY\x0d\x0a" \
-        b"Content-Disposition: form-data; name=\"text2\"\x0d\x0a" \
-        b"\x0d\x0a\x0d\x0a------------0xKhTmLbOuNdArY\x0d\x0a" \
-        b'Content-Disposition: form-data; name="upload"; file' \
-        b"name=\"hello.pl\"\x0d\x0a" \
-        b"Content-Type: application/octet-stream\x0d\x0a\x0d\x0a" \
-        b"#!/usr/bin/perl\n\n" \
-        b"use strict;\n" \
-        b"use warnings;\n\n" \
-        b"print \"Hello World :)\\n\"\n" \
-        b"\x0d\x0a------------0xKhTmLbOuNdA" \
-        b"r\x0d\x0a3\x0d\x0aY--\x0d\x0a" \
-        b"0\x0d\x0a\x0d\x0a" \
-        b"HTTP/1.0 200 OK\x0d\x0a\x0d\x0a"
+    multipart = (
+        b'HTTP/1.1 200 OK\x0d\x0a'
+        b'Transfer-Encoding: chunked\x0d\x0a'
+        b'Content-Type: multipart/form-data; bo'
+        b'undary=----------0xKhTmLbOuNdArY\x0d\x0a\x0d\x0a'
+        b'19f\x0d\x0a------------0xKhTmLbOuNdArY\x0d\x0a'
+        b'Content-Disposition: form-data; name="text1"\x0d\x0a'
+        b'\x0d\x0ahallo welt test123\n'
+        b'\x0d\x0a------------0xKhTmLbOuNdArY\x0d\x0a'
+        b'Content-Disposition: form-data; name="text2"\x0d\x0a'
+        b'\x0d\x0a\x0d\x0a------------0xKhTmLbOuNdArY\x0d\x0a'
+        b'Content-Disposition: form-data; name="upload"; file'
+        b'name="hello.pl"\x0d\x0a'
+        b'Content-Type: application/octet-stream\x0d\x0a\x0d\x0a'
+        b'#!/usr/bin/perl\n\n'
+        b'use strict;\n'
+        b'use warnings;\n\n'
+        b'print "Hello World :)\\n"\n'
+        b'\x0d\x0a------------0xKhTmLbOuNdA'
+        b'r\x0d\x0a3\x0d\x0aY--\x0d\x0a'
+        b'0\x0d\x0a\x0d\x0a'
+        b'HTTP/1.0 200 OK\x0d\x0a\x0d\x0a'
+    )
     res.parse(multipart)
     ok(res.is_finished, 'response is finished')
     is_ok(res.code, 200, 'right status')
     is_ok(res.message, 'OK', 'right message')
     is_ok(res.version, '1.1', 'right version')
-    is_ok(res.headers.content_type, 'multipart/form-data; boundary=----------0xKhTmLbOuNdArY', 'right "Content-Type" value')
+    is_ok(
+        res.headers.content_type,
+        'multipart/form-data; boundary=----------0xKhTmLbOuNdArY',
+        'right "Content-Type" value',
+    )
     is_ok(res.headers.content_length, '418', 'right "Content-Length" value')
     is_ok(res.headers.transfer_encoding, None, 'no "Transfer-Encoding" value')
     is_ok(res.body_size, 418, 'right size')
     isa_ok(res.content.parts[0], Pyjo.Content.Single.object, 'right part')
     isa_ok(res.content.parts[1], Pyjo.Content.Single.object, 'right part')
     isa_ok(res.content.parts[2], Pyjo.Content.Single.object, 'right part')
-    is_ok(res.content.parts[0].asset.slurp(), b"hallo welt test123\n", 'right content')
+    is_ok(res.content.parts[0].asset.slurp(), b'hallo welt test123\n', 'right content')
     is_ok(res.upload('upload').filename, 'hello.pl', 'right filename')
     isa_ok(res.upload('upload').asset, Pyjo.Asset.Memory.object, 'right file')
     is_ok(res.upload('upload').asset.size, 69, 'right size')
     is_ok(res.content.parts[2].headers.content_type, 'application/octet-stream', 'right "Content-Type" value')
-    is_ok(res.content.leftovers, b"HTTP/1.0 200 OK\x0d\x0a\x0d\x0a", 'next response in leftovers')
+    is_ok(res.content.leftovers, b'HTTP/1.0 200 OK\x0d\x0a\x0d\x0a', 'next response in leftovers')
 
     # Parse HTTP 1.1 chunked multipart response (in multiple small chunks)
     res = Pyjo.Message.Response.new()
-    res.parse(b"HTTP/1.1 200 OK\x0d\x0a")
-    res.parse(b"Transfer-Encoding: chunked\x0d\x0a")
+    res.parse(b'HTTP/1.1 200 OK\x0d\x0a')
+    res.parse(b'Transfer-Encoding: chunked\x0d\x0a')
     res.parse(b'Content-Type: multipart/parallel; boundary=AAA; charset=utf-8')
-    res.parse(b"\x0d\x0a\x0d\x0a")
-    res.parse(b"7\x0d\x0a")
-    res.parse(b"--AAA\x0d\x0a")
-    res.parse(b"\x0d\x0a1a\x0d\x0a")
-    res.parse(b"Content-Type: image/jpeg\x0d\x0a")
-    res.parse(b"\x0d\x0a16\x0d\x0a")
-    res.parse(b"Content-ID: 600050\x0d\x0a\x0d\x0a")
-    res.parse(b"\x0d")
-    res.parse(b"\x0a6")
-    res.parse(b"\x0d\x0aabcd\x0d\x0a")
-    res.parse(b"\x0d\x0a7\x0d\x0a")
-    res.parse(b"--AAA\x0d\x0a")
-    res.parse(b"\x0d\x0a1a\x0d\x0a")
-    res.parse(b"Content-Type: image/jpeg\x0d\x0a")
-    res.parse(b"\x0d\x0a16\x0d\x0a")
-    res.parse(b"Content-ID: 600051\x0d\x0a\x0d\x0a")
-    res.parse(b"\x0d\x0a6\x0d\x0a")
-    res.parse(b"efgh\x0d\x0a")
-    res.parse(b"\x0d\x0a7\x0d\x0a")
+    res.parse(b'\x0d\x0a\x0d\x0a')
+    res.parse(b'7\x0d\x0a')
+    res.parse(b'--AAA\x0d\x0a')
+    res.parse(b'\x0d\x0a1a\x0d\x0a')
+    res.parse(b'Content-Type: image/jpeg\x0d\x0a')
+    res.parse(b'\x0d\x0a16\x0d\x0a')
+    res.parse(b'Content-ID: 600050\x0d\x0a\x0d\x0a')
+    res.parse(b'\x0d')
+    res.parse(b'\x0a6')
+    res.parse(b'\x0d\x0aabcd\x0d\x0a')
+    res.parse(b'\x0d\x0a7\x0d\x0a')
+    res.parse(b'--AAA\x0d\x0a')
+    res.parse(b'\x0d\x0a1a\x0d\x0a')
+    res.parse(b'Content-Type: image/jpeg\x0d\x0a')
+    res.parse(b'\x0d\x0a16\x0d\x0a')
+    res.parse(b'Content-ID: 600051\x0d\x0a\x0d\x0a')
+    res.parse(b'\x0d\x0a6\x0d\x0a')
+    res.parse(b'efgh\x0d\x0a')
+    res.parse(b'\x0d\x0a7\x0d\x0a')
     res.parse(b'--AAA--')
     ok(not res.is_finished, 'response is not finished')
-    res.parse(b"\x0d\x0a0\x0d\x0a\x0d\x0a")
+    res.parse(b'\x0d\x0a0\x0d\x0a\x0d\x0a')
     ok(res.is_finished, 'response is finished')
     is_ok(res.code, 200, 'right status')
     is_ok(res.message, 'OK', 'right message')
@@ -567,23 +581,23 @@ if __name__ == '__main__':
 
     # Parse HTTP 1.1 multipart response with missing boundary
     res = Pyjo.Message.Response.new()
-    res.parse(b"HTTP/1.1 200 OK\x0d\x0a")
-    res.parse(b"Content-Length: 420\x0d\x0a")
-    res.parse(b"Content-Type: multipart/form-data; bo\x0d\x0a\x0d\x0a")
-    res.parse(b"\x0d\x0a------------0xKhTmLbOuNdArY\x0d\x0a")
-    res.parse(b"Content-Disposition: form-data; name=\"text1\"\x0d\x0a")
-    res.parse(b"\x0d\x0ahallo welt test123\n")
-    res.parse(b"\x0d\x0a------------0xKhTmLbOuNdArY\x0d\x0a")
-    res.parse(b"Content-Disposition: form-data; name=\"text2\"\x0d\x0a")
-    res.parse(b"\x0d\x0a\x0d\x0a------------0xKhTmLbOuNdArY\x0d\x0a")
+    res.parse(b'HTTP/1.1 200 OK\x0d\x0a')
+    res.parse(b'Content-Length: 420\x0d\x0a')
+    res.parse(b'Content-Type: multipart/form-data; bo\x0d\x0a\x0d\x0a')
+    res.parse(b'\x0d\x0a------------0xKhTmLbOuNdArY\x0d\x0a')
+    res.parse(b'Content-Disposition: form-data; name="text1"\x0d\x0a')
+    res.parse(b'\x0d\x0ahallo welt test123\n')
+    res.parse(b'\x0d\x0a------------0xKhTmLbOuNdArY\x0d\x0a')
+    res.parse(b'Content-Disposition: form-data; name="text2"\x0d\x0a')
+    res.parse(b'\x0d\x0a\x0d\x0a------------0xKhTmLbOuNdArY\x0d\x0a')
     res.parse(b'Content-Disposition: form-data; name="upload"; file')
-    res.parse(b"name=\"hello.pl\"\x0d\x0a\x0d\x0a")
-    res.parse(b"Content-Type: application/octet-stream\x0d\x0a\x0d\x0a")
-    res.parse(b"#!/usr/bin/perl\n\n")
-    res.parse(b"use strict;\n")
-    res.parse(b"use warnings;\n\n")
-    res.parse(b"print \"Hello World :)\\n\"\n")
-    res.parse(b"\x0d\x0a------------0xKhTmLbOuNdArY--")
+    res.parse(b'name="hello.pl"\x0d\x0a\x0d\x0a')
+    res.parse(b'Content-Type: application/octet-stream\x0d\x0a\x0d\x0a')
+    res.parse(b'#!/usr/bin/perl\n\n')
+    res.parse(b'use strict;\n')
+    res.parse(b'use warnings;\n\n')
+    res.parse(b'print "Hello World :)\\n"\n')
+    res.parse(b'\x0d\x0a------------0xKhTmLbOuNdArY--')
     ok(res.is_finished, 'response is finished')
     is_ok(res.code, 200, 'right status')
     is_ok(res.message, 'OK', 'right message')
@@ -598,10 +612,10 @@ if __name__ == '__main__':
     compressed = gzip.compress(uncompressed)
     compressed += gzip.flush()
     res = Pyjo.Message.Response.new()
-    res.parse(b"HTTP/1.1 200 OK\x0d\x0a")
-    res.parse(b"Content-Type: text/plain\x0d\x0a")
-    res.parse(b"Content-Length: " + b(str(len(compressed))) + b"\x0d\x0a")
-    res.parse(b"Content-Encoding: GZip\x0d\x0a\x0d\x0a")
+    res.parse(b'HTTP/1.1 200 OK\x0d\x0a')
+    res.parse(b'Content-Type: text/plain\x0d\x0a')
+    res.parse(b'Content-Length: ' + b(str(len(compressed))) + b'\x0d\x0a')
+    res.parse(b'Content-Encoding: GZip\x0d\x0a\x0d\x0a')
     ok(res.content.is_compressed, 'content is compressed')
     is_ok(res.content.progress, 0, 'right progress')
     res.parse(compressed[:1])
@@ -625,20 +639,20 @@ if __name__ == '__main__':
     compressed = gzip.compress(uncompressed)
     compressed += gzip.flush()
     res = Pyjo.Message.Response.new()
-    res.parse(b"HTTP/1.1 200 OK\x0d\x0a")
-    res.parse(b"Content-Type: text/plain\x0d\x0a")
-    res.parse(b"Content-Encoding: gzip\x0d\x0a")
-    res.parse(b"Transfer-Encoding: chunked\x0d\x0a\x0d\x0a")
+    res.parse(b'HTTP/1.1 200 OK\x0d\x0a')
+    res.parse(b'Content-Type: text/plain\x0d\x0a')
+    res.parse(b'Content-Encoding: gzip\x0d\x0a')
+    res.parse(b'Transfer-Encoding: chunked\x0d\x0a\x0d\x0a')
     ok(res.content.is_chunked, 'content is chunked')
     ok(res.content.is_compressed, 'content is compressed')
-    res.parse(b"1\x0d\x0a")
+    res.parse(b'1\x0d\x0a')
     res.parse(compressed[:1])
-    res.parse(b"\x0d\x0a")
+    res.parse(b'\x0d\x0a')
     res.parse(b(f'{len(compressed) - 1:x}'))
-    res.parse(b"\x0d\x0a")
+    res.parse(b'\x0d\x0a')
     res.parse(compressed[1:])
-    res.parse(b"\x0d\x0a")
-    res.parse(b"0\x0d\x0a\x0d\x0a")
+    res.parse(b'\x0d\x0a')
+    res.parse(b'0\x0d\x0a\x0d\x0a')
     ok(not res.content.is_chunked, 'content is not chunked anymore')
     ok(not res.content.is_compressed, 'content is not compressed anymore')
     ok(res.is_finished, 'response is finished')
@@ -696,7 +710,7 @@ if __name__ == '__main__':
     res.code = 200
     res.headers.connection = 'keep-alive'
     res.headers.date = 'Sun, 17 Aug 2008 16:27:35 GMT'
-    res.body = b"Hello World!\n"
+    res.body = b'Hello World!\n'
     res = Pyjo.Message.Response.new().parse(res.to_bytes())
     ok(res.is_finished, 'response is finished')
     is_ok(res.code, 200, 'right status')
@@ -705,7 +719,7 @@ if __name__ == '__main__':
     is_ok(res.headers.connection, 'keep-alive', 'right "Connection" value')
     is_ok(res.headers.date, 'Sun, 17 Aug 2008 16:27:35 GMT', 'right "Date" value')
     is_ok(res.headers.content_length, '13', 'right "Content-Length" value')
-    is_ok(res.body, b"Hello World!\n", 'right content')
+    is_ok(res.body, b'Hello World!\n', 'right content')
 
     # Build HTTP 1.1 response parts with progress
     res = Pyjo.Message.Response.new()
@@ -722,7 +736,7 @@ if __name__ == '__main__':
     res.code = 200
     res.headers.connection = 'keep-alive'
     res.headers.date = 'Sun, 17 Aug 2008 16:27:35 GMT'
-    res.body = b"Hello World!\n"
+    res.body = b'Hello World!\n'
     ok(not state.get(), 'no state')
     ok(not progressed.get(), 'no progress')
     ok(not finished.get(), 'not finished')
@@ -752,7 +766,7 @@ if __name__ == '__main__':
     res.content.parts.append(Pyjo.Content.Single.new(asset=Pyjo.Asset.File.new()))
     res.content.parts[-1].asset.add_chunk(b'Hallo Welt lalalalalala!')
     content = Pyjo.Content.Single.new()
-    content.asset.add_chunk(b"lala\nfoobar\nperl rocks\n")
+    content.asset.add_chunk(b'lala\nfoobar\nperl rocks\n')
     content.headers.content_type = 'text/plain'
     res.content.parts.append(content)
     res = Pyjo.Message.Response.new().parse(res.to_bytes())
@@ -765,15 +779,15 @@ if __name__ == '__main__':
     is_ok(res.headers.content_type, 'multipart/mixed; boundary=7am1X', 'right "Content-Type" value')
     is_ok(res.content.parts[0].asset.slurp(), b'Hallo Welt lalalalalala!', 'right content')
     is_ok(res.content.parts[1].headers.content_type, 'text/plain', 'right "Content-Type" value')
-    is_ok(res.content.parts[1].asset.slurp(), b"lala\nfoobar\nperl rocks\n", 'right content')
+    is_ok(res.content.parts[1].asset.slurp(), b'lala\nfoobar\nperl rocks\n', 'right content')
 
     # Parse response with cookie
     res = Pyjo.Message.Response.new()
-    res.parse(b"HTTP/1.0 200 OK\x0d\x0a")
-    res.parse(b"Content-Type: text/plain\x0d\x0a")
-    res.parse(b"Content-Length: 27\x0d\x0a")
-    res.parse(b"Set-Cookie: foo=bar; path=/test\x0d\x0a\x0d\x0a")
-    res.parse(b"Hello World!\n1234\nlalalala\n")
+    res.parse(b'HTTP/1.0 200 OK\x0d\x0a')
+    res.parse(b'Content-Type: text/plain\x0d\x0a')
+    res.parse(b'Content-Length: 27\x0d\x0a')
+    res.parse(b'Set-Cookie: foo=bar; path=/test\x0d\x0a\x0d\x0a')
+    res.parse(b'Hello World!\n1234\nlalalala\n')
     ok(res.is_finished, 'response is finished')
     is_ok(res.code, 200, 'right status')
     is_ok(res.message, 'OK', 'right message')
@@ -790,11 +804,11 @@ if __name__ == '__main__':
 
     # Parse WebSocket handshake response
     res = Pyjo.Message.Response.new()
-    res.parse(b"HTTP/1.1 101 Switching Protocols\x0d\x0a")
-    res.parse(b"Upgrade: websocket\x0d\x0a")
-    res.parse(b"Connection: Upgrade\x0d\x0a")
-    res.parse(b"Sec-WebSocket-Accept: abcdef=\x0d\x0a")
-    res.parse(b"Sec-WebSocket-Protocol: sample\x0d\x0a\x0d\x0a")
+    res.parse(b'HTTP/1.1 101 Switching Protocols\x0d\x0a')
+    res.parse(b'Upgrade: websocket\x0d\x0a')
+    res.parse(b'Connection: Upgrade\x0d\x0a')
+    res.parse(b'Sec-WebSocket-Accept: abcdef=\x0d\x0a')
+    res.parse(b'Sec-WebSocket-Protocol: sample\x0d\x0a\x0d\x0a')
     ok(res.is_finished, 'response is finished')
     ok(res.is_empty, 'response is empty')
     ok(res.content.skip_body, 'body has been skipped')
@@ -809,12 +823,12 @@ if __name__ == '__main__':
 
     # Parse WebSocket handshake response (with frame)
     res = Pyjo.Message.Response.new()
-    res.parse(b"HTTP/1.1 101 Switching Protocols\x0d\x0a")
-    res.parse(b"Upgrade: websocket\x0d\x0a")
-    res.parse(b"Connection: Upgrade\x0d\x0a")
-    res.parse(b"Sec-WebSocket-Accept: abcdef=\x0d\x0a")
-    res.parse(b"Sec-WebSocket-Protocol: sample\x0d\x0a")
-    res.parse(b"\x0d\x0a\x81\x08\x77\x68\x61\x74\x65\x76\x65\x72")
+    res.parse(b'HTTP/1.1 101 Switching Protocols\x0d\x0a')
+    res.parse(b'Upgrade: websocket\x0d\x0a')
+    res.parse(b'Connection: Upgrade\x0d\x0a')
+    res.parse(b'Sec-WebSocket-Accept: abcdef=\x0d\x0a')
+    res.parse(b'Sec-WebSocket-Protocol: sample\x0d\x0a')
+    res.parse(b'\x0d\x0a\x81\x08\x77\x68\x61\x74\x65\x76\x65\x72')
     ok(res.is_finished, 'response is finished')
     ok(res.is_empty, 'response is empty')
     ok(res.content.skip_body, 'body has been skipped')
@@ -826,7 +840,7 @@ if __name__ == '__main__':
     is_ok(res.headers.sec_websocket_accept, 'abcdef=', 'right "Sec-WebSocket-Accept" value')
     is_ok(res.headers.sec_websocket_protocol, 'sample', 'right "Sec-WebSocket-Protocol" value')
     is_ok(res.body, b'', 'no content')
-    is_ok(res.content.leftovers, b"\x81\x08\x77\x68\x61\x74\x65\x76\x65\x72", 'frame in leftovers')
+    is_ok(res.content.leftovers, b'\x81\x08\x77\x68\x61\x74\x65\x76\x65\x72', 'frame in leftovers')
 
     # Build WebSocket handshake response
     res = Pyjo.Message.Response.new()
@@ -855,7 +869,7 @@ if __name__ == '__main__':
     res.headers.date = 'Sun, 17 Aug 2008 16:27:35 GMT'
     res.cookies = [
         {'name': 'foo', 'value': 'bar', 'path': '/foobar'},
-        {'name': 'bar', 'value': 'baz', 'path': '/test/23'}
+        {'name': 'bar', 'value': 'baz', 'path': '/test/23'},
     ]
     res.set_cookie({'name': 'baz', 'value': 'yada', 'path': '/foobar'})
     ok(res.to_bytes(), 'message built')
@@ -884,7 +898,7 @@ if __name__ == '__main__':
     res.content.write_chunk(b'hello world!').write_chunk(b'')
     ok(res.content.is_chunked, 'chunked content')
     ok(res.content.is_dynamic, 'dynamic content')
-    is_ok(res.build_body(), b"6\x0d\x0ahello!\x0d\x0ac\x0d\x0ahello world!\x0d\x0a0\x0d\x0a\x0d\x0a", 'right format')
+    is_ok(res.build_body(), b'6\x0d\x0ahello!\x0d\x0ac\x0d\x0ahello world!\x0d\x0a0\x0d\x0a\x0d\x0a', 'right format')
     isa_ok(invocant.get(), Pyjo.Content.Single.object, 'right invocant')
 
     # Build dynamic response body
@@ -895,16 +909,16 @@ if __name__ == '__main__':
     res.content.write(b'hello world!').write(b'')
     ok(not res.content.is_chunked, 'no chunked content')
     ok(res.content.is_dynamic, 'dynamic content')
-    is_ok(res.build_body(), b"hello!hello world!", 'right format')
+    is_ok(res.build_body(), b'hello!hello world!', 'right format')
     isa_ok(invocant.get(), Pyjo.Content.Single.object, 'right invocant')
 
     # Build response with callback (make sure it's called)
     res = Pyjo.Message.Response.new()
     res.code = 200
     res.headers.content_length = '10'
-    res.content.write(b'lala', lambda content, offset: die(Exception("Body callback was called properly")))
+    res.content.write(b'lala', lambda content, offset: die(Exception('Body callback was called properly')))
     res.get_body_chunk(0)
-    throws_ok(lambda: res.get_body_chunk(3), "Body callback was called properly", 'right error')
+    throws_ok(lambda: res.get_body_chunk(3), 'Body callback was called properly', 'right error')
 
     # Build response with callback (consistency calls)
     res = Pyjo.Message.Response.new()
@@ -912,7 +926,7 @@ if __name__ == '__main__':
     res.headers.content_length = str(len(body))
 
     def cb(content, offset):
-        content.write(body[offset:offset + 1], cb)
+        content.write(body[offset : offset + 1], cb)
 
     res.content.write(b'', cb)
     full = b''
@@ -938,7 +952,7 @@ if __name__ == '__main__':
     body = b'I is here'
 
     def cb(content, offset):
-        content.write(body[offset:offset + 1], cb)
+        content.write(body[offset : offset + 1], cb)
 
     res.content.write(b'', cb)
     res.fix_headers()
@@ -999,9 +1013,9 @@ if __name__ == '__main__':
 
     # Parse response and extract JSON data
     res = Pyjo.Message.Response.new()
-    res.parse(b"HTTP/1.1 200 OK\x0a")
-    res.parse(b"Content-Type: application/json\x0a")
-    res.parse(b"Content-Length: 27\x0a\x0a")
+    res.parse(b'HTTP/1.1 200 OK\x0a')
+    res.parse(b'Content-Type: application/json\x0a')
+    res.parse(b'Content-Length: 27\x0a\x0a')
     res.parse(encode_json({'foo': 'bar', 'baz': [1, 2, 3]}))
     ok(res.is_finished, 'response is finished')
     is_ok(res.code, 200, 'right status')
@@ -1016,9 +1030,9 @@ if __name__ == '__main__':
 
     # Parse response and extract HTML
     res = Pyjo.Message.Response.new()
-    res.parse(b"HTTP/1.1 200 OK\x0a")
-    res.parse(b"Content-Type: text/html\x0a")
-    res.parse(b"Content-Length: 51\x0a\x0a")
+    res.parse(b'HTTP/1.1 200 OK\x0a')
+    res.parse(b'Content-Type: text/html\x0a')
+    res.parse(b'Content-Length: 51\x0a\x0a')
     res.parse(b'<p>foo<a href="/">bar</a><a href="/baz">baz</a></p>')
     ok(res.is_finished, 'response is finished')
     is_ok(res.code, 200, 'right status')
@@ -1037,9 +1051,9 @@ if __name__ == '__main__':
 
     # Build DOM from response with charset
     res = Pyjo.Message.Response.new()
-    res.parse(b"HTTP/1.0 200 OK\x0a")
-    res.parse(b"Content-Type: application/atom+xml; charset=UTF-8; type=feed\x0a")
-    res.parse(b"\x0a")
+    res.parse(b'HTTP/1.0 200 OK\x0a')
+    res.parse(b'Content-Type: application/atom+xml; charset=UTF-8; type=feed\x0a')
+    res.parse(b'\x0a')
     res.body = b'<p>foo <a href="/">bar</a><a href="/baz">baz</a></p>'
     ok(not res.is_finished, 'response is not finished')
     is_ok(res.headers.content_type, 'application/atom+xml; charset=UTF-8; type=feed', 'right "Content-Type" value')

@@ -1,5 +1,6 @@
 import Pyjo.IOLoop
 
+
 # Sequentialize multiple events
 delay = Pyjo.IOLoop.delay()
 
@@ -26,4 +27,4 @@ def step3(delay):
 
 delay.wait()
 
-print("END")
+print('END')

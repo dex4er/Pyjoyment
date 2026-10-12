@@ -1,4 +1,3 @@
-
 import Pyjo.Test
 
 
@@ -12,7 +11,6 @@ class UnitTest(Pyjo.Test.UnitTest):
 
 
 if __name__ == '__main__':
-
     from Pyjo.Test import *  # noqa
 
     import Pyjo.Asset.Memory
@@ -55,7 +53,7 @@ if __name__ == '__main__':
     boundary = content.build_boundary()
     ok(boundary, 'boundary has been generated')
     is_ok(boundary, content.boundary, 'same boundary')
-    is_ok(content.headers.content_type, f"multipart/mixed; boundary={boundary}", 'right "Content-Type" header')
+    is_ok(content.headers.content_type, f'multipart/mixed; boundary={boundary}', 'right "Content-Type" header')
 
     # Dynamic content
     content = Pyjo.Content.Single.new()
@@ -73,13 +71,13 @@ if __name__ == '__main__':
     ok(content.is_chunked, 'chunked content')
     content.write_chunk(b'')
     ok(content.is_dynamic, 'dynamic content')
-    is_ok(content.build_body(), b"6\x0d\x0aHello \x0d\x0a6\x0d\x0aWorld!\x0d\x0a0\x0d\x0a\x0d\x0a", 'right content')
+    is_ok(content.build_body(), b'6\x0d\x0aHello \x0d\x0a6\x0d\x0aWorld!\x0d\x0a0\x0d\x0a\x0d\x0a', 'right content')
 
     # Multipart boundary detection
     content = Pyjo.Content.MultiPart.new()
     none_ok(content.boundary, 'no boundary')
     content.headers.content_type = 'multipart/form-data; boundary  =  "azAZ09\'(),.:?-_+/"'
-    is_ok(content.boundary, "azAZ09\'(),.:?-_+/", 'right boundary')
+    is_ok(content.boundary, "azAZ09'(),.:?-_+/", 'right boundary')
     is_ok(content.boundary, content.build_boundary(), 'same boundary')
     content.headers.content_type = 'multipart/form-data'
     none_ok(content.boundary, 'no boundary')
@@ -104,12 +102,18 @@ if __name__ == '__main__':
 
     # Partial content with 128-bit content length
     content = Pyjo.Content.Single.new()
-    content.parse(b"Content-Length: 18446744073709551616\x0d\x0a\x0d\x0aHello World!")
+    content.parse(b'Content-Length: 18446744073709551616\x0d\x0a\x0d\x0aHello World!')
     is_ok(content.asset.size, 12, 'right size')
 
     # Abstract methods
-    throws_ok(lambda: Pyjo.Content.new().body_contains(), 'Method "body_contains" not implemented by subclass', 'right error')
+    throws_ok(
+        lambda: Pyjo.Content.new().body_contains(), 'Method "body_contains" not implemented by subclass', 'right error'
+    )
     throws_ok(lambda: Pyjo.Content.new().body_size(), 'Method "body_size" not implemented by subclass', 'right error')
-    throws_ok(lambda: Pyjo.Content.new().get_body_chunk(), 'Method "get_body_chunk" not implemented by subclass', 'right error')
+    throws_ok(
+        lambda: Pyjo.Content.new().get_body_chunk(),
+        'Method "get_body_chunk" not implemented by subclass',
+        'right error',
+    )
 
     done_testing()

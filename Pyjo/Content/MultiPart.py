@@ -1,4 +1,3 @@
-
 r"""
 Pyjo.Content.MultiPart - HTTP multipart content
 ===============================================
@@ -186,7 +185,7 @@ class Pyjo_Content_MultiPart(Pyjo.Content.object, Pyjo.String.Mixin.object):
         boundary_length = len(boundary) + 6
         length = boundary_length - 2
         if length > offset:
-            return bytearray(b('--' + boundary + "\x0d\x0a", 'ascii')[offset:])
+            return bytearray(b('--' + boundary + '\x0d\x0a', 'ascii')[offset:])
 
         # Prepare content part by part
         parts = self.parts
@@ -210,7 +209,7 @@ class Pyjo_Content_MultiPart(Pyjo.Content.object, Pyjo.String.Mixin.object):
                 boundary_length += 2
 
             if length + boundary_length > offset:
-                return bytearray(b("\x0d\x0a--" + boundary + "\x0d\x0a", 'ascii')[offset - length:])
+                return bytearray(b('\x0d\x0a--' + boundary + '\x0d\x0a', 'ascii')[offset - length :])
 
             length += boundary_length
             i += 1
@@ -229,7 +228,7 @@ class Pyjo_Content_MultiPart(Pyjo.Content.object, Pyjo.String.Mixin.object):
 
     def _parse_multipart_body(self, boundary):
         # Whole part in buffer
-        pos = self._multipart.find(b"\x0d\x0a--" + b(boundary, 'ascii'))
+        pos = self._multipart.find(b'\x0d\x0a--' + b(boundary, 'ascii'))
         if pos < 0:
             length = len(self._multipart) - (len(boundary) + 8)
             if length <= 0:
@@ -251,8 +250,8 @@ class Pyjo_Content_MultiPart(Pyjo.Content.object, Pyjo.String.Mixin.object):
 
     def _parse_multipart_boundary(self, boundary):
         # Boundary begins
-        if self._multipart.find(b("\x0d\x0a--" + boundary + "\x0d\x0a", 'ascii')) == 0:
-            del self._multipart[:len(boundary) + 6]
+        if self._multipart.find(b('\x0d\x0a--' + boundary + '\x0d\x0a', 'ascii')) == 0:
+            del self._multipart[: len(boundary) + 6]
 
             # New part
             part = Pyjo.Content.Single.new(relaxed=True)
@@ -264,9 +263,9 @@ class Pyjo_Content_MultiPart(Pyjo.Content.object, Pyjo.String.Mixin.object):
             return True
 
         # Boundary ends
-        end = b("\x0d\x0a--" + boundary + "--", 'ascii')
+        end = b('\x0d\x0a--' + boundary + '--', 'ascii')
         if self._multipart.find(end) == 0:
-            del self._multipart[:len(end)]
+            del self._multipart[: len(end)]
             self._multi_state = 'finished'
 
         return False

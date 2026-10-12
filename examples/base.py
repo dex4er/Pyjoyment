@@ -1,4 +1,3 @@
-
 import Pyjo.Base
 
 from Pyjo.Util import notnone
@@ -20,5 +19,5 @@ p = Point(x=1, y=2)
 
 line = Line(p1=p)
 
-print(f"[{line.p1.x},{line.p1.y}]")
-print(f"[{line.p2.x},{line.p2.y}]")
+print(f'[{line.p1.x},{line.p1.y}]')
+print(f'[{line.p2.x},{line.p2.y}]')

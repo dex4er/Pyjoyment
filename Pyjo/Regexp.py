@@ -1,4 +1,3 @@
-
 r"""
 Pyjo.Regexp - Compile regexp pattern into object
 ================================================
@@ -21,7 +20,6 @@ flag ``o`` means that cache is not used.
 Functions
 ---------
 """
-
 
 import importlib
 import os

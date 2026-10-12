@@ -1,4 +1,3 @@
-
 import Pyjo.Test
 
 
@@ -12,7 +11,6 @@ class UnitTest(Pyjo.Test.UnitTest):
 
 
 if __name__ == '__main__':
-
     from Pyjo.Test import *  # noqa
 
     import Pyjo.Cookie.Response
@@ -33,18 +31,8 @@ if __name__ == '__main__':
 
     # Session cookie
     jar.add(
-        Pyjo.Cookie.Response.new(
-            domain='example.com',
-            path='/foo',
-            name='foo',
-            value='bar'
-        ),
-        Pyjo.Cookie.Response.new(
-            domain='example.com',
-            path='/',
-            name='just',
-            value='works'
-        )
+        Pyjo.Cookie.Response.new(domain='example.com', path='/foo', name='foo', value='bar'),
+        Pyjo.Cookie.Response.new(domain='example.com', path='/', name='just', value='works'),
     )
     cookies = jar.find(Pyjo.URL.new('http://example.com/foo'))
     is_ok(cookies[0].name, 'foo', 'right name')
@@ -83,18 +71,8 @@ if __name__ == '__main__':
     # "localhost"
     jar = Pyjo.UserAgent.CookieJar.new()
     jar.add(
-        Pyjo.Cookie.Response.new(
-            domain='localhost',
-            path='/foo',
-            name='foo',
-            value='bar'
-        ),
-        Pyjo.Cookie.Response.new(
-            domain='foo.localhost',
-            path='/foo',
-            name='bar',
-            value='baz'
-        )
+        Pyjo.Cookie.Response.new(domain='localhost', path='/foo', name='foo', value='bar'),
+        Pyjo.Cookie.Response.new(domain='foo.localhost', path='/foo', name='bar', value='baz'),
     )
     cookies = jar.find(Pyjo.URL.new('http://localhost/foo'))
     is_ok(cookies[0].name, 'foo', 'right name')
@@ -120,18 +98,8 @@ if __name__ == '__main__':
     # Random top-level domain and IDNA
     jar = Pyjo.UserAgent.CookieJar.new()
     jar.add(
-        Pyjo.Cookie.Response.new(
-            domain='com',
-            path='/foo',
-            name='foo',
-            value='bar'
-        ),
-        Pyjo.Cookie.Response.new(
-            domain='xn--bcher-kva.com',
-            path='/foo',
-            name='bar',
-            value='baz'
-        )
+        Pyjo.Cookie.Response.new(domain='com', path='/foo', name='foo', value='bar'),
+        Pyjo.Cookie.Response.new(domain='xn--bcher-kva.com', path='/foo', name='bar', value='baz'),
     )
     cookies = jar.find(Pyjo.URL.new('http://bücher.com/foo'))
     is_ok(cookies[0].name, 'bar', 'right name')
@@ -155,24 +123,9 @@ if __name__ == '__main__':
     # Huge cookie
     jar = Pyjo.UserAgent.CookieJar.new(max_cookie_size=1024)
     jar.add(
-        Pyjo.Cookie.Response.new(
-            domain='example.com',
-            path='/foo',
-            name='small',
-            value='x'
-        ),
-        Pyjo.Cookie.Response.new(
-            domain='example.com',
-            path='/foo',
-            name='big',
-            value='x' * 1024
-        ),
-        Pyjo.Cookie.Response.new(
-            domain='example.com',
-            path='/foo',
-            name='huge',
-            value='x' * 1025
-        )
+        Pyjo.Cookie.Response.new(domain='example.com', path='/foo', name='small', value='x'),
+        Pyjo.Cookie.Response.new(domain='example.com', path='/foo', name='big', value='x' * 1024),
+        Pyjo.Cookie.Response.new(domain='example.com', path='/foo', name='huge', value='x' * 1025),
     )
     cookies = jar.find(Pyjo.URL.new('http://example.com/foo'))
     is_ok(cookies[0].name, 'small', 'right name')
@@ -184,26 +137,10 @@ if __name__ == '__main__':
     # Expired cookies
     jar = Pyjo.UserAgent.CookieJar.new()
     jar.add(
-        Pyjo.Cookie.Response.new(
-            domain='example.com',
-            path='/foo',
-            name='foo',
-            value='bar'
-        ),
-        Pyjo.Cookie.Response.new(
-            domain='labs.example.com',
-            path='/',
-            name='baz',
-            value='24',
-            max_age=-1
-        )
+        Pyjo.Cookie.Response.new(domain='example.com', path='/foo', name='foo', value='bar'),
+        Pyjo.Cookie.Response.new(domain='labs.example.com', path='/', name='baz', value='24', max_age=-1),
     )
-    expired = Pyjo.Cookie.Response.new(
-        domain='labs.example.com',
-        path='/',
-        name='baz',
-        value='23'
-    )
+    expired = Pyjo.Cookie.Response.new(domain='labs.example.com', path='/', name='baz', value='23')
     jar.add(expired.set(expires=time.time() - 1))
     cookies = jar.find(Pyjo.URL.new('http://labs.example.com/foo'))
     is_ok(cookies[0].name, 'foo', 'right name')
@@ -213,18 +150,8 @@ if __name__ == '__main__':
     # Replace cookie
     jar = Pyjo.UserAgent.CookieJar.new()
     jar.add(
-        Pyjo.Cookie.Response.new(
-            domain='example.com',
-            path='/foo',
-            name='foo',
-            value='bar1'
-        ),
-        Pyjo.Cookie.Response.new(
-            domain='example.com',
-            path='/foo',
-            name='foo',
-            value='bar2'
-        )
+        Pyjo.Cookie.Response.new(domain='example.com', path='/foo', name='foo', value='bar1'),
+        Pyjo.Cookie.Response.new(domain='example.com', path='/foo', name='foo', value='bar2'),
     )
     cookies = jar.find(Pyjo.URL.new('http://example.com/foo'))
     is_ok(cookies[0].name, 'foo', 'right name')
@@ -233,28 +160,13 @@ if __name__ == '__main__':
 
     # Switch between secure and normal cookies
     jar = Pyjo.UserAgent.CookieJar.new()
-    jar.add(
-        Pyjo.Cookie.Response.new(
-            domain='example.com',
-            path='/foo',
-            name='foo',
-            value='foo',
-            secure=1
-        )
-    )
+    jar.add(Pyjo.Cookie.Response.new(domain='example.com', path='/foo', name='foo', value='foo', secure=1))
     cookies = jar.find(Pyjo.URL.new('https://example.com/foo'))
     is_ok(cookies[0].name, 'foo', 'right name')
     is_ok(cookies[0].value, 'foo', 'right value')
     cookies = jar.find(Pyjo.URL.new('http://example.com/foo'))
     is_ok(len(cookies), 0, 'no insecure cookie')
-    jar.add(
-        Pyjo.Cookie.Response.new(
-            domain='example.com',
-            path='/foo',
-            name='foo',
-            value='bar'
-        )
-    )
+    jar.add(Pyjo.Cookie.Response.new(domain='example.com', path='/foo', name='foo', value='bar'))
     cookies = jar.find(Pyjo.URL.new('http://example.com/foo'))
     is_ok(cookies[0].name, 'foo', 'right name')
     is_ok(cookies[0].value, 'bar', 'right value')
@@ -266,18 +178,8 @@ if __name__ == '__main__':
     # Ignore leading dot
     jar = Pyjo.UserAgent.CookieJar.new()
     jar.add(
-        Pyjo.Cookie.Response.new(
-            domain='.example.com',
-            path='/foo',
-            name='foo',
-            value='bar'
-        ),
-        Pyjo.Cookie.Response.new(
-            domain='example.com',
-            path='/foo',
-            name='bar',
-            value='baz'
-        )
+        Pyjo.Cookie.Response.new(domain='.example.com', path='/foo', name='foo', value='bar'),
+        Pyjo.Cookie.Response.new(domain='example.com', path='/foo', name='bar', value='baz'),
     )
     cookies = jar.find(Pyjo.URL.new('http://www.labs.example.com/foo'))
     is_ok(cookies[0].name, 'foo', 'right name')
@@ -302,14 +204,7 @@ if __name__ == '__main__':
 
     # "(" in path
     jar = Pyjo.UserAgent.CookieJar.new()
-    jar.add(
-        Pyjo.Cookie.Response.new(
-            domain='example.com',
-            path='/foo(bar',
-            name='foo',
-            value='bar'
-        )
-    )
+    jar.add(Pyjo.Cookie.Response.new(domain='example.com', path='/foo(bar', name='foo', value='bar'))
     cookies = jar.find(Pyjo.URL.new('http://example.com/foo(bar'))
     is_ok(cookies[0].name, 'foo', 'right name')
     is_ok(cookies[0].value, 'bar', 'right value')
@@ -350,11 +245,7 @@ if __name__ == '__main__':
     tx.req.url.parse('http://example.com/test')
     tx.res.cookies = [
         Pyjo.Cookie.Response.new(name='foo', value='without'),
-        Pyjo.Cookie.Response.new(
-            name='foo',
-            value='with',
-            domain='example.com'
-        )
+        Pyjo.Cookie.Response.new(name='foo', value='with', domain='example.com'),
     ]
     jar.collect(tx)
     tx = Pyjo.Transaction.HTTP.new()
@@ -379,16 +270,8 @@ if __name__ == '__main__':
     tx = Pyjo.Transaction.HTTP.new()
     tx.req.url.parse('http://localhost:3000')
     tx.res.cookies = [
-        Pyjo.Cookie.Response.new(
-            name='foo',
-            value='local',
-            domain='localhost'
-        ),
-        Pyjo.Cookie.Response.new(
-            name='bar',
-            value='local',
-            domain='bar.localhost'
-        )
+        Pyjo.Cookie.Response.new(name='foo', value='local', domain='localhost'),
+        Pyjo.Cookie.Response.new(name='bar', value='local', domain='bar.localhost'),
     ]
     jar.collect(tx)
     tx = Pyjo.Transaction.HTTP.new()
@@ -403,24 +286,9 @@ if __name__ == '__main__':
     tx = Pyjo.Transaction.HTTP.new()
     tx.req.url.parse('http://LABS.bücher.Com/perldoc/Mojolicious')
     tx.res.cookies = [
-        Pyjo.Cookie.Response.new(
-            name='foo',
-            value='with',
-            domain='labs.xn--bcher-kva.com',
-            path='/perldoc'
-        ),
-        Pyjo.Cookie.Response.new(
-            name='bar',
-            value='with',
-            domain='xn--bcher-kva.com',
-            path='/'
-        ),
-        Pyjo.Cookie.Response.new(
-            name='0',
-            value='with',
-            domain='.xn--bcher-kva.cOm',
-            path='/%70erldoc/Mojolicious/'
-        ),
+        Pyjo.Cookie.Response.new(name='foo', value='with', domain='labs.xn--bcher-kva.com', path='/perldoc'),
+        Pyjo.Cookie.Response.new(name='bar', value='with', domain='xn--bcher-kva.com', path='/'),
+        Pyjo.Cookie.Response.new(name='0', value='with', domain='.xn--bcher-kva.cOm', path='/%70erldoc/Mojolicious/'),
     ]
     jar.collect(tx)
     tx = Pyjo.Transaction.HTTP.new()
@@ -452,12 +320,8 @@ if __name__ == '__main__':
     tx = Pyjo.Transaction.HTTP.new()
     tx.req.url.parse('http://213.133.102.53/perldoc/Mojolicious')
     tx.res.cookies = [
-        Pyjo.Cookie.Response.new(
-            name='foo',
-            value='valid',
-            domain='213.133.102.53'
-        ),
-        Pyjo.Cookie.Response.new(name='bar', value='too')
+        Pyjo.Cookie.Response.new(name='foo', value='valid', domain='213.133.102.53'),
+        Pyjo.Cookie.Response.new(name='bar', value='too'),
     ]
     jar.collect(tx)
     tx = Pyjo.Transaction.HTTP.new()
@@ -473,16 +337,8 @@ if __name__ == '__main__':
     tx = Pyjo.Transaction.HTTP.new()
     tx.req.url.parse('http://labs.example.com/perldoc/Mojolicious')
     tx.res.cookies = [
-        Pyjo.Cookie.Response.new(
-            name='foo',
-            value='invalid',
-            domain='a.s.example.com'
-        ),
-        Pyjo.Cookie.Response.new(
-            name='foo',
-            value='invalid',
-            domain='mojolicio.us'
-        )
+        Pyjo.Cookie.Response.new(name='foo', value='invalid', domain='a.s.example.com'),
+        Pyjo.Cookie.Response.new(name='foo', value='invalid', domain='mojolicio.us'),
     ]
     jar.collect(tx)
     is_deeply_ok(jar.all, [], 'no cookies')
@@ -492,26 +348,10 @@ if __name__ == '__main__':
     tx = Pyjo.Transaction.HTTP.new()
     tx.req.url.parse('http://213.133.102.53/perldoc/Mojolicious')
     tx.res.cookies = [
-        Pyjo.Cookie.Response.new(
-            name='foo',
-            value='valid',
-            domain='213.133.102.53.'
-        ),
-        Pyjo.Cookie.Response.new(
-            name='foo',
-            value='valid',
-            domain='.133.102.53'
-        ),
-        Pyjo.Cookie.Response.new(
-            name='foo',
-            value='invalid',
-            domain='102.53'
-        ),
-        Pyjo.Cookie.Response.new(
-            name='foo',
-            value='invalid',
-            domain='53'
-        )
+        Pyjo.Cookie.Response.new(name='foo', value='valid', domain='213.133.102.53.'),
+        Pyjo.Cookie.Response.new(name='foo', value='valid', domain='.133.102.53'),
+        Pyjo.Cookie.Response.new(name='foo', value='invalid', domain='102.53'),
+        Pyjo.Cookie.Response.new(name='foo', value='invalid', domain='53'),
     ]
     jar.collect(tx)
     is_deeply_ok(jar.all, [], 'no cookies')
@@ -521,21 +361,9 @@ if __name__ == '__main__':
     tx = Pyjo.Transaction.HTTP.new()
     tx.req.url.parse('http://labs.example.com/perldoc/Mojolicious')
     tx.res.cookies = [
-        Pyjo.Cookie.Response.new(
-            name='foo',
-            value='invalid',
-            path='/perldoc/index.html'
-        ),
-        Pyjo.Cookie.Response.new(
-            name='foo',
-            value='invalid',
-            path='/perldocMojolicious'
-        ),
-        Pyjo.Cookie.Response.new(
-            name='foo',
-            value='invalid',
-            path='/perldoc.Mojolicious'
-        )
+        Pyjo.Cookie.Response.new(name='foo', value='invalid', path='/perldoc/index.html'),
+        Pyjo.Cookie.Response.new(name='foo', value='invalid', path='/perldocMojolicious'),
+        Pyjo.Cookie.Response.new(name='foo', value='invalid', path='/perldoc.Mojolicious'),
     ]
     jar.collect(tx)
     is_deeply_ok(jar.all, [], 'no cookies')

@@ -6,7 +6,7 @@ loop = Pyjo.IOLoop.singleton
 
 @loop.recurring(0)
 def writer(loop):
-    print("A")
+    print('A')
 
 
 @loop.timer(1)

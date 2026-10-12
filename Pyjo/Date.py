@@ -1,4 +1,3 @@
-
 """
 Pyjo.Date - HTTP date
 =====================
@@ -26,11 +25,11 @@ Classes
 import Pyjo.Base
 import Pyjo.String.Mixin
 
-import calendar
-import time
-
 from Pyjo.Regexp import r
 from Pyjo.Util import notnone
+
+import calendar
+import time
 
 
 DAYS = ('Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun')
@@ -42,10 +41,13 @@ for _ in range(len(MONTHS)):
 
 re_epoch = r(r'^\d+$|^\d+\.\d+$')
 re_rfc_822_850 = r(r'^\w+\W+(\d+)\W+(\w+)\W+(\d+)\W+(\d+):(\d+):(\d+)\W*\w+$')
-re_rfc3339 = r(r'''
+re_rfc3339 = r(
+    r"""
   ^(\d+)-(\d+)-(\d+)\D+(\d+):(\d+):(\d+(?:\.\d+)?)   # Date and time
   (?:Z|([+-])(\d+):(\d+))?$                          # Offset
-''', 'xi')
+""",
+    'xi',
+)
 re_asctime = r(r'^\w+\s+(\w+)\s+(\d+)\s+(\d+):(\d+):(\d+)\s+(\d+)$')
 
 
@@ -128,13 +130,27 @@ class Pyjo_Date(Pyjo.Base.object, Pyjo.String.Mixin.object):
         while True:
             m = re_rfc_822_850.search(date)
             if m:
-                day, month, year, hh, mm, ss = int(m.group(1)), MONTHNAMES.get(m.group(2)), int(m.group(3)), int(m.group(4)), int(m.group(5)), float(m.group(6))
+                day, month, year, hh, mm, ss = (
+                    int(m.group(1)),
+                    MONTHNAMES.get(m.group(2)),
+                    int(m.group(3)),
+                    int(m.group(4)),
+                    int(m.group(5)),
+                    float(m.group(6)),
+                )
                 break
 
             # RFC 3339 (1994-11-06T08:49:37Z)
             m = re_rfc3339.search(date)
             if m:
-                year, month, day, hh, mm, ss = int(m.group(1)), int(m.group(2)), int(m.group(3)), int(m.group(4)), int(m.group(5)), float(m.group(6))
+                year, month, day, hh, mm, ss = (
+                    int(m.group(1)),
+                    int(m.group(2)),
+                    int(m.group(3)),
+                    int(m.group(4)),
+                    int(m.group(5)),
+                    float(m.group(6)),
+                )
                 if m.group(7):
                     offset = ((int(m.group(8)) * 3600) + (int(m.group(9)) * 60)) * (-1 if m.group(7) == '+' else 1)
                 break
@@ -142,15 +158,33 @@ class Pyjo_Date(Pyjo.Base.object, Pyjo.String.Mixin.object):
             # ANSI C asctime() (Sun Nov  6 08:49:37 1994)
             m = re_asctime.search(date)
             if m:
-                month, day, hh, mm, ss, year = MONTHNAMES.get(m.group(1)), int(m.group(2)), int(m.group(3)), int(m.group(4)), float(m.group(5)), int(m.group(6))
+                month, day, hh, mm, ss, year = (
+                    MONTHNAMES.get(m.group(1)),
+                    int(m.group(2)),
+                    int(m.group(3)),
+                    int(m.group(4)),
+                    float(m.group(5)),
+                    int(m.group(6)),
+                )
                 break
 
             self.epoch = None
             return self
 
         try:
-            if year < 0 or month < 0 or month > 12 or day < 0 or day > 31 \
-                    or hh < 0 or hh > 24 or mm < 0 or mm > 60 or ss < 0 or ss > 60:
+            if (
+                year < 0
+                or month < 0
+                or month > 12
+                or day < 0
+                or day > 31
+                or hh < 0
+                or hh > 24
+                or mm < 0
+                or mm > 60
+                or ss < 0
+                or ss > 60
+            ):
                 self.epoch = None
                 return self
 
@@ -161,7 +195,9 @@ class Pyjo_Date(Pyjo.Base.object, Pyjo.String.Mixin.object):
                     year += 1900
 
             # Prevent crash
-            epoch = calendar.timegm((year, month, day, hh, mm, ss, 0, 0, -1),)
+            epoch = calendar.timegm(
+                (year, month, day, hh, mm, ss, 0, 0, -1),
+            )
         except:
             epoch = None
 
@@ -193,7 +229,7 @@ class Pyjo_Date(Pyjo.Base.object, Pyjo.String.Mixin.object):
         if isinstance(epoch, float):
             epoch = str(epoch)
             if not epoch.endswith('.0'):
-                string += epoch[epoch.index('.'):]
+                string += epoch[epoch.index('.') :]
         string += 'Z'
         return string
 

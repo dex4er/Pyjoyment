@@ -1,4 +1,3 @@
-
 r"""
 Pyjo.Message.Response - HTTP Response
 =====================================
@@ -43,15 +42,15 @@ from Pyjo.Regexp import r
 from Pyjo.Util import b, convert, notnone
 
 
-re_line = r(br'^(.*?)\x0d?\x0a')
-re_http = r(br'^\s*HTTP/(\d\.\d)\s+(\d\d\d)\s*(.+)?$')
+re_line = r(rb'^(.*?)\x0d?\x0a')
+re_http = r(rb'^\s*HTTP/(\d\.\d)\s+(\d\d\d)\s*(.+)?$')
 
 
 # Umarked codes are from RFC 7231
 MESSAGES = {
     100: 'Continue',
     101: 'Switching Protocols',
-    102: 'Processing',                         # RFC 2518 (WebDAV)
+    102: 'Processing',  # RFC 2518 (WebDAV)
     200: 'OK',
     201: 'Created',
     202: 'Accepted',
@@ -59,9 +58,9 @@ MESSAGES = {
     204: 'No Content',
     205: 'Reset Content',
     206: 'Partial Content',
-    207: 'Multi-Status',                       # RFC 2518 (WebDAV)
-    208: 'Already Reported',                   # RFC 5842
-    226: 'IM Used',                            # RFC 3229
+    207: 'Multi-Status',  # RFC 2518 (WebDAV)
+    208: 'Already Reported',  # RFC 5842
+    226: 'IM Used',  # RFC 3229
     300: 'Multiple Choices',
     301: 'Moved Permanently',
     302: 'Found',
@@ -69,7 +68,7 @@ MESSAGES = {
     304: 'Not Modified',
     305: 'Use Proxy',
     307: 'Temporary Redirect',
-    308: 'Permanent Redirect',                 # RFC 7238
+    308: 'Permanent Redirect',  # RFC 7238
     400: 'Bad Request',
     401: 'Unauthorized',
     402: 'Payment Required',
@@ -88,27 +87,27 @@ MESSAGES = {
     415: 'Unsupported Media Type',
     416: 'Request Range Not Satisfiable',
     417: 'Expectation Failed',
-    418: "I'm a teapot",                       # RFC 2324 :)
-    422: 'Unprocessable Entity',               # RFC 2518 (WebDAV)
-    423: 'Locked',                             # RFC 2518 (WebDAV)
-    424: 'Failed Dependency',                  # RFC 2518 (WebDAV)
-    425: 'Unordered Colection',                # RFC 3648 (WebDAV)
-    426: 'Upgrade Required',                   # RFC 2817
-    428: 'Precondition Required',              # RFC 6585
-    429: 'Too Many Requests',                  # RFC 6585
-    431: 'Request Header Fields Too Large',    # RFC 6585
+    418: "I'm a teapot",  # RFC 2324 :)
+    422: 'Unprocessable Entity',  # RFC 2518 (WebDAV)
+    423: 'Locked',  # RFC 2518 (WebDAV)
+    424: 'Failed Dependency',  # RFC 2518 (WebDAV)
+    425: 'Unordered Colection',  # RFC 3648 (WebDAV)
+    426: 'Upgrade Required',  # RFC 2817
+    428: 'Precondition Required',  # RFC 6585
+    429: 'Too Many Requests',  # RFC 6585
+    431: 'Request Header Fields Too Large',  # RFC 6585
     500: 'Internal Server Error',
     501: 'Not Implemented',
     502: 'Bad Gateway',
     503: 'Service Unavailable',
     504: 'Gateway Timeout',
     505: 'HTTP Version Not Supported',
-    506: 'Variant Also Negotiates',            # RFC 2295
-    507: 'Insufficient Storage',               # RFC 2518 (WebDAV)
-    508: 'Loop Detected',                      # RFC 5842
-    509: 'Bandwidth Limit Exceeded',           # Unofficial
-    510: 'Not Extended',                       # RFC 2774
-    511: 'Network Authentication Required'     # RFC 6585
+    506: 'Variant Also Negotiates',  # RFC 2295
+    507: 'Insufficient Storage',  # RFC 2518 (WebDAV)
+    508: 'Loop Detected',  # RFC 5842
+    509: 'Bandwidth Limit Exceeded',  # Unofficial
+    510: 'Not Extended',  # RFC 2774
+    511: 'Network Authentication Required',  # RFC 6585
 }
 
 
@@ -148,7 +147,7 @@ class Pyjo_Message_Response(Pyjo.Message.object):
 
         String representation of an object shown in console.
         """
-        return f"<{self.__class__.__module__}.{self.__class__.__name__} code={repr(self.code)} message={repr(self.message)}>"
+        return f'<{self.__class__.__module__}.{self.__class__.__name__} code={repr(self.code)} message={repr(self.message)}>'
 
     @property
     def cookies(self):
@@ -200,7 +199,7 @@ class Pyjo_Message_Response(Pyjo.Message.object):
         m = re_line.search(buf)
         if m:
             line = m.group(1)
-            del buf[:m.end()]
+            del buf[: m.end()]
         else:
             return
 
@@ -262,10 +261,10 @@ class Pyjo_Message_Response(Pyjo.Message.object):
         if self._start_buffer is None:
             code = self.code or 404
             msg = self.message or self.default_message()
-            self._start_buffer = bytearray(b(f"HTTP/{self.version} {code} {msg}\x0d\x0a"))
+            self._start_buffer = bytearray(b(f'HTTP/{self.version} {code} {msg}\x0d\x0a'))
 
         self.emit('progress', 'start_line', offset)
-        return self._start_buffer[offset:offset + 131072]
+        return self._start_buffer[offset : offset + 131072]
 
     @property
     def is_empty(self):

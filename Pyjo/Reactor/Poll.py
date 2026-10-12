@@ -106,7 +106,9 @@ class Pyjo_Reactor_Poll(Pyjo.Reactor.Select.object):
                     events = poll.poll(timeout)
                     for fd, flag in events:
                         if fd in self._ios:
-                            if flag & (select.POLLIN | select.POLLPRI | select.POLLNVAL | select.POLLHUP | select.POLLERR):
+                            if flag & (
+                                select.POLLIN | select.POLLPRI | select.POLLNVAL | select.POLLHUP | select.POLLERR
+                            ):
                                 io = self._ios[fd]
                                 last = True
                                 self._sandbox(io['cb'], 'Read', False)
@@ -143,8 +145,8 @@ class Pyjo_Reactor_Poll(Pyjo.Reactor.Select.object):
                 last = True
                 if t['cb']:
                     if DEBUG:
-                        warn(f"-- Alarm timer[{tid}] = {t}")
-                    self._sandbox(t['cb'], f"Timer {tid}")
+                        warn(f'-- Alarm timer[{tid}] = {t}')
+                    self._sandbox(t['cb'], f'Timer {tid}')
 
         # Restore state if necessary
         if self._running:
@@ -160,15 +162,15 @@ class Pyjo_Reactor_Poll(Pyjo.Reactor.Select.object):
         """
         if remove is None:
             if DEBUG:
-                warn("-- Reactor remove None")
+                warn('-- Reactor remove None')
             return
 
         if isinstance(remove, str):
             if DEBUG:
                 if remove in self._timers:
-                    warn(f"-- Reactor remove timer[{remove}] = {self._timers[remove]}")
+                    warn(f'-- Reactor remove timer[{remove}] = {self._timers[remove]}')
                 else:
-                    warn(f"-- Reactor remove timer[{remove}] = None")
+                    warn(f'-- Reactor remove timer[{remove}] = None')
             if remove in self._timers:
                 del self._timers[remove]
                 return True
@@ -180,7 +182,7 @@ class Pyjo_Reactor_Poll(Pyjo.Reactor.Select.object):
                 fd = remove.fileno()
                 if DEBUG:
                     if fd in self._ios:
-                        warn(f"-- Reactor remove io[{fd}]")
+                        warn(f'-- Reactor remove io[{fd}]')
                 poll = self._poll()
                 if poll:
                     poll.unregister(remove)
@@ -190,10 +192,10 @@ class Pyjo_Reactor_Poll(Pyjo.Reactor.Select.object):
                 # remove.close()  # TODO remove?
             except KeyError:
                 if DEBUG:
-                    warn(f"-- Reactor remove io {remove} already closed")
+                    warn(f'-- Reactor remove io {remove} already closed')
             except OSError:
                 if DEBUG:
-                    warn(f"-- Reactor remove io {remove} already closed")
+                    warn(f'-- Reactor remove io {remove} already closed')
                 pass
 
         return False

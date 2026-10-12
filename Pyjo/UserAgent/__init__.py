@@ -1,4 +1,3 @@
-
 """
 Pyjo.UserAgent - Non-blocking I/O HTTP and WebSocket user agent
 ===============================================================
@@ -54,7 +53,9 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
         self.cert = notnone(kwargs.get('cert'), lambda: getenv('PYJO_CERT_FILE'))
         self.connect_timeout = notnone(kwargs.get('connect_timeout'), lambda: getenv('PYJO_CONNECT_TIMEOUT', 10))
         self.cookie_jar = notnone(kwargs.get('cookie_jar'), lambda: Pyjo.UserAgent.CookieJar.new())
-        self.inactivity_timeout = notnone(kwargs.get('inactivity_timeout'), lambda: getenv('PYJO_INACTIVITY_TIMEOUT', 30))
+        self.inactivity_timeout = notnone(
+            kwargs.get('inactivity_timeout'), lambda: getenv('PYJO_INACTIVITY_TIMEOUT', 30)
+        )
         self.ioloop = notnone(kwargs.get('ioloop'), lambda: Pyjo.IOLoop.new())
         self.key = notnone(kwargs.get('key'), lambda: getenv('PYJO_KEY_FILE'))
         self.local_address = kwargs.get('local_address')
@@ -127,13 +128,13 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
         # Non-blocking
         if cb:
             if DEBUG:
-                warn(f"-- Non-blocking request ({self._url(tx)})\n")
+                warn(f'-- Non-blocking request ({self._url(tx)})\n')
             return self._start(True, tx, cb)
 
         # Blocking
         else:
             if DEBUG:
-                warn(f"-- Blocking request ({self._url(tx)})\n")
+                warn(f'-- Blocking request ({self._url(tx)})\n')
 
             class context:
                 pass
@@ -241,10 +242,10 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
     def _connection(self, nb, tx, cb):
         # Reuse connection
         proto, host, port = self.transactor.endpoint(tx)
-        cid = tx.connection or self._dequeue(nb, f"{proto}:{host}:{port}", True)
+        cid = tx.connection or self._dequeue(nb, f'{proto}:{host}:{port}', True)
         if cid:
             if DEBUG:
-                warn(f"-- Reusing connection {cid} ({proto}://{host}:{port})\n")
+                warn(f'-- Reusing connection {cid} ({proto}://{host}:{port})\n')
             self._connections[cid] = {'cb': cb, 'nb': nb, 'tx': tx}
             if not tx.connection:
                 tx.kept_alive
@@ -258,7 +259,7 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
 
         # Connect
         if DEBUG:
-            warn(f"-- Connect ({proto}://{host}:{port})\n")
+            warn(f'-- Connect ({proto}://{host}:{port})\n')
         cid = self._connect(nb, True, tx, cid, self._connected)
         self._connections[cid] = {'cb': cb, 'nb': nb, 'tx': tx, 'writing': False}
 
@@ -369,7 +370,7 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
 
         # Process incoming data
         if DEBUG:
-            warn(f"-- Client <<< Server ({self._url(tx)})\n{str(chunk)}\n")
+            warn(f'-- Client <<< Server ({self._url(tx)})\n{str(chunk)}\n')
 
         tx.client_read(chunk)
         if tx.is_finished:
@@ -420,6 +421,7 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
         cid = self.emit('start', tx)._connection(nb, tx, cb)
         timeout = self.request_timeout
         if timeout:
+
             def timeout_cb(loop):
                 self._error(cid, 'Request timeout')
 
@@ -455,7 +457,7 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
         chunk = tx.client_write()
         c['writing'] = False
         if DEBUG:
-            warn(f"-- Client >>> Server ({self._url(tx)})\n{str(chunk)}\n")
+            warn(f'-- Client >>> Server ({self._url(tx)})\n{str(chunk)}\n')
 
         stream = self._loop(c['nb']).stream(cid).write(chunk)
         if tx.is_finished:

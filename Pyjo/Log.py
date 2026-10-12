@@ -1,4 +1,3 @@
-
 r"""
 Pyjo.Log - Simple logger
 ========================
@@ -49,12 +48,12 @@ Classes
 
 import Pyjo.EventEmitter
 
+from Pyjo.Util import getenv, notnone, u
+
 import codecs
 import os
 import sys
 import time
-
-from Pyjo.Util import getenv, notnone, u
 
 
 if os.name == 'posix':
@@ -69,6 +68,7 @@ class LockException(Exception):
 
 
 if os.name == 'posix':
+
     def lock(file):
         try:
             fcntl.flock(file.fileno(), fcntl.LOCK_EX)
@@ -83,6 +83,7 @@ if os.name == 'posix':
         fcntl.flock(file.fileno(), fcntl.LOCK_UN)
 
 else:
+
     def lock(file):
         pass
 
@@ -317,7 +318,7 @@ class Pyjo_Log(Pyjo.EventEmitter.object):
             return sys.stderr
 
     def _format(self, t, level, *lines):
-        return f"[{time.asctime(time.localtime(t))}] [{level}] {'\n'.join(map(u, lines))}\n"
+        return f'[{time.asctime(time.localtime(t))}] [{level}] {"\n".join(map(u, lines))}\n'
 
     def _log(self, level, lines):
         self.emit('message', level, lines)

@@ -13,10 +13,11 @@ def websocket(c):
         title = c.ua.get(msg).res.dom().at('title').text
         c.send(title)
 
+
 app.start()
 
 
-DATA = '''
+DATA = """
 @@ index.html.ep
 % url = url_for('title')
 <script>
@@ -24,4 +25,4 @@ DATA = '''
   ws.onmessage = function (event) { document.body.innerHTML += event.data };
   ws.onopen    = function (event) { ws.send('http://pyjoyment.net') };
 </script>
-'''
+"""

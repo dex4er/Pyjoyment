@@ -1,4 +1,3 @@
-
 import Pyjo.Test
 
 
@@ -12,7 +11,6 @@ class UnitTest(Pyjo.Test.UnitTest):
 
 
 if __name__ == '__main__':
-
     from Pyjo.Test import *  # noqa
 
     import platform
@@ -40,72 +38,72 @@ if __name__ == '__main__':
     isa_ok(empty, C, 'empty')
 
     # to_str
-    isa_ok(string.to_str(), str, "string.to_str()")
+    isa_ok(string.to_str(), str, 'string.to_str()')
     is_ok(string.to_str(), 'string', "string.to_str() == 'string'")
 
     is_ok(string2.to_str(), 'string', "string2.to_str() == 'string'")
     is_ok(other.to_str(), 'other', "other.to_str() == 'other'")
 
     # __bool__
-    ok(bool(string) is True, "bool(string) is True")
-    ok(bool(zero) is True, "bool(zero) is True")
-    ok(bool(empty) is False, "bool(empty) is False")
+    ok(bool(string) is True, 'bool(string) is True')
+    ok(bool(zero) is True, 'bool(zero) is True')
+    ok(bool(empty) is False, 'bool(empty) is False')
 
     # __complex__
-    is_ok(repr(complex(zero)), '0j', "complex(zero)")
+    is_ok(repr(complex(zero)), '0j', 'complex(zero)')
 
     # __eq__
     ok(string == 'string', "string == 'string'")
-    ok(string == string, "string == string")
-    ok(string == string2, "string == string2")
+    ok(string == string, 'string == string')
+    ok(string == string2, 'string == string2')
 
     # __float__
-    is_ok(repr(float(zero)), '0.0', "float(zero)")
+    is_ok(repr(float(zero)), '0.0', 'float(zero)')
 
     # __ge__
     ok(string >= 'string', "string >= 'string'")
     ok(string >= 'other', "string >= 'other'")
-    ok(string >= string, "string >= string")
-    ok(string >= other, "string >= other")
+    ok(string >= string, 'string >= string')
+    ok(string >= other, 'string >= other')
 
     # __gt__
     ok(not string > 'string', "not string > 'string'")
     ok(string > 'other', "string > 'other'")
-    ok(not string > string, "not string > string")
-    ok(string > other, "string > other")
+    ok(not string > string, 'not string > string')
+    ok(string > other, 'string > other')
 
     # __hash__
-    ok(isinstance(hash(string), int), "hash(string)")
+    ok(isinstance(hash(string), int), 'hash(string)')
 
     # __int__
     if platform.python_implementation() != 'PyPy':
-        is_ok(repr(int(zero)), '0', "int(zero)")
+        is_ok(repr(int(zero)), '0', 'int(zero)')
     else:
         skip('PyPy3 error')
 
     # __le__
     ok(string <= 'string', "string <= 'string'")
     ok(not string <= 'other', "not string <= 'other'")
-    ok(string <= string, "string <= string")
-    ok(not string <= other, "not string <= other")
+    ok(string <= string, 'string <= string')
+    ok(not string <= other, 'not string <= other')
 
     # __lt__
     ok(not string < 'string', "not string < 'string'")
     ok(not string < 'other', "not string < 'other'")
-    ok(not string < string, "not string < string")
-    ok(not string < other, "string < other")
+    ok(not string < string, 'not string < string')
+    ok(not string < other, 'string < other')
 
     # __ne__
     ok(not string != 'string', "not string != 'string'")
     ok(string != 'other', "string != 'other'")
-    ok(string != other, "string != other")
-    ok(not other != other, "not other != other")
+    ok(string != other, 'string != other')
+    ok(not other != other, 'not other != other')
 
     # __repr__
-    is_ok(repr(string), "C('string')", "repr(string) == \"C('string')\"")
+    is_ok(repr(string), "C('string')", 'repr(string) == "C(\'string\')"')
 
     # __str__
-    isa_ok(str(string), str, "string.to_str()")
+    isa_ok(str(string), str, 'string.to_str()')
     is_ok(str(string), 'string', "str(string) == 'string'")
 
     class C2(Pyjo.Base.object, Pyjo.String.Mixin.object):
@@ -128,69 +126,69 @@ if __name__ == '__main__':
     isa_ok(empty, C2, 'empty')
 
     # to_bytes
-    isa_ok(string.to_bytes(), bytes, "string.to_bytes()")
+    isa_ok(string.to_bytes(), bytes, 'string.to_bytes()')
     is_ok(string.to_bytes(), b'string', "string.to_bytes() == b'string'")
 
     is_ok(string2.to_bytes(), b'string', "string2.to_bytes() == b'string'")
     is_ok(other.to_bytes(), b'other', "other.to_bytes() == b'other'")
 
     # __bool__
-    ok(bool(string) is True, "bool(string) is True")
-    ok(bool(zero) is True, "bool(zero) is True")
-    ok(bool(empty) is False, "bool(empty) is False")
+    ok(bool(string) is True, 'bool(string) is True')
+    ok(bool(zero) is True, 'bool(zero) is True')
+    ok(bool(empty) is False, 'bool(empty) is False')
 
     # __eq__
     ok(string == b'string', "string == b'string'")
-    ok(string == string, "string == string")
-    ok(string == string2, "string == string2")
+    ok(string == string, 'string == string')
+    ok(string == string2, 'string == string2')
 
     # __float__
-    is_ok(repr(float(zero)), '0.0', "float(zero)")
+    is_ok(repr(float(zero)), '0.0', 'float(zero)')
 
     # __ge__
     ok(string >= b'string', "string >= b'string'")
     ok(string >= b'other', "string >= b'other'")
-    ok(string >= string, "string >= string")
-    ok(string >= other, "string >= other")
+    ok(string >= string, 'string >= string')
+    ok(string >= other, 'string >= other')
 
     # __gt__
     ok(not string > b'string', "not string > b'string'")
     ok(string > b'other', "string > b'other'")
-    ok(not string > string, "not string > string")
-    ok(string > other, "string > other")
+    ok(not string > string, 'not string > string')
+    ok(string > other, 'string > other')
 
     # __hash__
-    ok(isinstance(hash(string), int), "hash(string)")
+    ok(isinstance(hash(string), int), 'hash(string)')
 
     # __int__
     if platform.python_implementation() != 'PyPy':
-        is_ok(repr(int(zero)), '0', "int(zero)")
+        is_ok(repr(int(zero)), '0', 'int(zero)')
     else:
         skip('PyPy3 error')
 
     # __le__
     ok(string <= b'string', "string <= b'string'")
     ok(not string <= b'other', "not string <= b'other'")
-    ok(string <= string, "string <= string")
-    ok(not string <= other, "not string <= other")
+    ok(string <= string, 'string <= string')
+    ok(not string <= other, 'not string <= other')
 
     # __lt__
     ok(not string < b'string', "not string < b'string'")
     ok(not string < b'other', "not string < b'other'")
-    ok(not string < string, "not string < string")
-    ok(not string < other, "string < other")
+    ok(not string < string, 'not string < string')
+    ok(not string < other, 'string < other')
 
     # __ne__
     ok(not string != b'string', "not string != b'string'")
     ok(string != b'other', "string != b'other'")
-    ok(string != other, "string != other")
-    ok(not other != other, "not other != other")
+    ok(string != other, 'string != other')
+    ok(not other != other, 'not other != other')
 
     # __repr__
-    is_ok(repr(string), "C2(b'string')", "repr(string) == \"C(b'string')\"")
+    is_ok(repr(string), "C2(b'string')", 'repr(string) == "C(b\'string\')"')
 
     # __str__
-    isa_ok(str(string), str, "string.to_str()")
+    isa_ok(str(string), str, 'string.to_str()')
     is_ok(str(string), "b'string'", '''str(string) == "b'string'"''')
 
     class C3(Pyjo.Base.object, Pyjo.String.Mixin.object):
@@ -216,72 +214,72 @@ if __name__ == '__main__':
     isa_ok(empty, C3, 'empty')
 
     # to_str
-    isa_ok(string.to_str(), str, "string.to_str()")
+    isa_ok(string.to_str(), str, 'string.to_str()')
     is_ok(string.to_str(), 'string', "string.to_str() == 'string'")
 
     is_ok(string2.to_str(), 'string', "string2.to_str() == 'string'")
     is_ok(other.to_str(), 'other', "other.to_str() == 'other'")
 
     # __bool__
-    ok(bool(string) is True, "bool(string) is True")
-    ok(bool(zero) is True, "bool(zero) is True")
-    ok(bool(empty) is False, "bool(empty) is False")
+    ok(bool(string) is True, 'bool(string) is True')
+    ok(bool(zero) is True, 'bool(zero) is True')
+    ok(bool(empty) is False, 'bool(empty) is False')
 
     # __complex__
-    is_ok(repr(complex(zero)), '0j', "complex(zero)")
+    is_ok(repr(complex(zero)), '0j', 'complex(zero)')
 
     # __eq__
     ok(string == 'string', "string == 'string'")
-    ok(string == string, "string == string")
-    ok(string == string2, "string == string2")
+    ok(string == string, 'string == string')
+    ok(string == string2, 'string == string2')
 
     # __float__
-    is_ok(repr(float(zero)), '0.0', "float(zero)")
+    is_ok(repr(float(zero)), '0.0', 'float(zero)')
 
     # __ge__
     ok(string >= 'string', "string >= 'string'")
     ok(string >= 'other', "string >= 'other'")
-    ok(string >= string, "string >= string")
-    ok(string >= other, "string >= other")
+    ok(string >= string, 'string >= string')
+    ok(string >= other, 'string >= other')
 
     # __gt__
     ok(not string > 'string', "not string > 'string'")
     ok(string > 'other', "string > 'other'")
-    ok(not string > string, "not string > string")
-    ok(string > other, "string > other")
+    ok(not string > string, 'not string > string')
+    ok(string > other, 'string > other')
 
     # __hash__
-    ok(isinstance(hash(string), int), "hash(string)")
+    ok(isinstance(hash(string), int), 'hash(string)')
 
     # __int__
     if platform.python_implementation() != 'PyPy':
-        is_ok(repr(int(zero)), '0', "int(zero)")
+        is_ok(repr(int(zero)), '0', 'int(zero)')
     else:
         skip('PyPy3 error')
 
     # __le__
     ok(string <= 'string', "string <= 'string'")
     ok(not string <= 'other', "not string <= 'other'")
-    ok(string <= string, "string <= string")
-    ok(not string <= other, "not string <= other")
+    ok(string <= string, 'string <= string')
+    ok(not string <= other, 'not string <= other')
 
     # __lt__
     ok(not string < 'string', "not string < 'string'")
     ok(not string < 'other', "not string < 'other'")
-    ok(not string < string, "not string < string")
-    ok(not string < other, "string < other")
+    ok(not string < string, 'not string < string')
+    ok(not string < other, 'string < other')
 
     # __ne__
     ok(not string != 'string', "not string != 'string'")
     ok(string != 'other', "string != 'other'")
-    ok(string != other, "string != other")
-    ok(not other != other, "not other != other")
+    ok(string != other, 'string != other')
+    ok(not other != other, 'not other != other')
 
     # __repr__
-    is_ok(repr(string), "C3('string')", "repr(string) == \"C3('string')\"")
+    is_ok(repr(string), "C3('string')", 'repr(string) == "C3(\'string\')"')
 
     # __str__
-    isa_ok(str(string), str, "string.to_str()")
+    isa_ok(str(string), str, 'string.to_str()')
     is_ok(str(string), 'string', "str(string) == 'string'")
 
     done_testing()

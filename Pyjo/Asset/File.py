@@ -1,4 +1,3 @@
-
 """
 Pyjo.Asset.File - File storage for HTTP content
 ===============================================
@@ -31,7 +30,7 @@ Classes
 
 import Pyjo.Asset
 
-from Pyjo.Util import b, getenv, md5_sum, notnone, slurpb, steady_time, rand
+from Pyjo.Util import b, getenv, md5_sum, notnone, rand, slurpb, steady_time
 
 import errno
 import os
@@ -91,7 +90,9 @@ class Pyjo_Asset_File(Pyjo.Asset.object):
 
         String representation of an object shown in console.
         """
-        return f"<{self.__class__.__module__}.{self.__class__.__name__} handle={repr(self.handle)} path={repr(self.path)}>"
+        return (
+            f'<{self.__class__.__module__}.{self.__class__.__name__} handle={repr(self.handle)} path={repr(self.path)}>'
+        )
 
     def add_chunk(self, chunk=b''):
         """::

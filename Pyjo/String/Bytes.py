@@ -1,4 +1,3 @@
-
 """
 Pyjo.String.Bytes - Bytes string
 ================================
@@ -27,7 +26,6 @@ import Pyjo.String.Unicode
 import Pyjo.Util
 
 
-
 DEFAULT_CHARSET = 'utf-8'
 
 
@@ -41,7 +39,7 @@ class Pyjo_String_Bytes(bytes):
         return super().__new__(cls, Pyjo.Util.b(value, charset))
 
     def __repr__(self):
-        return f"{self.__module__}.new({super().__repr__()})"
+        return f'{self.__module__}.new({super().__repr__()})'
 
     def decode(self, charset=DEFAULT_CHARSET):
         """::

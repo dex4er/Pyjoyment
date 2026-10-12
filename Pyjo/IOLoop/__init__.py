@@ -83,7 +83,7 @@ import Pyjo.IOLoop.Server
 import Pyjo.IOLoop.Stream
 import Pyjo.Reactor.Base
 
-from Pyjo.Util import decorator, decoratormethod, getenv, isalive, md5_sum, notnone, steady_time, rand, warn
+from Pyjo.Util import decorator, decoratormethod, getenv, isalive, md5_sum, notnone, rand, steady_time, warn
 
 import importlib
 import traceback
@@ -97,6 +97,7 @@ class Error(Exception):
     """
     Exception raised on unhandled error event.
     """
+
     pass
 
 
@@ -177,10 +178,10 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
         self._stop_timer = None
 
         if DEBUG:
-            warn(f"-- Reactor initialized ({self.reactor})")
+            warn(f'-- Reactor initialized ({self.reactor})')
 
         def catch_cb(reactor, e, event):
-            warn(f"{reactor}: {event}\n{traceback.format_exc()}")
+            warn(f'{reactor}: {event}\n{traceback.format_exc()}')
 
         self.reactor.catch(catch_cb)
 
@@ -230,8 +231,10 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
         :meth:`Pyjo.IOLoop.Client.connect`.
         """
         if cb is None:
+
             def wrap(func):
                 return self.client(func, **kwargs)
+
             return wrap
 
         cid = self._id()
@@ -409,7 +412,7 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
                 ...
         """
         if DEBUG:
-            warn(f"-- Recurring after {after} cb {cb}")
+            warn(f'-- Recurring after {after} cb {cb}')
         return self._timer(cb, 'recurring', after)
 
     def remove(self, taskid):
@@ -477,8 +480,10 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
             port = Pyjo.IOLoop.acceptor(server).port
         """
         if cb is None:
+
             def wrap(func):
                 return self.server(func, **kwargs)
+
             return wrap
 
         server = Pyjo.IOLoop.Server.new()
@@ -545,6 +550,7 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
         self._not_accepting()
 
         if self._stop_timer is None:
+
             def finish_cb(loop):
                 loop._stop()
 
@@ -588,7 +594,7 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
                 ...
         """
         if DEBUG:
-            warn(f"-- Timer after {after} cb {cb}")
+            warn(f'-- Timer after {after} cb {cb}')
         return self._timer(cb, 'timer', after)
 
     def _id(self):
@@ -637,7 +643,7 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
             del self._connections[taskid]
             self._maybe_accepting()
             if DEBUG:
-                warn(f"-- Removed connection {taskid} ({len(self._connections)} connections)")
+                warn(f'-- Removed connection {taskid} ({len(self._connections)} connections)')
             return
 
         # Timer
@@ -662,7 +668,7 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
         self._connections[cid] = {'stream': stream}
 
         if DEBUG:
-            warn(f"-- New connection {cid} ({len(self._connections)} connections)")
+            warn(f'-- New connection {cid} ({len(self._connections)} connections)')
 
         stream.reactor = weakref.proxy(self.reactor)
         loop = weakref.proxy(self)
@@ -717,8 +723,10 @@ def acceptor(acceptor):
 
 def client(cb=None, **kwargs):
     if cb is None:
+
         def wrap(func):
             return singleton.client(func, **kwargs)
+
         return wrap
 
     return singleton.client(cb, **kwargs)
@@ -756,8 +764,10 @@ def reset():
 
 def server(cb=None, **kwargs):
     if cb is None:
+
         def wrap(func):
             return singleton.server(func, **kwargs)
+
         return wrap
 
     return singleton.server(cb, **kwargs)

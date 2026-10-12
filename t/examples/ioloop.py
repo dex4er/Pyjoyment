@@ -11,7 +11,6 @@ class UnitTest(Pyjo.Test.UnitTest):
 
 
 if __name__ == '__main__':
-
     from Pyjo.Test import *  # noqa
 
     import Pyjo.IOLoop
@@ -25,10 +24,10 @@ if __name__ == '__main__':
         @stream.on
         def read(stream, chunk):
             # Process input chunk
-            is_ok(chunk.decode('utf-8'), "GET / HTTP/1.1\x0d\x0a\x0d\x0a", "server's input chunk")
+            is_ok(chunk.decode('utf-8'), 'GET / HTTP/1.1\x0d\x0a\x0d\x0a', "server's input chunk")
 
             # Write response
-            stream.write(b"HTTP/1.1 200 OK\x0d\x0a\x0d\x0a")
+            stream.write(b'HTTP/1.1 200 OK\x0d\x0a\x0d\x0a')
 
             # Disconnect client
             stream.close_gracefully()
@@ -46,21 +45,21 @@ if __name__ == '__main__':
             @stream.on
             def read(stream, chunk):
                 # Process input
-                is_ok(chunk.decode('utf-8'), "HTTP/1.1 200 OK\x0d\x0a\x0d\x0a", "client's input chunk")
+                is_ok(chunk.decode('utf-8'), 'HTTP/1.1 200 OK\x0d\x0a\x0d\x0a', "client's input chunk")
 
             # Write request
-            stream.write(b"GET / HTTP/1.1\x0d\x0a\x0d\x0a")
+            stream.write(b'GET / HTTP/1.1\x0d\x0a\x0d\x0a')
 
     # Add a timer
     @Pyjo.IOLoop.timer(1)
     def timeouter(loop):
-        pass_ok("Timeout")
+        pass_ok('Timeout')
         # Shutdown server
         loop.remove(server)
 
     # Start event loop
     Pyjo.IOLoop.start()
 
-    pass_ok("Event loop ended")
+    pass_ok('Event loop ended')
 
     done_testing()

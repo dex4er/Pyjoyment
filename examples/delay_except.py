@@ -1,5 +1,6 @@
 import Pyjo.IOLoop
 
+
 # Handle exceptions in all steps
 delay = Pyjo.IOLoop.delay()
 
@@ -16,7 +17,7 @@ def step2(delay):
 
 @delay.catch
 def error(delay, err):
-    print(f"Something went wrong: {err}")
+    print(f'Something went wrong: {err}')
 
 
 delay.wait()

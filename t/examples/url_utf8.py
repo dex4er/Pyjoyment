@@ -1,4 +1,3 @@
-
 import Pyjo.Test
 
 
@@ -12,13 +11,16 @@ class UnitTest(Pyjo.Test.UnitTest):
 
 
 if __name__ == '__main__':
-
     from Pyjo.Test import *  # noqa
 
     import Pyjo.URL
 
-    url1 = Pyjo.URL.new('http://pl.wikipedia.org').set(path='/w/index.php', query=[('title', 'Wikipedia:Strona_główna'), ('action', 'history')])
-    is_ok(str(url1), 'http://pl.wikipedia.org/w/index.php?title=Wikipedia:Strona_g%C5%82%C3%B3wna&action=history', 'url1')
+    url1 = Pyjo.URL.new('http://pl.wikipedia.org').set(
+        path='/w/index.php', query=[('title', 'Wikipedia:Strona_główna'), ('action', 'history')]
+    )
+    is_ok(
+        str(url1), 'http://pl.wikipedia.org/w/index.php?title=Wikipedia:Strona_g%C5%82%C3%B3wna&action=history', 'url1'
+    )
 
     url2 = Pyjo.URL.new('http://pl.wikipedia.org').set(path='/wiki/Wikipedia:Strona_główna')
     is_ok(str(url2), 'http://pl.wikipedia.org/wiki/Wikipedia:Strona_g%C5%82%C3%B3wna', 'url2')

@@ -1,4 +1,3 @@
-
 """
 Pyjo.UserAgent.Transactor - User agent transactor
 =================================================
@@ -181,8 +180,11 @@ class Pyjo_UserAgent_Transactor(Pyjo.Base.object):
             new.req = clone
         else:
             method = req.method.upper()
-            headers = new.req.set(method='GET' if method == 'POST' else method) \
-                .content.set(headers=req.headers.clone()).headers
+            headers = (
+                new.req.set(method='GET' if method == 'POST' else method)
+                .content.set(headers=req.headers.clone())
+                .headers
+            )
             for n in filter(lambda n: n.lower().startswith('content-'), headers.names):
                 headers.remove(n)
 

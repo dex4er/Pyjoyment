@@ -1,4 +1,3 @@
-
 import Pyjo.Test
 
 
@@ -12,7 +11,6 @@ class UnitTest(Pyjo.Test.UnitTest):
 
 
 if __name__ == '__main__':
-
     from Pyjo.Test import *  # noqa
 
     import Pyjo.DOM
@@ -109,7 +107,9 @@ if __name__ == '__main__':
     is_ok(dom.attr(foo='bar').attr('foo'), None, 'no attribute')
     is_ok(dom.tree[1][0], 'doctype', 'right element')
     is_ok(dom.tree[1][1], ' foo', 'right doctype')
-    is_ok(dom, """<!DOCTYPE foo>
+    is_ok(
+        dom,
+        """<!DOCTYPE foo>
     <foo bar="ba&lt;z">
       test
       <simple class="working">easy</simple>
@@ -122,7 +122,9 @@ if __name__ == '__main__':
       &lt; very broken
       <br>
       more text
-    </a></foo>""", 'right result')
+    </a></foo>""",
+        'right result',
+    )
     simple = dom.at('foo simple.working[class^="wor"]')
     is_ok(simple.parent.all_text, 'test easy works well yada yada < very broken more text', 'right text')
     is_ok(simple.tag, 'simple', 'right tag')
@@ -216,8 +218,16 @@ if __name__ == '__main__':
     is_ok(dom.at('script').child_nodes.first().previous, None, 'no siblings')
     is_ok(dom.at('script').child_nodes[2].previous.content, 'fce', 'right content')
     is_ok(dom.at('b').child_nodes[1].next, None, 'no siblings')
-    is_ok(dom.at('script').child_nodes.first().wrap('<i>:)</i>').root, '<script><i>:)a</i><b>fce</b>1<b>d</b></script>', 'right result')
-    is_ok(dom.at('i').child_nodes.first().wrap_content('<b></b>').root, '<script><i><b>:)</b>a</i><b>fce</b>1<b>d</b></script>', 'right result')
+    is_ok(
+        dom.at('script').child_nodes.first().wrap('<i>:)</i>').root,
+        '<script><i>:)a</i><b>fce</b>1<b>d</b></script>',
+        'right result',
+    )
+    is_ok(
+        dom.at('i').child_nodes.first().wrap_content('<b></b>').root,
+        '<script><i><b>:)</b>a</i><b>fce</b>1<b>d</b></script>',
+        'right result',
+    )
     is_ok(dom.at('b').child_nodes.first().ancestors().map('tag').join(','), 'b,i,script', 'right result')
     is_ok(dom.at('b').child_nodes.first().append_content('g').content, ':)g', 'right content')
     is_ok(dom.at('b').child_nodes.first().prepend_content('h').content, 'h:)g', 'right content')
@@ -319,7 +329,7 @@ if __name__ == '__main__':
     is_ok(dom.at('[baz=//]').text, 'works', 'right text')
 
     # HTML1 (single quotes, uppercase tags and whitespace in attributes)
-    dom = Pyjo.DOM.new('''<DIV id = 'test' foo ='bar' class= "tset">works</DIV>''')
+    dom = Pyjo.DOM.new("""<DIV id = 'test' foo ='bar' class= "tset">works</DIV>""")
     is_ok(dom.at('#test').text, 'works', 'right text')
     is_ok(dom.at('div').text, 'works', 'right text')
     is_ok(dom.at('[foo="bar"]').text, 'works', 'right text')
@@ -341,15 +351,15 @@ if __name__ == '__main__':
     # Unicode and escaped selectors
     html = '<html><div id="☃x">Snowman</div><div class="x ♥">Heart</div></html>'
     dom = Pyjo.DOM.new(html)
-    is_ok(dom.at("#\\\n\\002603x").text, 'Snowman', 'right text')
+    is_ok(dom.at('#\\\n\\002603x').text, 'Snowman', 'right text')
     is_ok(dom.at('#\\2603 x').text, 'Snowman', 'right text')
-    is_ok(dom.at("#\\\n\\2603 x").text, 'Snowman', 'right text')
+    is_ok(dom.at('#\\\n\\2603 x').text, 'Snowman', 'right text')
     is_ok(dom.at('[id="\\\n\\2603 x"]').text, 'Snowman', 'right text')
     is_ok(dom.at('[id="\\\n\\002603x"]').text, 'Snowman', 'right text')
     is_ok(dom.at('[id="\\\\2603 x"]').text, 'Snowman', 'right text')
-    is_ok(dom.at("html #\\\n\\002603x").text, 'Snowman', 'right text')
+    is_ok(dom.at('html #\\\n\\002603x').text, 'Snowman', 'right text')
     is_ok(dom.at('html #\\2603 x').text, 'Snowman', 'right text')
-    is_ok(dom.at("html #\\\n\\2603 x").text, 'Snowman', 'right text')
+    is_ok(dom.at('html #\\\n\\2603 x').text, 'Snowman', 'right text')
     is_ok(dom.at('html [id="\\\n\\2603 x"]').text, 'Snowman', 'right text')
     is_ok(dom.at('html [id="\\\n\\002603x"]').text, 'Snowman', 'right text')
     is_ok(dom.at('html [id="\\\\2603 x"]').text, 'Snowman', 'right text')
@@ -364,9 +374,9 @@ if __name__ == '__main__':
     is_ok(dom.at('div[id^=☃]').text, 'Snowman', 'right text')
     is_ok(dom.at('html div[id^=☃]').text, 'Snowman', 'right text')
     is_ok(dom.at('html > div[id^=☃]').text, 'Snowman', 'right text')
-    is_ok(dom.at(".\\\n\\002665").text, 'Heart', 'right text')
+    is_ok(dom.at('.\\\n\\002665').text, 'Heart', 'right text')
     is_ok(dom.at('.\\2665').text, 'Heart', 'right text')
-    is_ok(dom.at("html .\\\n\\002665").text, 'Heart', 'right text')
+    is_ok(dom.at('html .\\\n\\002665').text, 'Heart', 'right text')
     is_ok(dom.at('html .\\2665').text, 'Heart', 'right text')
     is_ok(dom.at('html [class$="\\\n\\002665"]').text, 'Heart', 'right text')
     is_ok(dom.at('html [class$="\\2665"]').text, 'Heart', 'right text')
@@ -441,7 +451,7 @@ if __name__ == '__main__':
     dom.at('div').set(content='☃')
     is_ok(dom, '<div>☃</div>', 'right result')
     dom = Pyjo.DOM.new('<div>♥</div>')
-    dom.at('div').set(content="\u2603")
+    dom.at('div').set(content='\u2603')
     is_ok(dom.to_str(), '<div>☃</div>', 'right result')
     is_ok(dom.at('div').replace('<p>♥</p>').root, '<p>♥</p>', 'right result')
     is_ok(dom.to_str(), '<p>♥</p>', 'right result')
@@ -455,7 +465,11 @@ if __name__ == '__main__':
     is_ok(dom.strip(), 'whatever', 'right result')
     is_ok(dom.remove(), '', 'right result')
     dom.replace('A<div>B<p>C<b>D<i><u>E</u></i>F</b>G</p><div>H</div></div>I')
-    is_ok(dom.find(':not(div):not(i):not(u)').map('strip').first().root, 'A<div>BCD<i><u>E</u></i>FG<div>H</div></div>I', 'right result')
+    is_ok(
+        dom.find(':not(div):not(i):not(u)').map('strip').first().root,
+        'A<div>BCD<i><u>E</u></i>FG<div>H</div></div>I',
+        'right result',
+    )
     is_ok(dom.at('i').to_str(), '<i><u>E</u></i>', 'right result')
     dom = Pyjo.DOM.new('<div><div>A</div><div>B</div>C</div>')
     is_ok(dom.at('div').at('div').text, 'A', 'right text')
@@ -697,7 +711,11 @@ if __name__ == '__main__':
     dom = Pyjo.DOM.new("<div test=23 id='a' \n class='x' foo=bar />")
     is_ok(dom.at('div.x').attr('test'), '23', 'right attribute')
     is_ok(dom.at('[foo="bar"]').attr('class'), 'x', 'right attribute')
-    is_ok(dom.at('div').attr('baz', None).root.to_str(), '<div baz class="x" foo="bar" id="a" test="23"></div>', 'right result')
+    is_ok(
+        dom.at('div').attr('baz', None).root.to_str(),
+        '<div baz class="x" foo="bar" id="a" test="23"></div>',
+        'right result',
+    )
 
     # Markup characters in attribute values
     dom = Pyjo.DOM.new("""<div id="<a>" \n test='='>Test<div id='><' /></div>""")
@@ -1150,72 +1168,100 @@ if __name__ == '__main__':
     <div>D</div>
     """)
     dom.at('li').append('<p>A1</p>23')
-    is_ok(dom, """
+    is_ok(
+        dom,
+        """
     <ul>
         <li>A</li><p>A1</p>23
         <p>B</p>
         <li>C</li>
     </ul>
     <div>D</div>
-    """, 'right result')
+    """,
+        'right result',
+    )
     dom.at('li').prepend('24').prepend('<div>A-1</div>25')
-    is_ok(dom, """
+    is_ok(
+        dom,
+        """
     <ul>
         24<div>A-1</div>25<li>A</li><p>A1</p>23
         <p>B</p>
         <li>C</li>
     </ul>
     <div>D</div>
-    """, 'right result')
+    """,
+        'right result',
+    )
     is_ok(dom.at('div').text, 'A-1', 'right text')
     is_ok(dom.at('iv'), None, 'no result')
     dom.prepend('l').prepend('alal').prepend('a')
-    is_ok(dom, """
+    is_ok(
+        dom,
+        """
     <ul>
         24<div>A-1</div>25<li>A</li><p>A1</p>23
         <p>B</p>
         <li>C</li>
     </ul>
     <div>D</div>
-    """, 'no change')
+    """,
+        'no change',
+    )
     dom.append('lalala')
-    is_ok(dom, """
+    is_ok(
+        dom,
+        """
     <ul>
         24<div>A-1</div>25<li>A</li><p>A1</p>23
         <p>B</p>
         <li>C</li>
     </ul>
     <div>D</div>
-    """, 'no change')
+    """,
+        'no change',
+    )
     dom.find('div').each(lambda i, n: i.append('works'))
-    is_ok(dom, """
+    is_ok(
+        dom,
+        """
     <ul>
         24<div>A-1</div>works25<li>A</li><p>A1</p>23
         <p>B</p>
         <li>C</li>
     </ul>
     <div>D</div>works
-    """, 'right result')
+    """,
+        'right result',
+    )
     dom.at('li').prepend_content('A3<p>A2</p>').prepend_content('A4')
     is_ok(dom.at('li').text, 'A4A3 A', 'right text')
-    is_ok(dom, """
+    is_ok(
+        dom,
+        """
     <ul>
         24<div>A-1</div>works25<li>A4A3<p>A2</p>A</li><p>A1</p>23
         <p>B</p>
         <li>C</li>
     </ul>
     <div>D</div>works
-    """, 'right result')
+    """,
+        'right result',
+    )
     dom.find('li')[1].append_content('<p>C2</p>C3').append_content(' C4').append_content('C5')
     is_ok(dom.find('li')[1].text, 'C C3 C4C5', 'right text')
-    is_ok(dom, """
+    is_ok(
+        dom,
+        """
     <ul>
         24<div>A-1</div>works25<li>A4A3<p>A2</p>A</li><p>A1</p>23
         <p>B</p>
         <li>C<p>C2</p>C3 C4C5</li>
     </ul>
     <div>D</div>works
-    """, 'right result')
+    """,
+        'right result',
+    )
 
     # Optional "head" and "body" tags
     dom = Pyjo.DOM.new("""
@@ -1400,7 +1446,7 @@ if __name__ == '__main__':
     is_ok(dom.at('table > thead > tr > th').text, 'A', 'right text')
     is_ok(dom.find('table > thead > tr > th')[1].text, 'D', 'right text')
     is_ok(dom.at('table > tbody > tr > td').text, 'B', 'right text')
-    is_ok(dom.find('table > tbody > tr > td').map('text').join("\n"), "B\nE", 'right text')
+    is_ok(dom.find('table > tbody > tr > td').map('text').join('\n'), 'B\nE', 'right text')
 
     # Optional "colgroup", "tbody", "tr", "th" and "td" tags
     dom = Pyjo.DOM.new("""
@@ -1549,7 +1595,11 @@ if __name__ == '__main__':
     """)
     is_ok(dom.find('html > body')[0].text, 'Foo!', 'right text')
     is_ok(dom.find('html > head > style')[0].text, "#style { foo: style('<test>') }", 'right text')
-    is_ok(dom.find('html > head > script')[0].text, "\n          if (a < b) {\n            alert('<123>')\n          }\n        ", 'right text')
+    is_ok(
+        dom.find('html > head > script')[0].text,
+        "\n          if (a < b) {\n            alert('<123>')\n          }\n        ",
+        'right text',
+    )
     is_ok(dom.find('html > head > script')[1].text, "if (b > c) { alert('&<ohoh>') }", 'right text')
 
     # More real world JavaScript
@@ -1606,10 +1656,14 @@ if __name__ == '__main__':
     """)
     ok(dom.xml, 'XML mode detected')
     is_ok(dom.at('root').attr('att'), 'test', 'right attribute')
-    is_ok(dom.tree[5][1], """ root [
+    is_ok(
+        dom.tree[5][1],
+        """ root [
       <!ELEMENT root (#PCDATA)>
       <!ATTLIST root att CDATA #REQUIRED>
-    ]""", 'right doctype')
+    ]""",
+        'right doctype',
+    )
     is_ok(dom.at('root').text, '<hello>world</hello>', 'right text')
     dom = Pyjo.DOM.new("""
     <!doctype book
@@ -1619,11 +1673,15 @@ if __name__ == '__main__':
     ]>
     <foo />
     """)
-    is_ok(dom.tree[2][1], """ book
+    is_ok(
+        dom.tree[2][1],
+        """ book
     SYSTEM "usr.dtd"
     [
       <!ENTITY test "yeah">
-    ]""", 'right doctype')
+    ]""",
+        'right doctype',
+    )
     ok(not dom.xml, 'XML mode not detected')
     is_ok(dom.at('foo'), '<foo></foo>', 'right element')
     dom = Pyjo.DOM.new("""
@@ -1637,12 +1695,16 @@ if __name__ == '__main__':
     <foo xml:lang="de">Check!</fOo>
     """)
     ok(dom.xml, 'XML mode detected')
-    is_ok(dom.tree[4][1], """ foo [
+    is_ok(
+        dom.tree[4][1],
+        """ foo [
       <!ELEMENT foo ANY>
       <!ATTLIST foo xml:lang CDATA #IMPLIED>
       <!ENTITY % e SYSTEM "myentities.ent">
       %myentities;
-    ]  """, 'right doctype')
+    ]  """,
+        'right doctype',
+    )
     is_ok(dom.at('foo').attr('xml:lang'), 'de', 'right attribute')
     is_ok(dom.at('foo').text, 'Check!', 'right text')
     dom = Pyjo.DOM.new("""
@@ -1657,14 +1719,18 @@ if __name__ == '__main__':
     <?check for-nothing?>
     <foo bar='false'>&leertaste;!!!</foo>
     """)
-    is_ok(dom.tree[2][1], """ TESTSUITE PUBLIC "my.dtd" \'mhhh\' [
+    is_ok(
+        dom.tree[2][1],
+        """ TESTSUITE PUBLIC "my.dtd" \'mhhh\' [
       <!ELEMENT foo ANY>
       <!ATTLIST foo bar ENTITY \'true\'>
       <!ENTITY system_entities SYSTEM \'systems.xml\'>
       <!ENTITY leertaste \'&#32;\'>
       <!-- This is a comment -.
       <!NOTATION hmmm SYSTEM "hmmm">
-    ]   """, 'right doctype')
+    ]   """,
+        'right doctype',
+    )
     is_ok(dom.at('foo').attr('bar'), 'false', 'right attribute')
 
     # Broken "font" block and useless end tags
@@ -1757,7 +1823,9 @@ if __name__ == '__main__':
     is_ok(dom.find('html body table tr > td > font')[1].text, 't est3', 'right text')
     throws_ok(lambda: dom.find('html body table tr > td > font')[2], IndexError, 'no result')
     is_ok(dom.find('html body table tr > td > font').size, 2, 'right number of elements')
-    is_ok(dom, """
+    is_ok(
+        dom,
+        """
     <html>
       <head><title>Test</title></head>
       <body>
@@ -1770,7 +1838,9 @@ if __name__ == '__main__':
         </table>
       </body>
     </html>
-    """, 'right result')
+    """,
+        'right result',
+    )
 
     # A collection of wonderful screwups
     dom = Pyjo.DOM.new("""
@@ -1845,7 +1915,10 @@ if __name__ == '__main__':
     is_ok(dom.find('table > td > tr > thead').size, 2, 'right number of elements')
 
     # Ensure XML semantics again
-    dom = Pyjo.DOM.new().set(xml=True).parse("""
+    dom = (
+        Pyjo.DOM.new()
+        .set(xml=True)
+        .parse("""
     <table>
       <td>
         <tr><thead>foo<thead></tr>
@@ -1855,6 +1928,7 @@ if __name__ == '__main__':
       </td>
     </table>
     """)
+    )
     is_ok(dom.find('table > td > tr > thead')[0].text, 'foo', 'right text')
     is_ok(dom.find('table > td > tr > thead')[1].text, 'bar', 'right text')
     throws_ok(lambda: dom.find('table > td > tr > thead')[2], IndexError, 'no result')
@@ -1893,15 +1967,13 @@ if __name__ == '__main__':
     </c>
     """)
     results = []
-    dom.find('b').each(lambda i, n:
-                       i.find('a').each(lambda i, n: results.append(i.text)))
+    dom.find('b').each(lambda i, n: i.find('a').each(lambda i, n: results.append(i.text)))
     is_deeply_ok(results, ['bar', 'baz', 'yada'], 'right results')
     results = []
     dom.find('a').each(lambda i, n: results.append(i.text))
     is_deeply_ok(results, ['foo', 'bar', 'baz', 'yada'], 'right results')
     results = []
-    dom.find('b').each(lambda i, n:
-                       i.find('c a').each(lambda i, n: results.append(i.text)))
+    dom.find('b').each(lambda i, n: i.find('c a').each(lambda i, n: results.append(i.text)))
     is_deeply_ok(results, ['baz', 'yada'], 'right results')
     is_ok(dom.at('b').at('a').text, 'bar', 'right text')
     is_ok(dom.at('c > b > a').text, 'bar', 'right text')
@@ -1953,14 +2025,18 @@ if __name__ == '__main__':
     is_ok(dom.find('table tr td')[1].at('div').attr('id'), 'B', 'right attribute')
     throws_ok(lambda: dom.find('table tr td')[2], IndexError, 'no result')
     is_ok(dom.find('table tr td').size, 2, 'right number of elements')
-    is_ok(dom, """
+    is_ok(
+        dom,
+        """
     <table>
       <tr>
         <td><div id="A"></div></td>
         <td><div id="B"></div></td>
       </tr>
     </table>
-    """, 'right result')
+    """,
+        'right result',
+    )
 
     # Preformatted text
     dom = Pyjo.DOM.new("""
@@ -1974,21 +2050,29 @@ if __name__ == '__main__':
     </div>
     """)
     is_ok(dom.text, '', 'no text')
-    is_ok(dom.raw_text, "\n    \n    ", 'right text')
-    is_ok(dom.all_text, "looks like\n      it\n        really\n      works", 'right text')
-    is_ok(dom.all_raw_text, "\n    \n      looks\n      like\n      it\n        really\n      \n      works\n    \n    ", 'right text')
+    is_ok(dom.raw_text, '\n    \n    ', 'right text')
+    is_ok(dom.all_text, 'looks like\n      it\n        really\n      works', 'right text')
+    is_ok(
+        dom.all_raw_text,
+        '\n    \n      looks\n      like\n      it\n        really\n      \n      works\n    \n    ',
+        'right text',
+    )
     is_ok(dom.at('div').text, 'looks works', 'right text')
-    is_ok(dom.at('div').raw_text, "\n      looks\n      \n      works\n    ", 'right text')
-    is_ok(dom.at('div').all_text, "looks like\n      it\n        really\n      works", 'right text')
-    is_ok(dom.at('div').all_raw_text, "\n      looks\n      like\n      it\n        really\n      \n      works\n    ", 'right text')
-    is_ok(dom.at('div pre').text, "\n      ", 'right text')
-    is_ok(dom.at('div pre').raw_text, "\n      ", 'right text')
-    is_ok(dom.at('div pre').all_text, "like\n      it\n        really\n      ", 'right text')
-    is_ok(dom.at('div pre').all_raw_text, "like\n      it\n        really\n      ", 'right text')
-    is_ok(dom.at('div pre code').text, "like\n      it\n        really", 'right text')
-    is_ok(dom.at('div pre code').raw_text, "like\n      it\n        really", 'right text')
-    is_ok(dom.at('div pre code').all_text, "like\n      it\n        really", 'right text')
-    is_ok(dom.at('div pre code').all_raw_text, "like\n      it\n        really", 'right text')
+    is_ok(dom.at('div').raw_text, '\n      looks\n      \n      works\n    ', 'right text')
+    is_ok(dom.at('div').all_text, 'looks like\n      it\n        really\n      works', 'right text')
+    is_ok(
+        dom.at('div').all_raw_text,
+        '\n      looks\n      like\n      it\n        really\n      \n      works\n    ',
+        'right text',
+    )
+    is_ok(dom.at('div pre').text, '\n      ', 'right text')
+    is_ok(dom.at('div pre').raw_text, '\n      ', 'right text')
+    is_ok(dom.at('div pre').all_text, 'like\n      it\n        really\n      ', 'right text')
+    is_ok(dom.at('div pre').all_raw_text, 'like\n      it\n        really\n      ', 'right text')
+    is_ok(dom.at('div pre code').text, 'like\n      it\n        really', 'right text')
+    is_ok(dom.at('div pre code').raw_text, 'like\n      it\n        really', 'right text')
+    is_ok(dom.at('div pre code').all_text, 'like\n      it\n        really', 'right text')
+    is_ok(dom.at('div pre code').all_raw_text, 'like\n      it\n        really', 'right text')
 
     # PoCo example with whitespace sensitive text
     dom = Pyjo.DOM.new("""
@@ -2017,13 +2101,29 @@ if __name__ == '__main__':
     is_ok(dom.find('entry')[0].at('displayName').text, 'Homer Simpson', 'right text')
     is_ok(dom.find('entry')[0].at('id').text, '1286823', 'right text')
     is_ok(dom.find('entry')[0].at('addresses').children('type')[0].text, 'home', 'right text')
-    is_ok(dom.find('entry')[0].at('addresses formatted').text, "742 Evergreen Terrace\n    Springfield, VT 12345 USA", 'right text')
-    is_ok(dom.find('entry')[0].at('addresses formatted').raw_text, "742 Evergreen Terrace\n    Springfield, VT 12345 USA", 'right text')
+    is_ok(
+        dom.find('entry')[0].at('addresses formatted').text,
+        '742 Evergreen Terrace\n    Springfield, VT 12345 USA',
+        'right text',
+    )
+    is_ok(
+        dom.find('entry')[0].at('addresses formatted').raw_text,
+        '742 Evergreen Terrace\n    Springfield, VT 12345 USA',
+        'right text',
+    )
     is_ok(dom.find('entry')[1].at('displayName').text, 'Marge Simpson', 'right text')
     is_ok(dom.find('entry')[1].at('id').text, '1286822', 'right text')
     is_ok(dom.find('entry')[1].at('addresses').children('type')[0].text, 'home', 'right text')
-    is_ok(dom.find('entry')[1].at('addresses formatted').text, '742 Evergreen Terrace Springfield, VT 12345 USA', 'right text')
-    is_ok(dom.find('entry')[1].at('addresses formatted').raw_text, "742 Evergreen Terrace\n    Springfield, VT 12345 USA", 'right text')
+    is_ok(
+        dom.find('entry')[1].at('addresses formatted').text,
+        '742 Evergreen Terrace Springfield, VT 12345 USA',
+        'right text',
+    )
+    is_ok(
+        dom.find('entry')[1].at('addresses formatted').raw_text,
+        '742 Evergreen Terrace\n    Springfield, VT 12345 USA',
+        'right text',
+    )
     throws_ok(lambda: dom.find('entry')[2], IndexError, 'no result')
     is_ok(dom.find('entry').size, 2, 'right number of elements')
 
@@ -2084,17 +2184,21 @@ if __name__ == '__main__':
     is_ok(dom.tree[2][1], 'foo', 'right tag')
     is_deeply_ok(dom.tree[2][2], {'bar': ''}, 'right attributes')
     is_ok(dom.tree[2][4][0], 'text', 'right element')
-    is_ok(dom.tree[2][4][1], "\n      test\n    ", 'right text')
+    is_ok(dom.tree[2][4][1], '\n      test\n    ', 'right text')
     is_ok(dom.tree[4][0], 'tag', 'right element')
     is_ok(dom.tree[4][1], 'bar', 'right tag')
     is_ok(dom.tree[4][4][0], 'text', 'right element')
     is_ok(dom.tree[4][4][1], 'after', 'right text')
-    is_ok(dom, """
+    is_ok(
+        dom,
+        """
     <foo bar="">
       test
     </foo>
     <bar>after</bar>
-    """, 'right result')
+    """,
+        'right result',
+    )
 
     # Case-insensitive attribute values
     dom = Pyjo.DOM.new("""

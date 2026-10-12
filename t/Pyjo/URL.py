@@ -1,4 +1,3 @@
-
 import Pyjo.Test
 
 
@@ -12,7 +11,6 @@ class UnitTest(Pyjo.Test.UnitTest):
 
 
 if __name__ == '__main__':
-
     from Pyjo.Test import *  # noqa
 
     import Pyjo.URL
@@ -44,12 +42,12 @@ if __name__ == '__main__':
     is_ok(str(url), 'https://sri:foobar@example.com:8080/index.xml?monkey=biz&foo=1#/!%?@3', 'right format')
 
     # Advanced userinfo and fragment roundtrip
-    url = Pyjo.URL.new('ws://AZaz09-._~!$&\'()*+,;=:@localhost#AZaz09-._~!$&\'()*+,;=%:@/?')
+    url = Pyjo.URL.new("ws://AZaz09-._~!$&'()*+,;=:@localhost#AZaz09-._~!$&'()*+,;=%:@/?")
     is_ok(url.scheme, 'ws', 'right scheme')
-    is_ok(url.userinfo, 'AZaz09-._~!$&\'()*+,;=:', 'right userinfo')
+    is_ok(url.userinfo, "AZaz09-._~!$&'()*+,;=:", 'right userinfo')
     is_ok(url.host, 'localhost', 'right host')
-    is_ok(url.fragment, 'AZaz09-._~!$&\'()*+,;=%:@/?', 'right fragment')
-    is_ok(str(url), 'ws://AZaz09-._~!$&\'()*+,;=:@localhost#AZaz09-._~!$&\'()*+,;=%:@/?', 'right format')
+    is_ok(url.fragment, "AZaz09-._~!$&'()*+,;=%:@/?", 'right fragment')
+    is_ok(str(url), "ws://AZaz09-._~!$&'()*+,;=:@localhost#AZaz09-._~!$&'()*+,;=%:@/?", 'right format')
 
     # Parameters
     url = Pyjo.URL.new('http://sri:foobar@example.com:8080?_monkey=biz%3B&_monkey=23#23')
@@ -65,9 +63,13 @@ if __name__ == '__main__':
     is_ok(str(url), 'http://sri:foobar@example.com:8080?_monkey=biz%3B&_monkey=23#23', 'right format')
     url.query = [('monkey', 'foo')]
     is_ok(str(url), 'http://sri:foobar@example.com:8080?monkey=foo#23', 'right format')
-    url.query.merge(('monkey', 'bar'),)
+    url.query.merge(
+        ('monkey', 'bar'),
+    )
     is_ok(str(url), 'http://sri:foobar@example.com:8080?monkey=bar#23', 'right format')
-    url.query.append(('foo', 'bar'),)
+    url.query.append(
+        ('foo', 'bar'),
+    )
     is_ok(str(url), 'http://sri:foobar@example.com:8080?monkey=bar&foo=bar#23', 'right format')
     url.query = 'foo'
     is_ok(str(url), 'http://sri:foobar@example.com:8080?foo#23', 'right format')
@@ -324,7 +326,7 @@ if __name__ == '__main__':
 
     # IDNA (escaped userinfo and host)
     url = Pyjo.URL.new('https://foo:b%C3%A4r@kr%C3%A4ih.com:3000')
-    is_ok(url.host, "kr\xe4ih.com", 'right host')
+    is_ok(url.host, 'kr\xe4ih.com', 'right host')
     is_ok(url.ihost, 'xn--krih-moa.com', 'right internationalized host')
     is_ok(url.port, 3000, 'right port')
     is_ok(str(url), 'https://foo:b%C3%A4r@xn--krih-moa.com:3000', 'right format')
@@ -621,11 +623,11 @@ if __name__ == '__main__':
     is_ok(url.host, 'FOO.BAR', 'right host')
     is_ok(url.ihost, 'foo.bar', 'right internationalized host')
     is_ok(str(url.path), '/%E4/', 'right path')
-    is_deeply_ok(url.path.parts, [b"\xe4"], 'right structure')
+    is_deeply_ok(url.path.parts, [b'\xe4'], 'right structure')
     ok(url.path.leading_slash, 'has leading slash')
     ok(url.path.trailing_slash, 'has trailing slash')
     is_ok(str(url.query), '%E5=%E4', 'right query')
-    is_ok(url.query.param(b"\xe5"), b"\xe4", 'right value')
+    is_ok(url.query.param(b'\xe5'), b'\xe4', 'right value')
     is_ok(str(url), 'http://foo.bar/%E4/?%E5=%E4', 'right format')
 
     # Resolve RFC 1808 examples

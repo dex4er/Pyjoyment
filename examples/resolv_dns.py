@@ -1,13 +1,13 @@
-
 import Pyjo.IOLoop
-
-import dns.message
-import dns.rdatatype
-import dns.rdataclass
-import sys
 
 from Pyjo.Collection import c
 from Pyjo.Util import die
+
+import sys
+
+import dns.message
+import dns.rdataclass
+import dns.rdatatype
 
 
 name = c(sys.argv).get(1) or die('Usage: dns.py name A 8.8.8.8')

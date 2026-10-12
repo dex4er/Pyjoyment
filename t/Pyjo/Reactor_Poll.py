@@ -1,4 +1,3 @@
-
 import Pyjo.Test
 
 
@@ -12,7 +11,6 @@ class UnitTest(Pyjo.Test.UnitTest):
 
 
 if __name__ == '__main__':
-
     from Pyjo.Test import *  # noqa
 
     import select
@@ -23,11 +21,10 @@ if __name__ == '__main__':
     import Pyjo.Reactor.Poll
 
     from Pyjo.Util import setenv, steady_time
+    from t.lib.Value import Value
 
     import socket
     import time
-
-    from t.lib.Value import Value
 
     # Instantiation
     setenv('PYJO_REACTOR', 'Pyjo.Reactor.Poll')
@@ -37,6 +34,7 @@ if __name__ == '__main__':
     reactor = None
     is_ok(Pyjo.Reactor.Poll.new().__class__.__name__, 'Pyjo_Reactor_Poll', 'right object')
     import Pyjo.IOLoop
+
     reactor = Pyjo.IOLoop.singleton.reactor
     is_ok(reactor.__class__.__name__, 'Pyjo_Reactor_Poll', 'right object')
 
@@ -57,8 +55,9 @@ if __name__ == '__main__':
     port = listen.getsockname()[1]
     readable = Value(0)
     writable = Value(0)
-    reactor.io(lambda reactor, write: writable.inc() if write else readable.inc(), listen) \
-           .watch(listen, False, False).watch(listen, True, True)
+    reactor.io(lambda reactor, write: writable.inc() if write else readable.inc(), listen).watch(
+        listen, False, False
+    ).watch(listen, True, True)
     reactor.timer(lambda reactor: reactor.stop(), 0.025)
     reactor.start()
     ok(not readable.get(), 'handle is not readable')
@@ -82,7 +81,7 @@ if __name__ == '__main__':
     reactor.start()
     ok(not readable.get(), 'handle is not readable')
     ok(writable.get(), 'handle is writable')
-    client.send(b"hello!\n")
+    client.send(b'hello!\n')
     time.sleep(1)
     reactor.remove(client)
     readable.set(0)

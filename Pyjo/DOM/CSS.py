@@ -1,4 +1,3 @@
-
 r"""
 Pyjo.DOM.CSS - CSS selector engine
 ==================================
@@ -268,31 +267,42 @@ Classes
 -------
 """
 
-
 import Pyjo.Base
 
 from Pyjo.Regexp import r
 
 
 ESCAPE_PAT = r'(?:\\[^0-9a-fA-F]|\\[0-9a-fA-F]{1,6})'
-ATTR_PAT = r'''
+ATTR_PAT = (
+    r"""
     \[
-    ((?:''' + ESCAPE_PAT + r'''|[\w\-])+)         # Key
+    ((?:"""
+    + ESCAPE_PAT
+    + r"""|[\w\-])+)         # Key
     (?:
         (\W)?=                                    # Operator
         (?:"((?:\\"|[^"])*?)"|([^\]]+?))          # Value
         (?:\s+(i))?                               # Case-sensitivity
     )?
     \]
-'''
+"""
+)
 PSEUDO_CLASS_PAT = r'(?::([\w\-]+)(?:\(((?:\([^)]+\)|[^)])+)\))?)'
-TOKEN_PAT = r'''
+TOKEN_PAT = (
+    r"""
     (\s*,\s*)?                                        # Separator
-    ((?:[^[\\:\s,>+~]|''' + ESCAPE_PAT + r'''\s?)+)?  # Element  #]
-    (''' + PSEUDO_CLASS_PAT + r'''*)?                 # Pseudoclass
-    ((?:''' + ATTR_PAT + r''')*)?                     # Attributes
+    ((?:[^[\\:\s,>+~]|"""
+    + ESCAPE_PAT
+    + r"""\s?)+)?  # Element  #]
+    ("""
+    + PSEUDO_CLASS_PAT
+    + r"""*)?                 # Pseudoclass
+    ((?:"""
+    + ATTR_PAT
+    + r""")*)?                     # Attributes
     (?:\s*([>+~]))?                                   # Combinator
-'''
+"""
+)
 
 
 re_token = r(TOKEN_PAT, 'x')
@@ -664,8 +674,7 @@ class Pyjo_DOM_CSS(Pyjo.Base.object):
     def _siblings(self, current, nodetype=None):
         parent = current[3]
 
-        siblings = filter(lambda n: n[0] == 'tag',
-                          parent[(1 if parent[0] == 'root' else 4):])
+        siblings = filter(lambda n: n[0] == 'tag', parent[(1 if parent[0] == 'root' else 4) :])
 
         if nodetype is not None:
             siblings = filter(lambda n: nodetype == n[1], siblings)

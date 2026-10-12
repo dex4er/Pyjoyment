@@ -1,4 +1,3 @@
-
 """
 Pyjo.Server.Base - HTTP/WebSocket server base class
 ===================================================
@@ -50,11 +49,11 @@ Classes
 
 import Pyjo.EventEmitter
 
-import os
-import sys
-
 from Pyjo.Loader import load_module
 from Pyjo.Util import getenv, not_implemented, notnone
+
+import os
+import sys
 
 
 class Pyjo_Server_Base(Pyjo.EventEmitter.object):

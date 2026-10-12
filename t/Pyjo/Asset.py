@@ -1,4 +1,3 @@
-
 import Pyjo.Test
 
 
@@ -12,7 +11,6 @@ class UnitTest(Pyjo.Test.UnitTest):
 
 
 if __name__ == '__main__':
-
     from Pyjo.Test import *  # noqa
 
     import Pyjo.Asset.File
@@ -141,7 +139,11 @@ if __name__ == '__main__':
         is_ok(asset_file.contains(b'e'), -1, 'does not contain "e"')
         is_ok(asset_file.contains(b'a' * 131072), 0, '"a" * 131072 at position 0')
         is_ok(asset_file.contains(b'c' * 131072), 131073, '"c" * 131072 at position 131073')
-        is_ok(asset_file.contains(b'b' + (b'c' * 131072) + b'ddd'), 131072, '"b" + ("c" * 131072) . "ddd" at position 131072')
+        is_ok(
+            asset_file.contains(b'b' + (b'c' * 131072) + b'ddd'),
+            131072,
+            '"b" + ("c" * 131072) . "ddd" at position 131072',
+        )
 
     # Huge file asset with range
     with Pyjo.Asset.File.new(start_range=1, end_range=262146) as asset_file:

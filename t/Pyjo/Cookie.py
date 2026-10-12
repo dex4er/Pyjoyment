@@ -1,4 +1,3 @@
-
 import Pyjo.Test
 
 
@@ -12,7 +11,6 @@ class UnitTest(Pyjo.Test.UnitTest):
 
 
 if __name__ == '__main__':
-
     from Pyjo.Test import *  # noqa
 
     import Pyjo.Cookie.Request
@@ -180,7 +178,11 @@ if __name__ == '__main__':
     cookie.expires = 1218092879
     cookie.secure = True
     cookie.httponly = True
-    is_ok(cookie.to_str(), '0="ba r"; expires=Thu, 07 Aug 2008 07:07:59 GMT; domain=example.com; path=/test; secure; HttpOnly; Max-Age=60', 'right format')
+    is_ok(
+        cookie.to_str(),
+        '0="ba r"; expires=Thu, 07 Aug 2008 07:07:59 GMT; domain=example.com; path=/test; secure; HttpOnly; Max-Age=60',
+        'right format',
+    )
 
     # Empty response cookie
     is_deeply_ok(Pyjo.Cookie.Response.parse(), [], 'no cookies')
@@ -193,7 +195,9 @@ if __name__ == '__main__':
     throws_ok(lambda: cookies[1], IndexError, 'no more cookies')
 
     # Parse multiple response cookies (Netscape)
-    cookies = Pyjo.Cookie.Response.parse('CUSTOMER=WILE_E_COYOTE; expires=Tuesday, 09-Nov-1999 23:12:40 GMT; path=/,SHIPPING=FEDEX; path=/; expires=Tuesday, 09-Nov-1999 23:12:41 GMT')
+    cookies = Pyjo.Cookie.Response.parse(
+        'CUSTOMER=WILE_E_COYOTE; expires=Tuesday, 09-Nov-1999 23:12:40 GMT; path=/,SHIPPING=FEDEX; path=/; expires=Tuesday, 09-Nov-1999 23:12:41 GMT'
+    )
     is_ok(cookies[0].name, 'CUSTOMER', 'right name')
     is_ok(cookies[0].value, 'WILE_E_COYOTE', 'right value')
     is_ok(cookies[0].expires, 942189160, 'right expires value')
@@ -203,7 +207,9 @@ if __name__ == '__main__':
     throws_ok(lambda: cookies[2], IndexError, 'no more cookies')
 
     # Parse response cookie (RFC 6265)
-    cookies = Pyjo.Cookie.Response.parse('foo="ba r"; Domain=example.com; Path=/test; Max-Age=60; Expires=Thu, 07 Aug 2008 07:07:59 GMT; Secure;')
+    cookies = Pyjo.Cookie.Response.parse(
+        'foo="ba r"; Domain=example.com; Path=/test; Max-Age=60; Expires=Thu, 07 Aug 2008 07:07:59 GMT; Secure;'
+    )
     is_ok(cookies[0].name, 'foo', 'right name')
     is_ok(cookies[0].value, 'ba r', 'right value')
     is_ok(cookies[0].domain, 'example.com', 'right domain')
@@ -214,7 +220,9 @@ if __name__ == '__main__':
     throws_ok(lambda: cookies[1], IndexError, 'no more cookies')
 
     # Parse response cookie with invalid flag (RFC 6265)
-    cookies = Pyjo.Cookie.Response.parse('foo="ba r"; Domain=example.com; Path=/test; Max-Age=60; Expires=Thu, 07 Aug 2008 07:07:59 GMT; InSecure;')
+    cookies = Pyjo.Cookie.Response.parse(
+        'foo="ba r"; Domain=example.com; Path=/test; Max-Age=60; Expires=Thu, 07 Aug 2008 07:07:59 GMT; InSecure;'
+    )
     is_ok(cookies[0].name, 'foo', 'right name')
     is_ok(cookies[0].value, 'ba r', 'right value')
     is_ok(cookies[0].domain, 'example.com', 'right domain')
@@ -225,9 +233,11 @@ if __name__ == '__main__':
     throws_ok(lambda: cookies[1], IndexError, 'no more cookies')
 
     # Parse quoted response cookie (RFC 6265)
-    cookies = Pyjo.Cookie.Response.parse('foo="b a\\" r\\"\\\\"; Domain=example.com; Path=/test; Max-Age=60; Expires=Thu, 07 Aug 2008 07:07:59 GMT; Secure')
+    cookies = Pyjo.Cookie.Response.parse(
+        'foo="b a\\" r\\"\\\\"; Domain=example.com; Path=/test; Max-Age=60; Expires=Thu, 07 Aug 2008 07:07:59 GMT; Secure'
+    )
     is_ok(cookies[0].name, 'foo', 'right name')
-    is_ok(cookies[0].value, 'b a" r\"\\', 'right value')
+    is_ok(cookies[0].value, 'b a" r"\\', 'right value')
     is_ok(cookies[0].domain, 'example.com', 'right domain')
     is_ok(cookies[0].path, '/test', 'right path')
     is_ok(cookies[0].max_age, 60, 'right max age value')
@@ -236,7 +246,9 @@ if __name__ == '__main__':
     throws_ok(lambda: cookies[1], IndexError, 'no more cookies')
 
     # Parse quoted response cookie (RFC 6265, alternative)
-    cookies = Pyjo.Cookie.Response.parse('foo="b a\\" ;r\\"\\\\" ; domain=example.com ; path=/test ; Max-Age=60 ; expires=Thu, 07 Aug 2008 07:07:59 GMT ; secure')
+    cookies = Pyjo.Cookie.Response.parse(
+        'foo="b a\\" ;r\\"\\\\" ; domain=example.com ; path=/test ; Max-Age=60 ; expires=Thu, 07 Aug 2008 07:07:59 GMT ; secure'
+    )
     is_ok(cookies[0].name, 'foo', 'right name')
     is_ok(cookies[0].value, 'b a" ;r"\\', 'right value')
     is_ok(cookies[0].domain, 'example.com', 'right domain')
@@ -247,7 +259,9 @@ if __name__ == '__main__':
     throws_ok(lambda: cookies[1], IndexError, 'no more cookies')
 
     # Parse quoted response cookie roundtrip (RFC 6265)
-    cookies = Pyjo.Cookie.Response.parse('foo="b ,a\\";= r\\"\\\\"; Domain=example.com; Path=/test; Max-Age=60; Expires=Thu, 07 Aug 2008 07:07:59 GMT; Secure')
+    cookies = Pyjo.Cookie.Response.parse(
+        'foo="b ,a\\";= r\\"\\\\"; Domain=example.com; Path=/test; Max-Age=60; Expires=Thu, 07 Aug 2008 07:07:59 GMT; Secure'
+    )
     is_ok(cookies[0].name, 'foo', 'right name')
     is_ok(cookies[0].value, 'b ,a";= r"\\', 'right value')
     is_ok(cookies[0].domain, 'example.com', 'right domain')
@@ -267,7 +281,9 @@ if __name__ == '__main__':
     throws_ok(lambda: cookies[1], IndexError, 'no more cookies')
 
     # Parse quoted response cookie roundtrip (RFC 6265, alternative)
-    cookies = Pyjo.Cookie.Response.parse('foo="b ,a\\" r\\"\\\\"; Domain=example.com; Path=/test; Max-Age=60; Expires=Thu, 07 Aug 2008 07:07:59 GMT; Secure')
+    cookies = Pyjo.Cookie.Response.parse(
+        'foo="b ,a\\" r\\"\\\\"; Domain=example.com; Path=/test; Max-Age=60; Expires=Thu, 07 Aug 2008 07:07:59 GMT; Secure'
+    )
     is_ok(cookies[0].name, 'foo', 'right name')
     is_ok(cookies[0].value, 'b ,a" r"\\', 'right value')
     is_ok(cookies[0].domain, 'example.com', 'right domain')
@@ -287,7 +303,9 @@ if __name__ == '__main__':
     throws_ok(lambda: cookies[1], IndexError, 'no more cookies')
 
     # Parse quoted response cookie roundtrip (RFC 6265, another alternative)
-    cookies = Pyjo.Cookie.Response.parse('foo="b ;a\\" r\\"\\\\"; Domain=example.com; Path=/test; Max-Age=60; Expires=Thu, 07 Aug 2008 07:07:59 GMT;  Secure')
+    cookies = Pyjo.Cookie.Response.parse(
+        'foo="b ;a\\" r\\"\\\\"; Domain=example.com; Path=/test; Max-Age=60; Expires=Thu, 07 Aug 2008 07:07:59 GMT;  Secure'
+    )
     is_ok(cookies[0].name, 'foo', 'right name')
     is_ok(cookies[0].value, 'b ;a" r"\\', 'right value')
     is_ok(cookies[0].domain, 'example.com', 'right domain')
@@ -307,7 +325,9 @@ if __name__ == '__main__':
     throws_ok(lambda: cookies[1], IndexError, 'no more cookies')
 
     # Parse quoted response cookie roundtrip (RFC 6265, yet another alternative)
-    cookies = Pyjo.Cookie.Response.parse('foo="\\"b a\\" r\\""; Domain=example.com; Path=/test; Max-Age=60; Expires=Thu, 07 Aug 2008 07:07:59 GMT; Secure')
+    cookies = Pyjo.Cookie.Response.parse(
+        'foo="\\"b a\\" r\\""; Domain=example.com; Path=/test; Max-Age=60; Expires=Thu, 07 Aug 2008 07:07:59 GMT; Secure'
+    )
     is_ok(cookies[0].name, 'foo', 'right name')
     is_ok(cookies[0].value, '"b a" r"', 'right value')
     is_ok(cookies[0].domain, 'example.com', 'right domain')
@@ -327,7 +347,9 @@ if __name__ == '__main__':
     throws_ok(lambda: cookies[1], IndexError, 'no more cookies')
 
     # Parse response cookie without value (RFC 2965)
-    cookies = Pyjo.Cookie.Response.parse('foo=""; Version=1; Domain=example.com; Path=/test; Max-Age=60; expires=Thu, 07 Aug 2008 07:07:59 GMT; Secure')
+    cookies = Pyjo.Cookie.Response.parse(
+        'foo=""; Version=1; Domain=example.com; Path=/test; Max-Age=60; expires=Thu, 07 Aug 2008 07:07:59 GMT; Secure'
+    )
     is_ok(cookies[0].name, 'foo', 'right name')
     is_ok(cookies[0].value, '', 'no value')
     is_ok(cookies[0].domain, 'example.com', 'right domain')
@@ -335,9 +357,15 @@ if __name__ == '__main__':
     is_ok(cookies[0].max_age, 60, 'right max age value')
     is_ok(cookies[0].expires, 1218092879, 'right expires value')
     is_ok(cookies[0].secure, True, 'right secure flag')
-    is_ok(cookies[0].to_str(), 'foo=; expires=Thu, 07 Aug 2008 07:07:59 GMT; domain=example.com; path=/test; secure; Max-Age=60', 'right result')
+    is_ok(
+        cookies[0].to_str(),
+        'foo=; expires=Thu, 07 Aug 2008 07:07:59 GMT; domain=example.com; path=/test; secure; Max-Age=60',
+        'right result',
+    )
     throws_ok(lambda: cookies[1], IndexError, 'no more cookies')
-    cookies = Pyjo.Cookie.Response.parse('foo=; Version=1; domain=example.com; path=/test; Max-Age=60; expires=Thu, 07 Aug 2008 07:07:59 GMT; secure')
+    cookies = Pyjo.Cookie.Response.parse(
+        'foo=; Version=1; domain=example.com; path=/test; Max-Age=60; expires=Thu, 07 Aug 2008 07:07:59 GMT; secure'
+    )
     is_ok(cookies[0].name, 'foo', 'right name')
     is_ok(cookies[0].value, '', 'no value')
     is_ok(cookies[0].domain, 'example.com', 'right domain')
@@ -345,7 +373,11 @@ if __name__ == '__main__':
     is_ok(cookies[0].max_age, 60, 'right max age value')
     is_ok(cookies[0].expires, 1218092879, 'right expires value')
     is_ok(cookies[0].secure, True, 'right secure flag')
-    is_ok(cookies[0].to_str(), 'foo=; expires=Thu, 07 Aug 2008 07:07:59 GMT; domain=example.com; path=/test; secure; Max-Age=60', 'right result')
+    is_ok(
+        cookies[0].to_str(),
+        'foo=; expires=Thu, 07 Aug 2008 07:07:59 GMT; domain=example.com; path=/test; secure; Max-Age=60',
+        'right result',
+    )
     throws_ok(lambda: cookies[1], IndexError, 'no more cookies')
 
     # Parse response cookie with broken Expires value
@@ -368,7 +400,9 @@ if __name__ == '__main__':
     is_ok(cookie.to_str(), 'foo=bar; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; Max-Age=0', 'right format')
 
     # Parse response cookie with Max-Age 0 and Expires 0 (RFC 6265)
-    cookies = Pyjo.Cookie.Response.parse('foo=bar; Domain=example.com; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Secure')
+    cookies = Pyjo.Cookie.Response.parse(
+        'foo=bar; Domain=example.com; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Secure'
+    )
     is_ok(cookies[0].name, 'foo', 'right name')
     is_ok(cookies[0].value, 'bar', 'right value')
     is_ok(cookies[0].domain, 'example.com', 'right domain')

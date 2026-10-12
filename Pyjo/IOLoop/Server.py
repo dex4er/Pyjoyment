@@ -116,7 +116,7 @@ class Pyjo_IOLoop_Server(Pyjo.EventEmitter.object):
 
     def __del__(self):
         if DEBUG:
-            warn(f"-- Method {self}.__del__")
+            warn(f'-- Method {self}.__del__')
 
         try:
             self.close()

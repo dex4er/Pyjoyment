@@ -1,4 +1,3 @@
-
 import Pyjo.Test
 
 
@@ -12,7 +11,6 @@ class UnitTest(Pyjo.Test.UnitTest):
 
 
 if __name__ == '__main__':
-
     from Pyjo.Test import *  # noqa
 
     import Pyjo.Transaction.WebSocket
@@ -20,7 +18,7 @@ if __name__ == '__main__':
     # Simple text frame roundtrip
     ws = Pyjo.Transaction.WebSocket.new()
     chunk = ws.build_frame(1, 0, 0, 0, 1, b'whatever')
-    is_ok(chunk, b"\x81\x08\x77\x68\x61\x74\x65\x76\x65\x72", 'right frame')
+    is_ok(chunk, b'\x81\x08\x77\x68\x61\x74\x65\x76\x65\x72', 'right frame')
     dummy = bytearray(chunk)
     frame = ws.parse_frame(dummy)
     is_ok(frame[0], 1, 'fin flag is set')
@@ -34,7 +32,7 @@ if __name__ == '__main__':
     # Simple text frame roundtrip with all flags set
     ws = Pyjo.Transaction.WebSocket.new()
     chunk = ws.build_frame(1, 1, 1, 1, 1, b'whatever')
-    is_ok(chunk, b"\xf1\x08\x77\x68\x61\x74\x65\x76\x65\x72", 'right frame')
+    is_ok(chunk, b'\xf1\x08\x77\x68\x61\x74\x65\x76\x65\x72', 'right frame')
     dummy = bytearray(chunk)
     frame = ws.parse_frame(dummy)
     is_ok(frame[0], 1, 'fin flag is set')
@@ -48,7 +46,7 @@ if __name__ == '__main__':
     # Simple text frame roundtrip without FIN bit
     ws = Pyjo.Transaction.WebSocket.new()
     chunk = ws.build_frame(0, 0, 0, 0, 1, b'whatever')
-    is_ok(chunk, b"\x01\x08\x77\x68\x61\x74\x65\x76\x65\x72", 'right frame')
+    is_ok(chunk, b'\x01\x08\x77\x68\x61\x74\x65\x76\x65\x72', 'right frame')
     dummy = bytearray(chunk)
     frame = ws.parse_frame(dummy)
     is_ok(frame[0], 0, 'fin flag is not set')
@@ -62,7 +60,7 @@ if __name__ == '__main__':
     # Simple text frame roundtrip with RSV1 flags set
     ws = Pyjo.Transaction.WebSocket.new()
     chunk = ws.build_frame(1, 1, 0, 0, 1, b'whatever')
-    is_ok(chunk, b"\xc1\x08\x77\x68\x61\x74\x65\x76\x65\x72", 'right frame')
+    is_ok(chunk, b'\xc1\x08\x77\x68\x61\x74\x65\x76\x65\x72', 'right frame')
     dummy = bytearray(chunk)
     frame = ws.parse_frame(dummy)
     is_ok(frame[0], 1, 'fin flag is set')
@@ -76,7 +74,7 @@ if __name__ == '__main__':
     # Simple text frame roundtrip with RSV2 flags set
     ws = Pyjo.Transaction.WebSocket.new()
     chunk = ws.build_frame(1, 0, 1, 0, 1, b'whatever')
-    is_ok(chunk, b"\xa1\x08\x77\x68\x61\x74\x65\x76\x65\x72", 'right frame')
+    is_ok(chunk, b'\xa1\x08\x77\x68\x61\x74\x65\x76\x65\x72', 'right frame')
     dummy = bytearray(chunk)
     frame = ws.parse_frame(dummy)
     is_ok(frame[0], 1, 'fin flag is set')
@@ -90,7 +88,7 @@ if __name__ == '__main__':
     # Simple text frame roundtrip with RSV3 flags set
     ws = Pyjo.Transaction.WebSocket.new()
     chunk = ws.build_frame(1, 0, 0, 1, 1, b'whatever')
-    is_ok(chunk, b"\x91\x08\x77\x68\x61\x74\x65\x76\x65\x72", 'right frame')
+    is_ok(chunk, b'\x91\x08\x77\x68\x61\x74\x65\x76\x65\x72', 'right frame')
     dummy = bytearray(chunk)
     frame = ws.parse_frame(dummy)
     is_ok(frame[0], 1, 'fin flag is set')
@@ -104,7 +102,7 @@ if __name__ == '__main__':
     # Simple binary frame roundtrip
     ws = Pyjo.Transaction.WebSocket.new()
     chunk = ws.build_frame(1, 0, 0, 0, 2, b'works')
-    is_ok(chunk, b"\x82\x05\x77\x6f\x72\x6b\x73", 'right frame')
+    is_ok(chunk, b'\x82\x05\x77\x6f\x72\x6b\x73', 'right frame')
     dummy = bytearray(chunk)
     frame = ws.parse_frame(dummy)
     is_ok(frame[0], 1, 'fin flag is set')
@@ -144,7 +142,7 @@ if __name__ == '__main__':
     # One-character text frame roundtrip
     ws = Pyjo.Transaction.WebSocket.new()
     chunk = ws.build_frame(1, 0, 0, 0, 1, b'a')
-    is_ok(chunk, b"\x81\x01\x61", 'right frame')
+    is_ok(chunk, b'\x81\x01\x61', 'right frame')
     dummy = bytearray(chunk)
     frame = ws.parse_frame(dummy)
     is_ok(frame[0], 1, 'fin flag is set')
@@ -158,7 +156,7 @@ if __name__ == '__main__':
     # One-byte binary frame roundtrip
     ws = Pyjo.Transaction.WebSocket.new()
     chunk = ws.build_frame(1, 0, 0, 0, 2, b'a')
-    is_ok(chunk, b"\x82\x01\x61", 'right frame')
+    is_ok(chunk, b'\x82\x01\x61', 'right frame')
     dummy = bytearray(chunk)
     frame = ws.parse_frame(dummy)
     is_ok(frame[0], 1, 'fin flag is set')
@@ -172,7 +170,7 @@ if __name__ == '__main__':
     # 16-bit text frame roundtrip
     ws = Pyjo.Transaction.WebSocket.new()
     chunk = ws.build_frame(1, 0, 0, 0, 1, b'hi' * 10000)
-    is_ok(chunk, b"\x81\x7e\x4e\x20" + (b"\x68\x69" * 10000), 'right frame')
+    is_ok(chunk, b'\x81\x7e\x4e\x20' + (b'\x68\x69' * 10000), 'right frame')
     dummy = bytearray(chunk)
     frame = ws.parse_frame(dummy)
     is_ok(frame[0], 1, 'fin flag is set')
@@ -186,7 +184,7 @@ if __name__ == '__main__':
     # 64-bit text frame roundtrip
     ws = Pyjo.Transaction.WebSocket.new(max_websocket_size=500000)
     chunk = ws.build_frame(1, 0, 0, 0, 1, b'hi' * 200000)
-    is_ok(chunk, b"\x81\x7f\x00\x00\x00\x00\x00\x06\x1a\x80" + (b"\x68\x69" * 200000), 'right frame')
+    is_ok(chunk, b'\x81\x7f\x00\x00\x00\x00\x00\x06\x1a\x80' + (b'\x68\x69' * 200000), 'right frame')
     dummy = bytearray(chunk)
     frame = ws.parse_frame(dummy)
     is_ok(frame[0], 1, 'fin flag is set')
@@ -200,7 +198,7 @@ if __name__ == '__main__':
     # Empty text frame roundtrip
     ws = Pyjo.Transaction.WebSocket.new()
     chunk = ws.build_frame(1, 0, 0, 0, 1, b'')
-    is_ok(chunk, b"\x81\x00", 'right frame')
+    is_ok(chunk, b'\x81\x00', 'right frame')
     dummy = bytearray(chunk)
     frame = ws.parse_frame(dummy)
     is_ok(frame[0], 1, 'fin flag is set')
@@ -214,7 +212,7 @@ if __name__ == '__main__':
     # Empty close frame roundtrip
     ws = Pyjo.Transaction.WebSocket.new()
     chunk = ws.build_frame(1, 0, 0, 0, 8, b'')
-    is_ok(chunk, b"\x88\x00", 'right frame')
+    is_ok(chunk, b'\x88\x00', 'right frame')
     dummy = bytearray(chunk)
     frame = ws.parse_frame(dummy)
     is_ok(frame[0], 1, 'fin flag is set')

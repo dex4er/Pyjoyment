@@ -1,4 +1,3 @@
-
 """
 Pyjoyment.Lite - Micro real-time web framework
 ==============================================
@@ -15,7 +14,6 @@ Pyjoyment.Lite - Micro real-time web framework
     # Start the Mojolicious command system
     app.start
 """
-
 
 import Pyjoyment.Base
 
@@ -34,6 +32,7 @@ def get(path, **kwargs):
 def path(path):
     def wrap(cb):
         return cb
+
     return wrap
 
 

@@ -1,4 +1,3 @@
-
 """
 Pyjo.Loader - Loader
 ====================
@@ -45,11 +44,11 @@ Functions
 ---------
 """
 
-import importlib
-import types
-
 from Pyjo.Regexp import r
 from Pyjo.Util import b64_decode
+
+import importlib
+import types
 
 
 BIN = {}

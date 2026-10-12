@@ -1,11 +1,10 @@
-
-import sys
-
 import Pyjo.IOLoop
 import Pyjo.URL
 
 from Pyjo.Regexp import r
 from Pyjo.Util import steady_time
+
+import sys
 
 
 argv = sys.argv[1:]
@@ -49,7 +48,7 @@ for i in range(n):
         def read(stream, chunk):
             context.size += len(chunk)
             if verbose:
-                print(f"{context.size}\r", end='')
+                print(f'{context.size}\r', end='')
 
         @stream.on
         def close(stream):
@@ -61,7 +60,9 @@ for i in range(n):
                 print(context.size)
 
         # Write request
-        stream.write(f"GET {url.path} HTTP/1.1\x0d\x0aHost: {url.host}:{url.port or 80}\x0d\x0a\x0d\x0a".encode('ascii'))
+        stream.write(
+            f'GET {url.path} HTTP/1.1\x0d\x0aHost: {url.host}:{url.port or 80}\x0d\x0a\x0d\x0a'.encode('ascii')
+        )
 
 
 Pyjo.IOLoop.start()

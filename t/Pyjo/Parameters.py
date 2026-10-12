@@ -1,4 +1,3 @@
-
 import Pyjo.Test
 
 
@@ -12,7 +11,6 @@ class UnitTest(Pyjo.Test.UnitTest):
 
 
 if __name__ == '__main__':
-
     from Pyjo.Test import *  # noqa
 
     import Pyjo.Parameters
@@ -30,14 +28,18 @@ if __name__ == '__main__':
     # Append
     params.append(('a', 4), ('a', 5), ('b', 6), ('b', 7))
     is_ok(str(params), 'foo=b%3Bar&baz=23&a=4&a=5&b=6&b=7', 'right format')
-    params.append(('c', 'f;oo'),)
+    params.append(
+        ('c', 'f;oo'),
+    )
     is_ok(str(params), 'foo=b%3Bar&baz=23&a=4&a=5&b=6&b=7&c=f%3Boo', 'right format')
     is_ok(str(params.remove('a')), 'foo=b%3Bar&baz=23&b=6&b=7&c=f%3Boo', 'right format')
 
     # Clone
     clone = params.clone()
     is_ok(str(params), str(clone), 'equal parameters')
-    clone.append(('c', 9),)
+    clone.append(
+        ('c', 9),
+    )
     isnt_ok(str(params), str(clone), 'unequal parameters')
 
     # Merge
@@ -45,7 +47,15 @@ if __name__ == '__main__':
     params.merge(params2)
     is_ok(str(params), 'foo=b%3Bar&baz=23&a=4&a=5&b=6&b=7&c=f%3Boo&x=1&y=2', 'right format')
     is_ok(str(params2), 'x=1&y=2', 'right format')
-    is_ok(str(params.merge(('baz', None),)), 'foo=b%3Bar&a=4&a=5&b=6&b=7&c=f%3Boo&x=1&y=2', 'right format')
+    is_ok(
+        str(
+            params.merge(
+                ('baz', None),
+            )
+        ),
+        'foo=b%3Bar&a=4&a=5&b=6&b=7&c=f%3Boo&x=1&y=2',
+        'right format',
+    )
 
     # Param
     params = Pyjo.Parameters.new('foo=b%3Bar&a=4&a=5&b=6&b=7&c=f%3Boo&x=1&y=3&z=6')
@@ -86,7 +96,9 @@ if __name__ == '__main__':
     is_ok(str(params), 'foo=bar&baz=42&yada=yada', 'right format')
 
     # "0"
-    params = Pyjo.Parameters.new(('foo', 0),)
+    params = Pyjo.Parameters.new(
+        ('foo', 0),
+    )
     is_ok(params.param('foo'), 0, 'right value')
     is_deeply_ok(params.every_param('foo'), [0], 'right value')
     is_deeply_ok(params.every_param('bar'), [], 'no values')
@@ -137,7 +149,9 @@ if __name__ == '__main__':
     is_ok(str(params), 'foo=%2B&foo+=a', 'right format')
     params.remove('foo ')
     is_deeply_ok(params.to_dict(), {'foo': '+'}, 'right structure')
-    params.append(('1 2', '3+3'),)
+    params.append(
+        ('1 2', '3+3'),
+    )
     is_ok(params.param('1 2'), '3+3', 'right value')
     is_deeply_ok(params.to_dict(), {'foo': '+', '1 2': '3+3'}, 'right structure')
     params = Pyjo.Parameters.new('a=works+too')
@@ -153,7 +167,9 @@ if __name__ == '__main__':
     is_ok(params.param('a'), 'b', 'right value')
     is_deeply_ok(params.every_param('bar'), ['bas', 'test'], 'right values')
     is_deeply_ok(params.to_dict(), {'foo': ['bar', 'baz'], 'a': 'b', 'bar': ['bas', 'test']}, 'right structure')
-    params = Pyjo.Parameters.new(('foo', ['ba;r', 'b;az']),)
+    params = Pyjo.Parameters.new(
+        ('foo', ['ba;r', 'b;az']),
+    )
     is_deeply_ok(params.to_dict(), {'foo': ['ba;r', 'b;az']}, 'right structure')
     params.append(('foo', ['bar']), ('foo', ['baz', 'yada']))
     is_deeply_ok(params.to_dict(), {'foo': ['ba;r', 'b;az', 'bar', 'baz', 'yada']}, 'right structure')
@@ -192,8 +208,8 @@ if __name__ == '__main__':
     is_ok(str(params), 'a=2&b=3', 'right result')
 
     # Query string
-    params = Pyjo.Parameters.new('%AZaz09-._~&;=+!$\'()*,%:@/?')
-    is_ok(str(params), '%AZaz09-._~&;=+!$\'()*,%:@/?', 'right result')
+    params = Pyjo.Parameters.new("%AZaz09-._~&;=+!$'()*,%:@/?")
+    is_ok(str(params), "%AZaz09-._~&;=+!$'()*,%:@/?", 'right result')
     params = Pyjo.Parameters.new('foo{}bar')
     is_ok(str(params), 'foo%7B%7Dbar', 'right result')
 
@@ -203,14 +219,14 @@ if __name__ == '__main__':
     is_ok(str(params), '%25foo%25=%25', 'right result')
 
     # Special characters
-    params = Pyjo.Parameters.new('!$\'()*,:@/foo?=!$\'()*,:@/?&bar=23')
-    is_ok(params.param('!$\'()*,:@/foo?'), '!$\'()*,:@/?', 'right value')
+    params = Pyjo.Parameters.new("!$'()*,:@/foo?=!$'()*,:@/?&bar=23")
+    is_ok(params.param("!$'()*,:@/foo?"), "!$'()*,:@/?", 'right value')
     is_ok(params.param('bar'), '23', 'right value')
-    is_ok(str(params), '!$\'()*,:@/foo?=!$\'()*,:@/?&bar=23', 'right result')
+    is_ok(str(params), "!$'()*,:@/foo?=!$'()*,:@/?&bar=23", 'right result')
 
     # No charset
     params = Pyjo.Parameters.new('%E5=%E4').set(charset=None)
-    is_ok(params.param(b"\xe5"), b"\xe4", 'right value')
+    is_ok(params.param(b'\xe5'), b'\xe4', 'right value')
     is_ok(str(params), '%E5=%E4', 'right result')
     is_ok(str(params.clone()), '%E5=%E4', 'right result')
 

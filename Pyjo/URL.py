@@ -1,4 +1,3 @@
-
 """
 Pyjo.URL- Uniform Resource Locator
 ==================================
@@ -38,19 +37,19 @@ Classes
 """
 
 import Pyjo.Base
-import Pyjo.String.Mixin
 import Pyjo.Parameters
 import Pyjo.Path
+import Pyjo.String.Mixin
 
 from Pyjo.Regexp import r
 from Pyjo.Util import b, convert, u, url_escape, url_unescape
 
 
-re_authority = r(br'^([^\@]+)\@')
-re_port = r(br':(\d+)$')
-re_non_ascii = r(br'[^\x00-\x7f]')
-re_idn = r(br'^xn--(.+)$')
-re_url = r(br'^(([^:/?#]+):)?(//([^/?#]*))?([^?#]*)(\?([^#]*))?(#(.*))?')
+re_authority = r(rb'^([^\@]+)\@')
+re_port = r(rb':(\d+)$')
+re_non_ascii = r(rb'[^\x00-\x7f]')
+re_idn = r(rb'^xn--(.+)$')
+re_url = r(rb'^(([^:/?#]+):)?(//([^/?#]*))?([^?#]*)(\?([^#]*))?(#(.*))?')
 
 
 class Pyjo_URL(Pyjo.Base.object, Pyjo.String.Mixin.object):
@@ -142,7 +141,13 @@ class Pyjo_URL(Pyjo.Base.object, Pyjo.String.Mixin.object):
         """
         for k, v in kwargs.items():
             m = getattr(self, k)
-            if isinstance(v, (list, tuple,)):
+            if isinstance(
+                v,
+                (
+                    list,
+                    tuple,
+                ),
+            ):
                 m.append(*v)
             elif isinstance(v, dict):
                 m.append(**v)
@@ -173,7 +178,7 @@ class Pyjo_URL(Pyjo.Base.object, Pyjo.String.Mixin.object):
         info = self.userinfo
         if info is None:
             return authority
-        info = u(url_escape(b(info), br'^A-Za-z0-9\-._~!$&\'()*+,;=:'))
+        info = u(url_escape(b(info), rb'^A-Za-z0-9\-._~!$&\'()*+,;=:'))
 
         return info + '@' + authority
 
@@ -287,7 +292,10 @@ class Pyjo_URL(Pyjo.Base.object, Pyjo.String.Mixin.object):
             return self.host.lower()
 
         # Encode
-        parts = map(lambda s: ('xn--' + s.encode('punycode').decode('ascii')) if re_non_ascii.search(b(s)) else s, self.host.split('.'))
+        parts = map(
+            lambda s: ('xn--' + s.encode('punycode').decode('ascii')) if re_non_ascii.search(b(s)) else s,
+            self.host.split('.'),
+        )
         return '.'.join(parts).lower()
 
     @ihost.setter
@@ -326,7 +334,13 @@ class Pyjo_URL(Pyjo.Base.object, Pyjo.String.Mixin.object):
         """
         for k, v in kwargs.items():
             m = getattr(self, k)
-            if isinstance(v, (list, tuple,)):
+            if isinstance(
+                v,
+                (
+                    list,
+                    tuple,
+                ),
+            ):
                 m.merge(*v)
             elif isinstance(v, dict):
                 m.merge(**v)
@@ -490,7 +504,13 @@ class Pyjo_URL(Pyjo.Base.object, Pyjo.String.Mixin.object):
             self._query = Pyjo.Parameters.new(**value)
 
         # Replace with list or tuple
-        elif isinstance(value, (list, tuple,)):
+        elif isinstance(
+            value,
+            (
+                list,
+                tuple,
+            ),
+        ):
             self._query = Pyjo.Parameters.new(*value)
 
         # New parameters
@@ -605,7 +625,7 @@ class Pyjo_URL(Pyjo.Base.object, Pyjo.String.Mixin.object):
         if fragment is None:
             return url
 
-        return url + '#' + u(url_escape(b(fragment), br'^A-Za-z0-9\-._~!$&\'()*+,;=%:@\/?'))
+        return url + '#' + u(url_escape(b(fragment), rb'^A-Za-z0-9\-._~!$&\'()*+,;=%:@\/?'))
 
 
 new = Pyjo_URL.new

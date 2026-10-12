@@ -1,7 +1,6 @@
+import Pyjo.IOLoop
 
 import sys
-
-import Pyjo.IOLoop
 
 
 port = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
@@ -13,7 +12,8 @@ def client_cb(loop, err, stream):
         stream.close()
 
     stream.on(read_cb, 'read')
-    stream.write(b"GET / HTTP/1.0\x0d\x0a\x0d\x0a")
+    stream.write(b'GET / HTTP/1.0\x0d\x0a\x0d\x0a')
+
 
 Pyjo.IOLoop.client(address='127.0.0.1', port=port, cb=client_cb)
 
