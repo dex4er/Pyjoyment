@@ -1,0 +1,6 @@
+# Commits that only reformat code, skipped by `git blame` and by GitHub's
+# blame view. Locally, the trunk action git-blame-ignore-revs sets
+# blame.ignoreRevsFile.
+
+# Trunk with ruff and auto-formatting (#7)
+f1f8bb5aaf09c82ce26c68c3008fa9bf64ea8a9f

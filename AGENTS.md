@@ -149,6 +149,10 @@ hooks (any `trunk` command does). The hook formats with the configuration that
 is staged, so a change to the formatter configuration goes in its own commit,
 before the code that depends on it.
 
+A commit that only reformats code goes into `.git-blame-ignore-revs`, so that
+`git blame` and GitHub's blame view skip it. The trunk action
+`git-blame-ignore-revs` points `blame.ignoreRevsFile` at the file locally.
+
 The ruff configuration lives in `pyproject.toml`. Its rule list is explicit:
 newer ruff versions enable many more rules by default, including one that
 rejects the Mojo-style module names. Formatting uses single quotes and a line

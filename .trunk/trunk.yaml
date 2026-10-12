@@ -42,6 +42,7 @@ lint:
     - trufflehog
 actions:
   enabled:
+    - git-blame-ignore-revs
     - trunk-announce
     - trunk-check-pre-push
     - trunk-fmt-pre-commit
