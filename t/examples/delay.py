@@ -34,7 +34,7 @@ if __name__ == '__main__':
             pass_ok('Wait 1 second for step 2.2.')
 
         def step2_2(delay2, *args):
-            pass_ok("Step 2.2 got {0}".format(args))
+            pass_ok(f"Step 2.2 got {args}")
             Pyjo.IOLoop.timer(delay2.begin(), 0.3)
             pass_ok('Wait 3 seconds for step 3.')
 

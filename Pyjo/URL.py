@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 """
 Pyjo.URL- Uniform Resource Locator
@@ -129,16 +128,7 @@ class Pyjo_URL(Pyjo.Base.object, Pyjo.String.Mixin.object):
 
             boolean = bool(url)
 
-        Always true. (Python 3.x)
-        """
-        return True
-
-    def __nonzero__(self):
-        """::
-
-            boolean = bool(url)
-
-        Always true. (Python 2.x)
+        Always true.
         """
         return True
 
@@ -271,7 +261,7 @@ class Pyjo_URL(Pyjo.Base.object, Pyjo.String.Mixin.object):
         host = self.ihost
         port = self.port
         if port is not None:
-            return '{0}:{1}'.format(host, port)
+            return f'{host}:{port}'
         else:
             return host
 

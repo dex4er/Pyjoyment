@@ -1,4 +1,3 @@
-# coding: utf-8
 
 import Pyjo.Test
 
@@ -170,16 +169,16 @@ if __name__ == '__main__':
     # Unicode
     params = Pyjo.Parameters.new()
     params.parse('input=say%20%22%C2%AB~%22;')
-    is_deeply_ok(params.pairs, [('input', u'say "«~";')], 'right structure')
-    is_ok(params.param('input'), u'say "«~";', 'right value')
+    is_deeply_ok(params.pairs, [('input', 'say "«~";')], 'right structure')
+    is_ok(params.param('input'), 'say "«~";', 'right value')
     is_ok(str(params), 'input=say+%22%C2%AB~%22%3B', 'right result')
-    params = Pyjo.Parameters.new(u'♥=☃')
-    is_deeply_ok(params.pairs, [(u'♥', u'☃')], 'right structure')
-    is_ok(params.param(u'♥'), u'☃', 'right value')
+    params = Pyjo.Parameters.new('♥=☃')
+    is_deeply_ok(params.pairs, [('♥', '☃')], 'right structure')
+    is_ok(params.param('♥'), '☃', 'right value')
     is_ok(str(params), '%E2%99%A5=%E2%98%83', 'right result')
     params = Pyjo.Parameters.new('%E2%99%A5=%E2%98%83')
-    is_deeply_ok(params.pairs, [(u'♥', u'☃')], 'right structure')
-    is_ok(params.param(u'♥'), u'☃', 'right value')
+    is_deeply_ok(params.pairs, [('♥', '☃')], 'right structure')
+    is_ok(params.param('♥'), '☃', 'right value')
     is_ok(str(params), '%E2%99%A5=%E2%98%83', 'right result')
 
     # Reparse

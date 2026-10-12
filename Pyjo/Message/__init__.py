@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 """
 Pyjo.Message - HTTP message base class
@@ -98,7 +97,7 @@ class Pyjo_Message(Pyjo.EventEmitter.object):
     """
 
     def __init__(self, **kwargs):
-        super(Pyjo_Message, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.content = notnone(kwargs.get('content'), lambda: Pyjo.Content.Single.new())
         """::

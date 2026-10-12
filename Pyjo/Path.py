@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 """
 Pyjo.Path - Path
@@ -69,7 +68,7 @@ class Pyjo_Path(Pyjo.Base.object, Pyjo.String.Mixin.object):
 
             boolean = bool(path)
 
-        Always true. (Python 3.x)
+        Always true.
         """
         return True
 
@@ -82,15 +81,6 @@ class Pyjo_Path(Pyjo.Base.object, Pyjo.String.Mixin.object):
         will be treated as ``/`` for security reasons.
         """
         return iter(self.parts)
-
-    def __nonzero__(self):
-        """::
-
-            boolean = bool(path)
-
-        Always true. (Python 2.x)
-        """
-        return True
 
     def canonicalize(self):
         """::
@@ -394,11 +384,11 @@ class Pyjo_Path(Pyjo.Base.object, Pyjo.String.Mixin.object):
             if self._path is not None:
                 path = self._path
             else:
-                path = u'' if charset else b''
+                path = '' if charset else b''
 
             if charset:
                 path = url_unescape(b(path, charset)).decode(charset)
-                slash = u'/'
+                slash = '/'
             else:
                 path = url_unescape(path)
                 slash = b'/'

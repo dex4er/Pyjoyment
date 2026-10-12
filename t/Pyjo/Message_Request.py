@@ -1,4 +1,3 @@
-# coding: utf-8
 
 import Pyjo.Test
 
@@ -517,7 +516,7 @@ if __name__ == '__main__':
     is_ok(req.url, '/foo/bar/baz.html?foo=13#23', 'right URL')
     is_ok(req.headers.content_type, 'application/x-www-form-urlencoded', 'right "Content-Type" value')
     is_ok(req.headers.content_length, '14', 'right "Content-Length" value')
-    is_ok(req.param('name'), u'☃', 'right value')
+    is_ok(req.param('name'), '☃', 'right value')
 
     # Parse HTTP 1.1 gzip compressed request (no decompression)
     gzip = zlib.compressobj(-1, zlib.DEFLATED, zlib.MAX_WBITS | 16)
@@ -1648,7 +1647,7 @@ if __name__ == '__main__':
     # Parse multipart/form-data request with charset
     req = Pyjo.Message.Request.new()
     is_ok(req.default_charset, 'utf-8', 'default charset is utf-8')
-    yatta = u'やった'
+    yatta = 'やった'
     yatta_sjis = b(yatta, 'Shift_JIS')
     multipart = b"------1234567890\x0d\x0a" \
                 b"Content-Disposition: form-data; name=\"" + yatta_sjis + b"\"\x0d\x0a\x0d\x0a" \
@@ -1755,7 +1754,7 @@ if __name__ == '__main__':
 
     # Chrome 5 multipart/form-data request (UTF-8)
     req = Pyjo.Message.Request.new()
-    fname, sname, sex, avatar, submit = b(u'Иван'), b(u'Иванов'), b(u'мужской'), b(u'аватар.jpg'), b(u'Сохранить')
+    fname, sname, sex, avatar, submit = b('Иван'), b('Иванов'), b('мужской'), b('аватар.jpg'), b('Сохранить')
     chrome = \
         b"------WebKitFormBoundaryYGjwdkpB6ZLCZQbX\x0d\x0a" \
         b"Content-Disposition: form-data; name=\"fname\"\x0d\x0a\x0d\x0a" \
@@ -1801,23 +1800,23 @@ if __name__ == '__main__':
           'BAcIMTIzNDU2NzgECAgIAwIAAAAXDGFsZXgudm9yb25vdgQAAAB1c2VyBp6FjksAAAAABwA'
           'AAGV4cGlyZXM=--1641adddfe885276cda0deb7475f153a', 'right value')
     ok(req.headers.content_type.find('multipart/form-data') >= 0, 'right "Content-Type" value')
-    is_ok(req.param('fname'), u'Иван', 'right value')
-    is_ok(req.param('sname'), u'Иванов', 'right value')
-    is_ok(req.param('sex'), u'мужской', 'right value')
+    is_ok(req.param('fname'), 'Иван', 'right value')
+    is_ok(req.param('sname'), 'Иванов', 'right value')
+    is_ok(req.param('sex'), 'мужской', 'right value')
     is_ok(req.param('bdate'), '16.02.1987', 'right value')
     is_ok(req.param('phone'), '1234567890', 'right value')
-    is_ok(req.param('submit'), u'Сохранить', 'right value')
+    is_ok(req.param('submit'), 'Сохранить', 'right value')
     upload = req.upload('avatar')
     isa_ok(upload, Pyjo.Upload.object, 'right upload')
     is_ok(upload.headers.content_type, 'image/jpeg', 'right "Content-Type" value')
-    is_ok(upload.filename, u'аватар.jpg', 'right filename')
+    is_ok(upload.filename, 'аватар.jpg', 'right filename')
     is_ok(upload.size, 4, 'right size')
     is_ok(upload.slurp(), b'1234', 'right content')
     is_ok(req.content.parts[0].asset.slurp(), fname, 'right content')
 
     # Firefox 3.5.8 multipart/form-data request (UTF-8)
     req = Pyjo.Message.Request.new()
-    fname, sname, sex, avatar, submit = b(u'Иван'), b(u'Иванов'), b(u'мужской'), b(u'аватар.jpg'), b(u'Сохранить')
+    fname, sname, sex, avatar, submit = b('Иван'), b('Иванов'), b('мужской'), b('аватар.jpg'), b('Сохранить')
     firefox = \
         b"-----------------------------213090722714721300002030499922\x0d\x0a" \
         b"Content-Disposition: form-data; name=\"fname\"\x0d\x0a\x0d\x0a" \
@@ -1867,23 +1866,23 @@ if __name__ == '__main__':
           'BAcIMTIzNDU2NzgECAgIAwIAAAAXDGFsZXgudm9yb25vdgQAAAB1c2VyBiWFjksAAAAABwA'
           'AAGV4cGlyZXM=--cd933a37999e0fa8d7804205e89193a7', 'right value')
     ok(req.headers.content_type.find('multipart/form-data') >= 0, 'right "Content-Type" value')
-    is_ok(req.param('fname'), u'Иван', 'right value')
-    is_ok(req.param('sname'), u'Иванов', 'right value')
-    is_ok(req.param('sex'), u'мужской', 'right value')
+    is_ok(req.param('fname'), 'Иван', 'right value')
+    is_ok(req.param('sname'), 'Иванов', 'right value')
+    is_ok(req.param('sex'), 'мужской', 'right value')
     is_ok(req.param('bdate'), '16.02.1987', 'right value')
     is_ok(req.param('phone'), '1234567890', 'right value')
-    is_ok(req.param('submit'), u'Сохранить', 'right value')
+    is_ok(req.param('submit'), 'Сохранить', 'right value')
     upload = req.upload('avatar')
     isa_ok(upload, Pyjo.Upload.object, 'right upload')
     is_ok(upload.headers.content_type, 'image/jpeg', 'right "Content-Type" value')
-    is_ok(upload.filename, u'аватар.jpg', 'right filename')
+    is_ok(upload.filename, 'аватар.jpg', 'right filename')
     is_ok(upload.size, 4, 'right size')
     is_ok(upload.slurp(), b'1234', 'right content')
     is_ok(req.content.parts[0].asset.slurp(), fname, 'right content')
 
     # Opera 9.8 multipart/form-data request (UTF-8)
     req = Pyjo.Message.Request.new()
-    fname, sname, sex, avatar, submit = b(u'Иван'), b(u'Иванов'), b(u'мужской'), b(u'аватар.jpg'), b(u'Сохранить')
+    fname, sname, sex, avatar, submit = b('Иван'), b('Иванов'), b('мужской'), b('аватар.jpg'), b('Сохранить')
     opera = \
         b"------------IWq9cR9mYYG668xwSn56f0\x0d\x0a" \
         b"Content-Disposition: form-data; name=\"fname\"\x0d\x0a\x0d\x0a" \
@@ -1929,23 +1928,23 @@ if __name__ == '__main__':
           'BAcIMTIzNDU2NzgECAgIAwIAAAAXDGFsZXgudm9yb25vdgQAAAB1c2VyBhaIjksAAAAABwA'
           'AAGV4cGlyZXM=--78a58a94f98ae5b75a489be1189f2672', 'right value')
     ok(req.headers.content_type.find('multipart/form-data') >= 0, 'right "Content-Type" value')
-    is_ok(req.param('fname'), u'Иван', 'right value')
-    is_ok(req.param('sname'), u'Иванов', 'right value')
-    is_ok(req.param('sex'), u'мужской', 'right value')
+    is_ok(req.param('fname'), 'Иван', 'right value')
+    is_ok(req.param('sname'), 'Иванов', 'right value')
+    is_ok(req.param('sex'), 'мужской', 'right value')
     is_ok(req.param('bdate'), '16.02.1987', 'right value')
     is_ok(req.param('phone'), '1234567890', 'right value')
-    is_ok(req.param('submit'), u'Сохранить', 'right value')
+    is_ok(req.param('submit'), 'Сохранить', 'right value')
     upload = req.upload('avatar')
     isa_ok(upload, Pyjo.Upload.object, 'right upload')
     is_ok(upload.headers.content_type, 'image/jpeg', 'right "Content-Type" value')
-    is_ok(upload.filename, u'аватар.jpg', 'right filename')
+    is_ok(upload.filename, 'аватар.jpg', 'right filename')
     is_ok(upload.size, 4, 'right size')
     is_ok(upload.slurp(), b'1234', 'right content')
     is_ok(req.content.parts[0].asset.slurp(), fname, 'right content')
 
     # Firefox 14 multipart/form-data request (UTF-8)
     req = Pyjo.Message.Request.new()
-    name, filename = b(u'☃'), b(u'foo bär ☃.txt')
+    name, filename = b('☃'), b('foo bär ☃.txt')
     firefox = \
         b"-----------------------------1264369278903768281481663536\x0d\x0a" \
         b"Content-Disposition: form-data; name=\"" + name + b"\"; filename=\"" + filename + b"\"" \
@@ -1971,11 +1970,11 @@ if __name__ == '__main__':
     is_ok(req.version, '1.1', 'right version')
     is_ok(req.url, '/foo', 'right URL')
     ok(req.headers.content_type.find('multipart/form-data') >= 0, 'right "Content-Type" value')
-    is_ok(req.upload(u'☃').name, u'☃', 'right name')
-    is_ok(req.upload(u'☃').filename, u'foo bär ☃.txt', 'right filename')
-    is_ok(req.upload(u'☃').headers.content_type, 'text/plain', 'right "Content-Type" value')
-    is_ok(req.upload(u'☃').asset.size, 8, 'right size')
-    is_ok(req.upload(u'☃').asset.slurp(), b'test 123', 'right content')
+    is_ok(req.upload('☃').name, '☃', 'right name')
+    is_ok(req.upload('☃').filename, 'foo bär ☃.txt', 'right filename')
+    is_ok(req.upload('☃').headers.content_type, 'text/plain', 'right "Content-Type" value')
+    is_ok(req.upload('☃').asset.size, 8, 'right size')
+    is_ok(req.upload('☃').asset.slurp(), b'test 123', 'right content')
 
     # Parse "~" in URL
     req = Pyjo.Message.Request.new()

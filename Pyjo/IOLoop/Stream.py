@@ -108,7 +108,6 @@ import Pyjo.IOLoop
 from Pyjo.Util import getenv, isalive, notnone, warn
 
 import errno
-import socket
 import weakref
 
 
@@ -133,7 +132,7 @@ class Pyjo_IOLoop_Stream(Pyjo.EventEmitter.object):
     """
 
     def __init__(self, handle, *args, **kwargs):
-        super(Pyjo_IOLoop_Stream, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         self.reactor = notnone(kwargs.get('reactor'), lambda: Pyjo.IOLoop.singleton.reactor)
         """::
@@ -161,7 +160,7 @@ class Pyjo_IOLoop_Stream(Pyjo.EventEmitter.object):
 
     def __del__(self):
         if DEBUG:
-            warn("-- Method {0}.__del__".format(self))
+            warn(f"-- Method {self}.__del__")
 
         try:
             self.close()
@@ -373,7 +372,7 @@ class Pyjo_IOLoop_Stream(Pyjo.EventEmitter.object):
         readbuffer = b''
         try:
             readbuffer = self.handle.recv(131072)
-        except socket.error as e:
+        except OSError as e:
             return self._error(e)
         if not readbuffer:
             return self.close()
@@ -384,7 +383,7 @@ class Pyjo_IOLoop_Stream(Pyjo.EventEmitter.object):
         if len(self._buffer):
             try:
                 written = handle.send(self._buffer)
-            except socket.error as e:
+            except OSError as e:
                 self._error(e)
             self.emit('write', self._buffer[:written])
             self._buffer = self._buffer[written:]

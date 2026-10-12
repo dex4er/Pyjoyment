@@ -1,4 +1,4 @@
-class C(object):
+class C:
     def m(self):
         v = 42
 

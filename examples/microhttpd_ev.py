@@ -12,7 +12,7 @@ NONBLOCKING = (errno.EAGAIN, errno.EWOULDBLOCK)
 port = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
 
 
-class Connection(object):
+class Connection:
 
     def __init__(self, sock, address, loop):
         self.sock = sock
@@ -34,9 +34,9 @@ class Connection(object):
     def handle_read(self):
         try:
             buf = self.sock.recv(10240)
-        except socket.error as err:
+        except OSError as err:
             if err.args[0] not in NONBLOCKING:
-                self.handle_error("error reading from {0}".format(self.sock))
+                self.handle_error(f"error reading from {self.sock}")
         if not buf:
             self.handle_error("connection closed by peer")
             return
@@ -60,9 +60,9 @@ class Connection(object):
     def handle_write(self):
         try:
             sent = self.sock.send(self.buf)
-        except socket.error as err:
+        except OSError as err:
             if err.args[0] not in NONBLOCKING:
-                self.handle_error("error writing to {0}".format(self.sock))
+                self.handle_error(f"error writing to {self.sock}")
         else:
             self.buf = self.buf[sent:]
             if not self.buf:
@@ -83,7 +83,7 @@ class Connection(object):
         self.watcher = None
 
 
-class Server(object):
+class Server:
 
     def __init__(self, address):
         self.sock = socket.socket()
@@ -110,7 +110,7 @@ class Server(object):
             while True:
                 try:
                     sock, address = self.sock.accept()
-                except socket.error as err:
+                except OSError as err:
                     if err.args[0] in NONBLOCKING:
                         break
                     else:

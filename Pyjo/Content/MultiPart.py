@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 r"""
 Pyjo.Content.MultiPart - HTTP multipart content
@@ -71,7 +70,7 @@ class Pyjo_Content_MultiPart(Pyjo.Content.object, Pyjo.String.Mixin.object):
         Construct a new :mod:`Pyjo.Content.MultiPart` object and subscribe to ``read``
         event with default content parser.
         """
-        super(Pyjo_Content_MultiPart, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.parts = kwargs.get('parts', [])
         """::
@@ -164,7 +163,7 @@ class Pyjo_Content_MultiPart(Pyjo.Content.object, Pyjo.String.Mixin.object):
 
         Clone content if possible, otherwise return ``None``.
         """
-        clone = super(Pyjo_Content_MultiPart, self).clone()
+        clone = super().clone()
         if clone is not None:
             clone.parts = self.parts
             return clone

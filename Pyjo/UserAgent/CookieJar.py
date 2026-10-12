@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 """
 Pyjo.UserAgent.CookieJar - Cookie jar for HTTP user agents

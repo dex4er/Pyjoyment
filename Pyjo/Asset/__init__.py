@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 """
 Pyjo.Asset - HTTP content storage base class
@@ -57,7 +56,7 @@ class Pyjo_Asset(Pyjo.EventEmitter.object):
     """
 
     def __init__(self, **kwargs):
-        super(Pyjo_Asset, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.end_range = kwargs.get('end_range')
         """::

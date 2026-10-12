@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 """
 Pyjo.Server.CGI - CGI server
@@ -100,7 +99,7 @@ class Pyjo_Server_CGI(Pyjo.Server.Base.object):
         code = res.code or 404
         msg = res.message or res.default_message()
         if not self.nph:
-            res.headers.status = "{0} {1}".format(code, msg)
+            res.headers.status = f"{code} {msg}"
         if not self._write(res, 'get_header_chunk'):
             return
 

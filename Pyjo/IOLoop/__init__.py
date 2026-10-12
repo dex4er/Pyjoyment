@@ -107,7 +107,7 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
     """
 
     def __init__(self, **kwargs):
-        super(Pyjo_IOLoop, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.max_accepts = kwargs.get('max_accepts', 0)
         """::
@@ -177,10 +177,10 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
         self._stop_timer = None
 
         if DEBUG:
-            warn("-- Reactor initialized ({0})".format(self.reactor))
+            warn(f"-- Reactor initialized ({self.reactor})")
 
         def catch_cb(reactor, e, event):
-            warn("{0}: {1}\n{2}".format(reactor, event, traceback.format_exc()))
+            warn(f"{reactor}: {event}\n{traceback.format_exc()}")
 
         self.reactor.catch(catch_cb)
 
@@ -409,7 +409,7 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
                 ...
         """
         if DEBUG:
-            warn("-- Recurring after {0} cb {1}".format(after, cb))
+            warn(f"-- Recurring after {after} cb {cb}")
         return self._timer(cb, 'recurring', after)
 
     def remove(self, taskid):
@@ -588,13 +588,13 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
                 ...
         """
         if DEBUG:
-            warn("-- Timer after {0} cb {1}".format(after, cb))
+            warn(f"-- Timer after {after} cb {cb}")
         return self._timer(cb, 'timer', after)
 
     def _id(self):
         taskid = None
         while True:
-            taskid = md5_sum('c{0}{1}'.format(steady_time(), rand()).encode('ascii'))
+            taskid = md5_sum(f'c{steady_time()}{rand()}'.encode('ascii'))
             if taskid not in self._connections and taskid not in self._acceptors:
                 break
         return taskid
@@ -637,7 +637,7 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
             del self._connections[taskid]
             self._maybe_accepting()
             if DEBUG:
-                warn("-- Removed connection {0} ({1} connections)".format(taskid, len(self._connections)))
+                warn(f"-- Removed connection {taskid} ({len(self._connections)} connections)")
             return
 
         # Timer
@@ -662,7 +662,7 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
         self._connections[cid] = {'stream': stream}
 
         if DEBUG:
-            warn("-- New connection {0} ({1} connections)".format(cid, len(self._connections)))
+            warn(f"-- New connection {cid} ({len(self._connections)} connections)")
 
         stream.reactor = weakref.proxy(self.reactor)
         loop = weakref.proxy(self)

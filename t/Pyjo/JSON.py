@@ -1,4 +1,3 @@
-# coding: utf-8
 
 import Pyjo.Test
 
@@ -12,7 +11,7 @@ class UnitTest(Pyjo.Test.UnitTest):
     script = __file__
 
 
-class JSONTest(object):
+class JSONTest:
     def __init__(self, something={}):
         self.something = something
 
@@ -86,7 +85,7 @@ if __name__ == '__main__':
     array = decode_json(r'["hello\t\"world!"]')
     is_deeply_ok(array, ["hello\t\"world!"], r'decode ["hello\t\"world!"]')
     array = decode_json(r'["hello\u0152world\u0152!"]')
-    is_deeply_ok(array, [u"hello\u0152world\u0152!"], r'decode ["hello\u0152world\u0152!"]')
+    is_deeply_ok(array, ["hello\u0152world\u0152!"], r'decode ["hello\u0152world\u0152!"]')
     array = decode_json('["0."]')
     is_deeply_ok(array, ['0.'], 'decode ["0."]')
     array = decode_json('[" 0"]')
@@ -152,8 +151,8 @@ if __name__ == '__main__':
     is_ok(bstring, br'["hello\nworld!"]', r'encode ["hello\nworld!"]')
     bstring = encode_json(["hello\t\"world!"])
     is_ok(bstring, br'["hello\t\"world!"]', r'encode ["hello\t\"world!"]')
-    bstring = encode_json([u"hello\x03\u0152world\u0152!"])
-    is_ok(b(bstring).decode('utf-8'), u"[\"hello\\u0003\u0152world\u0152!\"]", r'encode ["hello\x03\u0152world\u0152!"]')
+    bstring = encode_json(["hello\x03\u0152world\u0152!"])
+    is_ok(b(bstring).decode('utf-8'), "[\"hello\\u0003\u0152world\u0152!\"]", r'encode ["hello\x03\u0152world\u0152!"]')
     bstring = encode_json(["123abc"])
     is_ok(bstring, b'["123abc"]', 'encode ["123abc"]')
     bstring = encode_json(["\x00\x1f \a\b/\f\r"])
@@ -212,14 +211,14 @@ if __name__ == '__main__':
     is_ok(bstring, b'23.3', 'encode 23.3')
 
     # Faihu roundtrip
-    bstring = j([u"\U00010346"])
-    is_ok(b(bstring).decode('utf-8'), u"[\"\U00010346\"]", r'encode ["\U00010346"]')
+    bstring = j(["\U00010346"])
+    is_ok(b(bstring).decode('utf-8'), "[\"\U00010346\"]", r'encode ["\U00010346"]')
     array = j(bstring)
-    is_deeply_ok(array, [u"\U00010346"], 'successful roundtrip')
+    is_deeply_ok(array, ["\U00010346"], 'successful roundtrip')
 
     # Decode faihu surrogate pair
     array = decode_json(b'["\\ud800\\udf46"]')
-    is_deeply_ok(array, [u"\U00010346"], 'decode [\"\\ud800\\udf46\"]')
+    is_deeply_ok(array, ["\U00010346"], 'decode [\"\\ud800\\udf46\"]')
 
     # Decode object with duplicate keys
     dictionary = decode_json(b'{"foo": 1, "foo": 2}')
@@ -250,14 +249,14 @@ if __name__ == '__main__':
     is_deeply_ok(decode_json(bstring), ['a' * 32768], 'successful roundtrip')
 
     # u2028, u2029 and slash
-    bstring = encode_json([u"\u2028test\u2029123</script>"])
+    bstring = encode_json(["\u2028test\u2029123</script>"])
     is_ok(bstring, br'["\u2028test\u2029123<\/script>"]', 'escaped u2028, u2029 and slash')
-    is_deeply_ok(decode_json(bstring), [u"\u2028test\u2029123</script>"], 'successful roundtrip')
+    is_deeply_ok(decode_json(bstring), ["\u2028test\u2029123</script>"], 'successful roundtrip')
 
     # JSON without utf-8 encoding
-    is_deeply_ok(from_json(u'["♥"]'), [u'♥'], 'characters decoded')
-    is_ok(to_json([u'♥']), u'["♥"]', 'characters encoded')
-    is_deeply_ok(from_json(to_json([u"\xe9"])), [u"\xe9"], 'successful roundtrip')
+    is_deeply_ok(from_json('["♥"]'), ['♥'], 'characters decoded')
+    is_ok(to_json(['♥']), '["♥"]', 'characters encoded')
+    is_deeply_ok(from_json(to_json(["\xe9"])), ["\xe9"], 'successful roundtrip')
 
     # Object
     bstring = encode_json([b('test')])

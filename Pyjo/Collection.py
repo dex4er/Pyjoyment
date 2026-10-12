@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 r"""
 Pyjo.Collection - Collection
@@ -40,10 +39,10 @@ class Pyjo_Collection(list):
     """
 
     def __new__(cls, value=[]):
-        return super(Pyjo_Collection, cls).__new__(cls, value)
+        return super().__new__(cls, value)
 
     def __repr__(self):
-        return "{0}.new({1})".format(self.__module__, super(Pyjo_Collection, self).__repr__())
+        return f"{self.__module__}.new({super().__repr__()})"
 
     def compact(self):
         """::
@@ -184,7 +183,7 @@ class Pyjo_Collection(list):
         """
         return self[offset]
 
-    def join(self, string=u''):
+    def join(self, string=''):
         r"""::
 
             stream = collection.join()
@@ -365,8 +364,7 @@ def c(value=[]):
 def _flatten(array):
     for item in array:
         if isinstance(item, (list, tuple)):
-            for subitem in _flatten(item):
-                yield subitem
+            yield from _flatten(item)
         else:
             yield item
 

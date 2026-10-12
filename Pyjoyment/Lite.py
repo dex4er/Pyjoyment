@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 """
 Pyjoyment.Lite - Micro real-time web framework

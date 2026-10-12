@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 """
 Pyjo.Parameters - Parameters
@@ -74,7 +73,7 @@ class Pyjo_Parameters(Pyjo.Base.object, Pyjo.String.Mixin.object):
 
             boolean = bool(params)
 
-        Always true. (Python 3.x)
+        Always true.
         """
         return True
 
@@ -86,15 +85,6 @@ class Pyjo_Parameters(Pyjo.Base.object, Pyjo.String.Mixin.object):
         Iterator based on :attr:`params`. Note that this will normalize the parameters.
         """
         return iter(self.pairs)
-
-    def __nonzero__(self):
-        """::
-
-            boolean = bool(params)
-
-        Always true. (Python 2.x)
-        """
-        return True
 
     def append(self, *args, **kwargs):
         """::

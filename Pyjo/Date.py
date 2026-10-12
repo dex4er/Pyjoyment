@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 """
 Pyjo.Date - HTTP date
@@ -84,16 +83,7 @@ class Pyjo_Date(Pyjo.Base.object, Pyjo.String.Mixin.object):
 
             boolean = bool(date)
 
-        Always true. (Python 3.x)
-        """
-        return True
-
-    def __nonzero__(self):
-        """::
-
-            boolean = bool(date)
-
-        Always true. (Python 2.x)
+        Always true.
         """
         return True
 
@@ -199,9 +189,7 @@ class Pyjo_Date(Pyjo.Base.object, Pyjo.String.Mixin.object):
         # RFC 3339 (1994-11-06T08:49:37Z)
         epoch = self.epoch
         year, month, day, h, m, s, _, _, _ = tuple(time.gmtime(epoch))
-        string = '{0:04d}-{1:02d}-{2:02d}{3}{4:02d}:{5:02d}:{6:02d}'.format(
-            year, month, day, sep, h, m, s
-        )
+        string = f'{year:04d}-{month:02d}-{day:02d}{sep}{h:02d}:{m:02d}:{s:02d}'
         if isinstance(epoch, float):
             epoch = str(epoch)
             if not epoch.endswith('.0'):
@@ -221,9 +209,7 @@ class Pyjo_Date(Pyjo.Base.object, Pyjo.String.Mixin.object):
         """
         # RFC 7231 (Sun, 06 Nov 1994 08:49:37 GMT)
         year, month, mday, h, m, s, wday, _, _ = tuple(time.gmtime(self.epoch))
-        return '{0}, {1:02d} {2} {3:04d} {4:02d}:{5:02d}:{6:02d} GMT'.format(
-            DAYS[wday], mday, MONTHS[month], year, h, m, s
-        )
+        return f'{DAYS[wday]}, {mday:02d} {MONTHS[month]} {year:04d} {h:02d}:{m:02d}:{s:02d} GMT'
 
 
 new = Pyjo_Date.new

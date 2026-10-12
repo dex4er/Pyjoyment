@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 """
 Pyjo.String.Bytes - Bytes string
@@ -18,8 +17,7 @@ Pyjo.String.Bytes - Bytes string
 :mod:`Pyjo.String.Bytes` is a container for bytes strings that provides a
 more friendly API for many of the functions in :mod:`Pyjo.Util`.
 
-It also inherits all methods from
-either :class:`str` (Python 2.x) or :class:`bytes` (Python 3.x).
+It also inherits all methods from :class:`bytes`.
 
 Classes
 -------
@@ -28,30 +26,22 @@ Classes
 import Pyjo.String.Unicode
 import Pyjo.Util
 
-import sys
-
-
-if sys.version_info >= (3, 0):
-    base_object = bytes
-else:
-    base_object = str
 
 
 DEFAULT_CHARSET = 'utf-8'
 
 
-class Pyjo_String_Bytes(base_object):
+class Pyjo_String_Bytes(bytes):
     """
-    :mod:`Pyjo.String.Bytes` inherits all methods from
-    either :class:`str` (Python 2.x) or :class:`bytes` (Python 3.x)
-    and implements the following new ones.
+    :mod:`Pyjo.String.Bytes` inherits all methods from :class:`bytes` and
+    implements the following new ones.
     """
 
     def __new__(cls, value=b'', charset=DEFAULT_CHARSET):
-        return super(Pyjo_String_Bytes, cls).__new__(cls, Pyjo.Util.b(value, charset))
+        return super().__new__(cls, Pyjo.Util.b(value, charset))
 
     def __repr__(self):
-        return "{0}.new({1})".format(self.__module__, super(Pyjo_String_Bytes, self).__repr__())
+        return f"{self.__module__}.new({super().__repr__()})"
 
     def decode(self, charset=DEFAULT_CHARSET):
         """::
@@ -64,7 +54,7 @@ class Pyjo_String_Bytes(base_object):
             string.decode('UTF-16LE').unquote().trim().say()
 
         """
-        return Pyjo.String.Unicode.new(super(Pyjo_String_Bytes, self).decode(charset))
+        return Pyjo.String.Unicode.new(super().decode(charset))
 
     @classmethod
     def new(cls, value=b'', charset=DEFAULT_CHARSET):

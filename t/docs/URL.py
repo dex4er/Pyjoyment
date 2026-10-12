@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 import Pyjo.Test
 
@@ -55,8 +54,8 @@ if __name__ == '__main__':
 
     fragment = url.fragment
     is_ok(fragment, None, "fragment")
-    url.fragment = u'♥pyjo♥'
-    is_ok(url.fragment, u'♥pyjo♥', "url.fragment")
+    url.fragment = '♥pyjo♥'
+    is_ok(url.fragment, '♥pyjo♥', "url.fragment")
 
     host = url.host
     is_ok(host, None, "host")
@@ -75,8 +74,8 @@ if __name__ == '__main__':
 
     userinfo = url.userinfo
     is_ok(userinfo, None, "userinfo")
-    url.userinfo = u'root:♥'
-    is_ok(url.userinfo, u'root:♥', "url.userinfo")
+    url.userinfo = 'root:♥'
+    is_ok(url.userinfo, 'root:♥', "url.userinfo")
 
     # __bool__
     ok(Pyjo.URL.new(), "Pyjo.URL.new()")
@@ -88,7 +87,7 @@ if __name__ == '__main__':
     url.authority = 'root:%E2%99%A5@localhost:8080'
     is_ok(url.authority, 'root:%E2%99%A5@localhost:8080', "url.authority")
 
-    authority = Pyjo.URL.new(u'http://root:♥@☃.net:8080/test').authority
+    authority = Pyjo.URL.new('http://root:♥@☃.net:8080/test').authority
     is_ok(authority, "root:%E2%99%A5@xn--n3h.net:8080", "authority")
 
     authority = Pyjo.URL.new('http://root@example.com/test').authority
@@ -104,7 +103,7 @@ if __name__ == '__main__':
     host_port = url.host_port
     is_ok(host_port, None, "host_port")
 
-    host_port = Pyjo.URL.new(u'http://☃.net:8080/test').host_port
+    host_port = Pyjo.URL.new('http://☃.net:8080/test').host_port
     is_ok(host_port, 'xn--n3h.net:8080', "host_port")
 
     host_port = Pyjo.URL.new('http://example.com/test').host_port
@@ -117,7 +116,7 @@ if __name__ == '__main__':
     url.ihost = 'xn--bcher-kva.ch'
     is_ok(url.ihost, 'xn--bcher-kva.ch', "url.ihost")
 
-    ihost = Pyjo.URL.new(u'http://☃.net').ihost
+    ihost = Pyjo.URL.new('http://☃.net').ihost
     is_ok(ihost, "xn--n3h.net", "ihost")
 
     ihost = Pyjo.URL.new('http://example.com').ihost

@@ -18,7 +18,7 @@ dirs = ['t/Pyjo', 't/docs', 't/examples']
 
 class TestSuite(unittest.TestSuite):
     def __init__(self, *args, **kwargs):
-        super(TestSuite, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         test_loader = unittest.defaultTestLoader
         for d in dirs:
             test_suite = test_loader.discover(d, pattern='*.py', top_level_dir='.')

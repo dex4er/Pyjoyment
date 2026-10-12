@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 """
 Pyjo.UserAgent.Proxy - User agent proxy manager

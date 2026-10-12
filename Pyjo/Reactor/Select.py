@@ -60,7 +60,6 @@ from Pyjo.Util import getenv, md5_sum, rand, steady_time, warn
 
 import errno
 import select
-import socket
 import time
 
 
@@ -75,7 +74,7 @@ class Pyjo_Reactor_Select(Pyjo.Reactor.Base.object):
     """
 
     def __init__(self, **kwargs):
-        super(Pyjo_Reactor_Select, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self._running = False
         self._select_select = None
@@ -107,11 +106,11 @@ class Pyjo_Reactor_Select(Pyjo.Reactor.Base.object):
         if fd in self._ios:
             self._ios[fd]['cb'] = cb
             if DEBUG:
-                warn("-- Reactor found io[{0}] = {1}".format(fd, self._ios[fd]))
+                warn(f"-- Reactor found io[{fd}] = {self._ios[fd]}")
         else:
             self._ios[fd] = {'cb': cb}
             if DEBUG:
-                warn("-- Reactor adding io[{0}] = {1}".format(fd, self._ios[fd]))
+                warn(f"-- Reactor adding io[{fd}] = {self._ios[fd]}")
         return self.watch(handle, True, True)
 
     @property
@@ -162,13 +161,13 @@ class Pyjo_Reactor_Select(Pyjo.Reactor.Base.object):
                             if fd in readable or fd in exceptional:
                                 io = self._ios[fd]
                                 last = True
-                                self._sandbox(io['cb'], "Read fd {0}".format(fd), False)
+                                self._sandbox(io['cb'], f"Read fd {fd}", False)
                         if fd in self._ios:
                             if fd in writable:
                                 io = self._ios[fd]
                                 last = True
-                                self._sandbox(io['cb'], "Write fd {0}".format(fd), True)
-                except select.error as e:
+                                self._sandbox(io['cb'], f"Write fd {fd}", True)
+                except OSError as e:
                     # Ctrl-c generates EINTR on Python 2.x
                     if e.args[0] != errno.EINTR:
                         raise Exception(e)
@@ -199,8 +198,8 @@ class Pyjo_Reactor_Select(Pyjo.Reactor.Base.object):
                 last = True
                 if t['cb']:
                     if DEBUG:
-                        warn("-- Alarm timer[{0}] = {1}".format(tid, t))
-                    self._sandbox(t['cb'], "Timer {0}".format(tid))
+                        warn(f"-- Alarm timer[{tid}] = {t}")
+                    self._sandbox(t['cb'], f"Timer {tid}")
 
         # Restore state if necessary
         if self._running:
@@ -232,9 +231,9 @@ class Pyjo_Reactor_Select(Pyjo.Reactor.Base.object):
         if isinstance(remove, str):
             if DEBUG:
                 if remove in self._timers:
-                    warn("-- Reactor remove timer[{0}] = {1}".format(remove, self._timers[remove]))
+                    warn(f"-- Reactor remove timer[{remove}] = {self._timers[remove]}")
                 else:
-                    warn("-- Reactor remove timer[{0}] = None".format(remove))
+                    warn(f"-- Reactor remove timer[{remove}] = None")
             if remove in self._timers:
                 del self._timers[remove]
                 return True
@@ -246,7 +245,7 @@ class Pyjo_Reactor_Select(Pyjo.Reactor.Base.object):
                 fd = remove.fileno()
                 if DEBUG:
                     if fd in self._ios:
-                        warn("-- Reactor remove io[{0}]".format(fd))
+                        warn(f"-- Reactor remove io[{fd}]")
                 if fd in self._inputs:
                     self._inputs.remove(fd)
                 if fd in self._outputs:
@@ -254,9 +253,9 @@ class Pyjo_Reactor_Select(Pyjo.Reactor.Base.object):
                 if fd in self._ios:
                     del self._ios[fd]
                     return True
-            except socket.error:
+            except OSError:
                 if DEBUG:
-                    warn("-- Reactor remove io {0} already closed".format(remove))
+                    warn(f"-- Reactor remove io {remove} already closed")
 
         return False
 
@@ -342,7 +341,7 @@ class Pyjo_Reactor_Select(Pyjo.Reactor.Base.object):
     def _timer(self, cb, recurring, after):
         tid = None
         while True:
-            tid = md5_sum('t{0}{1}'.format(steady_time(), rand()).encode('ascii'))
+            tid = md5_sum(f't{steady_time()}{rand()}'.encode('ascii'))
             if tid not in self._timers:
                 break
 
@@ -352,7 +351,7 @@ class Pyjo_Reactor_Select(Pyjo.Reactor.Base.object):
         self._timers[tid] = timer
 
         if DEBUG:
-            warn("-- Reactor adding timer[{0}] = {1}".format(tid, self._timers[tid]))
+            warn(f"-- Reactor adding timer[{tid}] = {self._timers[tid]}")
 
         return tid
 

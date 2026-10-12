@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 import Pyjo.Test
 
@@ -26,12 +25,12 @@ if __name__ == '__main__':
     is_ok(dom.find('[id]').map('attr', 'id').join("\n"), "a\nb", "dom.find()")
 
     expected = [None, 'b', 'a']
-    dom.find('p[id]').reverse().each(lambda i, num: is_ok(i.attr('id'), expected[num], "elem[{0}].attr()".format(num)))
+    dom.find('p[id]').reverse().each(lambda i, num: is_ok(i.attr('id'), expected[num], f"elem[{num}].attr()"))
 
     expected = [None, 'a:Test', 'b:123']
     num = 1
     for i in dom.find('p[id]').each():
-        is_ok(i.attr('id') + ':' + i.text, expected[num], "elem[{0}].attr()".format(num))
+        is_ok(i.attr('id') + ':' + i.text, expected[num], f"elem[{num}].attr()")
         num += 1
 
     dom = Pyjo.DOM.new('<div><p id="a">Test</p><p id="b">123</p></div>')

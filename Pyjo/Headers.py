@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 r"""
 Pyjo.Headers - Headers
@@ -35,7 +34,6 @@ from Pyjo.Regexp import r
 from Pyjo.Util import b, convert, getenv, notnone, u
 
 import collections
-import sys
 
 
 re_line = r(br'(.*?)\x0d?\x0a')
@@ -118,7 +116,7 @@ class Pyjo_Headers(Pyjo.Base.object, Pyjo.String.Mixin.object):
 
         String representation of an object shown in console.
         """
-        return "{0}.new().parse({1})".format(self.__module__, repr(self.to_str() + '\x0d\x0a\x0d\x0a'))
+        return f"{self.__module__}.new().parse({self.to_str() + '\x0d\x0a\x0d\x0a'!r})"
 
     @property
     def accept(self):
@@ -1060,10 +1058,7 @@ class Pyjo_Headers(Pyjo.Base.object, Pyjo.String.Mixin.object):
 
         Turn headers into a string, suitable for HTTP messages.
         """
-        if sys.version_info >= (3, 0):
-            return u(self.to_bytes(), 'ascii')
-        else:
-            return self.to_bytes()
+        return u(self.to_bytes(), 'ascii')
 
     @property
     def trailer(self):

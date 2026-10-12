@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 r"""
 Pyjo.Content.Single - HTTP content
@@ -65,7 +64,7 @@ class Pyjo_Content_Single(Pyjo.Content.object, Pyjo.String.Mixin.object):
         Construct a new :mod:`Pyjo.Content.Single` object and subscribe to ``read``
         event with default content parser.
         """
-        super(Pyjo_Content_Single, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.asset = notnone(kwargs.get('asset'), lambda: Pyjo.Asset.Memory.new(auto_upgrade=True))
         """::
@@ -121,7 +120,7 @@ class Pyjo_Content_Single(Pyjo.Content.object, Pyjo.String.Mixin.object):
 
         Clone content if possible, otherwise return ``None``.
         """
-        clone = super(Pyjo_Content_Single, self).clone()
+        clone = super().clone()
         if clone is not None:
             clone.asset = self.asset
             return clone
@@ -154,7 +153,7 @@ class Pyjo_Content_Single(Pyjo.Content.object, Pyjo.String.Mixin.object):
 
         # Parse body
         if not self.auto_upgrade or self.boundary is None:
-            return super(Pyjo_Content_Single, self).parse()
+            return super().parse()
 
         # Content needs to be upgraded to multipart
         self.unsubscribe('read', self._on_read)

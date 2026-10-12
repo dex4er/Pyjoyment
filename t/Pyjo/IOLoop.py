@@ -1,4 +1,3 @@
-# coding: utf-8
 
 import Pyjo.Test
 
@@ -196,9 +195,9 @@ if __name__ == '__main__':
         loop.stop()
         connected.set(True)
 
-    like_ok(getenv('PYJO_REUSE'), r'(?:^|\,)127\.0\.0\.1:{0}:'.format(port), 'file descriptor can be reused')
+    like_ok(getenv('PYJO_REUSE'), rf'(?:^|\,)127\.0\.0\.1:{port}:', 'file descriptor can be reused')
     loop.start()
-    unlike_ok(getenv('PYJO_REUSE'), r'(?:^|\,)127\.0\.0\.1:{0}:'.format(port), 'environment is clean')
+    unlike_ok(getenv('PYJO_REUSE'), rf'(?:^|\,)127\.0\.0\.1:{port}:', 'environment is clean')
     ok(connected, 'connected')
     ok(not loop.acceptor(cid), 'acceptor has been removed')
     cid = None

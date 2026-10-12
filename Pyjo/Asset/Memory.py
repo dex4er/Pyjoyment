@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 """
 Pyjo.Asset.Memory - In-memory storage for HTTP content
@@ -54,7 +53,7 @@ class Pyjo_Asset_Memory(Pyjo.Asset.object):
     mtime = None
 
     def __init__(self, **kwargs):
-        super(Pyjo_Asset_Memory, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.auto_upgrade = kwargs.get('auto_upgrade', False)
         """::
@@ -95,7 +94,7 @@ class Pyjo_Asset_Memory(Pyjo.Asset.object):
 
         String representation of an object shown in console.
         """
-        return "<{0}.{1} _content={2}>".format(self.__class__.__module__, self.__class__.__name__, repr(self._content))
+        return f"<{self.__class__.__module__}.{self.__class__.__name__} _content={repr(self._content)}>"
 
     def add_chunk(self, chunk=b''):
         """::

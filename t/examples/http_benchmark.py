@@ -26,7 +26,7 @@ if __name__ == '__main__':
         @stream.on
         def read(stream, chunk):
             # Process input chunk
-            is_ok(chunk.decode('utf-8'), "GET / HTTP/1.1\x0d\x0aHost: localhost:{0}\x0d\x0a\x0d\x0a".format(port), "server's input chunk")
+            is_ok(chunk.decode('utf-8'), f"GET / HTTP/1.1\x0d\x0aHost: localhost:{port}\x0d\x0a\x0d\x0a", "server's input chunk")
 
             # Write response
             stream.write(b"HTTP/1.1 200 OK\x0d\x0a\x0d\x0a")
@@ -65,7 +65,7 @@ if __name__ == '__main__':
                     Pyjo.IOLoop.remove(server)
 
             # Write request
-            stream.write("GET {0} HTTP/1.1\x0d\x0aHost: {1}:{2}\x0d\x0a\x0d\x0a".format(url.path, url.host, url.port or 80).encode('ascii'))
+            stream.write(f"GET {url.path} HTTP/1.1\x0d\x0aHost: {url.host}:{url.port or 80}\x0d\x0a\x0d\x0a".encode('ascii'))
 
     Pyjo.IOLoop.start()
 

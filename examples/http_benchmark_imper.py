@@ -1,4 +1,3 @@
-from __future__ import print_function
 
 import sys
 
@@ -48,7 +47,7 @@ for i in range(n):
         def on_read_cb(stream, chunk):
             context.size += len(chunk)
             if verbose:
-                print("{0}\r".format(context.size), end='')
+                print(f"{context.size}\r", end='')
 
         stream.on(on_read_cb, 'read')
 
@@ -63,7 +62,7 @@ for i in range(n):
         stream.on(on_close_cb, 'close')
 
         # Write request
-        stream.write("GET {0} HTTP/1.1\x0d\x0aHost: {1}:{2}\x0d\x0a\x0d\x0a".format(url.path, url.host, url.port or 80).encode('ascii'))
+        stream.write(f"GET {url.path} HTTP/1.1\x0d\x0aHost: {url.host}:{url.port or 80}\x0d\x0a\x0d\x0a".encode('ascii'))
 
     Pyjo.IOLoop.client(address=url.host,
                        port=(url.port or 80),
@@ -76,4 +75,4 @@ Pyjo.IOLoop.start()
 speed = str(sum(speeds))
 while r(r'(?<=\d)(\d{3})(,|$)').search(speed):
     speed = r(r'(?<=\d)(\d{3})(,|$)').sub(r',\1', speed)
-print('{0} Mb/s'.format(speed))
+print(f'{speed} Mb/s')

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 """
 Pyjo.Content - HTTP content base class
@@ -99,7 +98,7 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
     """
 
     def __init__(self, **kwargs):
-        super(Pyjo_Content, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.auto_decompress = kwargs.get('auto_decompress')
         """::
@@ -613,7 +612,7 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
             crlf = b''
         self._chunks += 1
 
-        return crlf + b('{0:x}'.format(len(chunk)), 'ascii') + b"\x0d\x0a" + chunk
+        return crlf + b(f'{len(chunk):x}', 'ascii') + b"\x0d\x0a" + chunk
 
     def _decompress(self, chunk):
         # No compression

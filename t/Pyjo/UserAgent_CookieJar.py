@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 import Pyjo.Test
 
@@ -134,11 +133,11 @@ if __name__ == '__main__':
             value='baz'
         )
     )
-    cookies = jar.find(Pyjo.URL.new(u'http://bücher.com/foo'))
+    cookies = jar.find(Pyjo.URL.new('http://bücher.com/foo'))
     is_ok(cookies[0].name, 'bar', 'right name')
     is_ok(cookies[0].value, 'baz', 'right value')
     throws_ok(lambda: cookies[1], IndexError, 'no second cookie')
-    cookies = jar.find(Pyjo.URL.new(u'http://bücher.com/foo'))
+    cookies = jar.find(Pyjo.URL.new('http://bücher.com/foo'))
     is_ok(cookies[0].name, 'bar', 'right name')
     is_ok(cookies[0].value, 'baz', 'right value')
     throws_ok(lambda: cookies[1], IndexError, 'no second cookie')

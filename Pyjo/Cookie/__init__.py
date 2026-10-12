@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 """
 Pyjo.Cookie - HTTP cookie base class
@@ -58,16 +57,7 @@ class Pyjo_Cookie(Pyjo.Base.object, Pyjo.String.Mixin.object):
 
             boolean = bool(path)
 
-        Always true. (Python 3.x)
-        """
-        return True
-
-    def __nonzero__(self):
-        """::
-
-            boolean = bool(path)
-
-        Always true. (Python 2.x)
+        Always true.
         """
         return True
 

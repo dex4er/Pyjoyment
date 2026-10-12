@@ -1,4 +1,3 @@
-# coding: utf-8
 
 import Pyjo.Test
 
@@ -22,7 +21,6 @@ if __name__ == '__main__':
     from Pyjo.Util import b, die, setenv
 
     import platform
-    import sys
     import zlib
 
     import Pyjo.Message.Response
@@ -408,8 +406,8 @@ if __name__ == '__main__':
     is_ok(res.headers.content_type, 'multipart/form-data; boundary=----------0xKhTmLbOuNdArY', 'right "Content-Type" value')
     setenv('PYJO_MAX_BUFFER_SIZE', None)
 
-    if platform.python_implementation() == 'PyPy' or sys.version_info < (2, 7, 4) or (sys.version_info >= (3, 0) and sys.version_info < (3, 4)):
-        skip('PyPy and Python<2.7.4 and Python<3.4 error', 10)
+    if platform.python_implementation() == 'PyPy':
+        skip('PyPy error', 10)
     else:
         # Parse HTTP 1.1 gzip compressed response (garbage bytes exceeding limit)
         setenv('PYJO_MAX_BUFFER_SIZE', '12')
@@ -636,7 +634,7 @@ if __name__ == '__main__':
     res.parse(b"1\x0d\x0a")
     res.parse(compressed[:1])
     res.parse(b"\x0d\x0a")
-    res.parse(b('{0:x}'.format(len(compressed) - 1)))
+    res.parse(b(f'{len(compressed) - 1:x}'))
     res.parse(b"\x0d\x0a")
     res.parse(compressed[1:])
     res.parse(b"\x0d\x0a")
@@ -980,14 +978,14 @@ if __name__ == '__main__':
 
     # Text
     res = Pyjo.Message.Response.new()
-    snowman = b(u'☃')
-    is_ok(res.set(body=snowman).text, u'☃', 'right content')
-    is_ok(res.set(body=snowman).dom().text, u'☃', 'right text')
+    snowman = b('☃')
+    is_ok(res.set(body=snowman).text, '☃', 'right content')
+    is_ok(res.set(body=snowman).dom().text, '☃', 'right text')
     res = Pyjo.Message.Response.new()
-    yatta = b(u'やった', 'shift_jis')
+    yatta = b('やった', 'shift_jis')
     res.headers.content_type = 'text/plain;charset=shift_jis'
-    is_ok(res.set(body=yatta).text, u'やった', 'right content')
-    is_ok(res.set(body=yatta).dom().text, u'やった', 'right text')
+    is_ok(res.set(body=yatta).text, 'やった', 'right content')
+    is_ok(res.set(body=yatta).dom().text, 'やった', 'right text')
 
     # Body exceeding memory limit (no upgrade)
     setenv('PYJO_MAX_MEMORY_SIZE', '8')

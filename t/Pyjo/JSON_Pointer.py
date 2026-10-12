@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 import Pyjo.Test
 
@@ -56,8 +55,8 @@ if __name__ == '__main__':
     is_ok(pointer.new({'~1': 'foo'}).get('/~01'), 'foo', '"/~01" is "foo"')
 
     # Unicode
-    is_ok(pointer.new({u'☃': 'snowman'}).get(u'/☃'), 'snowman', 'found the snowman')
-    is_ok(pointer.new().set(data={u'☃': ['snowman']}).get(u'/☃/0'), 'snowman', 'found the snowman')
+    is_ok(pointer.new({'☃': 'snowman'}).get('/☃'), 'snowman', 'found the snowman')
+    is_ok(pointer.new().set(data={'☃': ['snowman']}).get('/☃/0'), 'snowman', 'found the snowman')
 
     # RFC 6901
     d = {

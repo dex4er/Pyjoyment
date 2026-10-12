@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 """
 Pyjo.Server.Base - HTTP/WebSocket server base class
@@ -73,7 +72,7 @@ class Pyjo_Server_Base(Pyjo.EventEmitter.object):
         Construct a new ``Pyjo.Server`` object and subscribe to ``request`` event
         with default request handling.
         """
-        super(Pyjo_Server_Base, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.app = notnone(kwargs.get('app'), lambda: self.build_app('Pyjo.HelloWorld'))
         """::
@@ -110,7 +109,7 @@ class Pyjo_Server_Base(Pyjo.EventEmitter.object):
         if module:
             return module.new()
         else:
-            raise ImportError("No application module named '{0}'".format(app))
+            raise ImportError(f"No application module named '{app}'")
 
     def build_tx(self):
         """::

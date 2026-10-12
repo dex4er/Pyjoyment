@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 import Pyjo.Test
 
@@ -36,7 +35,7 @@ if __name__ == '__main__':
     # __iter__
     path = Pyjo.Path.new('/foo%2Fbar%3B/baz.html')
     l = [v for v in path]
-    is_deeply_ok(l, [u'foo', u'bar;', u'baz.html'], "[v for v in path]")
+    is_deeply_ok(l, ['foo', 'bar;', 'baz.html'], "[v for v in path]")
 
     # __bool__
     ok(Pyjo.Path.new(), "Pyjo.Path.new()")
@@ -93,7 +92,7 @@ if __name__ == '__main__':
     # parse
     path = Pyjo.Path.new()
     path = path.parse('/foo%2Fbar%3B/baz.html')
-    is_deeply_ok(path.parts, [u'foo', u'bar;', u'baz.html'], "path.parts")
+    is_deeply_ok(path.parts, ['foo', 'bar;', 'baz.html'], "path.parts")
 
     # paths
     path = Pyjo.Path.new()
@@ -126,10 +125,10 @@ if __name__ == '__main__':
 
     # to_route
     path = Pyjo.Path.new('/i/%E2%99%A5/pyjo').to_route()
-    is_ok(u(path), u"/i/♥/pyjo", "path")
+    is_ok(u(path), "/i/♥/pyjo", "path")
 
     path = Pyjo.Path.new('i/%E2%99%A5/pyjo').to_route()
-    is_ok(u(path), u"/i/♥/pyjo", "path")
+    is_ok(u(path), "/i/♥/pyjo", "path")
 
     # to_str
     path = Pyjo.Path.new('/i/%E2%99%A5/pyjo')
