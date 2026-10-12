@@ -145,7 +145,9 @@ trunk check --all  # lint everything, as CI does
 
 `trunk-fmt-pre-commit` formats staged files on commit and
 `trunk-check-pre-push` checks before a push, once Trunk has installed its git
-hooks (any `trunk` command does).
+hooks (any `trunk` command does). The hook formats with the configuration that
+is staged, so a change to the formatter configuration goes in its own commit,
+before the code that depends on it.
 
 The ruff configuration lives in `pyproject.toml`. Its rule list is explicit:
 newer ruff versions enable many more rules by default, including one that
