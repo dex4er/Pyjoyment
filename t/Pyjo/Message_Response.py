@@ -21,7 +21,6 @@ if __name__ == '__main__':
     from Pyjo.Util import b, die, setenv
 
     import platform
-    import sys
     import zlib
 
     import Pyjo.Message.Response
@@ -407,8 +406,8 @@ if __name__ == '__main__':
     is_ok(res.headers.content_type, 'multipart/form-data; boundary=----------0xKhTmLbOuNdArY', 'right "Content-Type" value')
     setenv('PYJO_MAX_BUFFER_SIZE', None)
 
-    if platform.python_implementation() == 'PyPy' or sys.version_info < (2, 7, 4) or (sys.version_info >= (3, 0) and sys.version_info < (3, 4)):
-        skip('PyPy and Python<2.7.4 and Python<3.4 error', 10)
+    if platform.python_implementation() == 'PyPy':
+        skip('PyPy error', 10)
     else:
         # Parse HTTP 1.1 gzip compressed response (garbage bytes exceeding limit)
         setenv('PYJO_MAX_BUFFER_SIZE', '12')

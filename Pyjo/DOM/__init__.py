@@ -790,8 +790,7 @@ class Pyjo_DOM(Pyjo.Base.object, Pyjo.String.Mixin.object):
         for n in nodes:
             if n[0] == 'tag':
                 yield n
-                for a in self._all(self._nodes(n)):
-                    yield a
+                yield from self._all(self._nodes(n))
             else:
                 yield n
 
@@ -822,8 +821,7 @@ class Pyjo_DOM(Pyjo.Base.object, Pyjo.String.Mixin.object):
         if isroot:
             yield ancestors[-1]
         else:
-            for i in ancestors[:-1]:
-                yield i
+            yield from ancestors[:-1]
 
     def _build(self, tree, xml):
         return self.new().set(tree=tree, xml=xml)

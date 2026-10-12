@@ -68,7 +68,7 @@ class Pyjo_Path(Pyjo.Base.object, Pyjo.String.Mixin.object):
 
             boolean = bool(path)
 
-        Always true. (Python 3.x)
+        Always true.
         """
         return True
 
@@ -81,15 +81,6 @@ class Pyjo_Path(Pyjo.Base.object, Pyjo.String.Mixin.object):
         will be treated as ``/`` for security reasons.
         """
         return iter(self.parts)
-
-    def __nonzero__(self):
-        """::
-
-            boolean = bool(path)
-
-        Always true. (Python 2.x)
-        """
-        return True
 
     def canonicalize(self):
         """::

@@ -128,16 +128,7 @@ class Pyjo_URL(Pyjo.Base.object, Pyjo.String.Mixin.object):
 
             boolean = bool(url)
 
-        Always true. (Python 3.x)
-        """
-        return True
-
-    def __nonzero__(self):
-        """::
-
-            boolean = bool(url)
-
-        Always true. (Python 2.x)
+        Always true.
         """
         return True
 

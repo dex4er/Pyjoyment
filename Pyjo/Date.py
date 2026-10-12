@@ -83,16 +83,7 @@ class Pyjo_Date(Pyjo.Base.object, Pyjo.String.Mixin.object):
 
             boolean = bool(date)
 
-        Always true. (Python 3.x)
-        """
-        return True
-
-    def __nonzero__(self):
-        """::
-
-            boolean = bool(date)
-
-        Always true. (Python 2.x)
+        Always true.
         """
         return True
 

@@ -16,7 +16,6 @@ if __name__ == '__main__':
     from Pyjo.Test import *  # noqa
 
     import platform
-    import sys
 
     import Pyjo.Base
     import Pyjo.String.Mixin
@@ -48,19 +47,9 @@ if __name__ == '__main__':
     is_ok(other.to_str(), 'other', "other.to_str() == 'other'")
 
     # __bool__
-    if sys.version_info >= (3, 0):
-        ok(bool(string) is True, "bool(string) is True")
-        ok(bool(zero) is True, "bool(zero) is True")
-        ok(bool(empty) is False, "bool(empty) is False")
-    else:
-        skip('test for Python 3.x', 3)
-
-    # __bytes__
-    if sys.version_info >= (3, 0) and sys.version_info < (3, 3):
-        is_ok(bytes(string, 'ascii'), b'string', "bytes(string, 'ascii') == b'string'")
-        is_ok(bytes(string, 'ascii'), bytes(string2, 'ascii'), "bytes(string, 'ascii') == bytes(string2, 'ascii')")
-    else:
-        skip('test for Python 3.[0-2]', 2)
+    ok(bool(string) is True, "bool(string) is True")
+    ok(bool(zero) is True, "bool(zero) is True")
+    ok(bool(empty) is False, "bool(empty) is False")
 
     # __complex__
     is_ok(repr(complex(zero)), '0j', "complex(zero)")
@@ -88,14 +77,8 @@ if __name__ == '__main__':
     # __hash__
     ok(isinstance(hash(string), int), "hash(string)")
 
-    # __hex__
-    if sys.version_info < (3, 0):
-        is_ok(repr(hex(zero)), "'0x0'", "hex(zero)")
-    else:
-        skip('test for Python 2.x')
-
     # __int__
-    if platform.python_implementation() != 'PyPy' or sys.version_info < (3, 0):
+    if platform.python_implementation() != 'PyPy':
         is_ok(repr(int(zero)), '0', "int(zero)")
     else:
         skip('PyPy3 error')
@@ -105,12 +88,6 @@ if __name__ == '__main__':
     ok(not string <= 'other', "not string <= 'other'")
     ok(string <= string, "string <= string")
     ok(not string <= other, "not string <= other")
-
-    # __long__
-    if sys.version_info < (3, 0):
-        is_ok(repr(long(zero)), '0L', "long(zero)")
-    else:
-        skip('test for Python 2.x')
 
     # __lt__
     ok(not string < 'string', "not string < 'string'")
@@ -124,33 +101,12 @@ if __name__ == '__main__':
     ok(string != other, "string != other")
     ok(not other != other, "not other != other")
 
-    # __nonzero__
-    if sys.version_info < (3, 0):
-        ok(bool(string) is True, "bool(string) is True")
-        ok(bool(zero) is True, "bool(zero) is True")
-        ok(bool(empty) is False, "bool(empty) is False")
-    else:
-        skip('test for Python 2.x', 3)
-
-    # __oct__
-    if sys.version_info < (3, 0):
-        is_ok(repr(oct(zero)), "'0'", "oct(zero)")
-    else:
-        skip('test for Python 2.x')
-
     # __repr__
     is_ok(repr(string), "C('string')", "repr(string) == \"C('string')\"")
 
     # __str__
     isa_ok(str(string), str, "string.to_str()")
     is_ok(str(string), 'string', "str(string) == 'string'")
-
-    # __unicode__
-    if sys.version_info < (3, 0):
-        is_ok(unicode(string), 'string', "unicode(string) == u'string'")
-        is_ok(unicode(string), unicode(string2), "unicode(string) == unicode(string2)")
-    else:
-        skip('test for Python 2.x', 2)
 
     class C2(Pyjo.Base.object, Pyjo.String.Mixin.object):
         def __init__(self, **kwargs):
@@ -179,19 +135,9 @@ if __name__ == '__main__':
     is_ok(other.to_bytes(), b'other', "other.to_bytes() == b'other'")
 
     # __bool__
-    if sys.version_info >= (3, 0):
-        ok(bool(string) is True, "bool(string) is True")
-        ok(bool(zero) is True, "bool(zero) is True")
-        ok(bool(empty) is False, "bool(empty) is False")
-    else:
-        skip('test for Python 3.x', 3)
-
-    # __bytes__
-    if sys.version_info >= (3, 0) and sys.version_info < (3, 3):
-        is_ok(bytes(string, 'ascii'), b'string', "bytes(string, 'ascii') == b'string'")
-        is_ok(bytes(string, 'ascii'), bytes(string2, 'ascii'), "bytes(string, 'ascii') == bytes(string2, 'ascii')")
-    else:
-        skip('test for Python 3.[0-2]', 2)
+    ok(bool(string) is True, "bool(string) is True")
+    ok(bool(zero) is True, "bool(zero) is True")
+    ok(bool(empty) is False, "bool(empty) is False")
 
     # __eq__
     ok(string == b'string', "string == b'string'")
@@ -216,14 +162,8 @@ if __name__ == '__main__':
     # __hash__
     ok(isinstance(hash(string), int), "hash(string)")
 
-    # __hex__
-    if sys.version_info < (3, 0):
-        is_ok(repr(hex(zero)), "'0x0'", "hex(zero)")
-    else:
-        skip('test for Python 2.x')
-
     # __int__
-    if platform.python_implementation() != 'PyPy' or sys.version_info < (3, 0):
+    if platform.python_implementation() != 'PyPy':
         is_ok(repr(int(zero)), '0', "int(zero)")
     else:
         skip('PyPy3 error')
@@ -233,12 +173,6 @@ if __name__ == '__main__':
     ok(not string <= b'other', "not string <= b'other'")
     ok(string <= string, "string <= string")
     ok(not string <= other, "not string <= other")
-
-    # __long__
-    if sys.version_info < (3, 0):
-        is_ok(repr(long(zero)), '0L', "long(zero)")
-    else:
-        skip('test for Python 2.x')
 
     # __lt__
     ok(not string < b'string', "not string < b'string'")
@@ -252,49 +186,19 @@ if __name__ == '__main__':
     ok(string != other, "string != other")
     ok(not other != other, "not other != other")
 
-    # __nonzero__
-    if sys.version_info < (3, 0):
-        ok(bool(string) is True, "bool(string) is True")
-        ok(bool(zero) is True, "bool(zero) is True")
-        ok(bool(empty) is False, "bool(empty) is False")
-    else:
-        skip('test for Python 2.x', 3)
-
-    # __oct__
-    if sys.version_info < (3, 0):
-        is_ok(repr(oct(zero)), "'0'", "oct(zero)")
-    else:
-        skip('test for Python 2.x')
-
     # __repr__
-    if sys.version_info < (3, 0):
-        is_ok(repr(string), "C2('string')", "repr(string) == \"C('string')\"")
-    else:
-        is_ok(repr(string), "C2(b'string')", "repr(string) == \"C(b'string')\"")
+    is_ok(repr(string), "C2(b'string')", "repr(string) == \"C(b'string')\"")
 
     # __str__
     isa_ok(str(string), str, "string.to_str()")
-    if sys.version_info < (3, 0):
-        is_ok(str(string), 'string', "str(string) == 'string'")
-    else:
-        is_ok(str(string), "b'string'", '''str(string) == "b'string'"''')
-
-    # __unicode__
-    if sys.version_info < (3, 0):
-        is_ok(unicode(string), 'string', "unicode(string) == u'string'")
-        is_ok(unicode(string), unicode(string2), "unicode(string) == unicode(string2)")
-    else:
-        skip('test for Python 2.x', 2)
+    is_ok(str(string), "b'string'", '''str(string) == "b'string'"''')
 
     class C3(Pyjo.Base.object, Pyjo.String.Mixin.object):
         def __init__(self, **kwargs):
             self.value = kwargs.get('value')
 
         def to_bytes(self):
-            if sys.version_info < (3, 0):
-                return self.value
-            else:
-                return bytes(self.value, 'ascii')
+            return bytes(self.value, 'ascii')
 
         def to_str(self):
             return self.value
@@ -319,19 +223,9 @@ if __name__ == '__main__':
     is_ok(other.to_str(), 'other', "other.to_str() == 'other'")
 
     # __bool__
-    if sys.version_info >= (3, 0):
-        ok(bool(string) is True, "bool(string) is True")
-        ok(bool(zero) is True, "bool(zero) is True")
-        ok(bool(empty) is False, "bool(empty) is False")
-    else:
-        skip('test for Python 3.x', 3)
-
-    # __bytes__
-    if sys.version_info >= (3, 0) and sys.version_info < (3, 3):
-        is_ok(bytes(string, 'ascii'), b'string', "bytes(string, 'ascii') == b'string'")
-        is_ok(bytes(string, 'ascii'), bytes(string2, 'ascii'), "bytes(string, 'ascii') == bytes(string2, 'ascii')")
-    else:
-        skip('test for Python 3.[0-2]', 2)
+    ok(bool(string) is True, "bool(string) is True")
+    ok(bool(zero) is True, "bool(zero) is True")
+    ok(bool(empty) is False, "bool(empty) is False")
 
     # __complex__
     is_ok(repr(complex(zero)), '0j', "complex(zero)")
@@ -359,14 +253,8 @@ if __name__ == '__main__':
     # __hash__
     ok(isinstance(hash(string), int), "hash(string)")
 
-    # __hex__
-    if sys.version_info < (3, 0):
-        is_ok(repr(hex(zero)), "'0x0'", "hex(zero)")
-    else:
-        skip('test for Python 2.x')
-
     # __int__
-    if platform.python_implementation() != 'PyPy' or sys.version_info < (3, 0):
+    if platform.python_implementation() != 'PyPy':
         is_ok(repr(int(zero)), '0', "int(zero)")
     else:
         skip('PyPy3 error')
@@ -376,12 +264,6 @@ if __name__ == '__main__':
     ok(not string <= 'other', "not string <= 'other'")
     ok(string <= string, "string <= string")
     ok(not string <= other, "not string <= other")
-
-    # __long__
-    if sys.version_info < (3, 0):
-        is_ok(repr(long(zero)), '0L', "long(zero)")
-    else:
-        skip('test for Python 2.x')
 
     # __lt__
     ok(not string < 'string', "not string < 'string'")
@@ -395,32 +277,11 @@ if __name__ == '__main__':
     ok(string != other, "string != other")
     ok(not other != other, "not other != other")
 
-    # __nonzero__
-    if sys.version_info < (3, 0):
-        ok(bool(string) is True, "bool(string) is True")
-        ok(bool(zero) is True, "bool(zero) is True")
-        ok(bool(empty) is False, "bool(empty) is False")
-    else:
-        skip('test for Python 2.x', 3)
-
-    # __oct__
-    if sys.version_info < (3, 0):
-        is_ok(repr(oct(zero)), "'0'", "oct(zero)")
-    else:
-        skip('test for Python 2.x')
-
     # __repr__
     is_ok(repr(string), "C3('string')", "repr(string) == \"C3('string')\"")
 
     # __str__
     isa_ok(str(string), str, "string.to_str()")
     is_ok(str(string), 'string', "str(string) == 'string'")
-
-    # __unicode__
-    if sys.version_info < (3, 0):
-        is_ok(unicode(string), 'string', "unicode(string) == u'string'")
-        is_ok(unicode(string), unicode(string2), "unicode(string) == unicode(string2)")
-    else:
-        skip('test for Python 2.x', 2)
 
     done_testing()

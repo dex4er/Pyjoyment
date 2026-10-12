@@ -364,8 +364,7 @@ def c(value=[]):
 def _flatten(array):
     for item in array:
         if isinstance(item, (list, tuple)):
-            for subitem in _flatten(item):
-                yield subitem
+            yield from _flatten(item)
         else:
             yield item
 

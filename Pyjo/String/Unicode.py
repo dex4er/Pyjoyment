@@ -22,8 +22,7 @@ Pyjo.String.Unicode - Unicode string
 :mod:`Pyjo.String.Unicode` is a container for unicode strings that provides a
 more friendly API for many of the functions in :mod:`Pyjo.Util`.
 
-It also inherits all methods from
-either :class:`unicode` (Python 2.x) or :class:`str` (Python 3.x).
+It also inherits all methods from :class:`str`.
 
 Classes
 -------
@@ -33,23 +32,15 @@ Classes
 import Pyjo.String.Bytes
 import Pyjo.Util
 
-import sys
-
-
-if sys.version_info >= (3, 0):
-    base_object = str
-else:
-    base_object = unicode
 
 
 DEFAULT_CHARSET = 'utf-8'
 
 
-class Pyjo_String_Unicode(base_object):
+class Pyjo_String_Unicode(str):
     """
-    :mod:`Pyjo.String.Unicode` inherits all methods from
-    either :class:`unicode` (Python 2.x) or :class:`str` (Python 3.x)
-    and implements the following new ones.
+    :mod:`Pyjo.String.Unicode` inherits all methods from :class:`str` and
+    implements the following new ones.
     """
 
     def __new__(cls, value='', charset=DEFAULT_CHARSET):
@@ -99,14 +90,7 @@ class Pyjo_String_Unicode(base_object):
 
         Print unicode string to handle and append a newline, defaults to :attr:`sys.stdout`.
         """
-        if 'flush' in kwargs and sys.version_info < (3, 0):
-            flush = kwargs.pop('flush')
-        else:
-            flush = False
         print(self.to_str(), **kwargs)
-        if flush:
-            f = kwargs.get('file', sys.stdout)
-            f.flush()
         return self
 
     def to_bytes(self, charset=DEFAULT_CHARSET):
@@ -124,13 +108,9 @@ class Pyjo_String_Unicode(base_object):
 
             string = string.to_str()
 
-        Turn unicode string into a string:
-        on Python 2.x into bytes string, on Python 3.x into unicode string.
+        Turn unicode string into a string, the same as :meth:`to_unicode`.
         """
-        if sys.version_info >= (3, 0):
-            return self.to_unicode(charset)
-        else:
-            return self.to_bytes(charset)
+        return self.to_unicode(charset)
 
     def to_unicode(self, charset=DEFAULT_CHARSET):
         """::

@@ -38,34 +38,19 @@ class Error(Exception):
 DEFAULT_CHARSET = 'utf-8'
 
 
-if sys.version_info >= (3, 0):
-    def b(unicodestring, charset=DEFAULT_CHARSET, errors='strict'):
-        """::
+def b(unicodestring, charset=DEFAULT_CHARSET, errors='strict'):
+    """::
 
-            bytestring = b(unicodestring)
-            bytestring = b(unicodestring, 'utf-8')
-            bytestring = b(unicodestring, 'utf-8', 'strict')
+        bytestring = b(unicodestring)
+        bytestring = b(unicodestring, 'utf-8')
+        bytestring = b(unicodestring, 'utf-8', 'strict')
 
-        Encode unicodestring into bytestring.
-        """
-        if isbytes(unicodestring):
-            return bytes(unicodestring)
-        else:
-            return bytes(str(unicodestring), charset, errors)
-else:
-    def b(unicodestring, charset=DEFAULT_CHARSET, errors='strict'):
-        """::
-
-            bytestring = b(unicodestring)
-            bytestring = b(unicodestring, 'utf-8')
-            bytestring = b(unicodestring, 'utf-8', 'strict')
-
-        Encode unicodestring into bytestring.
-        """
-        if isinstance(unicodestring, unicode):
-            return unicode(unicodestring).encode(charset, errors)
-        else:
-            return str(unicodestring)
+    Encode unicodestring into bytestring.
+    """
+    if isbytes(unicodestring):
+        return bytes(unicodestring)
+    else:
+        return bytes(str(unicodestring), charset, errors)
 
 
 def b64_decode(unicodestring):
@@ -212,26 +197,14 @@ def html_unescape(unicodestring):
     return re_entity.sub(lambda m: _decode(m.group(1), m.group(2)), unicodestring)
 
 
-if sys.version_info >= (3, 0):
-    def isbytes(obj):
-        """::
+def isbytes(obj):
+    """::
 
-            boolean = isbytes(obj)
+        boolean = isbytes(obj)
 
-        Check if object is ``bytearray`` or ``bytes`` (Python 3.x)
-        or ``str`` (Python 2.x).
-        """
-        return isinstance(obj, (bytearray, bytes))
-else:
-    def isbytes(obj):
-        """::
-
-            boolean = isbytes(obj)
-
-        Check if object is ``bytearray`` or ``bytes`` (Python 3.x)
-        or ``str`` (Python 2.x).
-        """
-        return isinstance(obj, (bytearray, str))
+    Check if object is ``bytearray`` or ``bytes``.
+    """
+    return isinstance(obj, (bytearray, bytes))
 
 
 def isalive(obj):
@@ -258,46 +231,24 @@ def isiterable(obj):
     return hasattr(obj, '__iter__') and not isstring(obj)
 
 
-if sys.version_info >= (3, 0):
-    def isstring(obj):
-        """::
+def isstring(obj):
+    """::
 
-            boolean = isstring(obj)
+        boolean = isstring(obj)
 
-        Check if object is string (``bytes``, ``str`` or ``unicode``).
-        """
-        return isinstance(obj, (bytes, str))
-else:
-    def isstring(obj):
-        """::
-
-            boolean = isstring(obj)
-
-        Check if object is string (``bytes``, ``str`` or ``unicode``).
-        """
-        return isinstance(obj, (bytes, str, unicode))
+    Check if object is string (``bytes`` or ``str``).
+    """
+    return isinstance(obj, (bytes, str))
 
 
-if sys.version_info >= (3, 0):
-    def isunicode(obj):
-        """::
+def isunicode(obj):
+    """::
 
-            boolean = isunicode(obj)
+        boolean = isunicode(obj)
 
-        Check if object is ``str`` (Python 3.x)
-        or ``unicode`` (Python 2.x).
-        """
-        return isinstance(obj, str)
-else:
-    def isunicode(obj):
-        """::
-
-            boolean = isunicode(obj)
-
-        Check if object is ``str`` (Python 3.x)
-        or ``unicode`` (Python 2.x).
-        """
-        return isinstance(obj, unicode)
+    Check if object is ``str``.
+    """
+    return isinstance(obj, str)
 
 
 def md5_bytes(bytestring):
@@ -535,41 +486,18 @@ def trim(string):
     return re_whitespaces_starts.sub('', re_whitespaces_ends.sub('', string, 1), 1)
 
 
-if sys.version_info >= (3, 0):
-    def u(string, charset=DEFAULT_CHARSET):
-        """::
+def u(string, charset=DEFAULT_CHARSET):
+    """::
 
-            unicodestring = u(bytestring)
-            unicodestring = u(bytestring, 'utf-8')
+        unicodestring = u(bytestring)
+        unicodestring = u(bytestring, 'utf-8')
 
-        Decode bytestring into unicodestring.
-        """
-        if isbytes(string):
-            return bytes(string).decode(charset)
-        else:
-            return str(string)
-else:
-    def u(string, charset=DEFAULT_CHARSET):
-        """::
-
-            unicodestring = u(bytestring)
-            unicodestring = u(bytestring, 'utf-8')
-
-        Decode bytestring into unicodestring.
-        """
-        if isinstance(string, unicode) or hasattr(string, '__unicode__'):
-            return unicode(string)
-        else:
-            if charset.lower() in ['ascii', '646', 'us-ascii']:
-                return str(str(string).decode(charset))
-            else:
-                return str(string).decode(charset)
-
-
-if sys.version_info >= (3, 0):
-    uchr = chr
-else:
-    uchr = unichr
+    Decode bytestring into unicodestring.
+    """
+    if isbytes(string):
+        return bytes(string).decode(charset)
+    else:
+        return str(string)
 
 
 re_b_unquote = r(br'^"(.*)"$')
@@ -2936,9 +2864,9 @@ def _decode(point, name):
     # Code point
     if name is None:
         if point.startswith('x'):
-            return uchr(int(point[1:], 16))
+            return chr(int(point[1:], 16))
         else:
-            return uchr(int(point))
+            return chr(int(point))
 
     while len(name):
         if name in ENTITIES:

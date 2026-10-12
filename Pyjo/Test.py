@@ -498,9 +498,9 @@ def plan_tests(how_many):
 def plan_skip_all(why):
     """::
 
-        import sys
-        if sys.version_info < (3, 0):
-            plan_skip_all("Python 3.x is required")
+        import os
+        if not os.getenv('TEST_ONLINE'):
+            plan_skip_all("set TEST_ONLINE to enable this test")
 
     Completely skip an entire testing script.
     """
@@ -519,10 +519,10 @@ def skip(why=None, how_many=1):
     """::
 
         plan_tests(1)
-        if sys.version_info < (3, 0):
-            isa_ok(u'string', unicode, "string is unicode")
+        if os.getenv('TEST_ONLINE'):
+            ok(Pyjo.UserAgent.new().get('https://mojolicious.org').success, "online request")
         else:
-            skip("Requires Python 2.x", 1)
+            skip("set TEST_ONLINE to enable this test", 1)
 
     Declare how many tests might be skipped so tests run will match up with
     the plan.

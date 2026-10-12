@@ -272,7 +272,6 @@ Classes
 import Pyjo.Base
 
 from Pyjo.Regexp import r
-from Pyjo.Util import uchr
 
 
 ESCAPE_PAT = r'(?:\\[^0-9a-fA-F]|\\[0-9a-fA-F]{1,6})'
@@ -678,7 +677,7 @@ class Pyjo_DOM_CSS(Pyjo.Base.object):
         value = value.replace('\\\n', '')
 
         # Unescape Unicode characters
-        value = re_escaped_unicode.sub(lambda m: uchr(int(m.group(1), 16)), value)
+        value = re_escaped_unicode.sub(lambda m: chr(int(m.group(1), 16)), value)
 
         # Remove backslash
         value = value.replace('\\', '')

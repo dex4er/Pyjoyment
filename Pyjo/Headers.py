@@ -34,7 +34,6 @@ from Pyjo.Regexp import r
 from Pyjo.Util import b, convert, getenv, notnone, u
 
 import collections
-import sys
 
 
 re_line = r(br'(.*?)\x0d?\x0a')
@@ -1059,10 +1058,7 @@ class Pyjo_Headers(Pyjo.Base.object, Pyjo.String.Mixin.object):
 
         Turn headers into a string, suitable for HTTP messages.
         """
-        if sys.version_info >= (3, 0):
-            return u(self.to_bytes(), 'ascii')
-        else:
-            return self.to_bytes()
+        return u(self.to_bytes(), 'ascii')
 
     @property
     def trailer(self):
