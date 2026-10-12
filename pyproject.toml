@@ -1,0 +1,60 @@
+[build-system]
+requires = ["hatchling>=1.32.4"]
+build-backend = "hatchling.build"
+
+[project]
+name = "Pyjoyment"
+version = "0.0.2"
+description = "An asynchronous, event driven web framework for the Python programming language."
+readme = "README.rst"
+license = "Artistic-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "Piotr Roszatycki", email = "piotr.roszatycki@gmail.com" }]
+requires-python = ">=3.14"
+dependencies = []
+keywords = [
+  "async",
+  "framework",
+  "html",
+  "http",
+  "mojo",
+  "mojolicious",
+  "pyjo",
+  "pyjoyment",
+  "tap",
+  "test",
+  "websocket",
+  "wsgi",
+]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Environment :: Web Environment",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: 3.15",
+  "Topic :: Internet :: WWW/HTTP",
+  "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
+  "Topic :: Internet :: WWW/HTTP :: WSGI",
+  "Topic :: Internet :: WWW/HTTP :: WSGI :: Server",
+  "Topic :: Software Development :: Testing",
+  "Topic :: Text Processing :: Markup :: HTML",
+]
+
+[project.urls]
+Homepage = "https://github.com/dex4er/Pyjoyment"
+Documentation = "https://pyjoyment.readthedocs.io/"
+Source = "https://github.com/dex4er/Pyjoyment"
+Issues = "https://github.com/dex4er/Pyjoyment/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["Pyjo", "Pyjoyment"]
+
+[tool.hatch.build.targets.sdist]
+include = ["/Pyjo", "/Pyjoyment", "/t", "/examples", "/docs", "/.proverc", "/LICENSE", "/README.rst"]
+
+[tool.ruff]
+line-length = 200
+target-version = "py314"
