@@ -16,7 +16,7 @@ def request(wsgi, tx):
     # Response
     tx.res.code = 200
     tx.res.headers.content_type = 'text/plain'
-    tx.res.body = b("{0} request for {1}\n".format(method, path))
+    tx.res.body = b(f"{method} request for {path}\n")
 
     # Resume transaction
     tx.resume()

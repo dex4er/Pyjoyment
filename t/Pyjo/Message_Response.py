@@ -634,7 +634,7 @@ if __name__ == '__main__':
     res.parse(b"1\x0d\x0a")
     res.parse(compressed[:1])
     res.parse(b"\x0d\x0a")
-    res.parse(b('{0:x}'.format(len(compressed) - 1)))
+    res.parse(b(f'{len(compressed) - 1:x}'))
     res.parse(b"\x0d\x0a")
     res.parse(compressed[1:])
     res.parse(b"\x0d\x0a")

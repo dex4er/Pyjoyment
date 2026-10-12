@@ -47,7 +47,7 @@ class Pyjo_String_Unicode(str):
         return super().__new__(cls, Pyjo.Util.u(value, charset))
 
     def __repr__(self):
-        return "{0}.new({1})".format(self.__module__, super().__repr__())
+        return f"{self.__module__}.new({super().__repr__()})"
 
     def html_unescape(self):
         """::

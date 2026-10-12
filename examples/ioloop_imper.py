@@ -7,7 +7,7 @@ def server_cb(loop, stream, cid):
 
     def on_read_cb(stream, chunk):
         # Process input chunk
-        print("Server: {0}".format(chunk.decode('utf-8')))
+        print(f"Server: {chunk.decode('utf-8')}")
 
         # Write response
         stream.write(b"HTTP/1.1 200 OK\x0d\x0a\x0d\x0a")
@@ -25,7 +25,7 @@ def client_cb(loop, err, stream):
 
     def on_read_cb(stream, chunk):
         # Process input
-        print("Client: {0}".format(chunk.decode('utf-8')))
+        print(f"Client: {chunk.decode('utf-8')}")
 
     stream.on(on_read_cb, 'read')
 

@@ -91,7 +91,7 @@ class Pyjo_Asset_File(Pyjo.Asset.object):
 
         String representation of an object shown in console.
         """
-        return "<{0}.{1} handle={2} path={3}>".format(self.__class__.__module__, self.__class__.__name__, repr(self.handle), repr(self.path))
+        return f"<{self.__class__.__module__}.{self.__class__.__name__} handle={repr(self.handle)} path={repr(self.path)}>"
 
     def add_chunk(self, chunk=b''):
         """::
@@ -276,7 +276,7 @@ class Pyjo_Asset_File(Pyjo.Asset.object):
                     fd = os.open(name, os.O_APPEND | os.O_CREAT | os.O_EXCL | os.O_RDWR)
                 except OSError as e:
                     if e.errno == errno.EEXIST:
-                        name = '{0}.{1}'.format(base, md5_sum(b('{0}{1}{2}'.format(steady_time(), os.getpid(), rand()))))
+                        name = f'{base}.{md5_sum(b(f"{steady_time()}{os.getpid()}{rand()}"))}'
                     else:
                         raise e
                 else:

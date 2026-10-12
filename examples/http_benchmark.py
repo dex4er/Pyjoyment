@@ -49,7 +49,7 @@ for i in range(n):
         def read(stream, chunk):
             context.size += len(chunk)
             if verbose:
-                print("{0}\r".format(context.size), end='')
+                print(f"{context.size}\r", end='')
 
         @stream.on
         def close(stream):
@@ -61,7 +61,7 @@ for i in range(n):
                 print(context.size)
 
         # Write request
-        stream.write("GET {0} HTTP/1.1\x0d\x0aHost: {1}:{2}\x0d\x0a\x0d\x0a".format(url.path, url.host, url.port or 80).encode('ascii'))
+        stream.write(f"GET {url.path} HTTP/1.1\x0d\x0aHost: {url.host}:{url.port or 80}\x0d\x0a\x0d\x0a".encode('ascii'))
 
 
 Pyjo.IOLoop.start()
@@ -70,4 +70,4 @@ Pyjo.IOLoop.start()
 speed = str(sum(speeds))
 while r(r'(?<=\d)(\d{3})(,|$)').search(speed):
     speed = r(r'(?<=\d)(\d{3})(,|$)').sub(r',\1', speed)
-print('{0} Mb/s'.format(speed))
+print(f'{speed} Mb/s')

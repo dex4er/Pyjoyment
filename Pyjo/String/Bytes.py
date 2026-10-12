@@ -41,7 +41,7 @@ class Pyjo_String_Bytes(bytes):
         return super().__new__(cls, Pyjo.Util.b(value, charset))
 
     def __repr__(self):
-        return "{0}.new({1})".format(self.__module__, super().__repr__())
+        return f"{self.__module__}.new({super().__repr__()})"
 
     def decode(self, charset=DEFAULT_CHARSET):
         """::

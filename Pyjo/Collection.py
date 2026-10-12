@@ -42,7 +42,7 @@ class Pyjo_Collection(list):
         return super().__new__(cls, value)
 
     def __repr__(self):
-        return "{0}.new({1})".format(self.__module__, super().__repr__())
+        return f"{self.__module__}.new({super().__repr__()})"
 
     def compact(self):
         """::

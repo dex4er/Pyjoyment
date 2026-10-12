@@ -116,7 +116,7 @@ class Pyjo_IOLoop_Server(Pyjo.EventEmitter.object):
 
     def __del__(self):
         if DEBUG:
-            warn("-- Method {0}.__del__".format(self))
+            warn(f"-- Method {self}.__del__")
 
         try:
             self.close()
@@ -138,7 +138,7 @@ class Pyjo_IOLoop_Server(Pyjo.EventEmitter.object):
         """
         if self._reuse:
             reuse = getenv('PYJO_REUSE')
-            reuse = r(r'(?:^|\,){0}'.format(re.escape(reuse))).sub('', reuse, 1)
+            reuse = r(rf'(?:^|\,){re.escape(reuse)}').sub('', reuse, 1)
             setenv('PYJO_REUSE', reuse)
 
         self.stop()
@@ -260,8 +260,8 @@ class Pyjo_IOLoop_Server(Pyjo.EventEmitter.object):
         port = int(kwargs.get('port', 0))
         backlog = kwargs.get('backlog', None) or socket.SOMAXCONN
 
-        address_port = '{0}:{1}'.format(address, port)
-        m = r(r'(?:^|\,){0}:(\d+)'.format(re.escape(address_port))).match(getenv('PYJO_REUSE', ''))
+        address_port = f'{address}:{port}'
+        m = r(rf'(?:^|\,){re.escape(address_port)}:(\d+)').match(getenv('PYJO_REUSE', ''))
         if m:
             fd = int(m.group(1))
         else:
@@ -280,7 +280,7 @@ class Pyjo_IOLoop_Server(Pyjo.EventEmitter.object):
             s.bind((address, port))
 
             fd = s.fileno()
-            self._reuse = '{0}:{1}:{2}'.format(address, s.getsockname()[1], fd)
+            self._reuse = f'{address}:{s.getsockname()[1]}:{fd}'
             if len(getenv('PYJO_REUSE', '')):
                 setenv('PYJO_REUSE', getenv('PYJO_REUSE') + ',' + self._reuse)
             else:

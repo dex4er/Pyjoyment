@@ -143,8 +143,8 @@ class Pyjo_Reactor_Poll(Pyjo.Reactor.Select.object):
                 last = True
                 if t['cb']:
                     if DEBUG:
-                        warn("-- Alarm timer[{0}] = {1}".format(tid, t))
-                    self._sandbox(t['cb'], "Timer {0}".format(tid))
+                        warn(f"-- Alarm timer[{tid}] = {t}")
+                    self._sandbox(t['cb'], f"Timer {tid}")
 
         # Restore state if necessary
         if self._running:
@@ -166,9 +166,9 @@ class Pyjo_Reactor_Poll(Pyjo.Reactor.Select.object):
         if isinstance(remove, str):
             if DEBUG:
                 if remove in self._timers:
-                    warn("-- Reactor remove timer[{0}] = {1}".format(remove, self._timers[remove]))
+                    warn(f"-- Reactor remove timer[{remove}] = {self._timers[remove]}")
                 else:
-                    warn("-- Reactor remove timer[{0}] = None".format(remove))
+                    warn(f"-- Reactor remove timer[{remove}] = None")
             if remove in self._timers:
                 del self._timers[remove]
                 return True
@@ -180,7 +180,7 @@ class Pyjo_Reactor_Poll(Pyjo.Reactor.Select.object):
                 fd = remove.fileno()
                 if DEBUG:
                     if fd in self._ios:
-                        warn("-- Reactor remove io[{0}]".format(fd))
+                        warn(f"-- Reactor remove io[{fd}]")
                 poll = self._poll()
                 if poll:
                     poll.unregister(remove)
@@ -190,10 +190,10 @@ class Pyjo_Reactor_Poll(Pyjo.Reactor.Select.object):
                 # remove.close()  # TODO remove?
             except KeyError:
                 if DEBUG:
-                    warn("-- Reactor remove io {0} already closed".format(remove))
+                    warn(f"-- Reactor remove io {remove} already closed")
             except OSError:
                 if DEBUG:
-                    warn("-- Reactor remove io {0} already closed".format(remove))
+                    warn(f"-- Reactor remove io {remove} already closed")
                 pass
 
         return False

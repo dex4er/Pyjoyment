@@ -127,13 +127,13 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
         # Non-blocking
         if cb:
             if DEBUG:
-                warn("-- Non-blocking request ({0})\n".format(self._url(tx)))
+                warn(f"-- Non-blocking request ({self._url(tx)})\n")
             return self._start(True, tx, cb)
 
         # Blocking
         else:
             if DEBUG:
-                warn("-- Blocking request ({0})\n".format(self._url(tx)))
+                warn(f"-- Blocking request ({self._url(tx)})\n")
 
             class context:
                 pass
@@ -241,10 +241,10 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
     def _connection(self, nb, tx, cb):
         # Reuse connection
         proto, host, port = self.transactor.endpoint(tx)
-        cid = tx.connection or self._dequeue(nb, "{0}:{1}:{2}".format(proto, host, port), True)
+        cid = tx.connection or self._dequeue(nb, f"{proto}:{host}:{port}", True)
         if cid:
             if DEBUG:
-                warn("-- Reusing connection {0} ({1}://{2}:{3})\n".format(cid, proto, host, port))
+                warn(f"-- Reusing connection {cid} ({proto}://{host}:{port})\n")
             self._connections[cid] = {'cb': cb, 'nb': nb, 'tx': tx}
             if not tx.connection:
                 tx.kept_alive
@@ -258,7 +258,7 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
 
         # Connect
         if DEBUG:
-            warn("-- Connect ({0}://{1}:{2})\n".format(proto, host, port))
+            warn(f"-- Connect ({proto}://{host}:{port})\n")
         cid = self._connect(nb, True, tx, cid, self._connected)
         self._connections[cid] = {'cb': cb, 'nb': nb, 'tx': tx, 'writing': False}
 
@@ -369,7 +369,7 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
 
         # Process incoming data
         if DEBUG:
-            warn("-- Client <<< Server ({0})\n{1}\n".format(self._url(tx), str(chunk)))
+            warn(f"-- Client <<< Server ({self._url(tx)})\n{str(chunk)}\n")
 
         tx.client_read(chunk)
         if tx.is_finished:
@@ -401,7 +401,7 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
 
         # Keep connection alive (CONNECT requests get upgraded)
         if tx.req.method.upper() != 'CONNECT':
-            self._enqueue(c['nb'], '{0}:{1}:{2}'.format(*self.transactor.endpoint(tx)), cid)
+            self._enqueue(c['nb'], '{}:{}:{}'.format(*self.transactor.endpoint(tx)), cid)
 
     def _start(self, nb, tx, cb):
         # Application server
@@ -455,7 +455,7 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
         chunk = tx.client_write()
         c['writing'] = False
         if DEBUG:
-            warn("-- Client >>> Server ({0})\n{1}\n".format(self._url(tx), str(chunk)))
+            warn(f"-- Client >>> Server ({self._url(tx)})\n{str(chunk)}\n")
 
         stream = self._loop(c['nb']).stream(cid).write(chunk)
         if tx.is_finished:

@@ -16,7 +16,7 @@ def step2(delay):
 
 @delay.catch
 def error(delay, err):
-    print("Something went wrong: {0}".format(err))
+    print(f"Something went wrong: {err}")
 
 
 delay.wait()

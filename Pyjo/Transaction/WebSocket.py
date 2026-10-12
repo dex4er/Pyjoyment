@@ -215,7 +215,7 @@ class Pyjo_Transaction_WebSocket(Pyjo.Transaction.object):
         """
 
         if DEBUG:
-            warn("-- Building frame ({0}, {1}, {2}, {3}, {4})\n".format(fin, rsv1, rsv2, rsv3, op))
+            warn(f"-- Building frame ({fin}, {rsv1}, {rsv2}, {rsv3}, {op})\n")
 
         frame = bytearray()
 
@@ -234,19 +234,19 @@ class Pyjo_Transaction_WebSocket(Pyjo.Transaction.object):
         masked = self.masked
         if length < 126:
             if DEBUG:
-                warn("-- Small payload ({0})\n-- {1}".format(length, repr(payload)))
+                warn(f"-- Small payload ({length})\n-- {repr(payload)}")
             frame += struct.pack('B', length | 128 if masked else length)
 
         # Extended payload (16-bit)
         elif length < 65536:
             if DEBUG:
-                warn("-- Extended 16-bit payload ({0})\n-- {1}".format(length, repr(payload)))
+                warn(f"-- Extended 16-bit payload ({length})\n-- {repr(payload)}")
             frame += struct.pack('B', 126 | 128 if masked else 126) + struct.pack('!H', length)
 
         # Extended payload (64-bit with 32-bit fallback)
         else:
             if DEBUG:
-                warn("-- Extended 64-bit payload ({0})\n-- {1}".format(length, repr(payload)))
+                warn(f"-- Extended 64-bit payload ({length})\n-- {repr(payload)}")
             frame += struct.pack('B', 127 | 128 if masked else 127)
             frame += struct.pack('!Q', length)
 
@@ -352,13 +352,13 @@ class Pyjo_Transaction_WebSocket(Pyjo.Transaction.object):
         # Opcode
         op = first & 0b00001111
         if DEBUG:
-            warn("-- Parsing frame ({0}, {1}, {2}, {3}, {4})\n".format(fin, rsv1, rsv2, rsv3, op))
+            warn(f"-- Parsing frame ({fin}, {rsv1}, {rsv2}, {rsv3}, {op})\n")
 
         # Small payload
         hlength, length = 2, second & 0b01111111
         if length < 126:
             if DEBUG:
-                warn("-- Small payload ({0})\n".format(length))
+                warn(f"-- Small payload ({length})\n")
 
         # Extended payload (16-bit)
         elif length == 126:
@@ -368,7 +368,7 @@ class Pyjo_Transaction_WebSocket(Pyjo.Transaction.object):
             hlength = 4
             length, = struct.unpack('!H', bytes(chunk[2:4]))
             if DEBUG:
-                warn("-- Extended 16-bit payload ({0})\n".format(length))
+                warn(f"-- Extended 16-bit payload ({length})\n")
 
         # Extended payload (64-bit with 32-bit fallback)
         elif length == 127:
@@ -379,7 +379,7 @@ class Pyjo_Transaction_WebSocket(Pyjo.Transaction.object):
             ext = chunk[2:10]
             length, = struct.unpack('!Q', bytes(ext))
             if DEBUG:
-                warn("-- Extended 64-bit payload ({0})\n".format(length))
+                warn(f"-- Extended 64-bit payload ({length})\n")
 
         # Check message size
         if length > self.max_websocket_size:
@@ -406,7 +406,7 @@ class Pyjo_Transaction_WebSocket(Pyjo.Transaction.object):
             payload = bytearray()
 
         if DEBUG:
-            warn("-- {0}\n".format(repr(payload)))
+            warn(f"-- {repr(payload)}\n")
 
         return fin, rsv1, rsv2, rsv3, op, payload
 

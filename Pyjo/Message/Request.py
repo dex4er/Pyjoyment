@@ -120,7 +120,7 @@ class Pyjo_Message_Request(Pyjo.Message.object):
 
         String representation of an object shown in console.
         """
-        return "<{0}.{1} method={2} url={3} version={4}>".format(self.__class__.__module__, self.__class__.__name__, repr(self.method), repr(self.url), repr(self.version))
+        return f"<{self.__class__.__module__}.{self.__class__.__name__} method={repr(self.method)} url={repr(self.url)} version={repr(self.version)}>"
 
     def clone(self):
         """::
@@ -264,14 +264,14 @@ class Pyjo_Message_Request(Pyjo.Message.object):
             method = self.method.upper()
             if method == 'CONNECT':
                 port = url.port or (443 if url.protocol == 'https' else 80)
-                path = '{0}:{1}'.format(url.ihost, port)
+                path = f'{url.ihost}:{port}'
 
             # Proxy
             elif self.proxy and url.protocol != 'https':
                 if not self.is_handshake:
                     path = url.clone().set(userinfo=None)
 
-            self._start_buffer = bytearray(b("{0} {1} HTTP/{2}\x0d\x0a".format(method, path, self.version)))
+            self._start_buffer = bytearray(b(f"{method} {path} HTTP/{self.version}\x0d\x0a"))
 
         self.emit('progress', 'start_line', offset)
         return self._start_buffer[offset:offset + 131072]

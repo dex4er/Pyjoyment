@@ -116,7 +116,7 @@ class Pyjo_Headers(Pyjo.Base.object, Pyjo.String.Mixin.object):
 
         String representation of an object shown in console.
         """
-        return "{0}.new().parse({1})".format(self.__module__, repr(self.to_str() + '\x0d\x0a\x0d\x0a'))
+        return f"{self.__module__}.new().parse({self.to_str() + '\x0d\x0a\x0d\x0a'!r})"
 
     @property
     def accept(self):

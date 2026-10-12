@@ -55,7 +55,7 @@ if __name__ == '__main__':
     boundary = content.build_boundary()
     ok(boundary, 'boundary has been generated')
     is_ok(boundary, content.boundary, 'same boundary')
-    is_ok(content.headers.content_type, "multipart/mixed; boundary={0}".format(boundary), 'right "Content-Type" header')
+    is_ok(content.headers.content_type, f"multipart/mixed; boundary={boundary}", 'right "Content-Type" header')
 
     # Dynamic content
     content = Pyjo.Content.Single.new()

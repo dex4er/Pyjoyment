@@ -20,5 +20,5 @@ p = Point(x=1, y=2)
 
 line = Line(p1=p)
 
-print("[{0},{1}]".format(line.p1.x, line.p1.y))
-print("[{0},{1}]".format(line.p2.x, line.p2.y))
+print(f"[{line.p1.x},{line.p1.y}]")
+print(f"[{line.p2.x},{line.p2.y}]")

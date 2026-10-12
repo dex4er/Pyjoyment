@@ -109,7 +109,7 @@ class Pyjo_Server_Base(Pyjo.EventEmitter.object):
         if module:
             return module.new()
         else:
-            raise ImportError("No application module named '{0}'".format(app))
+            raise ImportError(f"No application module named '{app}'")
 
     def build_tx(self):
         """::

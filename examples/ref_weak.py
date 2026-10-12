@@ -22,8 +22,8 @@ def test():
     a.ref(b)
     b.ref(a)
 
-    print("{0}.ref = {1}".format(a, a.ref()))
-    print("{0}.ref = {1}".format(b, b.ref()))
+    print(f"{a}.ref = {a.ref()}")
+    print(f"{b}.ref = {b.ref()}")
 
 
 test()

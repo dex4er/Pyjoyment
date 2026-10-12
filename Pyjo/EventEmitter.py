@@ -113,13 +113,13 @@ class Pyjo_EventEmitter(Pyjo.Base.object):
             s = self._events[name]
 
             if DEBUG:
-                warn("-- Emit {0} in {1} ({2})".format(name, self, len(s)))
+                warn(f"-- Emit {name} in {self} ({len(s)})")
 
             for cb in s:
                 cb(self, *args, **kwargs)
         else:
             if DEBUG:
-                warn("-- Emit {0} in {1} (0)".format(name, self))
+                warn(f"-- Emit {name} in {self} (0)")
 
             if name == 'error':
                 raise Error(*args, **kwargs)

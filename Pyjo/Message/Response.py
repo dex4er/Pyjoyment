@@ -148,7 +148,7 @@ class Pyjo_Message_Response(Pyjo.Message.object):
 
         String representation of an object shown in console.
         """
-        return "<{0}.{1} code={2} message={3}>".format(self.__class__.__module__, self.__class__.__name__, repr(self.code), repr(self.message))
+        return f"<{self.__class__.__module__}.{self.__class__.__name__} code={repr(self.code)} message={repr(self.message)}>"
 
     @property
     def cookies(self):
@@ -262,7 +262,7 @@ class Pyjo_Message_Response(Pyjo.Message.object):
         if self._start_buffer is None:
             code = self.code or 404
             msg = self.message or self.default_message()
-            self._start_buffer = bytearray(b("HTTP/{0} {1} {2}\x0d\x0a".format(self.version, code, msg)))
+            self._start_buffer = bytearray(b(f"HTTP/{self.version} {code} {msg}\x0d\x0a"))
 
         self.emit('progress', 'start_line', offset)
         return self._start_buffer[offset:offset + 131072]

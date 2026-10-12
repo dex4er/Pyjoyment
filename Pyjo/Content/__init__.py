@@ -612,7 +612,7 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
             crlf = b''
         self._chunks += 1
 
-        return crlf + b('{0:x}'.format(len(chunk)), 'ascii') + b"\x0d\x0a" + chunk
+        return crlf + b(f'{len(chunk):x}', 'ascii') + b"\x0d\x0a" + chunk
 
     def _decompress(self, chunk):
         # No compression

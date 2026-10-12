@@ -317,7 +317,7 @@ class Pyjo_Log(Pyjo.EventEmitter.object):
             return sys.stderr
 
     def _format(self, t, level, *lines):
-        return "[{0}] [{1}] {2}\n".format(time.asctime(time.localtime(t)), level, "\n".join(map(u, lines)))
+        return f"[{time.asctime(time.localtime(t))}] [{level}] {'\n'.join(map(u, lines))}\n"
 
     def _log(self, level, lines):
         self.emit('message', level, lines)

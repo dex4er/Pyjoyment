@@ -261,7 +261,7 @@ class Pyjo_URL(Pyjo.Base.object, Pyjo.String.Mixin.object):
         host = self.ihost
         port = self.port
         if port is not None:
-            return '{0}:{1}'.format(host, port)
+            return f'{host}:{port}'
         else:
             return host
 

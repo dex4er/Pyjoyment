@@ -160,7 +160,7 @@ class Pyjo_IOLoop_Stream(Pyjo.EventEmitter.object):
 
     def __del__(self):
         if DEBUG:
-            warn("-- Method {0}.__del__".format(self))
+            warn(f"-- Method {self}.__del__")
 
         try:
             self.close()

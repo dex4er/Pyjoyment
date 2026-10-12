@@ -294,7 +294,7 @@ def not_implemented(method):
     """
     @functools.wraps(method)
     def stub(*args, **kwargs):
-        raise Error('Method "{0}" not implemented by subclass'.format(method.__name__))
+        raise Error(f'Method "{method.__name__}" not implemented by subclass')
     return stub
 
 

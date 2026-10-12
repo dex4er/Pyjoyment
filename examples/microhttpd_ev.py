@@ -36,7 +36,7 @@ class Connection:
             buf = self.sock.recv(10240)
         except OSError as err:
             if err.args[0] not in NONBLOCKING:
-                self.handle_error("error reading from {0}".format(self.sock))
+                self.handle_error(f"error reading from {self.sock}")
         if not buf:
             self.handle_error("connection closed by peer")
             return
@@ -62,7 +62,7 @@ class Connection:
             sent = self.sock.send(self.buf)
         except OSError as err:
             if err.args[0] not in NONBLOCKING:
-                self.handle_error("error writing to {0}".format(self.sock))
+                self.handle_error(f"error writing to {self.sock}")
         else:
             self.buf = self.buf[sent:]
             if not self.buf:

@@ -190,8 +190,8 @@ def cmp_ok(got, operator, expected, test_name=None):
     is true and fails otherwise.
     """
     if test_name is None:
-        test_name = 'An object {0}'.format(type(got))
-    test_name = "{0} {1} {2}".format(test_name, operator, repr(expected))
+        test_name = f'An object {type(got)}'
+    test_name = f"{test_name} {operator} {repr(expected)}"
     methods = {
         '==': lambda a, b: a == b,
         '>=': lambda a, b: a >= b,
@@ -203,7 +203,7 @@ def cmp_ok(got, operator, expected, test_name=None):
     check = methods[operator](got, expected)
     _ok(check, test_name)
     if not check:
-        diag("    {0}\n        {1}\n    {2}\n".format(repr(got), operator, repr(expected)))
+        diag(f"    {repr(got)}\n        {operator}\n    {repr(expected)}\n")
     return check
 
 
@@ -240,12 +240,12 @@ def done_testing(how_many=None):
         return
 
     if tests and how_many:
-        fail_ok("planned to run {0} but done_testing() expects {1}".format(tests, how_many))
+        fail_ok(f"planned to run {tests} but done_testing() expects {how_many}")
         return
 
     if not tests:
         tests = test
-        _print('1..{0}'.format(tests))
+        _print(f'1..{tests}')
 
     if not tests:
         diag('No tests run!')
@@ -277,15 +277,15 @@ def in_ok(got, elem, test_name=None):
     but with more meaningful diagnostic message.
     """
     if test_name is None:
-        test_name = "an object {0}".format(type(got))
-    test_name = "{0} is in {1}".format(repr(elem), test_name)
+        test_name = f"an object {type(got)}"
+    test_name = f"{repr(elem)} is in {test_name}"
     try:
         check = elem in got
     except TypeError:
         check = False
     _ok(check, test_name)
     if not check:
-        diag("         got: {0}".format(repr(got)))
+        diag(f"         got: {repr(got)}")
     return check
 
 
@@ -298,7 +298,7 @@ def is_deeply_ok(got, expected, test_name=None):
     equivalent. If the two structures are different, it will display the place
     where they start differing.
     """
-    test_name = "{0} is {1}".format(test_name, repr(expected))
+    test_name = f"{test_name} is {repr(expected)}"
     if isinstance(got, (list, tuple, set, dict)) and isinstance(expected, (list, tuple, set, dict)):
         stack = []
         check = _deep_check(stack, got, expected)
@@ -309,7 +309,7 @@ def is_deeply_ok(got, expected, test_name=None):
         check = got == expected
         _ok(check, test_name)
         if not check:
-            diag("         got: {0}\n    expected: {1}".format(repr(got), repr(expected)))
+            diag(f"         got: {repr(got)}\n    expected: {repr(expected)}")
     return check
 
 
@@ -321,12 +321,12 @@ def is_ok(got, expected, test_name=None):
     Compare two arguments with '==' operator.
     """
     if test_name is None:
-        test_name = 'An object {0}'.format(type(got))
-    test_name = "{0} is {1}".format(test_name, repr(expected))
+        test_name = f'An object {type(got)}'
+    test_name = f"{test_name} is {repr(expected)}"
     check = got == expected
     _ok(check, test_name)
     if not check:
-        diag("         got: {0}\n    expected: {1}\n".format(repr(got), repr(expected)))
+        diag(f"         got: {repr(got)}\n    expected: {repr(expected)}\n")
     return check
 
 
@@ -340,8 +340,8 @@ def isa_ok(got, cls, test_name=None):
     Check if object is an instance of class or one of the classes.
     """
     if test_name is None:
-        test_name = "An object {0}".format(type(got))
-    test_name = "{0} is object {1}".format(test_name, cls)
+        test_name = f"An object {type(got)}"
+    test_name = f"{test_name} is object {cls}"
     check = isinstance(got, cls)
     _ok(check, test_name)
     return check
@@ -355,12 +355,12 @@ def isnt_ok(got, expected, test_name=None):
     Compare two arguments with '!=' operator.
     """
     if test_name is None:
-        test_name = 'An object {0}'.format(type(got))
-    test_name = "{0} is {1}".format(test_name, repr(expected))
+        test_name = f'An object {type(got)}'
+    test_name = f"{test_name} is {repr(expected)}"
     check = got != expected
     _ok(check, test_name)
     if not check:
-        diag("         got: {0}\n    expected: anything else\n".format(repr(got)))
+        diag(f"         got: {repr(got)}\n    expected: anything else\n")
     return check
 
 
@@ -391,7 +391,7 @@ def like_ok(got, expected, test_name=None):
     }
     if isinstance(expected, _type_regex):
         regex = expected
-        regex_repr = "re.compile({0}, {1})".format(repr(regex.pattern), regex.flags)
+        regex_repr = f"re.compile({repr(regex.pattern)}, {regex.flags})"
     else:
         re_flags = 0
         if isinstance(expected, (list, tuple)) and len(expected) > 1:
@@ -399,17 +399,17 @@ def like_ok(got, expected, test_name=None):
                 re_flags |= FLAGS[c]
             expected = expected[0]
         regex = re.compile(expected, re_flags)
-        regex_repr = "re.compile({0}, {1})".format(repr(expected), re_flags)
+        regex_repr = f"re.compile({repr(expected)}, {re_flags})"
     if test_name is None:
-        test_name = "An object {0}".format(type(got))
-    test_name = "{0} matches {1}".format(test_name, regex_repr)
+        test_name = f"An object {type(got)}"
+    test_name = f"{test_name} matches {regex_repr}"
     try:
         check = bool(regex.search(got))
     except:
         check = False
     _ok(check, test_name)
     if not check:
-        diag("                {0}\n  doesn't match {1}\n".format(repr(got), regex))
+        diag(f"                {repr(got)}\n  doesn't match {regex}\n")
     return check
 
 
@@ -421,9 +421,9 @@ def none_ok(got, test_name=None):
     Check if value is ``None``.
     """
     if test_name is None:
-        test_name = "An object {0} is None".format(type(got))
+        test_name = f"An object {type(got)} is None"
     else:
-        test_name = "{0} is None".format(test_name)
+        test_name = f"{test_name} is None"
     check = got is None
     _ok(check, test_name)
     return check
@@ -439,15 +439,15 @@ def not_in_ok(got, elem, test_name=None):
     given object.
     """
     if test_name is None:
-        test_name = "an object {0}".format(type(got))
-    test_name = "{0} is not in {1}".format(repr(elem), test_name)
+        test_name = f"an object {type(got)}"
+    test_name = f"{repr(elem)} is not in {test_name}"
     try:
         check = elem not in got
     except TypeError:
         check = False
     _ok(check, test_name)
     if not check:
-        diag("         got: {0}".format(repr(got)))
+        diag(f"         got: {repr(got)}")
     return check
 
 
@@ -491,7 +491,7 @@ def plan_tests(how_many):
     """
     global done, failed, test, tests
     tests = how_many
-    _print('1..{0}'.format(tests))
+    _print(f'1..{tests}')
     return True
 
 
@@ -509,7 +509,7 @@ def plan_skip_all(why):
         print('# You tried to plan twice', file=sys.stderr)
         exit()
     else:
-        _print('1..0 # SKIP {0}'.format(why))
+        _print(f'1..0 # SKIP {why}')
         done = True
         test = 255
         exit()
@@ -534,7 +534,7 @@ def skip(why=None, how_many=1):
         message = "skip"
     for _ in range(how_many):
         test += 1
-        _print("ok {0} # {1}".format(test, message))
+        _print(f"ok {test} # {message}")
     return True
 
 
@@ -551,9 +551,9 @@ def throws_ok(cb, expected, test_name=None):
 
     if isinstance(expected, type) and issubclass(expected, Exception):
         if test_name is None:
-            test_name = "Raised {0}".format(expected.__name__)
+            test_name = f"Raised {expected.__name__}"
         else:
-            test_name = "{0} raised {1}".format(test_name, expected.__name__)
+            test_name = f"{test_name} raised {expected.__name__}"
 
         try:
             cb()
@@ -566,9 +566,9 @@ def throws_ok(cb, expected, test_name=None):
 
     else:
         if test_name is None:
-            test_name = "Raised '{0}'".format(expected)
+            test_name = f"Raised '{expected}'"
         else:
-            test_name = "{0} raised '{1}'".format(test_name, expected)
+            test_name = f"{test_name} raised '{expected}'"
 
         try:
             cb()
@@ -578,7 +578,7 @@ def throws_ok(cb, expected, test_name=None):
 
     _ok(check, test_name)
     if not check:
-        diag("         got: {0}\n    expected: {1}\n".format(got if got is not None else None, expected))
+        diag(f"         got: {got if got is not None else None}\n    expected: {expected}\n")
     return check
 
 
@@ -603,7 +603,7 @@ def unlike_ok(got, expected, test_name=None):
     }
     if isinstance(expected, _type_regex):
         regex = expected
-        regex_repr = "re.compile({0}, {1})".format(repr(regex.pattern), regex.flags)
+        regex_repr = f"re.compile({repr(regex.pattern)}, {regex.flags})"
     else:
         re_flags = 0
         if isinstance(expected, (list, tuple)) and len(expected) > 1:
@@ -611,17 +611,17 @@ def unlike_ok(got, expected, test_name=None):
                 re_flags |= FLAGS[c]
             expected = expected[0]
         regex = re.compile(expected, re_flags)
-        regex_repr = "re.compile({0}, {1})".format(repr(expected), re_flags)
+        regex_repr = f"re.compile({repr(expected)}, {re_flags})"
     if test_name is None:
-        test_name = "An object {0}".format(type(got))
-    test_name = "{0} matches {1}".format(test_name, regex_repr)
+        test_name = f"An object {type(got)}"
+    test_name = f"{test_name} matches {regex_repr}"
     try:
         check = not regex.search(got)
     except:
         check = True
     _ok(check, test_name)
     if not check:
-        diag("                {0}\n        matches {1}\n".format(repr(got), repr(expected)))
+        diag(f"                {repr(got)}\n        matches {repr(expected)}\n")
     return check
 
 
@@ -719,9 +719,9 @@ def _format_stack(stack):
         t = entry.get('type', '')
         idx = entry.get('idx', 0)
         if t == 'list' or t == 'tuple' or t == 'dict':
-            vname += '[{0}]'.format(repr(idx))
+            vname += f'[{repr(idx)}]'
         elif t == 'set':
-            vname = 'sorted({0})[{1}]'.format(vname, repr(idx))
+            vname = f'sorted({vname})[{repr(idx)}]'
 
     vals = stack[-1]['vals']
     vnames = ['     ' + re.sub(r'\$FOO', 'got', vname),
@@ -738,8 +738,8 @@ def _format_stack(stack):
             val = repr(val)
         vals[idx] = val
 
-    out += "{0} = {1}\n".format(vnames[0], vals[0])
-    out += "{0} = {1}\n".format(vnames[1], vals[1])
+    out += f"{vnames[0]} = {vals[0]}\n"
+    out += f"{vnames[1]} = {vals[1]}\n"
 
     out = '    ' + "\n    ".join(out.split("\n"))
 
@@ -757,18 +757,18 @@ def _ok(check, test_name=None):
     else:
         message = ''
 
-    message += 'ok {0}'.format(test)
+    message += f'ok {test}'
 
     if test_name is not None:
-        if isinstance(test_name, int) or '{0}'.format(test_name).isdigit():
-            diag("    You named your test '{0}'.  You shouldn't use numbers for your test names.\n    Very confusing.".format(test_name))
-        message += ' - {0}'.format(test_name)
+        if isinstance(test_name, int) or f'{test_name}'.isdigit():
+            diag(f"    You named your test '{test_name}'.  You shouldn't use numbers for your test names.\n    Very confusing.")
+        message += f' - {test_name}'
 
     _print(message)
 
     if not check:
         if test_name is not None:
-            diag("  Failed test '{0}'".format(test_name))
+            diag(f"  Failed test '{test_name}'")
         else:
             diag("  Failed test")
         diag(''.join(traceback.format_stack()[:-2]))

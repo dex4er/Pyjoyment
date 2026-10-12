@@ -74,7 +74,7 @@ def r(pattern, flags=''):
         if f in FLAGS:
             re_flags |= FLAGS[f]
         else:
-            raise ValueError('Bad flag: {0}'.format(f))
+            raise ValueError(f'Bad flag: {f}')
 
     new_obj = re.compile(re_pattern, flags=re_flags)
 

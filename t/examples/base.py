@@ -32,7 +32,7 @@ if __name__ == '__main__':
 
     line = Line(p1=p)
 
-    is_ok("[{0},{1}]".format(line.p1.x, line.p1.y), "[1,2]", 'line.p1')
-    is_ok("[{0},{1}]".format(line.p2.x, line.p2.y), "[0,0]", 'line.p2')
+    is_ok(f"[{line.p1.x},{line.p1.y}]", "[1,2]", 'line.p1')
+    is_ok(f"[{line.p2.x},{line.p2.y}]", "[0,0]", 'line.p2')
 
     done_testing()

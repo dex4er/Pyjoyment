@@ -222,11 +222,11 @@ class Pyjo_String_Mixin:
             raise Error('Method "to_bytes" or "to_str" not implemented by subclass')
 
         if self.__module__ == '__main__':
-            return "{0}({1})".format(self.__class__.__name__, repr(string))
+            return f"{self.__class__.__name__}({repr(string)})"
         elif isinstance(self, Pyjo.Base.object):
-            return "{0}.new({1})".format(self.__module__, repr(string))
+            return f"{self.__module__}.new({repr(string)})"
         else:
-            return "{0}.{1}({2})".format(self.__module__, self.__class__.__name__, repr(string))
+            return f"{self.__module__}.{self.__class__.__name__}({repr(string)})"
 
     def __str__(self):
         """::
