@@ -65,3 +65,29 @@ jobs:
         run: |
           python --version
           prove t/Pyjo t/docs t/examples
+
+  build:
+    name: build
+
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up mise
+        uses: jdx/mise-action@v5
+        with:
+          version: 2026.10.4 # datasource=github-releases depName=jdx/mise
+
+      - name: Build sdist and wheel
+        run: uv build
+
+      # Package data is the easiest part of a package to lose silently.
+      - name: Check wheel contents
+        run: |
+          python -m zipfile -l dist/*.whl | tee wheel.txt
+          grep -q 'Pyjo/IOLoop/certs/server.crt' wheel.txt
+          grep -q 'Pyjo/IOLoop/certs/server.key' wheel.txt
+          grep -q 'Pyjoyment/__init__.py' wheel.txt
