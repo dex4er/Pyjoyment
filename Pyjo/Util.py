@@ -93,7 +93,7 @@ def convert(value, newtype, default=None):
     """
     try:
         return newtype(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return default
 
 
