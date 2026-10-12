@@ -1,0 +1,32 @@
+name: Trunk Check
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - "*"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  trunk:
+    name: Trunk Check
+
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
+
+    env:
+      DO_NOT_TRACK: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Trunk Check
+        uses: trunk-io/trunk-action@v2.0.0
+        with:
+          check-mode: all
