@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 """
 Pyjo.UserAgent - Non-blocking I/O HTTP and WebSocket user agent
@@ -49,7 +48,7 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
     """
 
     def __init__(self, **kwargs):
-        super(Pyjo_UserAgent, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.ca = notnone(kwargs.get('ca'), lambda: getenv('PYJO_CA_FILE'))
         self.cert = notnone(kwargs.get('cert'), lambda: getenv('PYJO_CERT_FILE'))

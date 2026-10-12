@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 r"""
 Pyjo.DOM - Minimalistic HTML/XML DOM parser with CSS selectors
@@ -284,7 +283,7 @@ class Pyjo_DOM(Pyjo.Base.object, Pyjo.String.Mixin.object):
         nodetype = self.type
         if nodetype == 'root' or nodetype == 'tag':
             html = Pyjo.DOM.HTML.new(xml=self.xml)
-            return u''.join(map(lambda i: html.set(tree=i).render(), self._nodes(self.tree)))
+            return ''.join(map(lambda i: html.set(tree=i).render(), self._nodes(self.tree)))
         else:
             return self.tree[1]
 

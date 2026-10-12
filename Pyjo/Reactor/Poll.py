@@ -47,7 +47,6 @@ from Pyjo.Util import getenv, steady_time, warn
 
 import errno
 import select
-import socket
 import time
 
 
@@ -61,7 +60,7 @@ class Pyjo_Reactor_Poll(Pyjo.Reactor.Select.object):
     """
 
     def __init__(self, **kwargs):
-        super(Pyjo_Reactor_Poll, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self._running = False
         self._select_poll = None
@@ -116,7 +115,7 @@ class Pyjo_Reactor_Poll(Pyjo.Reactor.Select.object):
                                 io = self._ios[fd]
                                 last = True
                                 self._sandbox(io['cb'], 'Write', True)
-                except select.error as e:
+                except OSError as e:
                     # Ctrl-c generates EINTR on Python 2.x
                     if e.args[0] != errno.EINTR:
                         raise Exception(e)
@@ -192,7 +191,7 @@ class Pyjo_Reactor_Poll(Pyjo.Reactor.Select.object):
             except KeyError:
                 if DEBUG:
                     warn("-- Reactor remove io {0} already closed".format(remove))
-            except socket.error:
+            except OSError:
                 if DEBUG:
                     warn("-- Reactor remove io {0} already closed".format(remove))
                 pass

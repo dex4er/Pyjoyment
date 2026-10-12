@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 """
 Pyjo.Server.Daemon - Non-blocking I/O HTTP and WebSocket server
@@ -80,7 +79,7 @@ class Pyjo_Server_Daemon(Pyjo.Server.Base.object):
     """
 
     def __init__(self, **kwargs):
-        super(Pyjo_Server_Daemon, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.acceptors = kwargs.get('acceptors', [])
         """::

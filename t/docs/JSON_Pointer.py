@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 import Pyjo.Test
 
@@ -40,11 +39,11 @@ if __name__ == '__main__':
     boolean = pointer.contains('/foo/1')
     is_ok(boolean, False, 'boolean')
 
-    ok(Pyjo.JSON.Pointer.new({u'♥': 'pyjo'}).contains(u'/♥'), 'contains')
+    ok(Pyjo.JSON.Pointer.new({'♥': 'pyjo'}).contains('/♥'), 'contains')
     ok(Pyjo.JSON.Pointer.new({'foo': 'bar', 'baz': [4, 5]}).contains('/foo'), 'contains')
     ok(Pyjo.JSON.Pointer.new({'foo': 'bar', 'baz': [4, 5]}).contains('/baz/1'), 'contains')
 
-    ok(not Pyjo.JSON.Pointer.new({u'♥': 'pyjo'}).contains(u'/☃'), 'contains')
+    ok(not Pyjo.JSON.Pointer.new({'♥': 'pyjo'}).contains('/☃'), 'contains')
     ok(not Pyjo.JSON.Pointer.new({'foo': 'bar', 'baz': [4, 5]}).contains('/bar'), 'contains')
     ok(not Pyjo.JSON.Pointer.new({'foo': 'bar', 'baz': [4, 5]}).contains('/baz/9'), 'contains')
 
@@ -53,7 +52,7 @@ if __name__ == '__main__':
     value = pointer.get('/foo/bar')
     is_ok(value, None, 'value')
 
-    is_ok(Pyjo.JSON.Pointer.new({u'♥': 'pyjo'}).get(u'/♥'), 'pyjo', 'get')
+    is_ok(Pyjo.JSON.Pointer.new({'♥': 'pyjo'}).get('/♥'), 'pyjo', 'get')
     is_ok(Pyjo.JSON.Pointer.new({'foo': 'bar', 'baz': [4, 5, 6]}).get('/foo'), 'bar', 'get')
     is_ok(Pyjo.JSON.Pointer.new({'foo': 'bar', 'baz': [4, 5, 6]}).get('/baz/0'), 4, 'get')
     is_ok(Pyjo.JSON.Pointer.new({'foo': 'bar', 'baz': [4, 5, 6]}).get('/baz/2'), 6, 'get')

@@ -1,4 +1,4 @@
-class Value(object):
+class Value:
     value = None
 
     def __init__(self, value):

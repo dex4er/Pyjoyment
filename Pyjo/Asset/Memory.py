@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 """
 Pyjo.Asset.Memory - In-memory storage for HTTP content
@@ -54,7 +53,7 @@ class Pyjo_Asset_Memory(Pyjo.Asset.object):
     mtime = None
 
     def __init__(self, **kwargs):
-        super(Pyjo_Asset_Memory, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.auto_upgrade = kwargs.get('auto_upgrade', False)
         """::

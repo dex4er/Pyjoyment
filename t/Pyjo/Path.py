@@ -1,4 +1,3 @@
-# coding: utf-8
 
 import Pyjo.Test
 
@@ -48,17 +47,17 @@ if __name__ == '__main__':
     is_ok(str(path), '/AZaz09-._~!$&\'()*+,;=:@/f%2Foo', 'right path')
 
     # Unicode
-    is_ok(str(path.parse(u'/foo/♥/bar')), '/foo/%E2%99%A5/bar', 'right path')
+    is_ok(str(path.parse('/foo/♥/bar')), '/foo/%E2%99%A5/bar', 'right path')
     is_ok(str(path.to_dir()), '/foo/%E2%99%A5/', 'right directory')
-    is_deeply_ok(path.parts, ['foo', u'♥', 'bar'], 'right structure')
+    is_deeply_ok(path.parts, ['foo', '♥', 'bar'], 'right structure')
     ok(path.leading_slash, 'has leading slash')
     ok(not path.trailing_slash, 'no trailing slash')
-    is_ok(path.to_route(), u'/foo/♥/bar', 'right route')
+    is_ok(path.to_route(), '/foo/♥/bar', 'right route')
     is_ok(str(path.parse('/foo/%E2%99%A5/~b@a:r+')), '/foo/%E2%99%A5/~b@a:r+', 'right path')
-    is_deeply_ok(path.parts, ['foo', u'♥', '~b@a:r+'], 'right structure')
+    is_deeply_ok(path.parts, ['foo', '♥', '~b@a:r+'], 'right structure')
     ok(path.leading_slash, 'has leading slash')
     ok(not path.trailing_slash, 'no trailing slash')
-    is_ok(path.to_route(), u'/foo/♥/~b@a:r+', 'right route')
+    is_ok(path.to_route(), '/foo/♥/~b@a:r+', 'right route')
 
     # Zero in path
     is_ok(str(path.parse('/path/0')), '/path/0', 'right path')
@@ -118,11 +117,11 @@ if __name__ == '__main__':
     ok(not path.contains('/foobar'), 'does not contain path')
     ok(not path.contains('/foo/b'), 'does not contain path')
     ok(not path.contains('/foo/bar/baz'), 'does not contain path')
-    path = Pyjo.Path.new(u'/♥/bar')
-    ok(path.contains(u'/♥'), 'contains path')
-    ok(path.contains(u'/♥/bar'), 'contains path')
-    ok(not path.contains(u'/♥foo'), 'does not contain path')
-    ok(not path.contains(u'/foo♥'), 'does not contain path')
+    path = Pyjo.Path.new('/♥/bar')
+    ok(path.contains('/♥'), 'contains path')
+    ok(path.contains('/♥/bar'), 'contains path')
+    ok(not path.contains('/♥foo'), 'does not contain path')
+    ok(not path.contains('/foo♥'), 'does not contain path')
     path = Pyjo.Path.new('/')
     ok(path.contains('/'), 'contains path')
     ok(not path.contains('/foo'), 'does not contain path')
@@ -130,14 +129,14 @@ if __name__ == '__main__':
     ok(path.contains('/'), 'contains path')
     ok(path.contains('/0'), 'contains path')
     ok(not path.contains('/0/0'), 'does not contain path')
-    path = Pyjo.Path.new(u'/0/♥.html')
+    path = Pyjo.Path.new('/0/♥.html')
     ok(path.contains('/'), 'contains path')
     ok(path.contains('/0'), 'contains path')
-    ok(path.contains(u'/0/♥.html'), 'contains path')
-    ok(not path.contains(u'/0/♥'), 'does not contain path')
-    ok(not path.contains(u'/0/0.html'), 'does not contain path')
+    ok(path.contains('/0/♥.html'), 'contains path')
+    ok(not path.contains('/0/♥'), 'does not contain path')
+    ok(not path.contains('/0/0.html'), 'does not contain path')
     ok(not path.contains('/0.html'), 'does not contain path')
-    ok(not path.contains(u'/♥.html'), 'does not contain path')
+    ok(not path.contains('/♥.html'), 'does not contain path')
 
     # Merge
     path = Pyjo.Path.new('/foo')
@@ -223,34 +222,34 @@ if __name__ == '__main__':
 
     # Unchanged path
     path = Pyjo.Path.new('/foob%E4r/-._~!$&\'()*+,;=:@').set(charset='iso-8859-1')
-    is_deeply_ok(path.clone().parts, [u"foob\xe4r", '-._~!$&\'()*+,;=:@'], 'right structure')
-    ok(path.contains(u"/foob\xe4r"), 'contains path')
-    ok(path.contains(u"/foob\xe4r/-._~!$&'()*+,;=:@"), 'contains path')
-    ok(not path.contains(u"/foob\xe4r/-._~!\\$&'()*+,;=:."), 'does not contain path')
+    is_deeply_ok(path.clone().parts, ["foob\xe4r", '-._~!$&\'()*+,;=:@'], 'right structure')
+    ok(path.contains("/foob\xe4r"), 'contains path')
+    ok(path.contains("/foob\xe4r/-._~!$&'()*+,;=:@"), 'contains path')
+    ok(not path.contains("/foob\xe4r/-._~!\\$&'()*+,;=:."), 'does not contain path')
     is_ok(str(path), '/foob%E4r/-._~!$&\'()*+,;=:@', 'right path')
     is_ok(path.to_abs_str(), '/foob%E4r/-._~!$&\'()*+,;=:@', 'right absolute path')
-    is_ok(path.to_route(), u"/foob\xe4r/-._~!$&'()*+,;=:@", 'right route')
+    is_ok(path.to_route(), "/foob\xe4r/-._~!$&'()*+,;=:@", 'right route')
     is_ok(str(path.clone()), '/foob%E4r/-._~!$&\'()*+,;=:@', 'right path')
     is_ok(path.clone().to_abs_str(), '/foob%E4r/-._~!$&\'()*+,;=:@', 'right absolute path')
-    is_ok(path.clone().to_route(), u"/foob\xe4r/-._~!$&'()*+,;=:@", 'right route')
+    is_ok(path.clone().to_route(), "/foob\xe4r/-._~!$&'()*+,;=:@", 'right route')
 
     # Reuse path
     path = Pyjo.Path.new('/foob%E4r').set(charset='iso-8859-1')
     is_ok(str(path), '/foob%E4r', 'right path')
-    is_deeply_ok(path.parts, [u"foob\xe4r"], 'right structure')
+    is_deeply_ok(path.parts, ["foob\xe4r"], 'right structure')
     path.parse('/foob%E4r')
     is_ok(str(path), '/foob%E4r', 'right path')
-    is_deeply_ok(path.parts, [u"foob\xe4r"], 'right structure')
+    is_deeply_ok(path.parts, ["foob\xe4r"], 'right structure')
 
     # Latin-1
     path = Pyjo.Path.new().set(charset='iso-8859-1').parse('/foob%E4r')
-    is_deeply_ok(path.parts, [u'foobär'], 'right structure')
+    is_deeply_ok(path.parts, ['foobär'], 'right structure')
     ok(path.leading_slash, 'has leading slash')
     ok(not path.trailing_slash, 'no trailing slash')
     is_ok(str(path), '/foob%E4r', 'right path')
     is_ok(str(path), '/foob%E4r', 'right path')
     is_ok(path.to_abs_str(), '/foob%E4r', 'right absolute path')
-    is_ok(path.to_route(), u'/foobär', 'right route')
+    is_ok(path.to_route(), '/foobär', 'right route')
     is_ok(str(path.clone()), '/foob%E4r', 'right path')
 
     # No charset

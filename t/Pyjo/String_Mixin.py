@@ -1,4 +1,3 @@
-# coding: utf-8
 
 import Pyjo.Test
 
@@ -148,7 +147,7 @@ if __name__ == '__main__':
 
     # __unicode__
     if sys.version_info < (3, 0):
-        is_ok(unicode(string), u'string', "unicode(string) == u'string'")
+        is_ok(unicode(string), 'string', "unicode(string) == u'string'")
         is_ok(unicode(string), unicode(string2), "unicode(string) == unicode(string2)")
     else:
         skip('test for Python 2.x', 2)
@@ -282,7 +281,7 @@ if __name__ == '__main__':
 
     # __unicode__
     if sys.version_info < (3, 0):
-        is_ok(unicode(string), u'string', "unicode(string) == u'string'")
+        is_ok(unicode(string), 'string', "unicode(string) == u'string'")
         is_ok(unicode(string), unicode(string2), "unicode(string) == unicode(string2)")
     else:
         skip('test for Python 2.x', 2)
@@ -419,7 +418,7 @@ if __name__ == '__main__':
 
     # __unicode__
     if sys.version_info < (3, 0):
-        is_ok(unicode(string), u'string', "unicode(string) == u'string'")
+        is_ok(unicode(string), 'string', "unicode(string) == u'string'")
         is_ok(unicode(string), unicode(string2), "unicode(string) == unicode(string2)")
     else:
         skip('test for Python 2.x', 2)

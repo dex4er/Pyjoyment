@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 import Pyjo.Test
 
@@ -28,7 +27,7 @@ if __name__ == '__main__':
 
     class Tiger(Cat):
         def __init__(self, **kwargs):
-            super(Tiger, self).__init__(**kwargs)
+            super().__init__(**kwargs)
             self.friend = notnone(kwargs.get('friend'), lambda: Cat())
             self.stripes = kwargs.get('stripes', 42)
 

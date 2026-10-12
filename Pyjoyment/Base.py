@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 """
 Pyjoyment.Base - Base class for Pyjoyment applications

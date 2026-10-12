@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 """
 Pyjo.String.Unicode - Unicode string
@@ -30,7 +29,6 @@ Classes
 -------
 """
 
-from __future__ import print_function
 
 import Pyjo.String.Bytes
 import Pyjo.Util
@@ -54,11 +52,11 @@ class Pyjo_String_Unicode(base_object):
     and implements the following new ones.
     """
 
-    def __new__(cls, value=u'', charset=DEFAULT_CHARSET):
-        return super(Pyjo_String_Unicode, cls).__new__(cls, Pyjo.Util.u(value, charset))
+    def __new__(cls, value='', charset=DEFAULT_CHARSET):
+        return super().__new__(cls, Pyjo.Util.u(value, charset))
 
     def __repr__(self):
-        return "{0}.new({1})".format(self.__module__, super(Pyjo_String_Unicode, self).__repr__())
+        return "{0}.new({1})".format(self.__module__, super().__repr__())
 
     def html_unescape(self):
         """::
@@ -81,10 +79,10 @@ class Pyjo_String_Unicode(base_object):
 
             string.trim().quote().encode().say()
         """
-        return Pyjo.String.Bytes.new(super(Pyjo_String_Unicode, self).encode(charset))
+        return Pyjo.String.Bytes.new(super().encode(charset))
 
     @classmethod
-    def new(cls, value=u'', charset=DEFAULT_CHARSET):
+    def new(cls, value='', charset=DEFAULT_CHARSET):
         """::
 
             string = Pyjo.String.Unicode.new('test123')
@@ -164,7 +162,7 @@ class Pyjo_String_Unicode(base_object):
         return self.new(Pyjo.Util.xml_escape(self))
 
 
-def u(value=u'', charset=DEFAULT_CHARSET):
+def u(value='', charset=DEFAULT_CHARSET):
     """::
 
         string = u('test123')

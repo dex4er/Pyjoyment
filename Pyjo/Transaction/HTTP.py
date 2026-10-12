@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 """
 Pyjo.Transaction.HTTP - HTTP transaction
@@ -88,7 +87,7 @@ class Pyjo_Transaction_HTTP(Pyjo.Transaction.object):
     """
 
     def __init__(self, **kwargs):
-        super(Pyjo_Transaction_HTTP, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.previous = kwargs.get('previous')
         """::

@@ -1,4 +1,3 @@
-# coding: utf-8
 
 import Pyjo.Test
 
@@ -30,12 +29,12 @@ if __name__ == '__main__':
         path = os.path.join(tmpdir, 'test_path.log')
         with Pyjo.Log.new(level='error', path=path) as log:
             log.error('Just works')
-            log.fatal(u'I ♥ Mojolicious')
+            log.fatal('I ♥ Mojolicious')
             log.debug('Does not work')
             log = None
             content = u(slurp(path))
             like_ok(content, r'\[.*\] \[error\] Just works', 'right error message')
-            like_ok(content, u'\\[.*\\] \\[fatal\\] I ♥ Mojolicious', 'right fatal message')
+            like_ok(content, '\\[.*\\] \\[fatal\\] I ♥ Mojolicious', 'right fatal message')
             unlike_ok(content, r'\[.*\] \[debug\] Does not work', 'no debug message')
 
     with TemporaryDirectory() as tmpdir:
@@ -44,18 +43,18 @@ if __name__ == '__main__':
         handle = codecs.open(path, 'w', 'utf-8')
         with Pyjo.Log.new(handle=handle) as log:
             log.error('Just works')
-            log.fatal(u'I ♥ Mojolicious')
+            log.fatal('I ♥ Mojolicious')
             log.debug('Works too')
             content = u(slurp(path))
             like_ok(content, r'\[.*\] \[error\] Just works', 'right error message')
-            like_ok(content, u'\\[.*\\] \\[fatal\\] I ♥ Mojolicious', 'right fatal message')
+            like_ok(content, '\\[.*\\] \\[fatal\\] I ♥ Mojolicious', 'right fatal message')
             like_ok(content, r'\[.*\] \[debug\] Works too', 'no debug message')
 
     # Formatting
     log = Pyjo.Log.new()
     like_ok(log.format(time.time(), 'debug', 'Test 123'), r'^\[.*\] \[debug\] Test 123\n$', 'right format')
     like_ok(log.format(time.time(), 'debug', 'Test', '1', '2', '3'), r'^\[.*\] \[debug\] Test\n1\n2\n3\n$', 'right format')
-    like_ok(log.format(time.time(), 'error', u'I ♥ Mojolicious'), u'^\\[.*\\] \\[error\\] I ♥ Mojolicious\\n$', 'right format')
+    like_ok(log.format(time.time(), 'error', 'I ♥ Mojolicious'), '^\\[.*\\] \\[error\\] I ♥ Mojolicious\\n$', 'right format')
     log.format = lambda t, level, *lines: ':'.join(map(str, [level, int(t)] + list(lines)))
     like_ok(log.format(time.time(), 'debug', 'Test', '1', '2', '3'), r'^debug:\d+:Test:1:2:3$', 'right format')
 

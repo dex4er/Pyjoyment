@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 """
 Pyjo.Transaction - Transaction base class
@@ -81,7 +80,7 @@ class Pyjo_Transaction(Pyjo.EventEmitter.object):
     """
 
     def __init__(self, **kwargs):
-        super(Pyjo_Transaction, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.kept_alive = kwargs.get('kept_alive')
         """::

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 """
 Pyjo.Cookie.Response - HTTP response cookie
@@ -38,7 +37,7 @@ class Pyjo_Cookie_Response(Pyjo.Cookie.object):
     """
 
     def __init__(self, **kwargs):
-        super(Pyjo_Cookie_Response, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.domain = kwargs.get('domain')
         """::

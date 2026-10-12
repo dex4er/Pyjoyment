@@ -107,7 +107,7 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
     """
 
     def __init__(self, **kwargs):
-        super(Pyjo_IOLoop, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.max_accepts = kwargs.get('max_accepts', 0)
         """::

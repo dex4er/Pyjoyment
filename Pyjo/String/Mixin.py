@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 """
 Pyjo.String.Mixin - Object with to_bytes/to_str methods
@@ -32,7 +31,7 @@ class Error(Exception):
     pass
 
 
-class Pyjo_String_Mixin(object):
+class Pyjo_String_Mixin:
     """
     This mixin does not provide own constructor method
     and implements the following new methods.

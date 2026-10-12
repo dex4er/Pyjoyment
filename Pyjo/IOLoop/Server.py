@@ -81,7 +81,7 @@ class Pyjo_IOLoop_Server(Pyjo.EventEmitter.object):
     """
 
     def __init__(self, *args, **kwargs):
-        super(Pyjo_IOLoop_Server, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         self.handle = kwargs.get('handle')
         """::

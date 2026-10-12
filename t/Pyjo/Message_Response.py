@@ -1,4 +1,3 @@
-# coding: utf-8
 
 import Pyjo.Test
 
@@ -980,14 +979,14 @@ if __name__ == '__main__':
 
     # Text
     res = Pyjo.Message.Response.new()
-    snowman = b(u'☃')
-    is_ok(res.set(body=snowman).text, u'☃', 'right content')
-    is_ok(res.set(body=snowman).dom().text, u'☃', 'right text')
+    snowman = b('☃')
+    is_ok(res.set(body=snowman).text, '☃', 'right content')
+    is_ok(res.set(body=snowman).dom().text, '☃', 'right text')
     res = Pyjo.Message.Response.new()
-    yatta = b(u'やった', 'shift_jis')
+    yatta = b('やった', 'shift_jis')
     res.headers.content_type = 'text/plain;charset=shift_jis'
-    is_ok(res.set(body=yatta).text, u'やった', 'right content')
-    is_ok(res.set(body=yatta).dom().text, u'やった', 'right text')
+    is_ok(res.set(body=yatta).text, 'やった', 'right content')
+    is_ok(res.set(body=yatta).dom().text, 'やった', 'right text')
 
     # Body exceeding memory limit (no upgrade)
     setenv('PYJO_MAX_MEMORY_SIZE', '8')

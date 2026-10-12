@@ -117,7 +117,7 @@ class Pyjo_IOLoop_Delay(Pyjo.EventEmitter.object):
     """
 
     def __init__(self, *args, **kwargs):
-        super(Pyjo_IOLoop_Delay, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         self.ioloop = notnone(kwargs.get('ioloop'), lambda: Pyjo.IOLoop.singleton)
         """::

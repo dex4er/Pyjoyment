@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 """
 Pyjo.Base - Minimal base class
@@ -31,7 +30,7 @@ Pyjo.Base - Minimal base class
 """
 
 
-class Pyjo_Base(object):
+class Pyjo_Base:
     """::
 
         obj = SubClass.new()

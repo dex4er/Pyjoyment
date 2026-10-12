@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 """
 Pyjo.String.Bytes - Bytes string
@@ -48,10 +47,10 @@ class Pyjo_String_Bytes(base_object):
     """
 
     def __new__(cls, value=b'', charset=DEFAULT_CHARSET):
-        return super(Pyjo_String_Bytes, cls).__new__(cls, Pyjo.Util.b(value, charset))
+        return super().__new__(cls, Pyjo.Util.b(value, charset))
 
     def __repr__(self):
-        return "{0}.new({1})".format(self.__module__, super(Pyjo_String_Bytes, self).__repr__())
+        return "{0}.new({1})".format(self.__module__, super().__repr__())
 
     def decode(self, charset=DEFAULT_CHARSET):
         """::
@@ -64,7 +63,7 @@ class Pyjo_String_Bytes(base_object):
             string.decode('UTF-16LE').unquote().trim().say()
 
         """
-        return Pyjo.String.Unicode.new(super(Pyjo_String_Bytes, self).decode(charset))
+        return Pyjo.String.Unicode.new(super().decode(charset))
 
     @classmethod
     def new(cls, value=b'', charset=DEFAULT_CHARSET):

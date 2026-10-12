@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 r"""
 Pyjo.JSON - Minimalistic JSON
@@ -128,7 +127,7 @@ def to_json(value):
                  .replace('/', r'\/')
 
     if isunicode(string):
-        return string.replace(u'\u2028', r'\u2028') \
-                     .replace(u'\u2029', r'\u2029')
+        return string.replace('\u2028', r'\u2028') \
+                     .replace('\u2029', r'\u2029')
     else:
         return string

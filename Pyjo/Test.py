@@ -158,7 +158,6 @@ Classes and functions
 ---------------------
 """
 
-from __future__ import print_function, unicode_literals
 
 import os
 import re
@@ -800,7 +799,7 @@ def _run(script=__file__, srcdir='.'):
         raise Error(stderr)
 
 
-class DoesNotExist(object):
+class DoesNotExist:
     pass
 
 
@@ -811,7 +810,7 @@ class Error(Exception):
     pass
 
 
-class Guard(object):
+class Guard:
     def __del__(self):
         global failed, done, tests
         if test and not tests and not done:
@@ -828,7 +827,7 @@ class Guard(object):
 _guard = Guard()
 
 
-class NoseTest(object):
+class NoseTest:
     """
     :mod:`Pyjo.Test` wrapper for ``nosetests`` command.
     """

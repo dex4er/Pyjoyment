@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 r"""
 Pyjo.Log - Simple logger
@@ -73,7 +72,7 @@ if os.name == 'posix':
     def lock(file):
         try:
             fcntl.flock(file.fileno(), fcntl.LOCK_EX)
-        except IOError as err:
+        except OSError as err:
             #  IOError: [Errno 11] Resource temporarily unavailable
             if err[0] == 11:
                 raise LockException(LockException.LOCK_FAILED, err[1])
@@ -98,7 +97,7 @@ class Pyjo_Log(Pyjo.EventEmitter.object):
     """
 
     def __init__(self, **kwargs):
-        super(Pyjo_Log, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         """::
 
@@ -318,7 +317,7 @@ class Pyjo_Log(Pyjo.EventEmitter.object):
             return sys.stderr
 
     def _format(self, t, level, *lines):
-        return u"[{0}] [{1}] {2}\n".format(time.asctime(time.localtime(t)), level, "\n".join(map(u, lines)))
+        return "[{0}] [{1}] {2}\n".format(time.asctime(time.localtime(t)), level, "\n".join(map(u, lines)))
 
     def _log(self, level, lines):
         self.emit('message', level, lines)

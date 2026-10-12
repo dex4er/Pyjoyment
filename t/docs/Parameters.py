@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 import Pyjo.Test
 
@@ -24,7 +23,7 @@ if __name__ == '__main__':
 
     # Build
     params = Pyjo.Parameters.new(('foo', 'bar'), ('baz', 23))
-    params.append(i=u'♥ pyjo')
+    params.append(i='♥ pyjo')
     is_ok(str(params), 'foo=bar&baz=23&i=%E2%99%A5+pyjo', 'params')
 
     # __init__

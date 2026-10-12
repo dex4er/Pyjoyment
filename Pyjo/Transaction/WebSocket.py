@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 """
 Pyjo.Transaction.WebSocket - WebSocket transaction
@@ -148,7 +147,7 @@ class Pyjo_Transaction_WebSocket(Pyjo.Transaction.object):
     """
 
     def __init__(self, **kwargs):
-        super(Pyjo_Transaction_WebSocket, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.compressed = kwargs.get('compressed', False)
         """::

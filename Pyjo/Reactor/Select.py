@@ -60,7 +60,6 @@ from Pyjo.Util import getenv, md5_sum, rand, steady_time, warn
 
 import errno
 import select
-import socket
 import time
 
 
@@ -75,7 +74,7 @@ class Pyjo_Reactor_Select(Pyjo.Reactor.Base.object):
     """
 
     def __init__(self, **kwargs):
-        super(Pyjo_Reactor_Select, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self._running = False
         self._select_select = None
@@ -168,7 +167,7 @@ class Pyjo_Reactor_Select(Pyjo.Reactor.Base.object):
                                 io = self._ios[fd]
                                 last = True
                                 self._sandbox(io['cb'], "Write fd {0}".format(fd), True)
-                except select.error as e:
+                except OSError as e:
                     # Ctrl-c generates EINTR on Python 2.x
                     if e.args[0] != errno.EINTR:
                         raise Exception(e)
@@ -254,7 +253,7 @@ class Pyjo_Reactor_Select(Pyjo.Reactor.Base.object):
                 if fd in self._ios:
                     del self._ios[fd]
                     return True
-            except socket.error:
+            except OSError:
                 if DEBUG:
                     warn("-- Reactor remove io {0} already closed".format(remove))
 

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 r"""
 Pyjo.Message.Response - HTTP Response
@@ -120,7 +119,7 @@ class Pyjo_Message_Response(Pyjo.Message.object):
     """
 
     def __init__(self, **kwargs):
-        super(Pyjo_Message_Response, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.code = kwargs.get('code')
         """::
@@ -244,7 +243,7 @@ class Pyjo_Message_Response(Pyjo.Message.object):
         """
         if self._fixed:
             return self
-        super(Pyjo_Message_Response, self).fix_headers()
+        super().fix_headers()
 
         # Date
         headers = self.headers

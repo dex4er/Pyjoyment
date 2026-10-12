@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 r"""
 Pyjo.Message.Request - HTTP request
@@ -61,7 +60,7 @@ class Pyjo_Message_Request(Pyjo.Message.object):
     """
 
     def __init__(self, **kwargs):
-        super(Pyjo_Message_Request, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.environ = kwargs.get('environ', {})
         """::
@@ -224,7 +223,7 @@ class Pyjo_Message_Request(Pyjo.Message.object):
         if self._fixed:
             return self
 
-        super(Pyjo_Message_Request, self).fix_headers()
+        super().fix_headers()
 
         # Host
         url = self.url
@@ -364,12 +363,12 @@ class Pyjo_Message_Request(Pyjo.Message.object):
 
         # Parse normal message
         if self._state != 'cgi':
-            super(Pyjo_Message_Request, self).parse(chunk)
+            super().parse(chunk)
 
         # Parse CGI content
         else:
             self.content = self.content.parse_body(chunk)
-            super(Pyjo_Message_Request, self).parse()
+            super().parse()
 
         # Check if we can fix things that require all headers
         if not self.is_finished:

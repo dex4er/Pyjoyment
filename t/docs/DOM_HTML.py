@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 import Pyjo.Test
 
@@ -34,11 +33,11 @@ if __name__ == '__main__':
     ok(not xml, "not xml")
 
     # parse
-    html = html.parse(u'<foo bar="baz">I ♥ Pyjo!</foo>')
+    html = html.parse('<foo bar="baz">I ♥ Pyjo!</foo>')
     isa_ok(html, Pyjo.DOM.HTML.object, "html")
 
     # render
     string = html.render()
-    is_ok(string, u'<foo bar="baz">I ♥ Pyjo!</foo>', "string")
+    is_ok(string, '<foo bar="baz">I ♥ Pyjo!</foo>', "string")
 
     done_testing()
