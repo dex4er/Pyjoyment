@@ -1,4 +1,3 @@
-
 """
 Pyjo.UserAgent.CookieJar - Cookie jar for HTTP user agents
 ==========================================================
@@ -82,7 +81,6 @@ class Pyjo_UserAgent_CookieJar(Pyjo.Base.object):
         size = self.max_cookie_size
 
         for cookie in cookies:
-
             # Convert max age to expires
             age = cookie.max_age
             if age:
@@ -247,7 +245,7 @@ class Pyjo_UserAgent_CookieJar(Pyjo.Base.object):
             return notnone(cookie.origin, '') != origin
 
     def _path(self, path1, path2):
-        return path1 == '/' or path1 == path2 or path2.find(path1 + "/") == 0
+        return path1 == '/' or path1 == path2 or path2.find(path1 + '/') == 0
 
 
 new = Pyjo_UserAgent_CookieJar.new

@@ -1,4 +1,3 @@
-
 import Pyjo.Test
 
 
@@ -12,7 +11,6 @@ class UnitTest(Pyjo.Test.UnitTest):
 
 
 if __name__ == '__main__':
-
     from Pyjo.Test import *  # noqa
 
     from Pyjo.Util import getenv, setenv, steady_time
@@ -25,10 +23,10 @@ if __name__ == '__main__':
     import Pyjo.IOLoop.Server
     import Pyjo.IOLoop.Stream
 
+    from t.lib.Value import Value
+
     import platform
     import socket
-
-    from t.lib.Value import Value
 
     # Reactor detection
     setenv('PYJO_REACTOR', 'MyReactorDoesNotExist')
@@ -206,9 +204,7 @@ if __name__ == '__main__':
     removed = Value(0)
     delay = Pyjo.IOLoop.delay(lambda delay: removed.inc())
     end = delay.begin()
-    cid = Pyjo.IOLoop.server(address='127.0.0.1',
-                             cb=lambda loop, stream, cid: stream.on(lambda stream:
-                                                                    end(), 'close'))
+    cid = Pyjo.IOLoop.server(address='127.0.0.1', cb=lambda loop, stream, cid: stream.on(lambda stream: end(), 'close'))
     port = Pyjo.IOLoop.acceptor(cid).port
     end2 = delay.begin()
 
@@ -257,6 +253,7 @@ if __name__ == '__main__':
     def cid2(loop, err, stream):
         def drain(stream):
             return stream.write(b'1', drain)
+
         drain(stream)
         stream.on(lambda stream, chunk: client.set(client.get() + chunk), 'read')
 

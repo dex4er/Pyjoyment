@@ -1,4 +1,3 @@
-
 """
 Pyjo.Transaction - Transaction base class
 =========================================

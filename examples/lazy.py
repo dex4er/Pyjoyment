@@ -1,5 +1,5 @@
-
-
 def _():
-    print("Hello")
+    print('Hello')
+
+
 _()

@@ -1,4 +1,3 @@
-
 import Pyjo.Test
 
 
@@ -12,7 +11,6 @@ class UnitTest(Pyjo.Test.UnitTest):
 
 
 if __name__ == '__main__':
-
     from Pyjo.Test import *  # noqa
 
     import Pyjo.JSON.Pointer
@@ -51,7 +49,11 @@ if __name__ == '__main__':
     is_ok(pointer.new([{'foo/bar': 'bar'}]).get('/0/foo~1bar'), 'bar', '"/0/foo~1bar" is "bar"')
     is_ok(pointer.new([{'foo/bar/baz': 'yada'}]).get('/0/foo~1bar~1baz'), 'yada', '"/0/foo~1bar~1baz" is "yada"')
     is_ok(pointer.new([{'foo~/bar': 'bar'}]).get('/0/foo~0~1bar'), 'bar', '"/0/foo~0~1bar" is "bar"')
-    is_ok(pointer.new([{'f~o~o~/b~': {'a~': {'r': 'baz'}}}]).get('/0/f~0o~0o~0~1b~0/a~0/r'), 'baz', '"/0/f~0o~0o~0~1b~0/a~0/r" is "baz"')
+    is_ok(
+        pointer.new([{'f~o~o~/b~': {'a~': {'r': 'baz'}}}]).get('/0/f~0o~0o~0~1b~0/a~0/r'),
+        'baz',
+        '"/0/f~0o~0o~0~1b~0/a~0/r" is "baz"',
+    )
     is_ok(pointer.new({'~1': 'foo'}).get('/~01'), 'foo', '"/~01" is "foo"')
 
     # Unicode
@@ -59,18 +61,7 @@ if __name__ == '__main__':
     is_ok(pointer.new().set(data={'☃': ['snowman']}).get('/☃/0'), 'snowman', 'found the snowman')
 
     # RFC 6901
-    d = {
-        'foo': ['bar', 'baz'],
-        '': 0,
-        'a/b': 1,
-        'c%d': 2,
-        'e^f': 3,
-        r'g|h': 4,
-        r'i\\j': 5,
-        'k"l': 6,
-        ' ': 7,
-        'm~n': 8
-    }
+    d = {'foo': ['bar', 'baz'], '': 0, 'a/b': 1, 'c%d': 2, 'e^f': 3, r'g|h': 4, r'i\\j': 5, 'k"l': 6, ' ': 7, 'm~n': 8}
     pointer = Pyjo.JSON.Pointer.new(d)
     is_deeply_ok(pointer.get(''), d, 'empty pointer is whole document')
     is_deeply_ok(pointer.get('/foo'), ['bar', 'baz'], '"/foo" is "["bar", "baz"]"')

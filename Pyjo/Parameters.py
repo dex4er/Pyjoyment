@@ -1,4 +1,3 @@
-
 """
 Pyjo.Parameters - Parameters
 ============================
@@ -26,10 +25,10 @@ import Pyjo.Base
 import Pyjo.String.Mixin
 
 from Pyjo.Regexp import r
-from Pyjo.Util import b, u, isiterable, notnone, url_escape, url_unescape
+from Pyjo.Util import b, isiterable, notnone, u, url_escape, url_unescape
 
 
-re_pair = r(br'^([^=]+)(?:=(.*))?$')
+re_pair = r(rb'^([^=]+)(?:=(.*))?$')
 
 
 class Pyjo_Parameters(Pyjo.Base.object, Pyjo.String.Mixin.object):
@@ -118,9 +117,13 @@ class Pyjo_Parameters(Pyjo.Base.object, Pyjo.String.Mixin.object):
         for k, v in list(args) + sorted(kwargs.items()):
             if isiterable(v):
                 for vv in v:
-                    pairs.append((k, vv),)
+                    pairs.append(
+                        (k, vv),
+                    )
             else:
-                pairs.append((k, v),)
+                pairs.append(
+                    (k, v),
+                )
         return self
 
     def clone(self):
@@ -242,7 +245,9 @@ class Pyjo_Parameters(Pyjo.Base.object, Pyjo.String.Mixin.object):
                     name = u(name, charset)
                     value = u(value, charset)
 
-                self._pairs.append((name, value),)
+                self._pairs.append(
+                    (name, value),
+                )
 
         return self._pairs
 
@@ -266,7 +271,13 @@ class Pyjo_Parameters(Pyjo.Base.object, Pyjo.String.Mixin.object):
         :meth:`every_param`. Note that this method will normalize the parameters.
         """
         # Multiple names
-        if name is not None and isinstance(name, (list, tuple,)):
+        if name is not None and isinstance(
+            name,
+            (
+                list,
+                tuple,
+            ),
+        ):
             return [self.param(n) for n in name]
 
         # Last value
@@ -325,7 +336,7 @@ class Pyjo_Parameters(Pyjo.Base.object, Pyjo.String.Mixin.object):
         charset = self.charset
 
         if self._string is not None:
-            return url_escape(self._string, br'^A-Za-z0-9\-._~!$&\'()*+,;=%:@/?')
+            return url_escape(self._string, rb'^A-Za-z0-9\-._~!$&\'()*+,;=%:@/?')
 
         # Build pairs
         pairs = self.pairs
@@ -338,8 +349,8 @@ class Pyjo_Parameters(Pyjo.Base.object, Pyjo.String.Mixin.object):
                 name = b(name, charset)
                 value = b(value, charset)
 
-            name = url_escape(name, br'^A-Za-z0-9\-._~!$\'()*,:@/?')
-            value = url_escape(value, br'^A-Za-z0-9\-._~!$\'()*,:@/?')
+            name = url_escape(name, rb'^A-Za-z0-9\-._~!$\'()*,:@/?')
+            value = url_escape(value, rb'^A-Za-z0-9\-._~!$\'()*,:@/?')
 
             name = name.replace(b'%20', b'+')
             value = value.replace(b'%20', b'+')
@@ -382,7 +393,13 @@ class Pyjo_Parameters(Pyjo.Base.object, Pyjo.String.Mixin.object):
     def _replace(self, name, value):
         pairs = self.pairs
 
-        if isinstance(value, (list, tuple,)):
+        if isinstance(
+            value,
+            (
+                list,
+                tuple,
+            ),
+        ):
             values = value
         else:
             values = [value]
@@ -391,7 +408,10 @@ class Pyjo_Parameters(Pyjo.Base.object, Pyjo.String.Mixin.object):
 
         while i < len(pairs) and len(values):
             if pairs[i][0] == name:
-                pairs[i] = (name, values.pop(0),)
+                pairs[i] = (
+                    name,
+                    values.pop(0),
+                )
             i += 1
 
         while i < len(pairs):
@@ -401,7 +421,9 @@ class Pyjo_Parameters(Pyjo.Base.object, Pyjo.String.Mixin.object):
                 i += 1
 
         while len(values):
-            self.append((name, values.pop(0)),)
+            self.append(
+                (name, values.pop(0)),
+            )
 
         return self
 

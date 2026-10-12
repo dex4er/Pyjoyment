@@ -21,4 +21,4 @@ def step3(delay):
 # Sequentialize multiple events
 Pyjo.IOLoop.delay().steps(step1, step2, step3).wait()
 
-print("END")
+print('END')

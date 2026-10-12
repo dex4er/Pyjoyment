@@ -1,5 +1,4 @@
 import asyncio
-
 import sys
 
 
@@ -11,19 +10,18 @@ class MicrohttpdProtocol(asyncio.Protocol):
         self.transport = transport
 
     def data_received(self, chunk):
-        if chunk.find(b"\x0d\x0a\x0d\x0a") >= 0:
-
-            if chunk.find(b"\x0d\x0aConnection: Keep-Alive\x0d\x0a") >= 0:
+        if chunk.find(b'\x0d\x0a\x0d\x0a') >= 0:
+            if chunk.find(b'\x0d\x0aConnection: Keep-Alive\x0d\x0a') >= 0:
                 keepalive = True
             else:
                 keepalive = False
 
             # Write a minimal HTTP response
             # (the "Hello World!" message has been optimized away!)
-            response = b"HTTP/1.1 200 OK\x0d\x0aContent-Length: 0\x0d\x0a"
+            response = b'HTTP/1.1 200 OK\x0d\x0aContent-Length: 0\x0d\x0a'
             if keepalive:
-                response += b"Connection: keep-alive\x0d\x0a"
-            response += b"\x0d\x0a"
+                response += b'Connection: keep-alive\x0d\x0a'
+            response += b'\x0d\x0a'
 
             self.transport.write(response)
 

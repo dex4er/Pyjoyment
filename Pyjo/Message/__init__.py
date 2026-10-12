@@ -1,4 +1,3 @@
-
 """
 Pyjo.Message - HTTP message base class
 ======================================
@@ -119,7 +118,9 @@ class Pyjo_Message(Pyjo.EventEmitter.object):
         defaults to ``utf-8``.
         """
 
-        self.max_line_size = notnone(kwargs.get('max_line_size'), lambda: convert(getenv('PYJO_MAX_LINE_SIZE'), int) or 8192)
+        self.max_line_size = notnone(
+            kwargs.get('max_line_size'), lambda: convert(getenv('PYJO_MAX_LINE_SIZE'), int) or 8192
+        )
         """::
 
             size = msg.max_line_size
@@ -129,7 +130,9 @@ class Pyjo_Message(Pyjo.EventEmitter.object):
         ``PYJO_MAX_LINE_SIZE`` environment variable or ``8192`` (8KB).
         """
 
-        self.max_message_size = notnone(kwargs.get('max_message_size'), lambda: notnone(convert(getenv('PYJO_MAX_MESSAGE_SIZE'), int), 16777216))
+        self.max_message_size = notnone(
+            kwargs.get('max_message_size'), lambda: notnone(convert(getenv('PYJO_MAX_MESSAGE_SIZE'), int), 16777216)
+        )
         """::
 
             size = msg.max_message_size
@@ -214,7 +217,9 @@ class Pyjo_Message(Pyjo.EventEmitter.object):
         # "multipart/form-data"
         elif content_type.lower().find('multipart/form-data') >= 0:
             for name, value, _ in self._parse_formdata():
-                params.append((name, u(value, params.charset)),)
+                params.append(
+                    (name, u(value, params.charset)),
+                )
 
         return params
 
@@ -524,7 +529,7 @@ class Pyjo_Message(Pyjo.EventEmitter.object):
         if not self._state:
             # Check start-line size
             try:
-                l = self._buffer.index(b"\x0a")
+                l = self._buffer.index(b'\x0a')
             except ValueError:
                 l = len(self._buffer)
             if l > self.max_line_size:
@@ -645,10 +650,7 @@ class Pyjo_Message(Pyjo.EventEmitter.object):
         """
         uploads = []
         for data in self._parse_formdata(True):
-            upload = Pyjo.Upload.new(name=data[0],
-                                     filename=data[2],
-                                     asset=data[1].asset,
-                                     headers=data[1].headers)
+            upload = Pyjo.Upload.new(name=data[0], filename=data[2], asset=data[1].asset, headers=data[1].headers)
             uploads.append(upload)
         return uploads
 

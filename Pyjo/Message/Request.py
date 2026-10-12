@@ -1,4 +1,3 @@
-
 r"""
 Pyjo.Message.Request - HTTP request
 ===================================
@@ -41,14 +40,14 @@ import Pyjo.Cookie.Request
 import Pyjo.Message
 import Pyjo.URL
 
-import os
-
 from Pyjo.Regexp import r
 from Pyjo.Util import b, b64_decode, b64_encode, convert, notnone, u
 
+import os
 
-re_start_line = r(br'^\s*(.*?)\x0d?\x0a')
-re_request = r(br'^(\S+)\s+(\S+)\s+HTTP\/(\d\.\d)$')
+
+re_start_line = r(rb'^\s*(.*?)\x0d?\x0a')
+re_request = r(rb'^(\S+)\s+(\S+)\s+HTTP\/(\d\.\d)$')
 re_hostport = r(r'^([^:]*):?(.*)$')
 re_server_protocol = r(r'^([^/]+)/([^/]+)$')
 
@@ -120,7 +119,7 @@ class Pyjo_Message_Request(Pyjo.Message.object):
 
         String representation of an object shown in console.
         """
-        return f"<{self.__class__.__module__}.{self.__class__.__name__} method={repr(self.method)} url={repr(self.url)} version={repr(self.version)}>"
+        return f'<{self.__class__.__module__}.{self.__class__.__name__} method={repr(self.method)} url={repr(self.url)} version={repr(self.version)}>'
 
     def clone(self):
         """::
@@ -132,10 +131,7 @@ class Pyjo_Message_Request(Pyjo.Message.object):
         # Dynamic requests cannot be cloned
         content = self.content.clone()
         if content is not None:
-            clone = self.new(content=content,
-                             method=self.method,
-                             url=self.url.clone(),
-                             version=self.version)
+            clone = self.new(content=content, method=self.method, url=self.url.clone(), version=self.version)
             if self._proxy:
                 clone._proxy = self._proxy.clone()
             return clone
@@ -195,7 +191,7 @@ class Pyjo_Message_Request(Pyjo.Message.object):
             return
 
         line = m.group(1)
-        del buf[:m.end()]
+        del buf[: m.end()]
         m = re_request.search(line)
 
         if not m:
@@ -253,7 +249,6 @@ class Pyjo_Message_Request(Pyjo.Message.object):
         Get a chunk of request-line data starting from a specific position.
         """
         if self._start_buffer is None:
-
             # Path
             url = self.url
             path = url.path_query
@@ -271,10 +266,10 @@ class Pyjo_Message_Request(Pyjo.Message.object):
                 if not self.is_handshake:
                     path = url.clone().set(userinfo=None)
 
-            self._start_buffer = bytearray(b(f"{method} {path} HTTP/{self.version}\x0d\x0a"))
+            self._start_buffer = bytearray(b(f'{method} {path} HTTP/{self.version}\x0d\x0a'))
 
         self.emit('progress', 'start_line', offset)
-        return self._start_buffer[offset:offset + 131072]
+        return self._start_buffer[offset : offset + 131072]
 
     @property
     def is_handshake(self):
@@ -472,7 +467,7 @@ class Pyjo_Message_Request(Pyjo.Message.object):
             offset = header.find(basic)
             if offset >= 0:
                 offset += len(basic)
-                auth = header[len(basic):]
+                auth = header[len(basic) :]
                 try:
                     return u(b64_decode(auth))
                 except:
@@ -491,7 +486,7 @@ class Pyjo_Message_Request(Pyjo.Message.object):
             headers.header(name, value)
 
             # Host/Port
-            if (name == 'HOST'):
+            if name == 'HOST':
                 host, port = value, None
                 m = re_hostport.search(host)
                 if m:
@@ -547,7 +542,7 @@ class Pyjo_Message_Request(Pyjo.Message.object):
             if buf.startswith('/'):
                 buf = buf[1:]
             if buf.find(value) == 0:
-                buf = buf[len(value):]
+                buf = buf[len(value) :]
                 if buf.startswith('/'):
                     buf = buf[1:]
             if buf.startswith('/'):

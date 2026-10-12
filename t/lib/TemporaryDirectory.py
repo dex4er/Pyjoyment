@@ -1,7 +1,8 @@
-from contextlib import contextmanager
 import errno
-import tempfile
 import shutil
+import tempfile
+
+from contextlib import contextmanager
 
 
 @contextmanager

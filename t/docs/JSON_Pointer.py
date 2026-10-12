@@ -1,4 +1,3 @@
-
 import Pyjo.Test
 
 
@@ -12,7 +11,6 @@ class UnitTest(Pyjo.Test.UnitTest):
 
 
 if __name__ == '__main__':
-
     from Pyjo.Test import *  # noqa
 
     import Pyjo.JSON.Pointer

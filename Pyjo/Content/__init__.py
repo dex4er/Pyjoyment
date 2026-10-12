@@ -1,4 +1,3 @@
-
 """
 Pyjo.Content - HTTP content base class
 ======================================
@@ -86,9 +85,9 @@ from Pyjo.Util import b, convert, getenv, not_implemented, notnone
 import zlib
 
 
-re_boundary = r(r'''multipart.*boundary\s*=\s*(?:"([^"]+)"|([\w'(),.:?\-+/]+))''', 'i')
+re_boundary = r(r"""multipart.*boundary\s*=\s*(?:"([^"]+)"|([\w'(),.:?\-+/]+))""", 'i')
 re_charset = r(r'charset\s*=\s*"?([^"\s;]+)"?', 'i')
-re_chunk = r(br'^(?:\x0d?\x0a)?([0-9a-fA-F]+).*\x0a')
+re_chunk = r(rb'^(?:\x0d?\x0a)?([0-9a-fA-F]+).*\x0a')
 
 
 class Pyjo_Content(Pyjo.EventEmitter.object):
@@ -136,7 +135,9 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
         Content headers, defaults to a :mod:`Pyjo.Headers` object.
         """
 
-        self.max_buffer_size = notnone(kwargs.get('max_buffer_size'), lambda: convert(getenv('PYJO_MAX_BUFFER_SIZE', '0'), int, 0) or 262144)
+        self.max_buffer_size = notnone(
+            kwargs.get('max_buffer_size'), lambda: convert(getenv('PYJO_MAX_BUFFER_SIZE', '0'), int, 0) or 262144
+        )
         """::
 
             size = content.max_buffer_size
@@ -146,7 +147,9 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
         the ``PYJO_MAX_BUFFER_SIZE` environment variable or ``262144`` (256KB).
         """
 
-        self.max_leftover_size = notnone(kwargs.get('max_leftover_size'), lambda: convert(getenv('PYJO_MAX_LEFTOVER_SIZE', '0'), int, 0) or 262144)
+        self.max_leftover_size = notnone(
+            kwargs.get('max_leftover_size'), lambda: convert(getenv('PYJO_MAX_LEFTOVER_SIZE', '0'), int, 0) or 262144
+        )
         """::
 
             size = content.max_leftover_size
@@ -322,9 +325,9 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
         if self._header_buffer is None:
             headers = bytearray(self.headers.to_bytes())
             if headers:
-                self._header_buffer = headers + b"\x0d\x0a\x0d\x0a"
+                self._header_buffer = headers + b'\x0d\x0a\x0d\x0a'
             else:
-                self._header_buffer = bytearray(b"\x0d\x0a")
+                self._header_buffer = bytearray(b'\x0d\x0a')
 
         return self._header_buffer[offset:131072]
 
@@ -603,16 +606,16 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
     def _build_chunk(self, chunk):
         # End
         if not len(chunk):
-            return b"\x0d\x0a0\x0d\x0a\x0d\x0a"
+            return b'\x0d\x0a0\x0d\x0a\x0d\x0a'
 
         # First chunk has no leading CRLF
         if self._chunks:
-            crlf = b"\x0d\x0a"
+            crlf = b'\x0d\x0a'
         else:
             crlf = b''
         self._chunks += 1
 
-        return crlf + b(f'{len(chunk):x}', 'ascii') + b"\x0d\x0a" + chunk
+        return crlf + b(f'{len(chunk):x}', 'ascii') + b'\x0d\x0a' + chunk
 
     def _decompress(self, chunk):
         # No compression

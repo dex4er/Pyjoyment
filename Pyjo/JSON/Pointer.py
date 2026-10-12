@@ -1,4 +1,3 @@
-
 """
 Pyjo.JSON.Pointer - JSON Pointers
 =================================

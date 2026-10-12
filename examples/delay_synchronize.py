@@ -9,6 +9,7 @@ delay = Pyjo.IOLoop.delay()
 def step(delay):
     print('BOOM!')
 
+
 for i in range(10):
     end = delay.begin()
 
@@ -16,6 +17,7 @@ for i in range(10):
         def timer_cb(loop):
             print(10 - i)
             end()
+
         return timer_cb
 
     Pyjo.IOLoop.timer(timer_wrap(i), i)

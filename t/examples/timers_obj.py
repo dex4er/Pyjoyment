@@ -11,7 +11,6 @@ class UnitTest(Pyjo.Test.UnitTest):
 
 
 if __name__ == '__main__':
-
     from Pyjo.Test import *  # noqa
 
     import Pyjo.IOLoop
@@ -22,7 +21,7 @@ if __name__ == '__main__':
 
     @loop.recurring(0.4)
     def writer(loop):
-        pass_ok("A")
+        pass_ok('A')
 
     @loop.timer(1)
     def timeouter(loop):
@@ -30,6 +29,6 @@ if __name__ == '__main__':
 
     loop.start()
 
-    pass_ok("Event loop ended")
+    pass_ok('Event loop ended')
 
     done_testing()

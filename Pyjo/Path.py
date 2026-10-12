@@ -1,4 +1,3 @@
-
 """
 Pyjo.Path - Path
 ================
@@ -154,9 +153,11 @@ class Pyjo_Path(Pyjo.Base.object, Pyjo.String.Mixin.object):
             return True
         else:
             path = self.to_route()
-            return len(path) >= len(prefix) \
-                and path.startswith(prefix) \
+            return (
+                len(path) >= len(prefix)
+                and path.startswith(prefix)
                 and (len(path) == len(prefix) or path[len(prefix)] == '/')
+            )
 
     @property
     def leading_slash(self):
@@ -275,13 +276,13 @@ class Pyjo_Path(Pyjo.Base.object, Pyjo.String.Mixin.object):
         charset = self.charset
 
         if self._path is not None:
-            return url_escape(self._path, br'^A-Za-z0-9\-._~!$&\'()*+,;=%:@/')
+            return url_escape(self._path, rb'^A-Za-z0-9\-._~!$&\'()*+,;=%:@/')
 
         if self._parts:
             parts = self._parts
             if charset:
                 parts = map(lambda p: p.encode(charset), parts)
-            path = b'/'.join(map(lambda p: url_escape(p, br'^A-Za-z0-9\-._~!$&\'()*+,;=:@'), parts))
+            path = b'/'.join(map(lambda p: url_escape(p, rb'^A-Za-z0-9\-._~!$&\'()*+,;=:@'), parts))
         else:
             path = b''
 

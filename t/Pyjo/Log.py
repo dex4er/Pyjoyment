@@ -1,4 +1,3 @@
-
 import Pyjo.Test
 
 
@@ -12,7 +11,6 @@ class UnitTest(Pyjo.Test.UnitTest):
 
 
 if __name__ == '__main__':
-
     from Pyjo.Test import *  # noqa
 
     import codecs
@@ -53,8 +51,12 @@ if __name__ == '__main__':
     # Formatting
     log = Pyjo.Log.new()
     like_ok(log.format(time.time(), 'debug', 'Test 123'), r'^\[.*\] \[debug\] Test 123\n$', 'right format')
-    like_ok(log.format(time.time(), 'debug', 'Test', '1', '2', '3'), r'^\[.*\] \[debug\] Test\n1\n2\n3\n$', 'right format')
-    like_ok(log.format(time.time(), 'error', 'I ♥ Mojolicious'), '^\\[.*\\] \\[error\\] I ♥ Mojolicious\\n$', 'right format')
+    like_ok(
+        log.format(time.time(), 'debug', 'Test', '1', '2', '3'), r'^\[.*\] \[debug\] Test\n1\n2\n3\n$', 'right format'
+    )
+    like_ok(
+        log.format(time.time(), 'error', 'I ♥ Mojolicious'), '^\\[.*\\] \\[error\\] I ♥ Mojolicious\\n$', 'right format'
+    )
     log.format = lambda t, level, *lines: ':'.join(map(str, [level, int(t)] + list(lines)))
     like_ok(log.format(time.time(), 'debug', 'Test', '1', '2', '3'), r'^debug:\d+:Test:1:2:3$', 'right format')
 

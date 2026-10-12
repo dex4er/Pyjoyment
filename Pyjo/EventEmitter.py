@@ -70,6 +70,7 @@ class Error(Exception):
     """
     Exception raised on unhandled error event.
     """
+
     pass
 
 
@@ -113,13 +114,13 @@ class Pyjo_EventEmitter(Pyjo.Base.object):
             s = self._events[name]
 
             if DEBUG:
-                warn(f"-- Emit {name} in {self} ({len(s)})")
+                warn(f'-- Emit {name} in {self} ({len(s)})')
 
             for cb in s:
                 cb(self, *args, **kwargs)
         else:
             if DEBUG:
-                warn(f"-- Emit {name} in {self} (0)")
+                warn(f'-- Emit {name} in {self} (0)')
 
             if name == 'error':
                 raise Error(*args, **kwargs)

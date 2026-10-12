@@ -1,4 +1,3 @@
-
 """
 Pyjo.Cookie - HTTP cookie base class
 ====================================

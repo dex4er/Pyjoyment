@@ -1,4 +1,3 @@
-
 r"""
 Pyjo.DOM - Minimalistic HTML/XML DOM parser with CSS selectors
 ==============================================================
@@ -35,7 +34,6 @@ should not use it for validation.
 Classes
 -------
 """
-
 
 import Pyjo.Base
 import Pyjo.Collection
@@ -878,7 +876,7 @@ class Pyjo_DOM(Pyjo.Base.object, Pyjo.String.Mixin.object):
     def _nodes(self, tree=None, tags=False):
         if not tree:
             return []
-        nodes = tree[self._start(tree):]
+        nodes = tree[self._start(tree) :]
         if tags:
             return filter(lambda n: n[0] == 'tag', nodes)
         else:
@@ -983,7 +981,7 @@ class Pyjo_DOM(Pyjo.Base.object, Pyjo.String.Mixin.object):
 
             # Add leading whitespace if punctuation allows it
             if re_no_space_ending.search(text) and re_good_punctuation.search(chunk):
-                chunk = " " + chunk
+                chunk = ' ' + chunk
 
             # Trim whitespace blocks
             if re_no_whitespace.search(chunk) or not trim:

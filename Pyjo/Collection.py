@@ -1,4 +1,3 @@
-
 r"""
 Pyjo.Collection - Collection
 ============================
@@ -42,7 +41,7 @@ class Pyjo_Collection(list):
         return super().__new__(cls, value)
 
     def __repr__(self):
-        return f"{self.__module__}.new({super().__repr__()})"
+        return f'{self.__module__}.new({super().__repr__()})'
 
     def compact(self):
         """::
@@ -232,18 +231,24 @@ class Pyjo_Collection(list):
             # Append the word "pyjo" to all values
             pyjoified = collection.map(lambda a: a + 'pyjo')
         """
-        assert(args)
+        assert args
         attribute = args[0]
         args = args[1:]
         if callable(attribute):
             return self.new(map(attribute, self))
         else:
             return self.new(
-                map(lambda a:
-                    getattr(a, attribute)(*args, **kwargs) if callable(getattr(a, attribute))
-                    else getattr(a, attribute, setattr(a, attribute, args[0])) if args
-                    else getattr(a, attribute),
-                    self))
+                map(
+                    lambda a: (
+                        getattr(a, attribute)(*args, **kwargs)
+                        if callable(getattr(a, attribute))
+                        else getattr(a, attribute, setattr(a, attribute, args[0]))
+                        if args
+                        else getattr(a, attribute)
+                    ),
+                    self,
+                )
+            )
 
     @classmethod
     def new(cls, value=[]):

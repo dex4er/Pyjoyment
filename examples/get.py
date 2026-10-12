@@ -1,12 +1,15 @@
 import Pyjo.UserAgent
 
+from Pyjo.Util import die
+
 import codecs
 import sys
 
-from Pyjo.Util import die
 
 if sys.stdout.isatty():
-    sys.stdout = codecs.getwriter(sys.stdout.encoding)(sys.stdout.detach() if hasattr(sys.stdout, 'detach') else sys.stdout, 'xmlcharrefreplace')
+    sys.stdout = codecs.getwriter(sys.stdout.encoding)(
+        sys.stdout.detach() if hasattr(sys.stdout, 'detach') else sys.stdout, 'xmlcharrefreplace'
+    )
 else:
     sys.stdout = codecs.getwriter('utf-8')(sys.stdout.detach() if hasattr(sys.stdout, 'detach') else sys.stdout)
 
@@ -21,7 +24,7 @@ tx = Pyjo.UserAgent.new(**opts).get(url)
 err = tx.error
 if err:
     if err['code']:
-        die("{code} response: {message}".format(**err))
+        die('{code} response: {message}'.format(**err))
     else:
-        die("Connection error: {message}".format(**err))
+        die('Connection error: {message}'.format(**err))
 print(tx.res.text)

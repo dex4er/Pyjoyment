@@ -1,4 +1,3 @@
-
 """
 Pyjo.UserAgent.Proxy - User agent proxy manager
 ===============================================

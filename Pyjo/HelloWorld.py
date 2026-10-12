@@ -1,4 +1,3 @@
-
 """
 Pyjo.HelloWorld - Hello world!
 ==============================
@@ -41,7 +40,7 @@ class Pyjo_HelloWorld(Pyjo.Base.object):
     def handler(self, tx):
         tx.res.code = 200
         tx.res.headers.content_type = 'text/plain'
-        tx.res.body = b"Hello, world!\n"
+        tx.res.body = b'Hello, world!\n'
         tx.resume()
         return self
 

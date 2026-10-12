@@ -1,4 +1,3 @@
-
 """
 Pyjo.Server.WSGI - WSGI server
 ==============================
@@ -86,12 +85,14 @@ class Pyjo_Server_WSGI(Pyjo.Server.Base.object):
 
         # Response headers
         res = tx.res.fix_headers()
-        status = f"{res.code or 404} {res.message or res.default_message()}"
+        status = f'{res.code or 404} {res.message or res.default_message()}'
         headers_dict = res.headers.to_dict_list()
         headers = []
         for name, value_list in headers_dict.items():
             for value in value_list:
-                headers.append((name, value),)
+                headers.append(
+                    (name, value),
+                )
 
         # WSGI response
         return status, headers, self._body(tx, tx.is_empty)

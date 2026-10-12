@@ -9,5 +9,6 @@ class C:
 
         return v
 
+
 o = C()
 print(o.m())

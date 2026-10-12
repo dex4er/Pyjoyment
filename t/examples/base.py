@@ -11,7 +11,6 @@ class UnitTest(Pyjo.Test.UnitTest):
 
 
 if __name__ == '__main__':
-
     from Pyjo.Test import *  # noqa
 
     import Pyjo.Base
@@ -32,7 +31,7 @@ if __name__ == '__main__':
 
     line = Line(p1=p)
 
-    is_ok(f"[{line.p1.x},{line.p1.y}]", "[1,2]", 'line.p1')
-    is_ok(f"[{line.p2.x},{line.p2.y}]", "[0,0]", 'line.p2')
+    is_ok(f'[{line.p1.x},{line.p1.y}]', '[1,2]', 'line.p1')
+    is_ok(f'[{line.p2.x},{line.p2.y}]', '[0,0]', 'line.p2')
 
     done_testing()

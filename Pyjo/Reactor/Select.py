@@ -106,11 +106,11 @@ class Pyjo_Reactor_Select(Pyjo.Reactor.Base.object):
         if fd in self._ios:
             self._ios[fd]['cb'] = cb
             if DEBUG:
-                warn(f"-- Reactor found io[{fd}] = {self._ios[fd]}")
+                warn(f'-- Reactor found io[{fd}] = {self._ios[fd]}')
         else:
             self._ios[fd] = {'cb': cb}
             if DEBUG:
-                warn(f"-- Reactor adding io[{fd}] = {self._ios[fd]}")
+                warn(f'-- Reactor adding io[{fd}] = {self._ios[fd]}')
         return self.watch(handle, True, True)
 
     @property
@@ -161,12 +161,12 @@ class Pyjo_Reactor_Select(Pyjo.Reactor.Base.object):
                             if fd in readable or fd in exceptional:
                                 io = self._ios[fd]
                                 last = True
-                                self._sandbox(io['cb'], f"Read fd {fd}", False)
+                                self._sandbox(io['cb'], f'Read fd {fd}', False)
                         if fd in self._ios:
                             if fd in writable:
                                 io = self._ios[fd]
                                 last = True
-                                self._sandbox(io['cb'], f"Write fd {fd}", True)
+                                self._sandbox(io['cb'], f'Write fd {fd}', True)
                 except OSError as e:
                     # Ctrl-c generates EINTR on Python 2.x
                     if e.args[0] != errno.EINTR:
@@ -198,8 +198,8 @@ class Pyjo_Reactor_Select(Pyjo.Reactor.Base.object):
                 last = True
                 if t['cb']:
                     if DEBUG:
-                        warn(f"-- Alarm timer[{tid}] = {t}")
-                    self._sandbox(t['cb'], f"Timer {tid}")
+                        warn(f'-- Alarm timer[{tid}] = {t}')
+                    self._sandbox(t['cb'], f'Timer {tid}')
 
         # Restore state if necessary
         if self._running:
@@ -225,15 +225,15 @@ class Pyjo_Reactor_Select(Pyjo.Reactor.Base.object):
         """
         if remove is None:
             if DEBUG:
-                warn("-- Reactor remove None")
+                warn('-- Reactor remove None')
             return
 
         if isinstance(remove, str):
             if DEBUG:
                 if remove in self._timers:
-                    warn(f"-- Reactor remove timer[{remove}] = {self._timers[remove]}")
+                    warn(f'-- Reactor remove timer[{remove}] = {self._timers[remove]}')
                 else:
-                    warn(f"-- Reactor remove timer[{remove}] = None")
+                    warn(f'-- Reactor remove timer[{remove}] = None')
             if remove in self._timers:
                 del self._timers[remove]
                 return True
@@ -245,7 +245,7 @@ class Pyjo_Reactor_Select(Pyjo.Reactor.Base.object):
                 fd = remove.fileno()
                 if DEBUG:
                     if fd in self._ios:
-                        warn(f"-- Reactor remove io[{fd}]")
+                        warn(f'-- Reactor remove io[{fd}]')
                 if fd in self._inputs:
                     self._inputs.remove(fd)
                 if fd in self._outputs:
@@ -255,7 +255,7 @@ class Pyjo_Reactor_Select(Pyjo.Reactor.Base.object):
                     return True
             except OSError:
                 if DEBUG:
-                    warn(f"-- Reactor remove io {remove} already closed")
+                    warn(f'-- Reactor remove io {remove} already closed')
 
         return False
 
@@ -351,7 +351,7 @@ class Pyjo_Reactor_Select(Pyjo.Reactor.Base.object):
         self._timers[tid] = timer
 
         if DEBUG:
-            warn(f"-- Reactor adding timer[{tid}] = {self._timers[tid]}")
+            warn(f'-- Reactor adding timer[{tid}] = {self._timers[tid]}')
 
         return tid
 

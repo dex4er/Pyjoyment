@@ -1,4 +1,3 @@
-
 r"""
 Pyjo.JSON - Minimalistic JSON
 =============================
@@ -118,16 +117,11 @@ def to_json(value):
 
     Encode Python value to JSON text without ``utf-8`` encoding it.
     """
-    string = json.dumps(value,
-                        ensure_ascii=False,
-                        allow_nan=False,
-                        cls=JSONEncoder,
-                        separators=(',', ':'),
-                        sort_keys=True) \
-                 .replace('/', r'\/')
+    string = json.dumps(
+        value, ensure_ascii=False, allow_nan=False, cls=JSONEncoder, separators=(',', ':'), sort_keys=True
+    ).replace('/', r'\/')
 
     if isunicode(string):
-        return string.replace('\u2028', r'\u2028') \
-                     .replace('\u2029', r'\u2029')
+        return string.replace('\u2028', r'\u2028').replace('\u2029', r'\u2029')
     else:
         return string

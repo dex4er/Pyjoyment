@@ -1,4 +1,3 @@
-
 """
 Pyjo.Transaction.HTTP - HTTP transaction
 ========================================

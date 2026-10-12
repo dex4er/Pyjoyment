@@ -1,5 +1,7 @@
 import Pyjo.Server.Daemon
+
 from Pyjo.Util import b
+
 
 with Pyjo.Server.Daemon.new(listen=['http://*:3000']) as daemon:
     daemon.unsubscribe('request')
@@ -13,7 +15,7 @@ with Pyjo.Server.Daemon.new(listen=['http://*:3000']) as daemon:
         # Response
         tx.res.code = 200
         tx.res.headers.content_type = 'text/plain'
-        tx.res.body = b(f"{method} request for {path}\n")
+        tx.res.body = b(f'{method} request for {path}\n')
 
         # Resume transaction
         tx.resume()

@@ -1,4 +1,3 @@
-
 """
 Pyjoyment.Base - Base class for Pyjoyment applications
 ======================================================
@@ -9,7 +8,6 @@ Pyjoyment.Base - Base class for Pyjoyment applications
     class MyApp(Pyjoyment.Base.object):
         ...
 """
-
 
 import Pyjo.Base
 

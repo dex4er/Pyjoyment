@@ -1,4 +1,3 @@
-
 r"""
 Pyjo.Content.Single - HTTP content
 ==================================

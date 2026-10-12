@@ -7,11 +7,11 @@ Pyjoyment is a port of [Mojolicious](https://mojolicious.org) to Python. The
 agent, servers, event loop), and the `Pyjoyment` package is reserved for the
 `Mojolicious::*` framework layer (routes, controllers, renderer, `Lite`).
 
-The code was written against Mojo 6.x and for Python 2 and 3 at once. The
-project is being revived: the target is the latest Mojolicious on Python 3.14+,
-with asyncio as the only I/O core. The plan, its order and its progress live in
-GitHub Issues, starting from the open umbrella issue about the revival; this
-file describes how the project works and why, not what is left to do.
+The code was written against Mojo 6.x. The project is being revived: the
+target is the latest Mojolicious on Python 3.14+, with asyncio as the only I/O
+core. The plan, its order and its progress live in GitHub Issues, starting from
+the open umbrella issue about the revival; this file describes how the project
+works and why, not what is left to do.
 
 ## Design Principles
 
@@ -115,13 +115,34 @@ copy:
 - `"\$"` in a double-quoted Perl string is a plain `$`; in Python it keeps the
   backslash.
 
-## Python 2 Leftovers
+## Linting and Formatting
 
-The code still carries Python 2 compatibility: `sys.version_info` branches,
-`u''` prefixes, `super(Class, self)`, `from __future__` imports, and the
-nose and unittest adapters in `Pyjo.Test` and every test file. New code does
-not add more of them. Removing them is a separate, mechanical step; mixing it
-into a functional change makes both hard to review.
+[Trunk](https://docs.trunk.io) runs the linters and formatters configured in
+`.trunk/trunk.yaml`: ruff for Python (lint, import order and formatting),
+prettier for Markdown, YAML and JSON, taplo for TOML, yamllint, markdownlint
+and actionlint. The `trunk` launcher is not pinned in `mise.toml` (mise only
+has it as an npm package); install it with `mise use -g trunk` or the
+installer from the Trunk documentation. The launcher downloads the CLI version
+named in `trunk.yaml`.
+
+```sh
+trunk fmt          # format changed files
+trunk check        # lint changed files
+trunk check --all  # lint everything, as CI does
+```
+
+`trunk-fmt-pre-commit` formats staged files on commit and
+`trunk-check-pre-push` checks before a push, once Trunk has installed its git
+hooks (any `trunk` command does).
+
+The ruff configuration lives in `pyproject.toml`. Its rule list is explicit:
+newer ruff versions enable many more rules by default, including one that
+rejects the Mojo-style module names. Formatting uses single quotes and a line
+length of 120. Imports list `Pyjo` modules before the standard library, like
+Mojo modules list `Mojo::*` before core modules.
+
+New code targets Python 3.14 only: no `sys.version_info` branches for older
+versions and no compatibility shims. The ruff `UP` rules keep it that way.
 
 ## Session and Temporary Files
 
@@ -166,9 +187,9 @@ and the pull request.
 ## Commits and Pull Requests
 
 - Commit subjects are short and in the imperative or descriptive style of the
-  history, optionally prefixed with the module: `Pyjo.IOLoop.Client: port is
-  converted to int`.
-- Keep mechanical changes (formatting, Python 2 cleanup) and functional
+  history, optionally prefixed with the module:
+  `Pyjo.IOLoop.Client: port is converted to int`.
+- Keep mechanical changes (formatting, import order, renames) and functional
   changes in separate commits.
 - A pull request description lists the changes and a validation checklist;
   check an item only once it has been verified.

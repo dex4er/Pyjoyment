@@ -1,4 +1,3 @@
-
 """
 Pyjo.Server.Daemon - Non-blocking I/O HTTP and WebSocket server
 ===============================================================
@@ -62,11 +61,11 @@ import Pyjo.IOLoop
 import Pyjo.Server.Base
 import Pyjo.URL
 
+from Pyjo.Util import convert, getenv, isalive, notnone, warn
+
 import platform
 import signal
 import weakref
-
-from Pyjo.Util import convert, getenv, isalive, notnone, warn
 
 
 DEBUG = getenv('PYJO_DAEMON_DEBUG', False)
@@ -99,7 +98,9 @@ class Pyjo_Server_Daemon(Pyjo.Server.Base.object):
         Listen backlog size, defaults to ``SOMAXCONN``.
         """
 
-        self.inactivity_timeout = notnone(kwargs.get('inactivity_timeout'), lambda: convert(getenv('PYJO_INACTIVITY_TIMEOUT'), int, 15))
+        self.inactivity_timeout = notnone(
+            kwargs.get('inactivity_timeout'), lambda: convert(getenv('PYJO_INACTIVITY_TIMEOUT'), int, 15)
+        )
         """::
 
             timeout = daemon.inactivity_timeout
@@ -235,7 +236,7 @@ class Pyjo_Server_Daemon(Pyjo.Server.Base.object):
 
     def __del__(self):
         if DEBUG:
-            warn(f"-- Method {self}.__del__")
+            warn(f'-- Method {self}.__del__')
 
         try:
             self.stop()
@@ -438,7 +439,7 @@ class Pyjo_Server_Daemon(Pyjo.Server.Base.object):
             if isalive(daemon):
                 c = daemon._connections[cid] = {'tls': tls}
                 if DEBUG:
-                    warn(f"-- Accept {cid} {stream.handle.getpeername()}\n")
+                    warn(f'-- Accept {cid} {stream.handle.getpeername()}\n')
                 stream.timeout = daemon.inactivity_timeout
 
                 def close_cb(stream):
@@ -474,7 +475,7 @@ class Pyjo_Server_Daemon(Pyjo.Server.Base.object):
         query.pairs = []
         if url.host == '*':
             url.host = '127.0.0.1'
-        print(f"Server available at {url}")
+        print(f'Server available at {url}')
 
     def _read(self, cid, chunk):
         # Make sure we have a transaction and parse chunk
@@ -486,7 +487,7 @@ class Pyjo_Server_Daemon(Pyjo.Server.Base.object):
             c['tx'] = self._build_tx(cid, c)
         tx = c['tx']
         if DEBUG:
-            warn(f"-- Server <<< Client ({self._url(tx)})\n{repr(chunk)}\n")
+            warn(f'-- Server <<< Client ({self._url(tx)})\n{repr(chunk)}\n')
         tx.server_read(chunk)
 
         # Last keep-alive request or corrupted connection
@@ -521,7 +522,7 @@ class Pyjo_Server_Daemon(Pyjo.Server.Base.object):
         chunk = tx.server_write()
         c['writing'] = False
         if DEBUG:
-            warn(f"-- Server >>> Client ({self._url(tx)})\n{repr(chunk)}\n")
+            warn(f'-- Server >>> Client ({self._url(tx)})\n{repr(chunk)}\n')
         stream = self.ioloop.stream(cid).write(chunk)
 
         # Finish or continue writing
@@ -535,6 +536,7 @@ class Pyjo_Server_Daemon(Pyjo.Server.Base.object):
 
         if tx.is_finished:
             if tx.has_subscribers('finish'):
+
                 def finish_cb(stream):
                     return daemon._finish(cid)
 

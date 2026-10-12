@@ -75,6 +75,7 @@ class Error(Exception):
     """
     Exception raised on unhandled error event.
     """
+
     pass
 
 

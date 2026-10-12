@@ -1,4 +1,3 @@
-
 import Pyjo.Test
 
 
@@ -20,7 +19,6 @@ class JSONTest:
 
 
 if __name__ == '__main__':
-
     from Pyjo.Test import *  # noqa
 
     from Pyjo.JSON import decode_json, encode_json, from_json, j, to_json
@@ -81,11 +79,11 @@ if __name__ == '__main__':
     array = decode_json('["hello world!"]')
     is_deeply_ok(array, ['hello world!'], 'decode ["hello world!"]')
     array = decode_json(r'["hello\nworld!"]')
-    is_deeply_ok(array, ["hello\nworld!"], r'decode ["hello\nworld!"]')
+    is_deeply_ok(array, ['hello\nworld!'], r'decode ["hello\nworld!"]')
     array = decode_json(r'["hello\t\"world!"]')
-    is_deeply_ok(array, ["hello\t\"world!"], r'decode ["hello\t\"world!"]')
+    is_deeply_ok(array, ['hello\t"world!'], r'decode ["hello\t\"world!"]')
     array = decode_json(r'["hello\u0152world\u0152!"]')
-    is_deeply_ok(array, ["hello\u0152world\u0152!"], r'decode ["hello\u0152world\u0152!"]')
+    is_deeply_ok(array, ['hello\u0152world\u0152!'], r'decode ["hello\u0152world\u0152!"]')
     array = decode_json('["0."]')
     is_deeply_ok(array, ['0.'], 'decode ["0."]')
     array = decode_json('[" 0"]')
@@ -93,11 +91,11 @@ if __name__ == '__main__':
     array = decode_json('["1"]')
     is_deeply_ok(array, ['1'], 'decode ["1"]')
     array = decode_json(r'["\u0007\b\/\f\r"]')
-    is_deeply_ok(array, ["\a\b/\f\r"], r'decode ["\u0007\b\/\f\r"]')
+    is_deeply_ok(array, ['\a\b/\f\r'], r'decode ["\u0007\b\/\f\r"]')
     value = decode_json('""')
     is_ok(value, '', 'decode ""')
     value = decode_json(r'"hell\no"')
-    is_ok(value, "hell\no", r'decode "hell\no"')
+    is_ok(value, 'hell\no', r'decode "hell\no"')
 
     # Decode object
     dictionary = decode_json('{}')
@@ -108,7 +106,7 @@ if __name__ == '__main__':
     is_deeply_ok(dictionary, {'foo': [23, 'bar']}, 'decode {"foo": [23, "bar"]}')
 
     # Decode full spec example
-    dictionary = decode_json('''
+    dictionary = decode_json("""
     {
        "Image": {
            "Width":  800,
@@ -122,7 +120,7 @@ if __name__ == '__main__':
            "IDs": [116, 943, 234, 38793]
         }
     }
-    ''')
+    """)
     is_ok(dictionary['Image']['Width'], 800, 'right value')
     is_ok(dictionary['Image']['Height'], 600, 'right value')
     is_ok(dictionary['Image']['Title'], 'View from 15th Floor', 'right value')
@@ -146,20 +144,20 @@ if __name__ == '__main__':
 
     # Encode string
     bstring = encode_json(['foo'])
-    is_ok(bstring, b'["foo"]', 'encode [\'foo\']')
-    bstring = encode_json(["hello\nworld!"])
-    is_ok(bstring, br'["hello\nworld!"]', r'encode ["hello\nworld!"]')
-    bstring = encode_json(["hello\t\"world!"])
-    is_ok(bstring, br'["hello\t\"world!"]', r'encode ["hello\t\"world!"]')
-    bstring = encode_json(["hello\x03\u0152world\u0152!"])
-    is_ok(b(bstring).decode('utf-8'), "[\"hello\\u0003\u0152world\u0152!\"]", r'encode ["hello\x03\u0152world\u0152!"]')
-    bstring = encode_json(["123abc"])
+    is_ok(bstring, b'["foo"]', "encode ['foo']")
+    bstring = encode_json(['hello\nworld!'])
+    is_ok(bstring, rb'["hello\nworld!"]', r'encode ["hello\nworld!"]')
+    bstring = encode_json(['hello\t"world!'])
+    is_ok(bstring, rb'["hello\t\"world!"]', r'encode ["hello\t\"world!"]')
+    bstring = encode_json(['hello\x03\u0152world\u0152!'])
+    is_ok(b(bstring).decode('utf-8'), '["hello\\u0003\u0152world\u0152!"]', r'encode ["hello\x03\u0152world\u0152!"]')
+    bstring = encode_json(['123abc'])
     is_ok(bstring, b'["123abc"]', 'encode ["123abc"]')
-    bstring = encode_json(["\x00\x1f \a\b/\f\r"])
+    bstring = encode_json(['\x00\x1f \a\b/\f\r'])
     is_ok(bstring, b'["\\u0000\\u001f \\u0007\\b\\/\\f\\r"]', r'encode ["\x00\x1f \a\b/\f\r"]')
     bstring = encode_json('')
     is_ok(bstring, b'""', 'encode ""')
-    bstring = encode_json("hell\no")
+    bstring = encode_json('hell\no')
     is_ok(bstring, b'"hell\\no"', r'encode "hell\no"')
 
     # Encode object
@@ -168,11 +166,11 @@ if __name__ == '__main__':
     bstring = encode_json({'foo': {}})
     is_ok(bstring, b'{"foo":{}}', 'encode {foo: {}}')
     bstring = encode_json({'foo': 'bar'})
-    is_ok(bstring, b'{"foo":"bar"}', 'encode {foo: \'bar\'}')
+    is_ok(bstring, b'{"foo":"bar"}', "encode {foo: 'bar'}")
     bstring = encode_json({'foo': []})
     is_ok(bstring, b'{"foo":[]}', 'encode {foo: []}')
     bstring = encode_json({'foo': ['bar']})
-    is_ok(bstring, b'{"foo":["bar"]}', 'encode {foo: [\'bar\']}')
+    is_ok(bstring, b'{"foo":["bar"]}', "encode {foo: ['bar']}")
 
     # Encode name
     bstring = encode_json([True])
@@ -191,16 +189,16 @@ if __name__ == '__main__':
     # Encode number
     bstring = encode_json([1])
     is_ok(bstring, b'[1]', 'encode [1]')
-    bstring = encode_json(["1"])
+    bstring = encode_json(['1'])
     is_ok(bstring, b'["1"]', 'encode ["1"]')
     bstring = encode_json(['-122.026020'])
-    is_ok(bstring, b'["-122.026020"]', 'encode [\'-122.026020\']')
+    is_ok(bstring, b'["-122.026020"]', "encode ['-122.026020']")
     bstring = encode_json([-122.026020])
     is_ok(bstring, b'[-122.02602]', 'encode [-122.026020]')
     bstring = encode_json([1, -2])
     is_ok(bstring, b'[1,-2]', 'encode [1, -2]')
     bstring = encode_json(['10e12', [2]])
-    is_ok(bstring, b'["10e12",[2]]', 'encode [\'10e12\', [2]]')
+    is_ok(bstring, b'["10e12",[2]]', "encode ['10e12', [2]]")
     bstring = encode_json([int(10e12), [2]])
     is_ok(bstring, b'[10000000000000,[2]]', 'encode [10e12, [2]]')
     bstring = encode_json([37.7668, [20]])
@@ -211,14 +209,14 @@ if __name__ == '__main__':
     is_ok(bstring, b'23.3', 'encode 23.3')
 
     # Faihu roundtrip
-    bstring = j(["\U00010346"])
-    is_ok(b(bstring).decode('utf-8'), "[\"\U00010346\"]", r'encode ["\U00010346"]')
+    bstring = j(['\U00010346'])
+    is_ok(b(bstring).decode('utf-8'), '["\U00010346"]', r'encode ["\U00010346"]')
     array = j(bstring)
-    is_deeply_ok(array, ["\U00010346"], 'successful roundtrip')
+    is_deeply_ok(array, ['\U00010346'], 'successful roundtrip')
 
     # Decode faihu surrogate pair
     array = decode_json(b'["\\ud800\\udf46"]')
-    is_deeply_ok(array, ["\U00010346"], 'decode [\"\\ud800\\udf46\"]')
+    is_deeply_ok(array, ['\U00010346'], 'decode ["\\ud800\\udf46"]')
 
     # Decode object with duplicate keys
     dictionary = decode_json(b'{"foo": 1, "foo": 2}')
@@ -240,7 +238,11 @@ if __name__ == '__main__':
 
     # Real world roundtrip
     bstring = encode_json({'foo': r'c:\progra~1\mozill~1\firefox.exe'})
-    is_ok(bstring, b'{"foo":"c:\\\\progra~1\\\\mozill~1\\\\firefox.exe"}', r'encode {foo: \'c:\progra~1\mozill~1\firefox.exe\'}')
+    is_ok(
+        bstring,
+        b'{"foo":"c:\\\\progra~1\\\\mozill~1\\\\firefox.exe"}',
+        r'encode {foo: \'c:\progra~1\mozill~1\firefox.exe\'}',
+    )
     dictionary = decode_json(bstring)
     is_deeply_ok(dictionary, {'foo': r'c:\progra~1\mozill~1\firefox.exe'}, 'successful roundtrip')
 
@@ -249,14 +251,14 @@ if __name__ == '__main__':
     is_deeply_ok(decode_json(bstring), ['a' * 32768], 'successful roundtrip')
 
     # u2028, u2029 and slash
-    bstring = encode_json(["\u2028test\u2029123</script>"])
-    is_ok(bstring, br'["\u2028test\u2029123<\/script>"]', 'escaped u2028, u2029 and slash')
-    is_deeply_ok(decode_json(bstring), ["\u2028test\u2029123</script>"], 'successful roundtrip')
+    bstring = encode_json(['\u2028test\u2029123</script>'])
+    is_ok(bstring, rb'["\u2028test\u2029123<\/script>"]', 'escaped u2028, u2029 and slash')
+    is_deeply_ok(decode_json(bstring), ['\u2028test\u2029123</script>'], 'successful roundtrip')
 
     # JSON without utf-8 encoding
     is_deeply_ok(from_json('["♥"]'), ['♥'], 'characters decoded')
     is_ok(to_json(['♥']), '["♥"]', 'characters encoded')
-    is_deeply_ok(from_json(to_json(["\xe9"])), ["\xe9"], 'successful roundtrip')
+    is_deeply_ok(from_json(to_json(['\xe9'])), ['\xe9'], 'successful roundtrip')
 
     # Object
     bstring = encode_json([b('test')])

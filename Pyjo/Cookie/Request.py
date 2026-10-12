@@ -1,4 +1,3 @@
-
 """
 Pyjo.Cookie.Request - HTTP request cookie
 =========================================

@@ -310,7 +310,7 @@ class Pyjo_IOLoop_Delay(Pyjo.EventEmitter.object):
     def _step(self, sid, offset=1, length=0, *args):
         if args:
             if length:
-                args = args[offset: offset + length]
+                args = args[offset : offset + length]
             else:
                 args = args[offset:]
 

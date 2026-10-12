@@ -1,4 +1,3 @@
-
 import Pyjo.Server.Daemon
 import Pyjo.URL
 
@@ -17,7 +16,7 @@ daemon.unsubscribe('request')
 
 
 # Embedded template file
-DATA = u(r'''
+DATA = u(r"""
 @@ index.html.tpl
 <!DOCTYPE html>
 <html>
@@ -31,7 +30,7 @@ DATA = u(r'''
 <p>{method} request for {path}</p>
 </body>
 </html>
-''')
+""")
 
 
 @daemon.on

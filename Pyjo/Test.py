@@ -158,7 +158,6 @@ Classes and functions
 ---------------------
 """
 
-
 import os
 import re
 import subprocess
@@ -167,10 +166,27 @@ import traceback
 import unittest
 
 
-__all__ = ['cmp_ok', 'done_testing', 'diag', 'fail_ok', 'in_ok', 'is_ok',
-           'isa_ok', 'is_deeply_ok', 'isnt_ok', 'like_ok', 'none_ok',
-           'not_in_ok', 'ok', 'pass_ok', 'plan_tests', 'plan_skip_all',
-           'skip', 'throws_ok', 'unlike_ok']
+__all__ = [
+    'cmp_ok',
+    'done_testing',
+    'diag',
+    'fail_ok',
+    'in_ok',
+    'is_ok',
+    'isa_ok',
+    'is_deeply_ok',
+    'isnt_ok',
+    'like_ok',
+    'none_ok',
+    'not_in_ok',
+    'ok',
+    'pass_ok',
+    'plan_tests',
+    'plan_skip_all',
+    'skip',
+    'throws_ok',
+    'unlike_ok',
+]
 
 
 done = False
@@ -191,7 +207,7 @@ def cmp_ok(got, operator, expected, test_name=None):
     """
     if test_name is None:
         test_name = f'An object {type(got)}'
-    test_name = f"{test_name} {operator} {repr(expected)}"
+    test_name = f'{test_name} {operator} {repr(expected)}'
     methods = {
         '==': lambda a, b: a == b,
         '>=': lambda a, b: a >= b,
@@ -203,7 +219,7 @@ def cmp_ok(got, operator, expected, test_name=None):
     check = methods[operator](got, expected)
     _ok(check, test_name)
     if not check:
-        diag(f"    {repr(got)}\n        {operator}\n    {repr(expected)}\n")
+        diag(f'    {repr(got)}\n        {operator}\n    {repr(expected)}\n')
     return check
 
 
@@ -218,7 +234,7 @@ def diag(*args):
 
     Returns false, so as to preserve failure.
     """
-    _print('# ' + "\n# ".join(''.join(args).split("\n")), file=sys.stderr)
+    _print('# ' + '\n# '.join(''.join(args).split('\n')), file=sys.stderr)
     return False
 
 
@@ -236,11 +252,11 @@ def done_testing(how_many=None):
     global done, failed, test, tests
 
     if done:
-        fail_ok("done_testing() was already called")
+        fail_ok('done_testing() was already called')
         return
 
     if tests and how_many:
-        fail_ok(f"planned to run {tests} but done_testing() expects {how_many}")
+        fail_ok(f'planned to run {tests} but done_testing() expects {how_many}')
         return
 
     if not tests:
@@ -277,15 +293,15 @@ def in_ok(got, elem, test_name=None):
     but with more meaningful diagnostic message.
     """
     if test_name is None:
-        test_name = f"an object {type(got)}"
-    test_name = f"{repr(elem)} is in {test_name}"
+        test_name = f'an object {type(got)}'
+    test_name = f'{repr(elem)} is in {test_name}'
     try:
         check = elem in got
     except TypeError:
         check = False
     _ok(check, test_name)
     if not check:
-        diag(f"         got: {repr(got)}")
+        diag(f'         got: {repr(got)}')
     return check
 
 
@@ -298,7 +314,7 @@ def is_deeply_ok(got, expected, test_name=None):
     equivalent. If the two structures are different, it will display the place
     where they start differing.
     """
-    test_name = f"{test_name} is {repr(expected)}"
+    test_name = f'{test_name} is {repr(expected)}'
     if isinstance(got, (list, tuple, set, dict)) and isinstance(expected, (list, tuple, set, dict)):
         stack = []
         check = _deep_check(stack, got, expected)
@@ -309,7 +325,7 @@ def is_deeply_ok(got, expected, test_name=None):
         check = got == expected
         _ok(check, test_name)
         if not check:
-            diag(f"         got: {repr(got)}\n    expected: {repr(expected)}")
+            diag(f'         got: {repr(got)}\n    expected: {repr(expected)}')
     return check
 
 
@@ -322,11 +338,11 @@ def is_ok(got, expected, test_name=None):
     """
     if test_name is None:
         test_name = f'An object {type(got)}'
-    test_name = f"{test_name} is {repr(expected)}"
+    test_name = f'{test_name} is {repr(expected)}'
     check = got == expected
     _ok(check, test_name)
     if not check:
-        diag(f"         got: {repr(got)}\n    expected: {repr(expected)}\n")
+        diag(f'         got: {repr(got)}\n    expected: {repr(expected)}\n')
     return check
 
 
@@ -340,8 +356,8 @@ def isa_ok(got, cls, test_name=None):
     Check if object is an instance of class or one of the classes.
     """
     if test_name is None:
-        test_name = f"An object {type(got)}"
-    test_name = f"{test_name} is object {cls}"
+        test_name = f'An object {type(got)}'
+    test_name = f'{test_name} is object {cls}'
     check = isinstance(got, cls)
     _ok(check, test_name)
     return check
@@ -356,11 +372,11 @@ def isnt_ok(got, expected, test_name=None):
     """
     if test_name is None:
         test_name = f'An object {type(got)}'
-    test_name = f"{test_name} is {repr(expected)}"
+    test_name = f'{test_name} is {repr(expected)}'
     check = got != expected
     _ok(check, test_name)
     if not check:
-        diag(f"         got: {repr(got)}\n    expected: anything else\n")
+        diag(f'         got: {repr(got)}\n    expected: anything else\n')
     return check
 
 
@@ -391,7 +407,7 @@ def like_ok(got, expected, test_name=None):
     }
     if isinstance(expected, _type_regex):
         regex = expected
-        regex_repr = f"re.compile({repr(regex.pattern)}, {regex.flags})"
+        regex_repr = f're.compile({repr(regex.pattern)}, {regex.flags})'
     else:
         re_flags = 0
         if isinstance(expected, (list, tuple)) and len(expected) > 1:
@@ -399,10 +415,10 @@ def like_ok(got, expected, test_name=None):
                 re_flags |= FLAGS[c]
             expected = expected[0]
         regex = re.compile(expected, re_flags)
-        regex_repr = f"re.compile({repr(expected)}, {re_flags})"
+        regex_repr = f're.compile({repr(expected)}, {re_flags})'
     if test_name is None:
-        test_name = f"An object {type(got)}"
-    test_name = f"{test_name} matches {regex_repr}"
+        test_name = f'An object {type(got)}'
+    test_name = f'{test_name} matches {regex_repr}'
     try:
         check = bool(regex.search(got))
     except:
@@ -421,9 +437,9 @@ def none_ok(got, test_name=None):
     Check if value is ``None``.
     """
     if test_name is None:
-        test_name = f"An object {type(got)} is None"
+        test_name = f'An object {type(got)} is None'
     else:
-        test_name = f"{test_name} is None"
+        test_name = f'{test_name} is None'
     check = got is None
     _ok(check, test_name)
     return check
@@ -439,15 +455,15 @@ def not_in_ok(got, elem, test_name=None):
     given object.
     """
     if test_name is None:
-        test_name = f"an object {type(got)}"
-    test_name = f"{repr(elem)} is not in {test_name}"
+        test_name = f'an object {type(got)}'
+    test_name = f'{repr(elem)} is not in {test_name}'
     try:
         check = elem not in got
     except TypeError:
         check = False
     _ok(check, test_name)
     if not check:
-        diag(f"         got: {repr(got)}")
+        diag(f'         got: {repr(got)}')
     return check
 
 
@@ -529,12 +545,12 @@ def skip(why=None, how_many=1):
     """
     global test
     if why is not None:
-        message = "skip " + why
+        message = 'skip ' + why
     else:
-        message = "skip"
+        message = 'skip'
     for _ in range(how_many):
         test += 1
-        _print(f"ok {test} # {message}")
+        _print(f'ok {test} # {message}')
     return True
 
 
@@ -551,9 +567,9 @@ def throws_ok(cb, expected, test_name=None):
 
     if isinstance(expected, type) and issubclass(expected, Exception):
         if test_name is None:
-            test_name = f"Raised {expected.__name__}"
+            test_name = f'Raised {expected.__name__}'
         else:
-            test_name = f"{test_name} raised {expected.__name__}"
+            test_name = f'{test_name} raised {expected.__name__}'
 
         try:
             cb()
@@ -578,7 +594,7 @@ def throws_ok(cb, expected, test_name=None):
 
     _ok(check, test_name)
     if not check:
-        diag(f"         got: {got if got is not None else None}\n    expected: {expected}\n")
+        diag(f'         got: {got if got is not None else None}\n    expected: {expected}\n')
     return check
 
 
@@ -603,7 +619,7 @@ def unlike_ok(got, expected, test_name=None):
     }
     if isinstance(expected, _type_regex):
         regex = expected
-        regex_repr = f"re.compile({repr(regex.pattern)}, {regex.flags})"
+        regex_repr = f're.compile({repr(regex.pattern)}, {regex.flags})'
     else:
         re_flags = 0
         if isinstance(expected, (list, tuple)) and len(expected) > 1:
@@ -611,48 +627,48 @@ def unlike_ok(got, expected, test_name=None):
                 re_flags |= FLAGS[c]
             expected = expected[0]
         regex = re.compile(expected, re_flags)
-        regex_repr = f"re.compile({repr(expected)}, {re_flags})"
+        regex_repr = f're.compile({repr(expected)}, {re_flags})'
     if test_name is None:
-        test_name = f"An object {type(got)}"
-    test_name = f"{test_name} matches {regex_repr}"
+        test_name = f'An object {type(got)}'
+    test_name = f'{test_name} matches {regex_repr}'
     try:
         check = not regex.search(got)
     except:
         check = True
     _ok(check, test_name)
     if not check:
-        diag(f"                {repr(got)}\n        matches {repr(expected)}\n")
+        diag(f'                {repr(got)}\n        matches {repr(expected)}\n')
     return check
 
 
 def _deep_check(stack, e1, e2):
-        if e1 is None or e2 is None:
-            if e1 is None and e2 is None:
-                return True
-            else:
-                stack.append({'vals': [e1, e2]})
-                return False
-
-        if id(e1) == id(e2):
+    if e1 is None or e2 is None:
+        if e1 is None and e2 is None:
             return True
+        else:
+            stack.append({'vals': [e1, e2]})
+            return False
 
-        if e1 == e2:
-            return True
+    if id(e1) == id(e2):
+        return True
 
-        if isinstance(e1, list) and isinstance(e2, list):
-            return _eq_array(stack, 'list', e1, e2)
+    if e1 == e2:
+        return True
 
-        if isinstance(e1, tuple) and isinstance(e2, tuple):
-            return _eq_array(stack, 'tuple', e1, e2)
+    if isinstance(e1, list) and isinstance(e2, list):
+        return _eq_array(stack, 'list', e1, e2)
 
-        if isinstance(e1, set) and isinstance(e2, set):
-            return _eq_array(stack, 'set', sorted(e1), sorted(e2))
+    if isinstance(e1, tuple) and isinstance(e2, tuple):
+        return _eq_array(stack, 'tuple', e1, e2)
 
-        if isinstance(e1, dict) and isinstance(e2, dict):
-            return _eq_hash(stack, 'dict', e1, e2)
+    if isinstance(e1, set) and isinstance(e2, set):
+        return _eq_array(stack, 'set', sorted(e1), sorted(e2))
 
-        stack.append({'vals': [e1, e2]})
-        return False
+    if isinstance(e1, dict) and isinstance(e2, dict):
+        return _eq_hash(stack, 'dict', e1, e2)
+
+    stack.append({'vals': [e1, e2]})
+    return False
 
 
 def _eq_array(stack, t, a1, a2):
@@ -724,10 +740,9 @@ def _format_stack(stack):
             vname = f'sorted({vname})[{repr(idx)}]'
 
     vals = stack[-1]['vals']
-    vnames = ['     ' + re.sub(r'\$FOO', 'got', vname),
-              re.sub(r'\$FOO', 'expected', vname)]
+    vnames = ['     ' + re.sub(r'\$FOO', 'got', vname), re.sub(r'\$FOO', 'expected', vname)]
 
-    out = "Structures begin differing at:\n"
+    out = 'Structures begin differing at:\n'
     for idx in range(len(vals)):
         val = vals[idx]
         if val is None:
@@ -738,10 +753,10 @@ def _format_stack(stack):
             val = repr(val)
         vals[idx] = val
 
-    out += f"{vnames[0]} = {vals[0]}\n"
-    out += f"{vnames[1]} = {vals[1]}\n"
+    out += f'{vnames[0]} = {vals[0]}\n'
+    out += f'{vnames[1]} = {vals[1]}\n'
 
-    out = '    ' + "\n    ".join(out.split("\n"))
+    out = '    ' + '\n    '.join(out.split('\n'))
 
     return out
 
@@ -761,7 +776,9 @@ def _ok(check, test_name=None):
 
     if test_name is not None:
         if isinstance(test_name, int) or f'{test_name}'.isdigit():
-            diag(f"    You named your test '{test_name}'.  You shouldn't use numbers for your test names.\n    Very confusing.")
+            diag(
+                f"    You named your test '{test_name}'.  You shouldn't use numbers for your test names.\n    Very confusing."
+            )
         message += f' - {test_name}'
 
     _print(message)
@@ -770,7 +787,7 @@ def _ok(check, test_name=None):
         if test_name is not None:
             diag(f"  Failed test '{test_name}'")
         else:
-            diag("  Failed test")
+            diag('  Failed test')
         diag(''.join(traceback.format_stack()[:-2]))
 
     return check
@@ -778,7 +795,7 @@ def _ok(check, test_name=None):
 
 def _print(*args, **kwargs):
     output = kwargs.get('file', sys.stdout)
-    string = ' '.join(args) + "\n"
+    string = ' '.join(args) + '\n'
     encoding = sys.stdout.encoding
     if not encoding or encoding.lower() != 'utf-8':
         string = string.encode('ascii', 'backslashreplace').decode('ascii')
@@ -807,6 +824,7 @@ class Error(Exception):
     """
     Exception raised if test script could not be started.
     """
+
     pass
 
 
@@ -824,6 +842,7 @@ class Guard:
             except:
                 pass
 
+
 _guard = Guard()
 
 
@@ -831,6 +850,7 @@ class NoseTest:
     """
     :mod:`Pyjo.Test` wrapper for ``nosetests`` command.
     """
+
     script = __file__
     srcdir = '.'
 
@@ -842,6 +862,7 @@ class UnitTest(unittest.TestCase):
     """
     :mod:`Pyjo.Test` wrapper for ``python -m unittest`` command.
     """
+
     script = __file__
     srcdir = '.'
 

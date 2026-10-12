@@ -1,4 +1,3 @@
-
 """
 Pyjo.Asset.Memory - In-memory storage for HTTP content
 ======================================================
@@ -65,7 +64,9 @@ class Pyjo_Asset_Memory(Pyjo.Asset.object):
         automatically upgrade to a :mod:`Pyjo.Asset.File` object.
         """
 
-        self.max_memory_size = notnone(kwargs.get('max_memory_size'), lambda: convert(getenv('PYJO_MAX_MEMORY_SIZE'), int, 262144))
+        self.max_memory_size = notnone(
+            kwargs.get('max_memory_size'), lambda: convert(getenv('PYJO_MAX_MEMORY_SIZE'), int, 262144)
+        )
         """::
 
             size = asset_mem.max_memory_size
@@ -94,7 +95,7 @@ class Pyjo_Asset_Memory(Pyjo.Asset.object):
 
         String representation of an object shown in console.
         """
-        return f"<{self.__class__.__module__}.{self.__class__.__name__} _content={repr(self._content)}>"
+        return f'<{self.__class__.__module__}.{self.__class__.__name__} _content={repr(self._content)}>'
 
     def add_chunk(self, chunk=b''):
         """::
@@ -154,7 +155,7 @@ class Pyjo_Asset_Memory(Pyjo.Asset.object):
         if end and offset + maximum > end:
             maximum = end + 1 - offset
 
-        return self._content[offset:offset + maximum]
+        return self._content[offset : offset + maximum]
 
     def move_to(self, dst):
         """::

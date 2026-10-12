@@ -1,4 +1,3 @@
-
 """
 Pyjo.String.Mixin - Object with to_bytes/to_str methods
 =======================================================
@@ -19,7 +18,6 @@ The mixin class for objects with :meth:`to_bytes` and/or :meth:`to_str` methods.
 Classes
 -------
 """
-
 
 import Pyjo.Base
 
@@ -149,6 +147,7 @@ class Pyjo_String_Mixin:
             raise Error('Method "to_bytes" or "to_str" not implemented by subclass')
 
     if platform.python_implementation() != 'PyPy':
+
         def __int__(self):
             """::
 
@@ -222,11 +221,11 @@ class Pyjo_String_Mixin:
             raise Error('Method "to_bytes" or "to_str" not implemented by subclass')
 
         if self.__module__ == '__main__':
-            return f"{self.__class__.__name__}({repr(string)})"
+            return f'{self.__class__.__name__}({repr(string)})'
         elif isinstance(self, Pyjo.Base.object):
-            return f"{self.__module__}.new({repr(string)})"
+            return f'{self.__module__}.new({repr(string)})'
         else:
-            return f"{self.__module__}.{self.__class__.__name__}({repr(string)})"
+            return f'{self.__module__}.{self.__class__.__name__}({repr(string)})'
 
     def __str__(self):
         """::

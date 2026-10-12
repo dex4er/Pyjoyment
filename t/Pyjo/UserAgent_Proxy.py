@@ -1,4 +1,3 @@
-
 import Pyjo.Test
 
 
@@ -12,7 +11,6 @@ class UnitTest(Pyjo.Test.UnitTest):
 
 
 if __name__ == '__main__':
-
     from Pyjo.Test import *  # noqa
 
     from Pyjo.Util import setenv
@@ -34,7 +32,7 @@ if __name__ == '__main__':
     none_ok(proxy.http, 'right proxy')
     none_ok(proxy.https, 'right proxy')
     ok(not proxy.is_needed('dummy.mojolicio.us'), 'no proxy needed')
-    ok(proxy.is_needed('icio.us'),   'proxy needed')
+    ok(proxy.is_needed('icio.us'), 'proxy needed')
     ok(proxy.is_needed('localhost'), 'proxy needed')
 
     setenv('HTTP_PROXY', None)

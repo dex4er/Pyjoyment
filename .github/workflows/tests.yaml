@@ -10,7 +10,7 @@ on:
   schedule:
     # Weekly run catches breakage from new Python releases even when the code
     # did not change.
-    - cron: "17 5 * * 1"
+    - cron: 17 5 * * 1
   workflow_dispatch: {}
 
 permissions:

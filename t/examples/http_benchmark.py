@@ -11,7 +11,6 @@ class UnitTest(Pyjo.Test.UnitTest):
 
 
 if __name__ == '__main__':
-
     from Pyjo.Test import *  # noqa
 
     import Pyjo.IOLoop
@@ -26,11 +25,15 @@ if __name__ == '__main__':
         @stream.on
         def read(stream, chunk):
             # Process input chunk
-            is_ok(chunk.decode('utf-8'), f"GET / HTTP/1.1\x0d\x0aHost: localhost:{port}\x0d\x0a\x0d\x0a", "server's input chunk")
+            is_ok(
+                chunk.decode('utf-8'),
+                f'GET / HTTP/1.1\x0d\x0aHost: localhost:{port}\x0d\x0a\x0d\x0a',
+                "server's input chunk",
+            )
 
             # Write response
-            stream.write(b"HTTP/1.1 200 OK\x0d\x0a\x0d\x0a")
-            stream.write(b"A" * 1000 * 1000)
+            stream.write(b'HTTP/1.1 200 OK\x0d\x0a\x0d\x0a')
+            stream.write(b'A' * 1000 * 1000)
 
             # Disconnect client
             stream.close_gracefully()
@@ -65,7 +68,9 @@ if __name__ == '__main__':
                     Pyjo.IOLoop.remove(server)
 
             # Write request
-            stream.write(f"GET {url.path} HTTP/1.1\x0d\x0aHost: {url.host}:{url.port or 80}\x0d\x0a\x0d\x0a".encode('ascii'))
+            stream.write(
+                f'GET {url.path} HTTP/1.1\x0d\x0aHost: {url.host}:{url.port or 80}\x0d\x0a\x0d\x0a'.encode('ascii')
+            )
 
     Pyjo.IOLoop.start()
 

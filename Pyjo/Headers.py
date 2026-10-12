@@ -1,4 +1,3 @@
-
 r"""
 Pyjo.Headers - Headers
 ======================
@@ -36,23 +35,68 @@ from Pyjo.Util import b, convert, getenv, notnone, u
 import collections
 
 
-re_line = r(br'(.*?)\x0d?\x0a')
-re_field = r(br'^(\S[^:]*)\s*:\s*(.*)$')
-re_startswith_space = r(br'^\s+')
+re_line = r(rb'(.*?)\x0d?\x0a')
+re_field = r(rb'^(\S[^:]*)\s*:\s*(.*)$')
+re_startswith_space = r(rb'^\s+')
 
 
-NORMALCASE = dict(map(lambda i: (b(i.lower()), b(i)), [
-    'Accept', 'Accept-Charset', 'Accept-Encoding', 'Accept-Language', 'Accept-Ranges',
-    'Access-Control-Allow-Origin', 'Allow', 'Authorization', 'Cache-Control', 'Connection',
-    'Content-Disposition', 'Content-Encoding', 'Content-Language', 'Content-Length',
-    'Content-Location', 'Content-Range', 'Content-Security-Policy', 'Content-Type',
-    'Cookie', 'DNT', 'Date', 'ETag', 'Expect',
-    'Expires', 'Host', 'If-Modified-Since', 'If-None-Match', 'Last-Modified', 'Link', 'Location',
-    'Origin', 'Proxy-Authenticate', 'Proxy-Authorization', 'Range', 'Sec-WebSocket-Accept',
-    'Sec-WebSocket-Extensions', 'Sec-WebSocket-Key', 'Sec-WebSocket-Protocol',
-    'Sec-WebSocket-Version', 'Server', 'Set-Cookie', 'Status', 'Strict-Transport-Security',
-    'TE', 'Trailer', 'Transfer-Encoding', 'Upgrade', 'User-Agent', 'Vary', 'WWW-Authenticate',
-]))
+NORMALCASE = dict(
+    map(
+        lambda i: (b(i.lower()), b(i)),
+        [
+            'Accept',
+            'Accept-Charset',
+            'Accept-Encoding',
+            'Accept-Language',
+            'Accept-Ranges',
+            'Access-Control-Allow-Origin',
+            'Allow',
+            'Authorization',
+            'Cache-Control',
+            'Connection',
+            'Content-Disposition',
+            'Content-Encoding',
+            'Content-Language',
+            'Content-Length',
+            'Content-Location',
+            'Content-Range',
+            'Content-Security-Policy',
+            'Content-Type',
+            'Cookie',
+            'DNT',
+            'Date',
+            'ETag',
+            'Expect',
+            'Expires',
+            'Host',
+            'If-Modified-Since',
+            'If-None-Match',
+            'Last-Modified',
+            'Link',
+            'Location',
+            'Origin',
+            'Proxy-Authenticate',
+            'Proxy-Authorization',
+            'Range',
+            'Sec-WebSocket-Accept',
+            'Sec-WebSocket-Extensions',
+            'Sec-WebSocket-Key',
+            'Sec-WebSocket-Protocol',
+            'Sec-WebSocket-Version',
+            'Server',
+            'Set-Cookie',
+            'Status',
+            'Strict-Transport-Security',
+            'TE',
+            'Trailer',
+            'Transfer-Encoding',
+            'Upgrade',
+            'User-Agent',
+            'Vary',
+            'WWW-Authenticate',
+        ],
+    )
+)
 
 
 class Pyjo_Headers(Pyjo.Base.object, Pyjo.String.Mixin.object):
@@ -79,7 +123,9 @@ class Pyjo_Headers(Pyjo.Base.object, Pyjo.String.Mixin.object):
         Charset used for encoding and decoding, defaults to ``ascii``.
         """
 
-        self.max_line_size = notnone(kwargs.get('max_line_size'), lambda: convert(getenv('PYJO_MAX_LINE_SIZE'), int) or 8192)
+        self.max_line_size = notnone(
+            kwargs.get('max_line_size'), lambda: convert(getenv('PYJO_MAX_LINE_SIZE'), int) or 8192
+        )
         """::
 
             size = headers.max_line_size
@@ -116,7 +162,7 @@ class Pyjo_Headers(Pyjo.Base.object, Pyjo.String.Mixin.object):
 
         String representation of an object shown in console.
         """
-        return f"{self.__module__}.new().parse({self.to_str() + '\x0d\x0a\x0d\x0a'!r})"
+        return f'{self.__module__}.new().parse({self.to_str() + "\x0d\x0a\x0d\x0a"!r})'
 
     @property
     def accept(self):
@@ -708,9 +754,15 @@ class Pyjo_Headers(Pyjo.Base.object, Pyjo.String.Mixin.object):
             for n in headers.name:
                 print(n)
         """
-        return list(map(lambda i: u(i, 'ascii'),
-                        map(lambda i: NORMALCASE[i] if i in NORMALCASE else self._normalcase[i] if i in self._normalcase else i,
-                        self._headers.keys())))
+        return list(
+            map(
+                lambda i: u(i, 'ascii'),
+                map(
+                    lambda i: NORMALCASE[i] if i in NORMALCASE else self._normalcase[i] if i in self._normalcase else i,
+                    self._headers.keys(),
+                ),
+            )
+        )
 
     @property
     def origin(self):
@@ -1032,8 +1084,9 @@ class Pyjo_Headers(Pyjo.Base.object, Pyjo.String.Mixin.object):
 
         Turn headers into :class:`dict` with :class:`list` as its values.
         """
-        return dict(map(lambda i: (i, list(map(lambda i: u(i, 'ascii'), self._headers[b(i.lower(), 'ascii')]))),
-                        self.names))
+        return dict(
+            map(lambda i: (i, list(map(lambda i: u(i, 'ascii'), self._headers[b(i.lower(), 'ascii')]))), self.names)
+        )
 
     def to_bytes(self):
         """::
@@ -1049,7 +1102,7 @@ class Pyjo_Headers(Pyjo.Base.object, Pyjo.String.Mixin.object):
             for v in self._headers[name.lower()]:
                 headers.append(name + b': ' + v)
 
-        return b"\x0d\x0a".join(headers)
+        return b'\x0d\x0a'.join(headers)
 
     def to_str(self):
         """::

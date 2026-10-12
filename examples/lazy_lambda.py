@@ -1,3 +1,1 @@
-
-
-(lambda: print("Hello"))()
+(lambda: print('Hello'))()

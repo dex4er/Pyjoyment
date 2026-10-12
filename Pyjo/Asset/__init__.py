@@ -1,4 +1,3 @@
-
 """
 Pyjo.Asset - HTTP content storage base class
 ============================================
