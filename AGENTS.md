@@ -8,7 +8,7 @@ agent, servers, event loop), and the `Pyjoyment` package is reserved for the
 `Mojolicious::*` framework layer (routes, controllers, renderer, `Lite`).
 
 The code was written against Mojo 6.x. The project is being revived: the
-target is the latest Mojolicious on Python 3.14+, with asyncio as the only I/O
+target is the latest Mojolicious on Python 3.12+, with asyncio as the only I/O
 core. The plan, its order and its progress live in GitHub Issues, starting from
 the open umbrella issue about the revival; this file describes how the project
 works and why, not what is left to do.
@@ -42,9 +42,15 @@ of them is a regression.
   counterpart of that is `asyncio`. A promise is an `asyncio.Future` subclass
   with Mojo's `then`/`catch`/`wait` API, so the same object works with
   `await`, with `asyncio.gather`, and in a callback chain.
-- **Python 3.14 is the minimum**, for template strings (PEP 750): t-strings
-  keep interpolations separate from the literal text, which gives templates
-  auto-escaping without a template language.
+- **Python 3.12 is the minimum, template strings come with 3.14.** t-strings
+  (PEP 750) keep interpolations separate from the literal text, which gives
+  templates auto-escaping without a template language. The `t"..."` syntax is
+  written by the user, not by the library: the library only accepts
+  `string.templatelib.Template` objects, so it supports them where the module
+  exists and stays importable on Python 3.12 and 3.13, where PyPy is.
+- **PyPy is supported on a best-effort basis.** Helper code for PyPy is fine,
+  and a test may be skipped on PyPy where PyPy clearly differs from CPython,
+  with the reason in the skip message.
 - **No runtime dependencies.** Development tools are fine; `dependencies` in
   `pyproject.toml` stays empty.
 
@@ -90,6 +96,12 @@ fails the build. Python keeps an unknown escape such as `"\:"` as a backslash
 followed by the character, which is often exactly what a CSS selector or a
 regular expression ported from Perl needs; write it as `"\\:"` or as a raw
 string so it survives the Python release that turns the warning into an error.
+
+CI runs the tests on every supported CPython version and on PyPy. PyPy frees
+objects only when its garbage collector runs, not when the last reference
+goes, so code must not rely on that: resizing a `bytearray` that a regex
+iterator still scans raises `BufferError`, and `__del__` may not run at all
+before the interpreter exits.
 
 ## Syncing with Mojolicious
 
@@ -141,8 +153,10 @@ rejects the Mojo-style module names. Formatting uses single quotes and a line
 length of 120. Imports list `Pyjo` modules before the standard library, like
 Mojo modules list `Mojo::*` before core modules.
 
-New code targets Python 3.14 only: no `sys.version_info` branches for older
-versions and no compatibility shims. The ruff `UP` rules keep it that way.
+New code targets Python 3.12 and newer: no compatibility shims for older
+versions. The ruff `UP` rules and `target-version` keep it that way; with a
+newer target, the formatter would use syntax such as `except A, B:` (PEP 758,
+Python 3.14), which also looks like Python 2's `except A, e:`.
 
 ## Session and Temporary Files
 

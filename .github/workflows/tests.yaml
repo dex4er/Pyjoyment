@@ -18,23 +18,22 @@ permissions:
 
 jobs:
   prove:
-    name: prove (${{ matrix.os }}, python ${{ matrix.python }})
+    name: prove (python ${{ matrix.python }})
 
     strategy:
       fail-fast: false
       matrix:
-        os:
-          - ubuntu-24.04-arm
-          - macos-15
         # "mise" is the version pinned in mise.toml and verified against
-        # mise.lock; other entries are newer Pythons from setup-python.
+        # mise.lock; the other entries come from setup-python. PyPy is
+        # supported on a best-effort basis.
         python:
           - mise
-        include:
-          - os: ubuntu-24.04-arm
-            python: "3.15"
+          - "3.12"
+          - "3.13"
+          - "3.15"
+          - pypy3.12
 
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 20
 
     env:
