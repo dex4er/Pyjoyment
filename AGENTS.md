@@ -51,13 +51,22 @@ of them is a regression.
   (`url.to_urllib()`, `date.to_datetime()`). Where a Mojo method has the name
   of such a conversion, the conversion keeps it, and the Mojo method gets a
   name that says what it renders: Mojo's `to_datetime` is `to_rfc3339`.
-- **Asyncio is the event loop.** Mojo's reactor exists because Perl has no
-  standard event loop; Python has one. `Pyjo.Reactor.Asyncio` is the API of
-  `Mojo::Reactor` on the asyncio event loop, so the I/O of Pyjoyment and the
-  coroutines and tasks of asyncio run in the same loop. Mojo 9 moved from
+- **Asyncio is the event loop, the reactor is where it is replaced.** Mojo's
+  reactor exists because Perl has no standard event loop; Python has one.
+  `Pyjo.Reactor.Asyncio` is the API of `Mojo::Reactor` on the asyncio event
+  loop, so the I/O of Pyjoyment and the coroutines and tasks of asyncio run in
+  the same loop. Only a reactor uses the event loop: everything else goes
+  through the methods of `Pyjo.Reactor`, and ruff's TID251 rejects
+  `import asyncio` outside `Pyjo/Reactor/`, the test harness, the tests and
+  the examples. Another reactor, on uvloop, Trio, gevent or anything else,
+  comes from another distribution, in the namespace `Pyjo.Reactor` that
+  `extend_path` keeps open, and `PYJO_REACTOR` selects it, as
+  `Mojo::Reactor::EV` replaces `Mojo::Reactor::Poll`. Mojo 9 moved from
   callbacks and `Mojo::IOLoop::Delay` to promises and async/await; a promise
   is a port of `Mojo::Promise`, which follows the Promise of ECMAScript, and
-  awaiting it, the counterpart of Mojo's `AWAIT_*` methods, is `__await__`.
+  awaiting it, the counterpart of Mojo's `AWAIT_*` methods, is `__await__`,
+  which asks the reactor for what to wait on, so that it works with the event
+  loop of any reactor.
 - **Python 3.12 is the minimum, template strings come with 3.14.** t-strings
   (PEP 750) keep interpolations separate from the literal text, which gives
   templates auto-escaping without a template language. The `t"..."` syntax is

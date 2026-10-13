@@ -41,6 +41,33 @@ careful. ::
 
     reactor.on('error', lambda reactor, err: print(f'Something very bad happened: {err}'))
 
+Alternative reactors
+--------------------
+
+:mod:`Pyjo.Reactor` is a namespace that other distributions can add reactors
+to, and the ``PYJO_REACTOR`` environment variable selects one for
+:mod:`Pyjo.IOLoop`. A reactor on another implementation of the asyncio event
+loop, like uvloop, is a subclass of :mod:`Pyjo.Reactor.Asyncio`, and one on
+an event loop that is not asyncio's, like the ones of Trio or gevent,
+implements the methods of :mod:`Pyjo.Reactor`. ::
+
+    # Pyjo/Reactor/MyLoop.py of another distribution
+    import Pyjo.Reactor.Asyncio
+
+    import asyncio
+    import selectors
+
+    class Pyjo_Reactor_MyLoop(Pyjo.Reactor.Asyncio.object):
+        def __init__(self, loop=None):
+            super().__init__(loop=loop or asyncio.SelectorEventLoop(selectors.SelectSelector()))
+
+    new = Pyjo_Reactor_MyLoop.new
+    object = Pyjo_Reactor_MyLoop
+
+and::
+
+    PYJO_REACTOR=Pyjo.Reactor.MyLoop
+
 See also
 --------
 
@@ -58,6 +85,7 @@ import builtins
 import os
 
 from collections.abc import Callable
+from pkgutil import extend_path
 from typing import Any, Protocol, Self
 
 
@@ -78,6 +106,9 @@ type IOCallback = Callable[[Any, bool], Anything]
 type TimerCallback = Callable[[Any], Anything]
 
 _DETECTED: dict[str, str] = {}
+
+# Not in Mojolicious: a namespace that other distributions can add reactors to
+__path__ = extend_path(__path__, __name__)
 
 
 class Pyjo_Reactor(Pyjo.EventEmitter.object):

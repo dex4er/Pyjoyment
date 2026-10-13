@@ -45,6 +45,41 @@ with subtest('detect'):
     reactor = sys.modules[Pyjo.Reactor.detect()].new()
     isa_ok(reactor, Pyjo.Reactor.object, 'reactor')
 
+with subtest('Alternative reactors'):
+    from Pyjo.File import tempdir
+
+    import os
+    import subprocess
+
+    dist = tempdir()
+    dist.child('Pyjo', 'Reactor').make_path()
+    dist.child('Pyjo', 'Reactor', 'MyLoop.py').spew(
+        """# Pyjo/Reactor/MyLoop.py of another distribution
+import Pyjo.Reactor.Asyncio
+
+import asyncio
+import selectors
+
+class Pyjo_Reactor_MyLoop(Pyjo.Reactor.Asyncio.object):
+    def __init__(self, loop=None):
+        super().__init__(loop=loop or asyncio.SelectorEventLoop(selectors.SelectSelector()))
+
+new = Pyjo_Reactor_MyLoop.new
+object = Pyjo_Reactor_MyLoop
+"""
+    )
+    code = """
+import Pyjo.IOLoop
+reactor = Pyjo.IOLoop.singleton.reactor
+reactor.timer(0, lambda reactor: print('timer'))
+reactor.start()
+print(type(reactor).__name__, type(reactor.loop._selector).__name__)
+"""
+    env = dict(os.environ, PYJO_REACTOR='Pyjo.Reactor.MyLoop')
+    env['PYTHONPATH'] = os.pathsep.join([os.getcwd(), dist.to_str()])
+    result = subprocess.run([sys.executable, '-c', code], env=env, capture_output=True, text=True)
+    is_ok(result.stdout, 'timer\nPyjo_Reactor_MyLoop SelectSelector\n', 'reactor of another distribution')
+
 with subtest('Abstract methods'):
     reactor = Pyjo.Reactor.new()
     for call in (
