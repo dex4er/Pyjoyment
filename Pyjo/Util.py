@@ -28,6 +28,8 @@ import select
 import sys
 import time
 
+from typing import Any, overload
+
 
 class Error(Exception):
     pass
@@ -335,7 +337,15 @@ re_b_quote = r(rb'(["\\])')
 re_u_quote = r(r'(["\\])')
 
 
-def quote(string):
+@overload
+def quote(string: str) -> str: ...
+
+
+@overload
+def quote(string: bytes) -> bytes: ...
+
+
+def quote(string: str | bytes) -> str | bytes:
     """::
 
         quoted = quote(string)
@@ -397,7 +407,8 @@ def slurpb(path):
         return b(f.read())
 
 
-def split_cookie_header(string):
+# Any: the tokens are str or bytes, like the string
+def split_cookie_header(string: str | bytes) -> list[list[list[Any]]]:
     """::
 
         tree = split_cookie_header('a=b; expires=Thu, 07 Aug 2008 07:07:59 GMT')
@@ -408,7 +419,8 @@ def split_cookie_header(string):
     return _header(string, True)
 
 
-def split_header(string):
+# Any: the tokens are str or bytes, like the string
+def split_header(string: str | bytes) -> list[list[list[Any]]]:
     """::
 
         tree = split_header('foo="bar baz"; test=123, yada')
