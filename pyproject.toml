@@ -138,6 +138,7 @@ strict = [
   "Pyjo/Home.py",
   "Pyjo/JSON/__init__.py",
   "Pyjo/JSON/Pointer.py",
+  "Pyjo/Loader.py",
   "Pyjo/Log.py",
   "Pyjo/Parameters.py",
   "Pyjo/Path.py",

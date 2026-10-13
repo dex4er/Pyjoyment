@@ -1,27 +1,30 @@
-"""
-Pyjo.Loader - Loader
-====================
+r"""
+Pyjo.Loader - Load all kinds of things
+======================================
 ::
 
-    from Pyjo.Loader import embedded_file, load_module
+    from Pyjo.Loader import data_section, find_modules, load_class
+    from Pyjo.Util import warn
 
     # Find modules in a namespace
     for module in find_modules('Some.Namespace'):
 
         # Load them safely
-        try:
-            load_module(module)
-        except ImportError as e:
-            print('Loading "{0}" failed: {1}'.format(module, e))
+        e = load_class(module)
+        if isinstance(e, Exception):
+            warn(f'Loading "{module}" failed: {e}')
+            continue
 
         # And extract files from the DATA section
-        print(embedded_file(module, 'some_file.txt'))
+        print(data_section(module, 'some_file.txt'))
 
-:mod:`Pyjo.Loader` is a module loader and plugin framework. Aside from finding
+:mod:`Pyjo.Loader` is a class loader and plugin framework. Aside from finding
 modules and loading classes, it allows multiple files to be stored in the
-``DATA`` variable of a module, which can then be accessed individually. ::
+``DATA`` section of a module, which can then be accessed individually. The
+section is the ``DATA`` variable of the module, or its docstring after a line
+``__DATA__``. ::
 
-    # Some/Namespace/Module.py
+    # Foo.py
 
     DATA = r'''
     @@ test.txt
@@ -40,103 +43,264 @@ optional instructions for decoding its content. Currently only the Base64
 encoding is supported, which can be quite convenient for the storage of binary
 data.
 
+A class is named as a module of Python, with dots, and is loaded from
+:data:`sys.path`. A function that takes a class takes the module, a class, or
+the dotted name of a module or of a class in it.
+
+See also
+--------
+
+:mod:`Pyjoyment`, https://mojolicious.org.
+
+Ported from `Mojo::Loader <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/Loader.pm>`_
+of Mojolicious 9.49.
+
 Functions
 ---------
 """
 
-from Pyjo.Regexp import r
+import Pyjo.Exception
+import Pyjo.File
+import Pyjo.String.Unicode
+
 from Pyjo.Util import b64_decode
 
 import importlib
-import types
+import importlib.util
+import os
+import re
+import sys
+import traceback
+
+from types import ModuleType
 
 
-BIN = {}
-CACHE = {}
+# A class: its module, a class in it, or the dotted name of either
+type Class = ModuleType | type | str
+
+_BIN: dict[str, dict[str, bool]] = {}
+_CACHE: dict[str, dict[str, str | bytes]] = {}
 
 
-re_files = r(r'^@@\s*(.+?)\s*\r?\n', 'm')
-re_base64 = r(r'\s*\(\s*base64\s*\)$')
-
-
-def embedded_file(module, filename=None):
+def data_section(cls: Class | None, name: str | None = None) -> 'dict[str, str | bytes] | str | bytes | None':
     """::
 
-        all_files = embedded_file('Foo.Bar')
-        index = embedded_file('Foo.Bar', 'index.html')
-        main_module_files = embedded_file(sys.modules[__name__])
+        all = data_section('Foo.Bar')
+        index = data_section('Foo.Bar', 'index.html')
 
-    Extract embedded file from the ``DATA`` variable of a module, all files will be
-    cached once they have been accessed for the first time. ::
+    Extract embedded file from the ``DATA`` section of a module, all files
+    will be cached once they have been accessed for the first time. A file
+    encoded in Base64 is :class:`bytes`, any other a :class:`str`. ::
 
-        for content in data_section('Foo.Bar'):
-            print(content)
+        # List embedded files
+        for name in data_section('Foo.Bar'):
+            print(name)
     """
-    if filename:
-        return _all(module)[filename]
-    else:
-        return _all(module)
+    if not cls:
+        return None
+    return _all(cls).get(name) if name else _all(cls)
 
 
-def load_module(name):
+def file_is_binary(cls: Class, name: str) -> bool | None:
     """::
 
-        module = load_module('Foo.Bar')
+        boolean = file_is_binary('Foo.Bar', 'test.png')
 
-    Load a module and ignore it if it is not found. Note that modules are
-    checked for a :func:`new` factory function to see if they are already
-    loaded and compatible with :mod:`Pyjo`. ::
-
-        module = load_module('Foo.Bar')
-        if not module:
-            print('Not found!')
+    Check if embedded file from the ``DATA`` section of a module was Base64
+    encoded.
     """
+    return bool(_BIN.get(_key(cls) or '', {}).get(name)) if len(_all(cls)) else None
+
+
+def find_modules(ns: str, *, recursive: bool = False) -> list[str]:
+    """::
+
+        modules = find_modules('MyApp.Namespace')
+        modules = find_modules('MyApp.Namespace', recursive=True)
+
+    Search for modules in a namespace, in the directories of
+    :data:`sys.path`, without loading them. A package, a directory with an
+    ``__init__.py``, is a module too.
+
+    These options are currently available:
+
+    recursive
+        ::
+
+            recursive=True
+
+        Search namespace recursively.
+    """
+    parts = ns.split('.')
+    dirs = [d for d in (Pyjo.File.new(p or '.', *parts) for p in sys.path) if os.path.isdir(d)]
+
+    modules: set[str] = set()
+    for dir in dirs:
+        for file in dir.list_tree() if recursive else dir.list(dir=True):
+            path = file.to_str()
+
+            # Not in Mojolicious: a package is a module, as Foo.pm next to Foo/ is in Perl
+            if os.path.isdir(path):
+                if not os.path.isfile(path := os.path.join(path, '__init__.py')):
+                    continue
+
+            if not path.endswith('.py'):
+                continue
+            rel = Pyjo.File.new(path[:-3]).to_rel(dir).to_list()
+            if rel[-1] == '__init__':
+                rel.pop()
+            if len(rel):
+                modules.add('.'.join([ns, *rel]))
+
+    return sorted(modules)
+
+
+def find_packages(ns: str) -> list[str]:
+    """::
+
+        pkgs = find_packages('MyApp.Namespace')
+
+    Search for packages in a namespace non-recursively: the modules in it that
+    are loaded, as :data:`sys.modules` has them.
+    """
+    prefix = f'{ns}.'
+    return sorted(n for n in list(sys.modules) if n.startswith(prefix) and '.' not in n[len(prefix) :])
+
+
+def load_class(cls: str) -> 'Pyjo.Exception.object | bool | None':
+    """::
+
+        e = load_class('Foo.Bar')
+
+    Load a class and catch exceptions, returns a false value if loading was
+    successful, a true value if the class was not found, or a
+    :mod:`Pyjo.Exception` object if loading failed. A directory without an
+    ``__init__.py`` (a namespace package) is not a class. The context of the
+    exception is the line of the module that failed to load, and the exception
+    of Python is its ``__cause__``. ::
+
+        # Handle exceptions
+        if e := load_class('Foo.Bar'):
+            raise Exception(f'Exception: {e}' if isinstance(e, Exception) else 'Not found!')
+    """
+    # Invalid class name
+    if not re.fullmatch(r'\w(?:[\w.]*\w)?', cls or ''):
+        return True
+    # Left out from Mojolicious: the deprecated package separator "'", which Python has never had
+
+    # Load if not already loaded
+    module = sys.modules.get(cls)
     try:
-        module = importlib.import_module(name)
-        if hasattr(module, 'new'):
-            return module
-        else:
-            return
-    except ImportError:
-        return
+        spec = module.__spec__ if module is not None else importlib.util.find_spec(cls)
+    except ModuleNotFoundError as e:
+        # Does not exist
+        if e.name is not None and (cls == e.name or cls.startswith(f'{e.name}.')):
+            return True
+        return _exception(e, None)
+    except Exception as e:
+        return _exception(e, None)
+    if module is not None and spec is None:
+        return None
+
+    # Does not exist, or a namespace package
+    if spec is None or spec.origin is None:
+        return True
+
+    try:
+        importlib.import_module(cls)
+    except Exception as e:
+        # Real error
+        return _exception(e, spec.origin)
+    return None
 
 
-def _all(module):
-    if isinstance(module, types.ModuleType):
-        modname = module.__name__
-    else:
-        modname = module
-        module = load_module(modname)
+def load_classes(ns: str) -> list[str]:
+    """::
 
-    if modname in CACHE:
-        return CACHE[modname]
+        classes = load_classes('Foo.Bar')
 
-    if not module or not hasattr(module, 'DATA'):
+    Load all classes in a namespace recursively.
+    """
+    classes: list[str] = []
+    for module in find_modules(ns, recursive=True):
+        if not (e := load_class(module)):
+            classes.append(module)
+        if isinstance(e, Exception):
+            raise e
+
+    return classes
+
+
+def _all(cls: Class) -> dict[str, str | bytes]:
+    if (module := _module(cls)) is None:
         return {}
+    name = module.__name__
+    if name in _CACHE:
+        return _CACHE[name]
 
-    data = module.DATA
+    # Not in Mojolicious: the DATA variable of a module, or its docstring after a line __DATA__
+    data = getattr(module, 'DATA', None)
+    if not isinstance(data, str):
+        doc = module.__doc__
+        if not isinstance(doc, str) or not re.search(r'^__DATA__\r?$', doc, re.M):
+            return {}
+        data = doc
+
+    # Ignore everything before __DATA__
+    data = re.sub(r'\A.*\n__DATA__\r?\n', '\n', data, count=1, flags=re.S)
+
+    # Ignore everything after __END__
+    data = re.sub(r'\n__END__\r?\n.*\Z', '\n', data, count=1, flags=re.S)
 
     # Split files
-    files = re_files.split(data)
-
-    if len(files) < 3:
-        return {}
-
-    files.pop(0)
+    files = Pyjo.String.Unicode.split(re.compile(r'^@@\s*(.+?)\s*\r?\n', re.M), data)[1:]
 
     # Find data
-    all_files = CACHE[modname] = {}
-
-    while len(files) >= 2:
-        name = files.pop(0)
-        content = files.pop(0)
-        name, n = re_base64.subn('', name)
-        if n:
-            all_files[name] = b64_decode(content)
-            if modname not in BIN:
-                BIN[modname] = {}
-            BIN[modname][name] = True
+    all: dict[str, str | bytes] = {}
+    _CACHE[name] = all
+    while len(files):
+        file, content = files[0] or '', files[1] if len(files) > 1 else None
+        del files[:2]
+        content = content or ''
+        if (base := re.sub(r'\s*\(\s*base64\s*\)$', '', file)) != file:
+            _BIN.setdefault(name, {})[base] = True
+            all[base] = b64_decode(content)
         else:
-            all_files[name] = content
+            all[file] = content
 
-    return all_files
+    return all
+
+
+# The exception of a module that failed to load, with the context of the line of the module
+def _exception(e: Exception, origin: str | None) -> Pyjo.Exception.object:
+    err = Pyjo.Exception.new(e)
+    err.__cause__ = e
+
+    # Unlike Mojolicious: croak reports the line of the caller, Python the line of the raise, so the frames of the
+    # module come first, or the location of a syntax error, which is not in a frame
+    if isinstance(e, SyntaxError) and e.filename is not None and e.lineno is not None:
+        err.frames.insert(0, traceback.FrameSummary(e.filename, e.lineno, '<module>', lookup_line=False, line=e.text))
+    elif origin is not None:
+        for i, frame in enumerate(err.frames):
+            if frame.filename == origin and frame.name == '<module>':
+                del err.frames[:i]
+                break
+
+    return err.inspect()
+
+
+# The module of a class, or the longest prefix of a dotted name that is loaded
+def _module(cls: Class) -> ModuleType | None:
+    if isinstance(cls, ModuleType):
+        return cls
+    name = cls.__module__ if isinstance(cls, type) else cls
+    parts = name.split('.')
+    for i in range(len(parts), 0, -1):
+        if (module := sys.modules.get('.'.join(parts[:i]))) is not None:
+            return module
+    return None
+
+
+# The name of the module of a class, the key of the cache
+def _key(cls: Class) -> str | None:
+    return module.__name__ if (module := _module(cls)) is not None else None

@@ -1,7 +1,7 @@
 import Pyjo.Server.Daemon
 import Pyjo.URL
 
-from Pyjo.Loader import embedded_file
+from Pyjo.Loader import data_section
 from Pyjo.Util import b, u
 
 import sys
@@ -40,7 +40,7 @@ def request(daemon, tx):
     path = tx.req.url.path
 
     # Template
-    template = embedded_file(sys.modules[__name__], 'index.html.tpl')
+    template = data_section(__name__, 'index.html.tpl')
 
     # Response
     tx.res.code = 200

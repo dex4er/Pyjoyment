@@ -48,8 +48,9 @@ Classes
 """
 
 import Pyjo.EventEmitter
+import Pyjo.Exception
 
-from Pyjo.Loader import load_module
+from Pyjo.Loader import load_class
 from Pyjo.Util import getenv, not_implemented, notnone
 
 import os
@@ -104,11 +105,14 @@ class Pyjo_Server_Base(Pyjo.EventEmitter.object):
 
         Build application from class.
         """
-        module = load_module(app)
-        if module:
-            return module.new()
-        else:
-            raise ImportError(f"No application module named '{app}'")
+        if not (e := load_class(app)):
+            self.app = sys.modules[app].new()
+            return self.app
+        raise (
+            e
+            if isinstance(e, Exception)
+            else Pyjo.Exception.new(f'Can\'t find application class "{app}" in sys.path. ({" ".join(sys.path)})')
+        )
 
     def build_tx(self):
         """::

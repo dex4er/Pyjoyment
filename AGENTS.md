@@ -351,9 +351,20 @@ copy:
 - A name of a Perl package, as `Mojo::Exception` takes them, is a dotted name
   of a class in Python (`'MyApp.X.Foo'`), resolved by importing the longest
   prefix that is a module.
-- Perl's `%INC`, the files of the modules that are loaded, is `sys.modules`
-  and the `__file__` of a module, as `Pyjo.Home.detect` uses it; a module
+- Perl's `@INC` is `sys.path`, and `%INC`, the files of the modules that
+  are loaded, and the symbol table of packages are `sys.modules` and the
+  `__file__` of a module, as `Pyjo.Home` and `Pyjo.Loader` use them; a module
   that is not loaded is not imported to find it.
+- The `__DATA__` section of a Perl module is the `DATA` variable of a Python
+  module, or its docstring after a line `__DATA__`.
+- `croak` of Carp reports the line of the caller, Python the line of the
+  `raise`. Where Mojo's tests check the line that `croak` gives, as
+  `load_class` of `Mojo::Loader` does, the port takes the frame of the caller
+  from the traceback.
+- Modules that a Mojo test loads from `t/mojo/lib` are written into a
+  temporary directory by the test, as `Pyjo.Prove` runs every `.py` file
+  under `t`, and are top-level there, as Python does not merge a regular
+  package like `Mojo::` from every directory of `sys.path`.
 - A stack trace, Perl's `caller` frames, is a list of
   `traceback.FrameSummary`, the most recent first, as Mojo keeps it.
 - `like` of `Test::More` stringifies what it checks, `like_ok` does not:
