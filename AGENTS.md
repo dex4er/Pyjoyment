@@ -351,6 +351,9 @@ copy:
 - A name of a Perl package, as `Mojo::Exception` takes them, is a dotted name
   of a class in Python (`'MyApp.X.Foo'`), resolved by importing the longest
   prefix that is a module.
+- Perl's `%INC`, the files of the modules that are loaded, is `sys.modules`
+  and the `__file__` of a module, as `Pyjo.Home.detect` uses it; a module
+  that is not loaded is not imported to find it.
 - A stack trace, Perl's `caller` frames, is a list of
   `traceback.FrameSummary`, the most recent first, as Mojo keeps it.
 - `like` of `Test::More` stringifies what it checks, `like_ok` does not:
