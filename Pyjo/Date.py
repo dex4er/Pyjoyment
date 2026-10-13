@@ -10,13 +10,19 @@ Pyjo.Date - HTTP date
     print(date.epoch)
 
     # Build
-    date = Pyjo.Date.new(steady_time() + 60)
+    date = Pyjo.Date.new(time.time() + 60)
     print(date)
 
-:mod:`Pyjo.Date` implements HTTP date and time functions based on
-:rfc:`7230`,
-:rfc:`7231` and
-:rfc:`3339`.
+:mod:`Pyjo.Date` implements HTTP date and time functions, based on :rfc:`7230`,
+:rfc:`7231` and :rfc:`3339`.
+
+See also
+--------
+
+:mod:`Pyjoyment`, https://mojolicious.org.
+
+Ported from `Mojo::Date <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/Date.pm>`_
+of Mojolicious 9.49.
 
 Classes
 -------
@@ -25,39 +31,35 @@ Classes
 import Pyjo.Base
 import Pyjo.String.Mixin
 
-from Pyjo.Regexp import r
-from Pyjo.Util import notnone
-
 import calendar
+import re
 import time
 
-
-DAYS = ('Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun')
-MONTHS = (None, 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec')
-MONTHNAMES = {}
-for _ in range(len(MONTHS)):
-    MONTHNAMES[MONTHS[_]] = _
+from typing import Self
 
 
-re_epoch = r(r'^\d+$|^\d+\.\d+$')
-re_rfc_822_850 = r(r'^\w+\W+(\d+)\W+(\w+)\W+(\d+)\W+(\d+):(\d+):(\d+)\W*\w+$')
-re_rfc3339 = r(
+RFC3339_RE = re.compile(
     r"""
   ^(\d+)-(\d+)-(\d+)\D+(\d+):(\d+):(\d+(?:\.\d+)?)   # Date and time
   (?:Z|([+-])(\d+):(\d+))?$                          # Offset
 """,
-    'xi',
+    re.X | re.I,
 )
-re_asctime = r(r'^\w+\s+(\w+)\s+(\d+)\s+(\d+):(\d+):(\d+)\s+(\d+)$')
+
+DAYS = ('Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat')
+MONTHS = ('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec')
+MONTH_NUMBERS = {name: number for number, name in enumerate(MONTHS)}
 
 
 class Pyjo_Date(Pyjo.Base.object, Pyjo.String.Mixin.object):
     """
-    :mod:`Pyjo.Date` inherits all attributes and methods from
-    :mod:`Pyjo.Base` and :mod:`Pyjo.String.Mixin` and implements the following new ones.
+    :mod:`Pyjo.Date` inherits all methods from :mod:`Pyjo.Base` and
+    :mod:`Pyjo.String.Mixin` and implements the following new ones.
     """
 
-    def __init__(self, date=None, **kwargs):
+    epoch: int | float | None
+
+    def __init__(self, date: str | float | None = None) -> None:
         """::
 
             date = Pyjo.Date.new()
@@ -66,7 +68,7 @@ class Pyjo_Date(Pyjo.Base.object, Pyjo.String.Mixin.object):
         Construct a new :mod:`Pyjo.Date` object and :meth:`parse` date if necessary.
         """
 
-        self.epoch = None
+        self.epoch = int(time.time())
         """::
 
             epoch = date.epoch
@@ -77,10 +79,8 @@ class Pyjo_Date(Pyjo.Base.object, Pyjo.String.Mixin.object):
 
         if date is not None:
             self.parse(date)
-        else:
-            self.epoch = notnone(kwargs.get('epoch'), lambda: time.time())
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
         """::
 
             boolean = bool(date)
@@ -89,7 +89,16 @@ class Pyjo_Date(Pyjo.Base.object, Pyjo.String.Mixin.object):
         """
         return True
 
-    def parse(self, date):
+    def __str__(self) -> str:
+        """::
+
+            string = str(date)
+
+        Alias for :meth:`to_str`.
+        """
+        return self.to_str()
+
+    def parse(self, date: str | float) -> Self:
         """::
 
             date = date.parse('Sun Nov  6 08:49:37 1994')
@@ -116,124 +125,59 @@ class Pyjo_Date(Pyjo.Base.object, Pyjo.String.Mixin.object):
             print(Pyjo.Date.new('1994-11-06T08:49:37+01:00').epoch)
             print(Pyjo.Date.new('1994-11-06T08:49:37-01:00').epoch)
         """
+        date = str(date)
+
         # epoch (784111777)
-        if isinstance(date, (int, float)) or re_epoch.search(date):
-            if isinstance(date, float) or not str(date).isdigit():
-                self.epoch = float(date)
-            else:
-                self.epoch = int(date)
+        if re.search(r'^\d+$|^\d+\.\d+$', date):
+            self.epoch = float(date) if '.' in date else int(date)
             return self
 
         # RFC 822/1123 (Sun, 06 Nov 1994 08:49:37 GMT)
         # RFC 850/1036 (Sunday, 06-Nov-94 08:49:37 GMT)
         offset = 0
-        while True:
-            m = re_rfc_822_850.search(date)
-            if m:
-                day, month, year, hh, mm, ss = (
-                    int(m.group(1)),
-                    MONTHNAMES.get(m.group(2)),
-                    int(m.group(3)),
-                    int(m.group(4)),
-                    int(m.group(5)),
-                    float(m.group(6)),
-                )
-                break
+        if m := re.search(r'^\w+\W+(\d+)\W+(\w+)\W+(\d+)\W+(\d+):(\d+):(\d+)\W*\w+$', date):
+            day, month, year, h, mi, s = m[1], MONTH_NUMBERS.get(m[2]), m[3], m[4], m[5], m[6]
 
-            # RFC 3339 (1994-11-06T08:49:37Z)
-            m = re_rfc3339.search(date)
-            if m:
-                year, month, day, hh, mm, ss = (
-                    int(m.group(1)),
-                    int(m.group(2)),
-                    int(m.group(3)),
-                    int(m.group(4)),
-                    int(m.group(5)),
-                    float(m.group(6)),
-                )
-                if m.group(7):
-                    offset = ((int(m.group(8)) * 3600) + (int(m.group(9)) * 60)) * (-1 if m.group(7) == '+' else 1)
-                break
+        # RFC 3339 (1994-11-06T08:49:37Z)
+        elif m := RFC3339_RE.search(date):
+            year, month, day, h, mi, s = m[1], int(m[2]) - 1, m[3], m[4], m[5], m[6]
+            if m[7]:
+                offset = ((int(m[8]) * 3600) + (int(m[9]) * 60)) * (-1 if m[7] == '+' else 1)
 
-            # ANSI C asctime() (Sun Nov  6 08:49:37 1994)
-            m = re_asctime.search(date)
-            if m:
-                month, day, hh, mm, ss, year = (
-                    MONTHNAMES.get(m.group(1)),
-                    int(m.group(2)),
-                    int(m.group(3)),
-                    int(m.group(4)),
-                    float(m.group(5)),
-                    int(m.group(6)),
-                )
-                break
+        # ANSI C asctime() (Sun Nov  6 08:49:37 1994)
+        elif m := re.search(r'^\w+\s+(\w+)\s+(\d+)\s+(\d+):(\d+):(\d+)\s+(\d+)$', date):
+            month, day, h, mi, s, year = MONTH_NUMBERS.get(m[1]), m[2], m[3], m[4], m[5], m[6]
 
+        # Invalid
+        else:
             self.epoch = None
             return self
 
-        try:
-            if (
-                year < 0
-                or month < 0
-                or month > 12
-                or day < 0
-                or day > 31
-                or hh < 0
-                or hh > 24
-                or mm < 0
-                or mm > 60
-                or ss < 0
-                or ss > 60
-            ):
-                self.epoch = None
-                return self
-
-            if year < 100:
-                if year < 70:
-                    year += 2000
-                else:
-                    year += 1900
-
-            # Prevent crash
-            epoch = calendar.timegm(
-                (year, month, day, hh, mm, ss, 0, 0, -1),
-            )
-        except:
-            epoch = None
-
-        if epoch is not None:
-            epoch += offset
-            if epoch < 0:
-                epoch = None
-
-        self.epoch = epoch
+        epoch = _timegm(float(s), int(mi), int(h), int(day), month, int(year))
+        self.epoch = epoch + offset if epoch is not None and epoch + offset >= 0 else None
         return self
 
-    def isoformat(self, sep='T'):
+    def to_datetime(self) -> str:
         """::
 
-            string = date.iso_format()
+            string = date.to_datetime()
 
         Render :rfc:`3339` date and time. ::
 
             # "1994-11-06T08:49:37Z"
-            Pyjo.Date.new(784111777).isoformat()
+            Pyjo.Date.new(784111777).to_datetime()
 
             # "1994-11-06T08:49:37.21Z"
-            Pyjo.Date.new(784111777.21).isoformat(sep='T')
+            Pyjo.Date.new(784111777.21).to_datetime()
         """
         # RFC 3339 (1994-11-06T08:49:37Z)
-        epoch = self.epoch
-        year, month, day, h, m, s, _, _, _ = tuple(time.gmtime(epoch))
-        string = f'{year:04d}-{month:02d}-{day:02d}{sep}{h:02d}:{m:02d}:{s:02d}'
-        if isinstance(epoch, float):
-            epoch = str(epoch)
-            if not epoch.endswith('.0'):
-                string += epoch[epoch.index('.') :]
-        string += 'Z'
-        return string
+        epoch = self.epoch or 0
+        t = time.gmtime(epoch)
+        string = f'{t.tm_year:04d}-{t.tm_mon:02d}-{t.tm_mday:02d}T{t.tm_hour:02d}:{t.tm_min:02d}:{t.tm_sec:02d}'
+        m = re.search(r'(\.\d+)$', _number(epoch))
+        return string + (m[1] if m else '') + 'Z'
 
-    def to_str(self):
+    def to_str(self) -> str:
         """::
 
             string = date.to_str()
@@ -244,8 +188,42 @@ class Pyjo_Date(Pyjo.Base.object, Pyjo.String.Mixin.object):
             Pyjo.Date.new(784111777).to_str()
         """
         # RFC 7231 (Sun, 06 Nov 1994 08:49:37 GMT)
-        year, month, mday, h, m, s, wday, _, _ = tuple(time.gmtime(self.epoch))
-        return f'{DAYS[wday]}, {mday:02d} {MONTHS[month]} {year:04d} {h:02d}:{m:02d}:{s:02d} GMT'
+        t = time.gmtime(self.epoch or 0)
+        # Python counts the days of the week from Monday, Perl from Sunday
+        day, month = DAYS[(t.tm_wday + 1) % 7], MONTHS[t.tm_mon - 1]
+        return f'{day}, {t.tm_mday:02d} {month} {t.tm_year:04d} {t.tm_hour:02d}:{t.tm_min:02d}:{t.tm_sec:02d} GMT'
+
+
+def _number(number: int | float) -> str:
+    # A number as Perl stringifies it: no ".0" for a whole float
+    return repr(number) if isinstance(number, float) and not number.is_integer() else str(int(number))
+
+
+def _timegm(s: float, mi: int, h: int, day: int, month: int | None, year: int) -> int | float | None:
+    # Time::Local's timegm: None instead of an exception for a value out of
+    # range, and an unknown month name is invalid rather than January
+
+    # Years 0 to 99 are within 50 years of the current one, 100 to 999 count
+    # from 1900
+    if year < 100:
+        this_year = time.localtime().tm_year
+        year += this_year - this_year % 100
+        if year > this_year + 50:
+            year -= 100
+        elif year <= this_year - 50:
+            year += 100
+    elif year < 1000:
+        year += 1900
+
+    # datetime, which calendar.timegm uses, ends with the year 9999
+    if month is None or not 0 <= month <= 11 or year > 9999:
+        return None
+    month_days = calendar.monthrange(2000 if calendar.isleap(year) else 2001, month + 1)[1]
+    if not (1 <= day <= month_days and 0 <= h <= 23 and 0 <= mi <= 59 and 0 <= s < 60):
+        return None
+
+    epoch = calendar.timegm((year, month + 1, day, h, mi, int(s), 0, 0, 0))
+    return epoch + (s - int(s)) if s != int(s) else epoch
 
 
 new = Pyjo_Date.new
