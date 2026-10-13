@@ -151,6 +151,13 @@ Perl's `Test::More`), `Pyjo.String.*`, `Pyjo.Regexp` and the helpers in
 Perl inspiration where it helps, without porting it, and their tests are
 written for them rather than ported.
 
+`Pyjo.Util` is not ported anew as a whole: next to the functions of
+`Mojo::Util` it has helpers of its own, for Python. A function of it is
+brought to the target when a ported module needs it, without changing what
+the modules that are not ported yet get from it: typed signatures, and a
+variant for `str` next to the one for `bytes` where Mojo works on
+characters, like `url_unescape`.
+
 A module is ported anew from the target Mojolicious, not migrated from the
 existing Python code. The existing Python module is a reference for how
 Perl idioms were translated before, not a base to patch: it follows an older
@@ -195,9 +202,14 @@ copy:
   `bool(proxy)` raise `ReferenceError` for a dead proxy.
 - `"\$"` in a double-quoted Perl string is a plain `$`; in Python it keeps the
   backslash.
-- Overloaded operators become special methods: `""` is `__str__` and `bool`
-  is `__bool__`. `to_string` is `to_str`, the counterpart of `to_bytes` in
+- Overloaded operators become special methods: `""` is `__str__`, `bool` is
+  `__bool__`, and `@{}` is `__getitem__`, `__iter__` and `__len__`.
+  `to_string` is `to_str`, the counterpart of `to_bytes` in
   `Pyjo.String.Mixin`.
+- A Perl string of characters is a `str`, and bytes in Python are `bytes`,
+  encoded with the charset of the module. Perl keeps bytes that do not decode
+  as a byte string, which is a `str` of the characters 0-255 in Python:
+  `.decode('latin-1')`.
 - `None` is not `undef` everywhere: `time.gmtime(None)` is the current time,
   `gmtime(undef)` is the epoch. Python's `tm_wday` counts from Monday, Perl's
   from Sunday.
