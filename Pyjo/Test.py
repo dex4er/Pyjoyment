@@ -96,9 +96,15 @@ Functions
 """
 
 import atexit
+import inspect
 import os
 import re
 import sys
+
+from collections.abc import Callable
+from dataclasses import dataclass
+from types import TracebackType
+from typing import Any, NoReturn, Self, TextIO, cast, overload
 
 
 __all__ = [
@@ -142,24 +148,36 @@ class SkipAll(Exception):
     """
 
 
+@dataclass
 class _State:
-    def __init__(self, name=None, depth=0):
-        self.name = name
-        self.depth = depth
-        self.count = 0
-        self.failed = 0
-        self.planned = None
-        self.done = False
-        self.skip_all = None
+    name: str | None = None
+    depth: int = 0
+    count: int = 0
+    failed: int = 0
+    planned: int | None = None
+    done: bool = False
+    skip_all: str | None = None
 
 
-_stack = [_State()]
+@dataclass
+class _Step:
+    kind: str | None
+    idx: object
+    got: object
+    expected: object
+
+
+# Any: comparisons and regular expressions take whatever the tested code
+# returns, str or bytes, and a mismatch is a failed test, not a type error.
+type _Pattern = str | bytes | re.Pattern[Any] | tuple[str | bytes, str]
+
+_stack: list[_State] = [_State()]
 _used = False
 _died = False
 _bailed_out = False
 
 
-def bail_out(reason=''):
+def bail_out(reason: str = '') -> NoReturn:
     """::
 
         if not connected:
@@ -175,7 +193,7 @@ def bail_out(reason=''):
     sys.exit(255)
 
 
-def cmp_ok(got, operator, expected, test_name=None):
+def cmp_ok(got: Any, operator: str, expected: Any, test_name: str | None = None) -> bool:
     """::
 
         # ok(got == expected)
@@ -185,7 +203,7 @@ def cmp_ok(got, operator, expected, test_name=None):
     ``>``, ``>=``, ``is``, ``is not``, ``in`` or ``not in``. The test passes if
     the comparison is true.
     """
-    operators = {
+    operators: dict[str, Callable[[Any, Any], bool]] = {
         '==': lambda a, b: a == b,
         '!=': lambda a, b: a != b,
         '<': lambda a, b: a < b,
@@ -206,7 +224,7 @@ def cmp_ok(got, operator, expected, test_name=None):
     return check
 
 
-def diag(*messages):
+def diag(*messages: object) -> bool:
     """::
 
         if not in_ok(users, 'foo', "There's a foo user"):
@@ -220,7 +238,7 @@ def diag(*messages):
     return False
 
 
-def done_testing(how_many=None):
+def done_testing(how_many: int | None = None) -> bool:
     """::
 
         ok(True)
@@ -250,7 +268,7 @@ def done_testing(how_many=None):
     return _finish(state)
 
 
-def fail_ok(test_name=None):
+def fail_ok(test_name: str | None = None) -> bool:
     """::
 
         fail_ok('This should not happen')
@@ -260,7 +278,7 @@ def fail_ok(test_name=None):
     return _ok(False, test_name)
 
 
-def in_ok(got, elem, test_name=None):
+def in_ok(got: Any, elem: object, test_name: str | None = None) -> bool:
     """::
 
         in_ok(['foo', 'bar'], 'foo', 'foo is in the list')
@@ -278,7 +296,7 @@ def in_ok(got, elem, test_name=None):
     return check
 
 
-def is_deeply_ok(got, expected, test_name=None):
+def is_deeply_ok(got: object, expected: object, test_name: str | None = None) -> bool:
     """::
 
         is_deeply_ok([[1, 2], [3, [4, 5]]], [[1, 2], [3]], 'deep structure')
@@ -287,8 +305,8 @@ def is_deeply_ok(got, expected, test_name=None):
     dicts. If they differ, the diagnostic message shows where they start
     differing.
     """
-    if isinstance(got, (list, tuple, set, dict)) and isinstance(expected, (list, tuple, set, dict)):
-        stack = []
+    if _is_container(got) and _is_container(expected):
+        stack: list[_Step] = []
         check = _deep_check(stack, got, expected)
         _ok(check, test_name)
         if not check:
@@ -301,7 +319,7 @@ def is_deeply_ok(got, expected, test_name=None):
     return check
 
 
-def is_ok(got, expected, test_name=None):
+def is_ok(got: object, expected: object, test_name: str | None = None) -> bool:
     """::
 
         is_ok(ultimate_answer(), 42, 'meaning of life')
@@ -315,7 +333,7 @@ def is_ok(got, expected, test_name=None):
     return check
 
 
-def isa_ok(got, cls, test_name=None):
+def isa_ok(got: object, cls: type | tuple[type, ...], test_name: str | None = None) -> bool:
     """::
 
         obj = SomeClass()
@@ -333,7 +351,7 @@ def isa_ok(got, cls, test_name=None):
     return check
 
 
-def isnt_ok(got, expected, test_name=None):
+def isnt_ok(got: object, expected: object, test_name: str | None = None) -> bool:
     """::
 
         isnt_ok(foo, '', 'got some foo')
@@ -347,7 +365,7 @@ def isnt_ok(got, expected, test_name=None):
     return check
 
 
-def like_ok(got, expected, test_name=None):
+def like_ok(got: Any, expected: _Pattern, test_name: str | None = None) -> bool:
     """::
 
         like_ok(got, r'expected', 'test name')
@@ -360,7 +378,7 @@ def like_ok(got, expected, test_name=None):
     """
     regex = _regex(expected)
     try:
-        check = bool(regex.search(got))
+        check = regex.search(got) is not None
     except TypeError:
         check = False
     _ok(check, test_name)
@@ -369,7 +387,7 @@ def like_ok(got, expected, test_name=None):
     return check
 
 
-def none_ok(got, test_name=None):
+def none_ok(got: object, test_name: str | None = None) -> bool:
     """::
 
         none_ok(req.headers.transfer_encoding, 'no "Transfer-Encoding" value')
@@ -383,7 +401,7 @@ def none_ok(got, test_name=None):
     return check
 
 
-def not_in_ok(got, elem, test_name=None):
+def not_in_ok(got: Any, elem: object, test_name: str | None = None) -> bool:
     """::
 
         not_in_ok(os.environ, 'DISPLAY', 'DISPLAY is not set')
@@ -401,7 +419,7 @@ def not_in_ok(got, elem, test_name=None):
     return check
 
 
-def note(*messages):
+def note(*messages: object) -> None:
     """::
 
         note('Tempfile is', tempfile)
@@ -414,7 +432,7 @@ def note(*messages):
         _print(f'# {line}' if line else '#')
 
 
-def ok(check, test_name=None):
+def ok(check: object, test_name: str | None = None) -> bool:
     """::
 
         ok(exp(9) == 81, 'simple exponential')
@@ -427,7 +445,7 @@ def ok(check, test_name=None):
     return _ok(check, test_name)
 
 
-def pass_ok(test_name=None):
+def pass_ok(test_name: str | None = None) -> bool:
     """::
 
         pass_ok('step 1')
@@ -437,7 +455,7 @@ def pass_ok(test_name=None):
     return _ok(True, test_name)
 
 
-def plan(tests=None, skip_all=None):
+def plan(tests: int | None = None, skip_all: str | None = None) -> bool:
     """::
 
         plan(tests=3)
@@ -472,7 +490,7 @@ def plan(tests=None, skip_all=None):
     return True
 
 
-def plan_skip_all(why):
+def plan_skip_all(why: str) -> bool:
     """::
 
         plan_skip_all('set TEST_ONLINE to enable this test')
@@ -482,7 +500,7 @@ def plan_skip_all(why):
     return plan(skip_all=why)
 
 
-def plan_tests(how_many):
+def plan_tests(how_many: int) -> bool:
     """::
 
         plan_tests(3)
@@ -492,7 +510,7 @@ def plan_tests(how_many):
     return plan(tests=how_many)
 
 
-def skip(why=None, how_many=1):
+def skip(why: str | None = None, how_many: int = 1) -> bool:
     """::
 
         if os.getenv('TEST_ONLINE'):
@@ -517,22 +535,24 @@ class Subtest:
     of its tests passed.
     """
 
-    def __init__(self, name):
+    def __init__(self, name: str) -> None:
         self.name = name
-        self.passed = None
+        self.passed: bool | None = None
 
-    def __call__(self, fn):
+    def __call__[F: Callable[[], object]](self, fn: F) -> F:
         with self:
             fn()
         return fn
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         _use()
         _print(f'# Subtest: {self.name}')
         _stack.append(_State(self.name, _current().depth + 1))
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(
+        self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None
+    ) -> bool:
         state = _current()
 
         if exc_type is not None and issubclass(exc_type, SystemExit):
@@ -570,7 +590,15 @@ class Subtest:
         return False
 
 
-def subtest(name, fn=None):
+@overload
+def subtest(name: str, fn: None = None) -> Subtest: ...
+
+
+@overload
+def subtest(name: str, fn: Callable[[], object]) -> bool: ...
+
+
+def subtest(name: str, fn: Callable[[], object] | None = None) -> Subtest | bool:
     """::
 
         with subtest('Parse'):
@@ -591,10 +619,12 @@ def subtest(name, fn=None):
     if fn is None:
         return test
     test(fn)
-    return test.passed
+    return bool(test.passed)
 
 
-def throws_ok(cb, expected, test_name=None):
+def throws_ok(
+    cb: Callable[[], object], expected: type[BaseException] | str | re.Pattern[str], test_name: str | None = None
+) -> bool:
     """::
 
         throws_ok(lambda: [1, 2, 3][3], IndexError, 'no more elements')
@@ -610,7 +640,7 @@ def throws_ok(cb, expected, test_name=None):
     try:
         cb()
     except Exception as e:
-        if isinstance(expected, type) and issubclass(expected, BaseException):
+        if isinstance(expected, type):
             got = type(e).__name__
             check = isinstance(e, expected)
         elif isinstance(expected, re.Pattern):
@@ -631,7 +661,7 @@ def throws_ok(cb, expected, test_name=None):
     return check
 
 
-def unlike_ok(got, expected, test_name=None):
+def unlike_ok(got: Any, expected: _Pattern, test_name: str | None = None) -> bool:
     """::
 
         unlike_ok(got, r'expected', 'test name')
@@ -641,7 +671,7 @@ def unlike_ok(got, expected, test_name=None):
     """
     regex = _regex(expected)
     try:
-        check = not regex.search(got)
+        check = regex.search(got) is None
     except TypeError:
         check = True
     _ok(check, test_name)
@@ -651,13 +681,13 @@ def unlike_ok(got, expected, test_name=None):
 
 
 class _DoesNotExist:
-    def __repr__(self):
+    def __repr__(self) -> str:
         return 'Does not exist'
 
 
 _DOES_NOT_EXIST = _DoesNotExist()
 
-_FLAGS = {
+_FLAGS: dict[str, re.RegexFlag] = {
     'a': re.ASCII,
     'i': re.IGNORECASE,
     'm': re.MULTILINE,
@@ -666,7 +696,7 @@ _FLAGS = {
 }
 
 
-def _at_exit():
+def _at_exit() -> None:
     if not _used:
         return
 
@@ -696,14 +726,14 @@ def _at_exit():
         os._exit(code)
 
 
-def _class_names(cls):
+def _class_names(cls: type | tuple[type, ...]) -> str:
     if isinstance(cls, tuple):
         return ', '.join(c.__name__ for c in cls)
     return cls.__name__
 
 
-def _caller():
-    frame = sys._getframe(1)
+def _caller() -> str | None:
+    frame = inspect.currentframe()
     while frame is not None and frame.f_code.co_filename == __file__:
         frame = frame.f_back
     if frame is None:
@@ -711,66 +741,72 @@ def _caller():
     return f'{frame.f_code.co_filename} line {frame.f_lineno}'
 
 
-def _current():
+def _current() -> _State:
     return _stack[-1]
 
 
-def _deep_check(stack, e1, e2):
+def _deep_check(stack: list[_Step], e1: object, e2: object) -> bool:
+    step = _Step(None, None, e1, e2)
+
     if e1 is e2:
         return True
 
     if isinstance(e1, list) and isinstance(e2, list):
-        return _eq_array(stack, 'list', e1, e2)
+        return _eq_sequence(stack, 'list', cast(list[object], e1), cast(list[object], e2))
 
     if isinstance(e1, tuple) and isinstance(e2, tuple):
-        return _eq_array(stack, 'tuple', e1, e2)
+        return _eq_sequence(stack, 'tuple', cast(tuple[object, ...], e1), cast(tuple[object, ...], e2))
 
     if isinstance(e1, set) and isinstance(e2, set):
-        return _eq_array(stack, 'set', sorted(e1, key=repr), sorted(e2, key=repr))
+        return _eq_sequence(
+            stack, 'set', sorted(cast(set[object], e1), key=repr), sorted(cast(set[object], e2), key=repr)
+        )
 
     if isinstance(e1, dict) and isinstance(e2, dict):
-        return _eq_dict(stack, e1, e2)
+        return _eq_dict(stack, cast(dict[object, object], e1), cast(dict[object, object], e2))
 
     if e1 is not None and e2 is not None and e1 == e2:
         return True
 
-    stack.append({'vals': [e1, e2]})
+    stack.append(step)
     return False
 
 
-def _diag_lines(lines, stream=None, depth=None):
+def _diag_lines(lines: list[str], stream: TextIO | None = None, depth: int | None = None) -> None:
     _print(*[f'# {line}' if line else '#' for line in lines], stream=stream or sys.stderr, depth=depth)
 
 
-def _eq_array(stack, kind, a1, a2):
-    for i in range(max(len(a1), len(a2))):
-        e1 = a1[i] if i < len(a1) else _DOES_NOT_EXIST
-        e2 = a2[i] if i < len(a2) else _DOES_NOT_EXIST
-        stack.append({'type': kind, 'idx': i, 'vals': [e1, e2]})
-        if not _deep_check(stack, e1, e2):
-            return False
-        stack.pop()
-    return True
-
-
-def _eq_dict(stack, h1, h2):
+def _eq_dict(stack: list[_Step], h1: dict[object, object], h2: dict[object, object]) -> bool:
     for k in sorted(set(h1) | set(h2), key=repr):
         e1 = h1.get(k, _DOES_NOT_EXIST)
         e2 = h2.get(k, _DOES_NOT_EXIST)
-        stack.append({'type': 'dict', 'idx': k, 'vals': [e1, e2]})
+        stack.append(_Step('dict', k, e1, e2))
         if not _deep_check(stack, e1, e2):
             return False
         stack.pop()
     return True
 
 
-def _except_hook(exc_type, exc_value, traceback):
+def _eq_sequence(
+    stack: list[_Step], kind: str, a1: list[object] | tuple[object, ...], a2: list[object] | tuple[object, ...]
+) -> bool:
+    for i in range(max(len(a1), len(a2))):
+        e1 = a1[i] if i < len(a1) else _DOES_NOT_EXIST
+        e2 = a2[i] if i < len(a2) else _DOES_NOT_EXIST
+        stack.append(_Step(kind, i, e1, e2))
+        if not _deep_check(stack, e1, e2):
+            return False
+        stack.pop()
+    return True
+
+
+def _except_hook(exc_type: type[BaseException], exc_value: BaseException, traceback: TracebackType | None) -> None:
     global _died
     _died = True
     _original_except_hook(exc_type, exc_value, traceback)
 
 
-def _finish(state):
+def _finish(state: _State) -> bool:
     if state.skip_all is None:
         if state.count != state.planned:
             _diag_lines([f'Looks like you planned {_tests(state.planned)} but ran {state.count}.'])
@@ -781,16 +817,15 @@ def _finish(state):
     return _passed(state)
 
 
-def _format_stack(stack):
+def _format_stack(stack: list[_Step]) -> list[str]:
     path = ''
-    for entry in stack:
-        kind = entry.get('type')
-        if kind in ('list', 'tuple', 'dict'):
-            path += f'[{entry["idx"]!r}]'
-        elif kind == 'set':
-            path = f'sorted({path or "x"})[{entry["idx"]!r}]'
+    for step in stack:
+        if step.kind in ('list', 'tuple', 'dict'):
+            path += f'[{step.idx!r}]'
+        elif step.kind == 'set':
+            path = f'sorted({path or "x"})[{step.idx!r}]'
 
-    got, expected = stack[-1]['vals']
+    got, expected = stack[-1].got, stack[-1].expected
     return [
         '    Structures begin differing at:',
         f'         got{path} = {got!r}',
@@ -798,7 +833,11 @@ def _format_stack(stack):
     ]
 
 
-def _ok(check, test_name=None):
+def _is_container(value: object) -> bool:
+    return isinstance(value, (list, tuple, set, dict))
+
+
+def _ok(check: object, test_name: str | None = None) -> bool:
     _use()
     state = _current()
     state.count += 1
@@ -825,14 +864,16 @@ def _ok(check, test_name=None):
     return check
 
 
-def _passed(state):
+def _passed(state: _State) -> bool:
     if state.skip_all is not None:
         return True
     return state.count == state.planned and not state.failed and state.count > 0
 
 
-def _print(*lines, stream=None, depth=None):
+def _print(*lines: str, stream: TextIO | None = None, depth: int | None = None) -> None:
     stream = stream or sys.stdout
+    if stream is None:
+        return
     indent = '    ' * (_current().depth if depth is None else depth)
     text = ''.join(f'{indent}{line}\n' for line in lines)
     encoding = getattr(stream, 'encoding', None)
@@ -844,7 +885,7 @@ def _print(*lines, stream=None, depth=None):
     stream.flush()
 
 
-def _regex(expected):
+def _regex(expected: _Pattern) -> re.Pattern[Any]:
     if isinstance(expected, re.Pattern):
         return expected
     flags = 0
@@ -855,11 +896,11 @@ def _regex(expected):
     return re.compile(expected, flags)
 
 
-def _tests(n):
+def _tests(n: int | None) -> str:
     return f'{n} test' if n == 1 else f'{n} tests'
 
 
-def _use():
+def _use() -> None:
     global _used
     _used = True
 
