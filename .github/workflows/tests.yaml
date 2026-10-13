@@ -30,6 +30,7 @@ jobs:
           - mise
           - "3.12"
           - "3.13"
+          - "3.14"
           - "3.15"
           - pypy3.12
 
@@ -38,8 +39,9 @@ jobs:
 
     env:
       PYTHONPATH: .
-      # Invalid escape sequences become errors in a future Python.
-      PYTHONWARNINGS: error::SyntaxWarning
+      # Invalid escape sequences and deprecated APIs become errors in a future
+      # Python; fail now instead.
+      PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
 
     steps:
       - name: Checkout
@@ -83,7 +85,7 @@ jobs:
 
       # Package data is the easiest part of a package to lose silently.
       - name: Check wheel contents
-        run: |
+        run: |-
           python -m zipfile -l dist/*.whl | tee wheel.txt
           grep -q 'Pyjo/IOLoop/certs/server.crt' wheel.txt
           grep -q 'Pyjo/IOLoop/certs/server.key' wheel.txt

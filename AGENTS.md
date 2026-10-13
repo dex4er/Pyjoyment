@@ -117,8 +117,10 @@ and only once a test function has been called, so importing the module (as
 Sphinx does) has no effect. Older test files still wrap their body in
 `if __name__ == '__main__':`, which is no longer needed.
 
-CI sets `PYTHONWARNINGS=error::SyntaxWarning`, so an invalid escape sequence
-fails the build. Python keeps an unknown escape such as `"\:"` as a backslash
+CI sets `PYTHONWARNINGS=error::SyntaxWarning,error::DeprecationWarning`, so an
+invalid escape sequence or a deprecated API fails the build, before a new
+Python removes it; the weekly run catches the deprecations of a new Python
+release. Python keeps an unknown escape such as `"\:"` as a backslash
 followed by the character, which is often exactly what a CSS selector or a
 regular expression ported from Perl needs; write it as `"\\:"` or as a raw
 string so it survives the Python release that turns the warning into an error.
