@@ -388,6 +388,14 @@ copy:
   temporary directory of `Pyjo.File.tempdir()`, an object made from it, like
   its `child()`, keeps it, so that `tempdir().child('x').spew(...)` works as in
   Perl.
+- What Mojo calls on the class as a shortcut to its singleton, like
+  `Mojo::IOLoop->timer`, is a function of the module bound to the singleton,
+  `Pyjo.IOLoop.timer`.
+- An object that holds a resource, like a socket or an I/O watcher, and that
+  Perl closes in `DESTROY` when the port drops the last reference to it, as
+  `Mojo::IOLoop` does with the acceptors and connections it deletes, is closed
+  by the port where it drops it, as PyPy frees it only when its garbage
+  collector runs.
 - A method that Mojo calls on the class or on an object, like
   `Mojo::DOM->new_tag` and `$dom->new_tag`, is a descriptor that passes either
   of them.

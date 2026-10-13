@@ -262,7 +262,7 @@ class Pyjo_Server_Daemon(Pyjo.Server.Base.object):
         def ticker_cb(loop):
             pass
 
-        ticker = loop.recurring(ticker_cb, 1)
+        ticker = loop.recurring(1, ticker_cb)
 
         def signal_cb(signal, frame):
             if isalive(loop):
