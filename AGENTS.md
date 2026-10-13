@@ -97,7 +97,9 @@ because the output is standard TAP; `.proverc` supplies its
 - `t/Pyjo/` holds the module tests, ported from Mojo's `t/mojo/*.t`.
 - `t/docs/` checks that the code in the module documentation is correct: it
   is the same code as in the docstrings, in the same order, with `print` and
-  the comments that show a result turned into assertions.
+  the comments that show a result turned into assertions. Documented code
+  that prints TAP itself or ends the script, as in `Pyjo.Test`, runs as a
+  script of its own, and the test checks its output and exit status.
 - `t/examples/` runs the scripts from `examples/`.
 - `t/lib/` holds helpers shared by the tests. Run on their own, they skip with
   `plan(skip_all=...)`, so `-r t` reports them as skipped instead of failing.
