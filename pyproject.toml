@@ -159,6 +159,7 @@ strict = [
   "Pyjo/Prove.py",
   "Pyjo/Reactor/__init__.py",
   "Pyjo/Reactor/Asyncio.py",
+  "Pyjo/Reactor/Poll.py",
   "Pyjo/String/Bytes.py",
   "Pyjo/String/Unicode.py",
   "Pyjo/Test.py",

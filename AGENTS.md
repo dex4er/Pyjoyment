@@ -61,7 +61,9 @@ of them is a regression.
   the examples. Another reactor, on uvloop, Trio, gevent or anything else,
   comes from another distribution, in the namespace `Pyjo.Reactor` that
   `extend_path` keeps open, and `PYJO_REACTOR` selects it, as
-  `Mojo::Reactor::EV` replaces `Mojo::Reactor::Poll`. Mojo 9 moved from
+  `Mojo::Reactor::EV` replaces `Mojo::Reactor::Poll`. `Pyjo.Reactor.Poll`, the port of
+  `Mojo::Reactor::Poll` on `select.poll`, is a reactor without asyncio that
+  runs the same tests, the example of such a reactor. Mojo 9 moved from
   callbacks and `Mojo::IOLoop::Delay` to promises and async/await; a promise
   is a port of `Mojo::Promise`, which follows the Promise of ECMAScript, and
   awaiting it, the counterpart of Mojo's `AWAIT_*` methods, is `__await__`,
