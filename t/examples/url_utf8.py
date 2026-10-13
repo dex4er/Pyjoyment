@@ -19,6 +19,6 @@ if __name__ == '__main__':
     is_ok(str(url3), 'http://xn--wie-fna90bfl.pl', 'url3')
 
     url4 = Pyjo.URL.new('http://localhost').set(userinfo='gęślą:jaźń')
-    is_ok(str(url4), 'http://g%C4%99%C5%9Bl%C4%85:ja%C5%BA%C5%84@localhost', 'url4')
+    is_ok(url4.to_unsafe_str(), 'http://g%C4%99%C5%9Bl%C4%85:ja%C5%BA%C5%84@localhost', 'url4')
 
     done_testing()

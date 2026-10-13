@@ -130,4 +130,5 @@ strict = [
   "Pyjo/Path.py",
   "Pyjo/Prove.py",
   "Pyjo/Test.py",
+  "Pyjo/URL.py",
 ]

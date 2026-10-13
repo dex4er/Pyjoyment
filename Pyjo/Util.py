@@ -99,6 +99,26 @@ def convert(value, newtype, default=None):
         return default
 
 
+def decode(charset: str, data: str | bytes) -> str | None:
+    """::
+
+        chars = decode('UTF-8', data)
+
+    Decode bytes to characters, or return ``None`` if decoding failed. A string
+    of the characters 0-255 is decoded as the bytes it holds, like a Perl byte
+    string; one with other characters does not decode.
+    """
+    if isinstance(data, str):
+        try:
+            data = data.encode('latin-1')
+        except UnicodeEncodeError:
+            return None
+    try:
+        return data.decode(charset)
+    except (LookupError, UnicodeDecodeError):
+        return None
+
+
 def decorator(func):
     """::
 
@@ -175,6 +195,16 @@ def die(e):
         raise e
     else:
         raise SystemExit(e)
+
+
+def encode(charset: str, chars: str) -> bytes:
+    """::
+
+        data = encode('UTF-8', chars)
+
+    Encode characters to bytes.
+    """
+    return chars.encode(charset)
 
 
 def getenv(name, default=None):
@@ -331,6 +361,32 @@ def notnone(*args):
                 return a()
             else:
                 return a
+
+
+def punycode_decode(punycode: str) -> str:
+    """::
+
+        string = punycode_decode(punycode)
+
+    Punycode decode string as described in :rfc:`3492`. ::
+
+        # "bücher"
+        punycode_decode('bcher-kva')
+    """
+    return punycode.encode('ascii').decode('punycode')
+
+
+def punycode_encode(string: str) -> str:
+    """::
+
+        punycode = punycode_encode(string)
+
+    Punycode encode string as described in :rfc:`3492`. ::
+
+        # "bcher-kva"
+        punycode_encode('bücher')
+    """
+    return string.encode('punycode').decode('ascii')
 
 
 re_b_quote = r(rb'(["\\])')

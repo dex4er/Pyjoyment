@@ -409,8 +409,7 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
         url = tx.req.url
         if not url.is_abs:
             base = self.server.db_url if nb else self.server.url
-            url.scheme = base.scheme
-            url.authority = base.authority
+            url.scheme, url.host, url.port = base.scheme, base.host, base.port
 
         if self.proxy:
             self.proxy.prepare(tx)
