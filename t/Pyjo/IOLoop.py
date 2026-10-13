@@ -1,310 +1,300 @@
-if __name__ == '__main__':
-    from Pyjo.Test import *  # noqa
+import Pyjo.IOLoop
+import Pyjo.IOLoop.Client
+import Pyjo.IOLoop.Server
+import Pyjo.IOLoop.Stream
 
-    from Pyjo.Util import getenv, setenv, steady_time
+from Pyjo.Test import *
 
-    setenv('PYJO_REACTOR', 'Pyjo.Reactor.Asyncio')
+import contextlib
+import io
+import os
+import re
+import socket
+import time
 
-    import Pyjo.IOLoop.Client
-    import Pyjo.IOLoop.Delay
-    import Pyjo.IOLoop.Server
-    import Pyjo.IOLoop.Stream
 
-    from t.lib.Value import Value
+# Left out from Mojolicious: BEGIN { $ENV{MOJO_REACTOR} = 'Mojo::Reactor::Poll' }, the tests run on the reactor that
+# Pyjo.Reactor.detect() gives, Pyjo.Reactor.Asyncio unless PYJO_REACTOR names another one
 
-    import contextlib
-    import io
-    import platform
-    import re
-    import socket
 
-    # Reactor detection
-    setenv('PYJO_REACTOR', 'MyReactorDoesNotExist')
-    loop = Pyjo.IOLoop.new()
-    like_ok(loop.reactor.__class__.__name__, '^Pyjo_Reactor_Asyncio$', 'right class')
-    setenv('PYJO_REACTOR', 't.lib.TestReactor')
-    loop = Pyjo.IOLoop.new()
-    is_ok(loop.reactor.__class__.__name__, 'TestReactor', 'right class')
+def eval_(cb):
+    try:
+        cb()
+    except Exception as e:
+        return e
 
-    # Defaults
+
+with subtest('Defaults'):
     loop = Pyjo.IOLoop.new()
     is_ok(loop.max_connections, 1000, 'right default')
-    is_ok(loop.multi_accept, 50, 'right default')
-    loop = Pyjo.IOLoop.new(max_connections=51)
-    is_ok(loop.max_connections, 51, 'right value')
-    is_ok(loop.multi_accept, 50, 'right value')
     loop = Pyjo.IOLoop.new(max_connections=10)
     is_ok(loop.max_connections, 10, 'right value')
-    is_ok(loop.multi_accept, 1, 'right value')
-    loop = Pyjo.IOLoop.new(multi_accept=10)
-    is_ok(loop.max_connections, 1000, 'right value')
-    is_ok(loop.multi_accept, 10, 'right value')
 
-    # Double start
-    err = Value('')
+with subtest('Double start'):
+    err = None
 
-    @Pyjo.IOLoop.next_tick
-    def cb1(loop):
-        try:
-            loop.start()
-        except Exception as ex:
-            err.set(ex)
+    def double_start(loop):
+        global err
+        err = eval_(lambda: loop.start())
         loop.stop()
 
+    Pyjo.IOLoop.next_tick(double_start)
     Pyjo.IOLoop.start()
-    is_ok(str(err.get()), 'Pyjo.IOLoop already running', 'right error')
+    like_ok(str(err), r'^Pyjo.IOLoop already running', 'right error')
 
-    # Basic functionality
-    ticks = Value(0)
-    timer = Value(0)
-    hirestimer = Value(0)
-    tid = loop.recurring(lambda loop: ticks.inc(), 0)
+with subtest('Double one_tick'):
+    err = None
 
-    @loop.timer(1)
-    def cb2(loop):
-        loop.timer(lambda loop: loop.stop(), 0)
-        timer.inc()
+    def double_one_tick(loop):
+        global err
+        err = eval_(lambda: loop.one_tick())
 
-    loop.timer(lambda loop: hirestimer.inc(), 0.25)
+    Pyjo.IOLoop.next_tick(double_one_tick)
+    Pyjo.IOLoop.one_tick()
+    like_ok(str(err), r'^Pyjo.IOLoop already running', 'right error')
+
+with subtest('Basic functionality'):
+    ticks = timer = hirestimer = 0
+
+    def ticks_cb(loop):
+        global ticks
+        ticks += 1
+
+    def timer_cb(loop):
+        global timer
+        loop.timer(0, lambda loop: loop.stop())
+        timer += 1
+
+    def hirestimer_cb(loop):
+        global hirestimer
+        hirestimer += 1
+
+    loop = Pyjo.IOLoop.new()
+    id = loop.recurring(0, ticks_cb)
+    loop.timer(1, timer_cb)
+    loop.timer(0.25, hirestimer_cb)
     loop.start()
     ok(timer, 'recursive timer works')
     ok(hirestimer, 'hires timer works')
     loop.one_tick()
-    ok(ticks.get() > 2, 'more than two ticks')
+    ok(ticks > 2, 'more than two ticks')
 
     # Run again without first tick event handler
-    before = ticks.get()
-    after = Value(0)
-    tid2 = loop.recurring(lambda loop: after.inc(), 0)
-    loop.remove(tid)
-    loop.timer(lambda loop: loop.stop(), 0.5)
+    before = ticks
+    after = 0
+
+    def after_cb(loop):
+        global after
+        after += 1
+
+    id2 = loop.recurring(0, after_cb)
+    loop.remove(id)
+    loop.timer(0.5, lambda loop: loop.stop())
     loop.start()
     loop.one_tick()
-    loop.remove(tid2)
-    ok(after.get() > 1, 'more than one tick')
-    is_ok(ticks.get(), before, 'no additional ticks')
+    loop.remove(id2)
+    ok(after > 1, 'more than one tick')
+    is_ok(ticks, before, 'no additional ticks')
 
-    # Recurring timer
-    count = Value(0)
-    tid = loop.recurring(lambda loop: count.inc(), 0.1)
-    loop.timer(lambda loop: loop.stop(), 0.5)
+with subtest('Recurring timer'):
+    count = 0
+
+    def count_cb(loop):
+        global count
+        count += 1
+
+    loop = Pyjo.IOLoop.new()
+    id = loop.recurring(0.1, count_cb)
+    loop.timer(0.5, lambda loop: loop.stop())
     loop.start()
     loop.one_tick()
-    loop.remove(tid)
-    ok(count.get() > 1, 'more than one recurring event')
-    ok(count.get() < 10, 'less than ten recurring events')
+    loop.remove(id)
+    ok(count > 1, 'more than one recurring event')
+    ok(count < 10, 'less than ten recurring events')
 
-    # Handle and reset
-    handle = Value(None)
-    handle2 = Value(None)
 
-    @Pyjo.IOLoop.server(address='127.0.0.1')
-    def cid(loop, stream, cid):
-        handle.set(stream.handle)
+def handle_and_reset(freeze):
+    global handle, handle2, reset, close, count, running, timer
+    handle = handle2 = None
+    reset = close = 0
+
+    def reset_cb(loop):
+        global reset
+        reset += 1
+
+    def close_cb(stream):
+        global close
+        close += 1
+
+    def server_cb(loop, stream, id):
+        global handle
+        stream.on('close', close_cb)
+        handle = stream.handle
         Pyjo.IOLoop.stop()
 
-    port = Pyjo.IOLoop.acceptor(cid).port
-    Pyjo.IOLoop.acceptor(cid).on('accept', lambda server, handle: handle2.set(handle))
-    cid2 = Pyjo.IOLoop.client(address='127.0.0.1', port=port, cb=lambda loop, err, stream: True)
+    def accept_cb(server, accepted):
+        global handle2
+        handle2 = accepted
+
+    Pyjo.IOLoop.singleton.on('reset', reset_cb)
+    id = Pyjo.IOLoop.server(server_cb, address='127.0.0.1')
+    port = Pyjo.IOLoop.acceptor(id).port
+    Pyjo.IOLoop.acceptor(id).on('accept', accept_cb)
+    id2 = Pyjo.IOLoop.client(lambda loop, err, stream: None, address='127.0.0.1', port=port)
     Pyjo.IOLoop.start()
-    count.set(0)
-    Pyjo.IOLoop.recurring(lambda loop: timer.inc(), 10)
-    running = Value(None)
+    count = running = timer = 0
 
-    @Pyjo.IOLoop.next_tick
-    def cb(loop):
-        Pyjo.IOLoop.reset()
-        running.set(Pyjo.IOLoop.is_running())
+    def timer_cb(loop):
+        global timer
+        timer += 1
 
+    def reset_tick(loop):
+        global running
+        Pyjo.IOLoop.reset(freeze=freeze)
+        running = Pyjo.IOLoop.is_running()
+
+    Pyjo.IOLoop.recurring(10, timer_cb)
+    Pyjo.IOLoop.next_tick(reset_tick)
     Pyjo.IOLoop.start()
-    ok(not running.get(), 'not running')
-    is_ok(count.get(), 0, 'no recurring events')
-    ok(not Pyjo.IOLoop.acceptor(cid), 'acceptor has been removed')
-    ok(not Pyjo.IOLoop.stream(cid2), 'stream has been removed')
-    is_ok(handle.get(), handle2.get(), 'handles are equal')
-    isa_ok(handle.get(), type(socket.socket()), 'right reference')
+    return id, id2
 
-    # The poll reactor stops when there are no events being watched anymore
-    time = steady_time()
+
+with subtest('Handle and reset'):
+    id, id2 = handle_and_reset(False)
+    ok(not running, 'not running')
+    is_ok(count, 0, 'no recurring events')
+    ok(not Pyjo.IOLoop.acceptor(id), 'acceptor has been removed')
+    ok(not Pyjo.IOLoop.stream(id2), 'stream has been removed')
+    is_ok(handle, handle2, 'handles are equal')
+    isa_ok(handle, socket.socket, 'right reference')
+    is_ok(reset, 1, 'reset event has been emitted once')
+    is_ok(close, 1, 'close event has been emitted once')
+
+with subtest('Handle and reset with freeze'):
+    id, id2 = handle_and_reset(True)
+    ok(not running, 'not running')
+    is_ok(count, 0, 'no recurring events')
+    ok(not Pyjo.IOLoop.acceptor(id), 'acceptor has been removed')
+    ok(not Pyjo.IOLoop.stream(id2), 'stream has been removed')
+    is_ok(handle, handle2, 'handles are equal')
+    isa_ok(handle, socket.socket, 'right reference')
+    is_ok(reset, 1, 'reset event has been emitted once')
+    ok(not close, 'close event has not been emitted')
+
+with subtest('The poll reactor stops when there are no events being watched anymore'):
+    started = time.time()
     Pyjo.IOLoop.start()
     Pyjo.IOLoop.one_tick()
     Pyjo.IOLoop.reset()
-    ok(steady_time() < time + 10, 'stopped automatically')
+    ok(time.time() < (started + 10), 'stopped automatically')
 
-    # Stream
-    buf = Value(b'')
+with subtest('Reset events'):
+    Pyjo.IOLoop.singleton.on('finish', lambda loop: None)
+    ok(Pyjo.IOLoop.singleton.has_subscribers('finish'), 'has subscribers')
+    Pyjo.IOLoop.reset()
+    ok(not Pyjo.IOLoop.singleton.has_subscribers('finish'), 'no subscribers')
 
-    @Pyjo.IOLoop.server(address='127.0.0.1')
-    def cid(loop, stream, cid):
-        buf.set(buf.get() + b'accepted')
+with subtest('Stream'):
+    skip('Pyjo.Promise is not ported yet', 7)
 
-        @stream.on
-        def read(stream, chunk):
-            buf.set(buf.get() + chunk)
-            if buf.get() == b'acceptedhello':
-                stream.write(b'wo').write(b'').write(b'rld', lambda stream: stream.close())
+with subtest('Removed listen socket'):
+    loop = Pyjo.IOLoop.new()
+    id = loop.server(lambda loop, stream, id: None, address='127.0.0.1')
+    port = loop.acceptor(id).port
+    connected = False
 
-    port = Pyjo.IOLoop.acceptor(cid).port
-    delay = Pyjo.IOLoop.delay()
-    end = delay.begin()
-    handle = Value(None)
-
-    @Pyjo.IOLoop.client(port=port)
-    def cid2(loop, err, stream):
-        handle.set(stream.steal_handle())
-        end()
-        stream.on('close', lambda stream: buf.set(buf.get() + b'should not happen'))
-        stream.on('error', lambda stream, err: buf.set(buf.get() + b'should not happen either'))
-
-    delay.wait()
-    stream = Pyjo.IOLoop.Stream.new(handle.get())
-    is_ok(stream.timeout, 15, 'right default')
-    is_ok(stream.set(timeout=16).timeout, 16, 'right timeout')
-    cid = Pyjo.IOLoop.stream(stream)
-    stream.on('close', lambda stream: Pyjo.IOLoop.stop())
-    stream.on('read', lambda stream, chunk: buf.set(buf.get() + chunk))
-    stream.write(b'hello')
-    ok(Pyjo.IOLoop.stream(cid), 'stream exists')
-    is_ok(stream.timeout, 16, 'right timeout')
-    Pyjo.IOLoop.start()
-    Pyjo.IOLoop.timer(lambda loop: Pyjo.IOLoop.stop(), 0.25)
-    Pyjo.IOLoop.start()
-    ok(not Pyjo.IOLoop.stream(cid), 'stream does not exist anymore')
-    is_ok(buf.get(), b'acceptedhelloworld', 'right result')
-
-    # Removed listen socket
-    cid = loop.server(address='127.0.0.1', cb=lambda *args: True)
-    port = loop.acceptor(cid).port
-    connected = Value(False)
-
-    @loop.client(port=port)
-    def cid2(loop, err, stream):
-        loop.remove(cid)
+    def connected_cb(loop, err, stream):
+        global connected
+        loop.remove(id)
         loop.stop()
-        connected.set(True)
+        connected = True
 
-    like_ok(getenv('PYJO_REUSE'), rf'(?:^|\,)127\.0\.0\.1:{port}:', 'file descriptor can be reused')
+    loop.client(connected_cb, port=port)
+    fd = loop.acceptor(id).handle.fileno()
+    like_ok(os.environ['PYJO_REUSE'], rf'(?:^|\,)127\.0\.0\.1:{port}:{fd}', 'file descriptor can be reused')
     loop.start()
-    unlike_ok(getenv('PYJO_REUSE'), rf'(?:^|\,)127\.0\.0\.1:{port}:', 'environment is clean')
+    unlike_ok(os.environ['PYJO_REUSE'], rf'(?:^|\,)127\.0\.0\.1:{port}:{fd}', 'environment is clean')
     ok(connected, 'connected')
-    ok(not loop.acceptor(cid), 'acceptor has been removed')
-    cid = None
+    ok(not loop.acceptor(id), 'acceptor has been removed')
 
-    # Removed connection (with delay)
-    removed = Value(0)
-    delay = Pyjo.IOLoop.delay(lambda delay: removed.inc())
-    end = delay.begin()
-    cid = Pyjo.IOLoop.server(address='127.0.0.1', cb=lambda loop, stream, cid: stream.on('close', lambda stream: end()))
-    port = Pyjo.IOLoop.acceptor(cid).port
-    end2 = delay.begin()
+with subtest('Removed connection (with promise)'):
+    skip('Pyjo.Promise is not ported yet', 1)
 
-    @Pyjo.IOLoop.client(port=port)
-    def cid2(loop, err, stream):
-        stream.on('close', end2)
-        loop.remove(cid2)
+with subtest('Stream throttling'):
+    skip('bytes_waiting of Mojo::IOLoop::Stream 9.49 is not ported yet', 5)
 
-    delay.wait()
-    is_ok(removed.get(), 1, 'connection has been removed')
+with subtest('Watermarks'):
+    skip('high_water_mark and can_write of Mojo::IOLoop::Stream 9.49 are not ported yet', 6)
 
-    # Stream throttling
-    client = Value(b'')
-    client_after = Value(b'')
-    client_before = Value(b'')
-    server = Value(b'')
-    server_after = Value(b'')
-    server_before = Value(b'')
+with subtest('Graceful shutdown'):
+    err = None
+    finish = 0
 
-    @Pyjo.IOLoop.server(address='127.0.0.1')
-    def cid(loop, stream, cid):
-        stream.timeout = 0
+    def finish_cb(loop):
+        global finish
+        finish += 1
+        loop.stream(id).close()
 
-        @stream.on
-        def read(stream, chunk):
-            if not server.get():
-
-                @Pyjo.IOLoop.timer(0.5)
-                def timer(loop):
-                    server_before.set(server.get())
-                    stream.stop()
-                    stream.write(b'works!')
-
-                    @Pyjo.IOLoop.timer(0.5)
-                    def timer(loop):
-                        server_after.set(server.get())
-                        client_after.set(client.get())
-                        stream.start()
-                        Pyjo.IOLoop.timer(lambda loop: Pyjo.IOLoop.stop(), 0.5)
-
-            server.set(server.get() + chunk)
-
-    port = Pyjo.IOLoop.acceptor(cid).port
-
-    @Pyjo.IOLoop.client(port=port)
-    def cid2(loop, err, stream):
-        def drain(stream):
-            return stream.write(b'1', drain)
-
-        drain(stream)
-        stream.on('read', lambda stream, chunk: client.set(client.get() + chunk))
-
-    Pyjo.IOLoop.start()
-    is_ok(server_before.get(), server_after.get(), 'stream has been paused')
-    ok(len(server.get()) > len(server_after.get()), 'stream has been resumed')
-    is_ok(client.get(), client_after.get(), 'stream was writable while paused')
-    is_ok(client.get(), b'works!', 'full message has been written')
-
-    if platform.python_implementation() != 'PyPy':
-        # Graceful shutdown
-        err = Value('')
-        loop = Pyjo.IOLoop.new()
-        finish = Value(0)
-        loop.on('finish', lambda loop: finish.inc())
-        loop.stop_gracefully()
-        loop.remove(loop.client(port=Pyjo.IOLoop.Server.generate_port(), cb=lambda *args: True))
-
-        @loop.timer(5)
-        def timer(loop):
-            loop.stop()
-            err.set('failed')
-
-        loop.start()
-        ok(not err.get(), 'no error')
-        is_ok(finish.get(), 1, 'finish event has been emitted once')
-    else:
-        skip('PyPy error', 2)
-
-    # Graceful shutdown (max_accepts)
-    err = Value('')
-    loop = Pyjo.IOLoop.new(max_accepts=1)
-    cid = loop.server(address='127.0.0.1', cb=lambda loop, stream, cid: stream.close())
-    port = loop.acceptor(cid).port
-    loop.client(port=port, cb=lambda loop, err, stream: True)
-
-    @loop.timer(5)
-    def cb3(loop):
+    def failed_cb(loop):
+        global err
         loop.stop()
-        err.set('failed')
+        err = 'failed'
 
+    loop = Pyjo.IOLoop.new()
+    port = loop.acceptor(loop.server(lambda loop, stream, id: None, address='127.0.0.1')).port
+    id = loop.client(lambda loop, err, stream: loop.stop_gracefully(), port=port)
+    loop.on('finish', finish_cb)
+    loop.timer(30, failed_cb)
     loop.start()
-    ok(not err.get(), 'no error')
+    ok(not loop.stream(id), 'stopped gracefully')
+    ok(not err, 'no error')
+    is_ok(finish, 1, 'finish event has been emitted once')
+
+with subtest('Graceful shutdown (without connection)'):
+    err = None
+    finish = 0
+
+    def finish_cb(loop):
+        global finish
+        finish += 1
+
+    loop = Pyjo.IOLoop.new()
+    loop.on('finish', finish_cb)
+    loop.next_tick(lambda loop: loop.stop_gracefully())
+    loop.timer(30, failed_cb)
+    loop.start()
+    ok(not err, 'no error')
+    is_ok(finish, 1, 'finish event has been emitted once')
+
+with subtest('Graceful shutdown (max_accepts)'):
+    err = None
+    loop = Pyjo.IOLoop.new(max_accepts=1)
+    id = loop.server(lambda loop, stream, id: None, address='127.0.0.1')
+    port = loop.acceptor(id).port
+    loop.client(lambda loop, err, stream: stream.close(), port=port)
+    loop.timer(30, failed_cb)
+    loop.start()
+    ok(not err, 'no error')
     is_ok(loop.max_accepts, 1, 'right value')
 
-    # Exception in timer
+with subtest('Connection limit'):
+    skip('single_accept and is_accepting of Mojo::IOLoop::Server 9.49 are not ported yet', 3)
+
+with subtest('Exception in timer'):
     with contextlib.redirect_stderr(io.StringIO()) as stderr:
         loop = Pyjo.IOLoop.new()
 
-        @loop.timer(0)
-        def cb4(loop):
+        def bye(loop):
             raise Exception('Bye!')
 
+        loop.timer(0, bye)
         loop.start()
     name = f'{type(loop.reactor).__module__}.{type(loop.reactor).__qualname__}'
     like_ok(stderr.getvalue(), rf'^{re.escape(name)}:.*Bye!', 'right error')
 
-    # Defaults
+with subtest('Defaults'):
     is_ok(Pyjo.IOLoop.Client.new().reactor, Pyjo.IOLoop.singleton.reactor, 'right default')
-    is_ok(Pyjo.IOLoop.Delay.new().ioloop, Pyjo.IOLoop.singleton, 'right default')
     is_ok(Pyjo.IOLoop.Server.new().reactor, Pyjo.IOLoop.singleton.reactor, 'right default')
-    is_ok(Pyjo.IOLoop.Stream.new(handle=None).reactor, Pyjo.IOLoop.singleton.reactor, 'right default')
+    is_ok(Pyjo.IOLoop.Stream.new(None).reactor, Pyjo.IOLoop.singleton.reactor, 'right default')
 
-    done_testing()
+done_testing()

@@ -4,8 +4,13 @@ import Pyjo.Reactor.Asyncio
 from Pyjo.Loader import load_class
 from Pyjo.Test import *
 
+import os
 import socket
 import time
+
+
+# BEGIN { $ENV{MOJO_REACTOR} = 'Mojo::Reactor::Poll' }, before Pyjo.IOLoop is loaded
+os.environ['PYJO_REACTOR'] = 'Pyjo.Reactor.Asyncio'
 
 
 def eval_(cb):

@@ -150,6 +150,7 @@ strict = [
   "Pyjo/File.py",
   "Pyjo/Headers.py",
   "Pyjo/Home.py",
+  "Pyjo/IOLoop/__init__.py",
   "Pyjo/JSON/__init__.py",
   "Pyjo/JSON/Pointer.py",
   "Pyjo/Loader.py",

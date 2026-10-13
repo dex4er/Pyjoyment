@@ -7,788 +7,742 @@ Pyjo.IOLoop - Minimalistic event loop
 
     # Listen on port 3000
     @Pyjo.IOLoop.server(port=3000)
-    def server(loop, stream, cid):
-
+    def server(loop, stream, id):
         @stream.on
         def read(stream, chunk):
             # Process input chunk
-            print("Server: {0}".format(chunk.decode('utf-8')))
+            print(chunk)
 
             # Write response
-            stream.write(b"HTTP/1.1 200 OK\x0d\x0a\x0d\x0a")
-
-            # Disconnect client
-            stream.close_gracefully()
+            stream.write(b'HTTP/1.1 200 OK')
 
     # Connect to port 3000
     @Pyjo.IOLoop.client(port=3000)
-    def client(loop, err, stream):
-
+    def id(loop, err, stream):
         @stream.on
         def read(stream, chunk):
             # Process input
-            print("Client: {0}".format(chunk.decode('utf-8')))
+            print(f'Input: {chunk}')
 
         # Write request
-        stream.write(b"GET / HTTP/1.1\x0d\x0a\x0d\x0a")
+        stream.write(b'GET / HTTP/1.1\x0d\x0a\x0d\x0a')
 
     # Add a timer
-    @Pyjo.IOLoop.timer(3)
-    def timeouter(loop):
-        print("Timeout")
-        # Shutdown server
-        loop.remove(server)
+    Pyjo.IOLoop.timer(5, lambda loop: loop.remove(id))
 
     # Start event loop if necessary
     if not Pyjo.IOLoop.is_running():
         Pyjo.IOLoop.start()
 
-:mod:`Pyjo.IOLoop` is a very minimalistic event loop based on :mod:`Pyjo.Reactor`,
-it has been reduced to the absolute minimal feature set required to build
-solid and scalable non-blocking TCP clients and servers.
+:mod:`Pyjo.IOLoop` is a very minimalistic event loop based on
+:mod:`Pyjo.Reactor`, it has been reduced to the absolute minimal feature set
+required to build solid and scalable non-blocking clients and servers.
+
+Depending on operating system, the default per-process and system-wide file
+descriptor limits are often very low and need to be tuned for better
+scalability.
+
+The event loop is resilient to time jumps, as it uses a monotonic clock. A
+TLS certificate and key are also built right in, to make writing test servers
+as easy as possible.
+
+What Mojo calls on the class, as ``Mojo::IOLoop->timer``, is a function of
+the module that works with the :data:`singleton`, as ``Pyjo.IOLoop.timer``.
+A method that takes a callback is a decorator without it, and the decorated
+name is what the method returns. ::
+
+    @Pyjo.IOLoop.timer(3)
+    def id(loop):
+        print('Timeout!')
 
 Events
 ------
 
-:mod:`Pyjo.IOLoop` inherits all events from :mod:`Pyjo.EventEmitter` and can emit the
-following new ones.
+:mod:`Pyjo.IOLoop` inherits all events from :mod:`Pyjo.EventEmitter` and can
+emit the following new ones.
 
 finish
 ~~~~~~
 ::
 
-    @loop.on
-    def finish(loop):
-        ...
+    loop.on('finish', lambda loop: ...)
 
 Emitted when the event loop wants to shut down gracefully and is just waiting
 for all existing connections to be closed.
+
+reset
+~~~~~
+::
+
+    loop.on('reset', lambda loop: ...)
+
+Emitted when the event loop is reset, this usually happens after the process
+is forked to clean up resources that cannot be shared.
 
 Debugging
 ---------
 
 You can set the ``PYJO_IOLOOP_DEBUG`` environment variable to get some
-advanced diagnostics information printed to :attr:`sys.stderr`. ::
+advanced diagnostics information printed to ``sys.stderr``. ::
 
     PYJO_IOLOOP_DEBUG=1
 
-Classes
--------
+See also
+--------
+
+:mod:`Pyjoyment`, https://mojolicious.org.
+
+Ported from `Mojo::IOLoop <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/IOLoop.pm>`_
+of Mojolicious 9.49.
 """
 
 import Pyjo.EventEmitter
+import Pyjo.Exception
 import Pyjo.IOLoop.Client
-import Pyjo.IOLoop.Delay
 import Pyjo.IOLoop.Server
 import Pyjo.IOLoop.Stream
 import Pyjo.Reactor
 
-from Pyjo.Util import decorator, decoratormethod, getenv, isalive, md5_sum, notnone, rand, steady_time, warn
+from Pyjo.Util import md5_sum, warn
 
+import builtins
+import os
+import random
 import sys
+import time
 import weakref
 
+from collections.abc import Callable
+from typing import Any, Self, overload
 
-DEBUG = getenv('PYJO_IOLOOP_DEBUG', False)
 
+type Anything = builtins.object
 
-class Error(Exception):
-    """
-    Exception raised on unhandled error event.
-    """
+# A callback of a timer gets the loop
+type TimerCallback = Callable[[Any], Anything]
 
-    pass
+# A callback of a server gets the loop, the stream and the id of the connection
+type ServerCallback = Callable[[Any, Any, str], Anything]
+
+# A callback of a client gets the loop, an error and the stream
+type ClientCallback = Callable[[Any, Any, Any], Anything]
+
+DEBUG = bool(os.environ.get('PYJO_IOLOOP_DEBUG'))
+
+# The states that reset(freeze=True) keeps
+_FROZEN: list[dict[str, Any]] = []
+
+_singleton: 'Pyjo_IOLoop | None' = None
 
 
 class Pyjo_IOLoop(Pyjo.EventEmitter.object):
     """
-    :mod:`Pyjo.IOLoop` inherits all attributes and methods from
-    :mod:`Pyjo.EventEmitter` and implements the following new ones.
+    :mod:`Pyjo.IOLoop` inherits all methods from :mod:`Pyjo.EventEmitter` and
+    implements the following new ones.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(
+        self, *, max_accepts: int = 0, max_connections: int = 1000, reactor: Pyjo.Reactor.object | None = None
+    ) -> None:
+        """::
+
+            loop = Pyjo.IOLoop.new()
+            loop = Pyjo.IOLoop.new(max_connections=100)
+
+        Construct a new :mod:`Pyjo.IOLoop` object.
+        """
         super().__init__()
 
-        self.max_accepts = kwargs.get('max_accepts', 0)
+        self.max_accepts = max_accepts
         """::
 
-            max_accepts = loop.max_accepts
+            max = loop.max_accepts
             loop.max_accepts = 1000
 
-        The maximum number of connections this event loop is allowed to accept before
-        shutting down gracefully without interrupting existing connections, defaults
-        to ``0``. Setting the value to ``0`` will allow this event loop to accept new
-        connections indefinitely. Note that up to half of this value can be subtracted
-        randomly to improve load balancing between multiple server processes.
+        The maximum number of connections this event loop is allowed to
+        accept, before shutting down gracefully without interrupting existing
+        connections, defaults to ``0``. Setting the value to ``0`` will allow
+        this event loop to accept new connections indefinitely. Note that up to
+        half of this value can be subtracted randomly to improve load balancing
+        between multiple server processes, and to make sure that not all of
+        them restart at the same time.
         """
 
-        self.max_connections = kwargs.get('max_connections', 1000)
+        self.max_connections = max_connections
         """::
 
-            max_connections = loop.max_connections
-            loop.max_connections = 1000
+            max = loop.max_connections
+            loop.max_connections = 100
 
-        The maximum number of concurrent connections this event loop is allowed to
-        handle before stopping to accept new incoming connections, defaults to ``1000``.
+        The maximum number of accepted connections this event loop is allowed
+        to handle concurrently, before stopping to accept new incoming
+        connections, defaults to ``1000``.
         """
 
-        self.multi_accept = notnone(kwargs.get('multi_accept'), lambda: 50 if self.max_connections > 50 else 1)
-        """::
+        self._accepting = False
+        self._accepts: int | None = None
+        self._acceptors: dict[str, Any] = {}
+        self._in: dict[str, dict[str, Any]] = {}
+        self._out: dict[str, dict[str, Any]] = {}
+        self._reactor = reactor
+        self._stop = 0
 
-            multi = loop.multi_accept
-            loop.multi_accept = 100
-
-        Number of connections to accept at once, defaults to ``50`` or ``1``, depending
-        on if the value of :attr:`max_connections` is smaller than ``50``.
-        """
-
-        self.reactor = notnone(kwargs.get('reactor'), lambda: sys.modules[Pyjo.Reactor.detect()].new())
+    @property
+    def reactor(self) -> Pyjo.Reactor.object:
         """::
 
             reactor = loop.reactor
-            loop.reactor = Pyjo.Reactor.new()
+            loop.reactor = Pyjo.Reactor.Asyncio.new()
 
-        Low-level event reactor, usually a :mod:`Pyjo.Reactor.Asyncio`
-        object with a default subscriber to the event
-        ``error``. ::
+        Low-level event reactor, usually a :mod:`Pyjo.Reactor.Asyncio` object
+        with a default subscriber to the event ``error`` of
+        :mod:`Pyjo.Reactor`. ::
 
             # Watch if handle becomes readable or writable
-            def io_cb(reactor, writable):
-                if writable:
-                    print('Handle is writable')
-                else:
-                    print('Handle is readable')
-
-            loop.reactor.io(handle, io_cb)
+            Pyjo.IOLoop.singleton.reactor.io(handle, lambda reactor, writable: print(
+                'Handle is writable' if writable else 'Handle is readable'
+            ))
 
             # Change to watching only if handle becomes writable
-            loop.reactor.watch(handle, read=False, write=True)
+            Pyjo.IOLoop.singleton.reactor.watch(handle, False, True)
 
             # Remove handle again
-            loop.reactor.remove(handle)
+            Pyjo.IOLoop.singleton.reactor.remove(handle)
         """
+        if self._reactor is None:
+            name = Pyjo.Reactor.detect()
+            if DEBUG:
+                warn(f'-- Reactor initialized ({name})')
+            reactor: Pyjo.Reactor.object = sys.modules[name].new()
 
-        self._accepting_timer = False
-        self._acceptors = {}
-        self._accepts = None
-        self._connections = {}
-        self._stop_timer = None
+            def catch(reactor: Pyjo.Reactor.object, err: Any) -> None:
+                warn(f'{_name(type(reactor))}: {err}')
 
-        if DEBUG:
-            warn(f'-- Reactor initialized ({self.reactor})')
+            self._reactor = reactor.catch(catch)
+        return self._reactor
 
-        def catch_cb(reactor, err):
-            warn(f'{type(reactor).__module__}.{type(reactor).__qualname__}: {err}')
+    @reactor.setter
+    def reactor(self, value: Pyjo.Reactor.object) -> None:
+        self._reactor = value
 
-        self.reactor.catch(catch_cb)
-
-    def acceptor(self, acceptor):
+    def acceptor(self, acceptor: Any) -> Any:
         """::
 
-            server = Pyjo.IOLoop.acceptor(cid)
-            server = loop.acceptor(cid)
-            cid = loop.acceptor(Pyjo.IOLoop.Server.new())
+            server = Pyjo.IOLoop.acceptor(id)
+            server = loop.acceptor(id)
+            id = loop.acceptor(Pyjo.IOLoop.Server.new())
 
-        Get :mod:`Pyjo.IOLoop.Server` object for id or turn object into an acceptor.
+        Get :mod:`Pyjo.IOLoop.Server` object for id or turn object into an
+        acceptor.
         """
         # Find acceptor for id
         if isinstance(acceptor, str):
-            if acceptor in self._acceptors:
-                return self._acceptors[acceptor]
-            else:
-                return
+            return self._acceptors.get(acceptor)
 
         # Connect acceptor with reactor
-        cid = self._id()
-        acceptor.multi_accept = self.multi_accept
-        self._acceptors[cid] = acceptor
-        acceptor.reactor = weakref.proxy(self.reactor)
+        id = self._id()
+        acceptor.reactor = self.reactor
+        self._acceptors[id] = acceptor
 
         # Allow new acceptor to get picked up
         self._not_accepting()._maybe_accepting()
 
-        return cid
+        return id
 
-    def client(self, cb=None, **kwargs):
+    @overload
+    def client(self, cb: ClientCallback, /, **options: Any) -> str: ...
+
+    @overload
+    def client(self, /, **options: Any) -> Callable[[ClientCallback], str]: ...
+
+    def client(self, cb: ClientCallback | None = None, /, **options: Any) -> Any:
         """::
 
-            cid = Pyjo.IOLoop.client(cb, address='127.0.0.1', port=3000)
+            id = Pyjo.IOLoop.client(cb, address='127.0.0.1', port=3000)
+            id = loop.client(cb, address='127.0.0.1', port=3000)
 
-            @Pyjo.IOLoop.client(address='127.0.0.1', port=3000)
-            def cid(loop, err, stream):
+            @loop.client(address='127.0.0.1', port=3000)
+            def id(loop, err, stream):
                 ...
 
-            cid = loop.client(cb, address='127.0.0.1', port=3000)
-
-            @loop.client(cb, address='127.0.0.1', port=3000)
-            def cid(loop, err, stream):
-                ...
-
-        Open TCP connection with :mod:`Pyjo.IOLoop.Client`, takes the same arguments as
+        Open a TCP/IP or UNIX domain socket connection with
+        :mod:`Pyjo.IOLoop.Client` and create a stream object (usually
+        :mod:`Pyjo.IOLoop.Stream`), takes the same arguments as
         :meth:`Pyjo.IOLoop.Client.connect`.
         """
+        # Not in Mojolicious: a decorator
         if cb is None:
 
-            def wrap(func):
-                return self.client(func, **kwargs)
+            def decorator(cb: ClientCallback) -> str:
+                return self.client(cb, **options)
 
-            return wrap
+            return decorator
 
-        cid = self._id()
-        client = Pyjo.IOLoop.Client.new()
-        self._connections[cid] = {'client': client}
+        id = self._id()
+        client: Any = Pyjo.IOLoop.Client.new(reactor=self.reactor)
+        self._out[id] = {'client': client}
 
-        client.reactor = weakref.proxy(self.reactor)
-        loop = weakref.proxy(self)
+        ref = weakref.ref(self)
 
-        def connect_cb(client, handle):
-            if isalive(loop):
-                del loop._connections[cid]['client']
-                stream = Pyjo.IOLoop.Stream.new(handle)
-                loop._stream(stream, cid)
-                cb(loop, None, stream)
+        def connect(client: Any, handle: Any) -> None:
+            if (loop := ref()) is None:
+                return
+            del loop._out[id]['client']
+            stream = Pyjo.IOLoop.Stream.new(handle)
+            loop._stream(stream, id)
+            cb(loop, None, stream)
 
-        client.on('connect', connect_cb)
+        def error(client: Any, err: Any) -> None:
+            if (loop := ref()) is None:
+                return
+            loop._remove(id)
+            cb(loop, err, None)
 
-        def error_cb(client, err):
-            if isalive(loop):
-                loop._remove(cid)
-                cb(loop, err, None)
+        client.on('connect', connect)
+        client.on('error', error)
+        client.connect(**options)
 
-        client.on('error', error_cb)
-
-        client.connect(**kwargs)
-        return cid
-
-    def delay(self, *args):
-        """::
-
-            delay = Pyjo.IOLoop.delay()
-            delay = loop.delay()
-            delay = loop.delay(cb)
-            delay = loop.delay(cb1, cb2)
-
-        Build :mod:`Pyjo.IOLoop.Delay` object to manage callbacks and control the flow
-        of events for this event loop, which can help you avoid deep nested closures
-        and memory leaks that often result from continuation-passing style. Callbacks
-        will be passed along to :meth:`Pyjo.IOLoop.Delay.steps`. ::
-
-            # Synchronize multiple events
-            delay = Pyjo.IOLoop.delay()
-
-            @delay.step
-            def step(delay):
-                print('BOOM!')
-
-            for i in range(10):
-                end = delay.begin()
-
-                def timer_wrap(i):
-                    def timer_cb(loop):
-                        print(10 - i)
-                        end()
-                    return timer_cb
-
-                Pyjo.IOLoop.timer(timer_wrap(i), i)
-
-            delay.wait()
-
-            # Sequentialize multiple events
-            delay = Pyjo.IOLoop.delay()
-
-            # First step (simple timer)
-            @delay.step
-            def step1(delay):
-                Pyjo.IOLoop.timer(delay.begin(), 2)
-                print('Second step in 2 seconds.')
-
-            # Second step (concurrent timers)
-            @delay.step
-            def step2(delay):
-                Pyjo.IOLoop.timer(delay.begin(), 1)
-                Pyjo.IOLoop.timer(delay.begin(), 3)
-                print('Third step in 3 seconds.')
-
-            # Third step (the end)
-            @delay.step
-            def step3(delay):
-                print('And done after 5 seconds total.')
-
-            delay.wait()
-
-            # Handle exceptions in all steps
-            delay = Pyjo.IOLoop.delay()
-
-            @delay.step
-            def step1(delay):
-                raise Exception('Intentional error')
-
-            @delay.step
-            def step2(delay, *args):
-                say('Never actually reached.')
-
-            @delay.catch
-            def catch(delay, err):
-                print("Something went wrong: " + err)
-
-            delay.wait()
-        """
-        delay = Pyjo.IOLoop.Delay.new()
-        delay.ioloop = weakref.proxy(self)
-        if args:
-            return delay.steps(*args)
-        else:
-            return delay
+        return id
 
     @property
-    def is_running(self):
+    def is_running(self) -> bool:
         """::
 
             boolean = Pyjo.IOLoop.is_running()
             boolean = loop.is_running
 
-        Check if event loop is running. ::
-
-            if not Pyjo.IOLoop.is_running():
-                Pyjo.IOLoop.start()
+        Check if event loop is running.
         """
         return self.reactor.is_running
 
-    @decoratormethod
-    def next_tick(self, cb):
+    @overload
+    def next_tick(self, cb: TimerCallback) -> None: ...
+
+    @overload
+    def next_tick(self) -> Callable[[TimerCallback], None]: ...
+
+    def next_tick(self, cb: TimerCallback | None = None) -> Any:
         """::
 
-            Pyjo.IOLoop.next_tick(cb)
-            loop.next_tick(cb)
+            none = Pyjo.IOLoop.next_tick(lambda loop: ...)
+            none = loop.next_tick(lambda loop: ...)
 
-        Invoke callback as soon as possible, but not before returning, always returns
+        Execute callback as soon as possible, but not before returning or other
+        callbacks that have been registered with this method, always returns
         ``None``. ::
 
             # Perform operation on next reactor tick
-            @Pyjo.IOLoop.next_tick
-            def do_something(loop):
-                ...
+            Pyjo.IOLoop.next_tick(lambda loop: ...)
         """
-        loop = weakref.proxy(self)
+        # Not in Mojolicious: a decorator
+        if cb is None:
 
-        def next_tick_cb(reactor):
-            if isalive(loop):
-                cb(loop)
+            def decorator(cb: TimerCallback) -> None:
+                return self.next_tick(cb)
 
-        return self.reactor.next_tick(next_tick_cb)
+            return decorator
 
-    def one_tick(self):
+        ref = weakref.ref(self)
+        callback = cb
+
+        def next_tick(reactor: Pyjo.Reactor.object) -> None:
+            callback(ref())
+
+        return self.reactor.next_tick(next_tick)
+
+    def one_tick(self) -> None:
         """::
 
             Pyjo.IOLoop.one_tick()
             loop.one_tick()
 
-        Run event loop until an event occurs. Note that this method can recurse back
-        into the reactor, so you need to be careful. ::
+        Run event loop until an event occurs. ::
 
             # Don't block longer than 0.5 seconds
-            tid = Pyjo.IOLoop.timer(lambda loop: None, 0.5)
+            id = Pyjo.IOLoop.timer(0.5, lambda loop: None)
             Pyjo.IOLoop.one_tick()
-            Pyjo.IOLoop.remove(tid)
+            Pyjo.IOLoop.remove(id)
         """
-        return self.reactor.one_tick()
+        if self.is_running:
+            Pyjo.Exception.object.throw('Pyjo.IOLoop already running')
+        self.reactor.one_tick()
 
-    @decoratormethod
-    def recurring(self, cb, after):
+    @overload
+    def recurring(self, after: float, cb: TimerCallback) -> str: ...
+
+    @overload
+    def recurring(self, after: float) -> Callable[[TimerCallback], str]: ...
+
+    def recurring(self, after: float, cb: TimerCallback | None = None) -> Any:
         """::
 
-            tid = Pyjo.IOLoop.recurring(cb, 3)
-            tid = loop.recurring(cb, 0)
-            tid = loop.recurring(cb, 0.25)
+            id = Pyjo.IOLoop.recurring(3, lambda loop: ...)
+            id = loop.recurring(0, lambda loop: ...)
+            id = loop.recurring(0.25, lambda loop: ...)
 
-        Create a new recurring timer, invoking the callback repeatedly after a given
-        amount of time in seconds. ::
+        Create a new recurring timer, invoking the callback repeatedly after a
+        given amount of time in seconds. ::
 
-            @Pyjo.IOLoop.recurring(5)
-            def do_something(loop):
-                ...
+            # Perform operation every 5 seconds
+            Pyjo.IOLoop.recurring(5, lambda loop: ...)
         """
-        if DEBUG:
-            warn(f'-- Recurring after {after} cb {cb}')
-        return self._timer(cb, 'recurring', after)
+        return self._timer('recurring', after, cb)
 
-    def remove(self, taskid):
+    def remove(self, id: str) -> None:
         """::
 
-            Pyjo.IOLoop.remove(taskid)
-            loop.remove(taskid)
+            Pyjo.IOLoop.remove(id)
+            loop.remove(id)
 
-        Remove anything with an id, connections will be dropped gracefully by allowing
-        them to finish writing all data in their write buffers.
+        Remove anything with an id, connections will be dropped gracefully by
+        allowing them to finish writing all data in their write buffers.
         """
-        if taskid in self._connections:
-            c = self._connections[taskid]
-            if c:
-                stream = c.get('stream')
-                if stream:
-                    return stream.close_gracefully()
+        c = self._in.get(id) or self._out.get(id)
+        if c and (stream := c.get('stream')):
+            return stream.close_gracefully()
+        self._remove(id)
 
-        self._remove(taskid)
-
-    def reset(self):
+    def reset(self, *, freeze: bool = False) -> None:
         """::
 
             Pyjo.IOLoop.reset()
             loop.reset()
+            loop.reset(freeze=True)
 
         Remove everything and stop the event loop.
+
+        These options are currently available:
+
+        freeze
+            ::
+
+                freeze=True
+
+            Freeze the current state of the event loop in time before
+            resetting it. This will prevent active connections from getting
+            closed immediately, which can help with many unintended side
+            effects when processes are forked.
         """
+        self.emit('reset').stop()
+        if freeze:
+            _FROZEN.append(dict(self.__dict__))
+            self._reactor = None
+        else:
+            self.reactor.reset()
+
+        acceptors, connections = [*self._acceptors.values()], [*self._in.values(), *self._out.values()]
+        self._accepting = False
         self._acceptors = {}
-        self._connections = {}
-        self._accepting_timer = False
-        self._stop_timer = None
+        self._events = {}
+        self._in = {}
+        self._out = {}
+        self._stop = 0
 
-        self.reactor.reset()
-        self.stop()
+        # Perl closes what it frees at once, Python later, as PyPy does when its garbage collector runs
+        if not freeze:
+            for acceptor in acceptors:
+                acceptor.close()
+            for connection in connections:
+                for value in connection.values():
+                    value.close()
 
-    def server(self, cb=None, **kwargs):
+    @overload
+    def server(self, cb: ServerCallback, /, **options: Any) -> str: ...
+
+    @overload
+    def server(self, /, **options: Any) -> Callable[[ServerCallback], str]: ...
+
+    def server(self, cb: ServerCallback | None = None, /, **options: Any) -> Any:
         """::
 
-            cid = Pyjo.IOLoop.server(cb, port=3000)
-
-            @Pyjo.IOLoop.server(port=3000)
-            def server(loop, stream, cid):
-                ...
-
-            cid = loop.server(cb, port=3000)
+            id = Pyjo.IOLoop.server(cb, port=3000)
+            id = loop.server(cb, port=3000)
 
             @loop.server(port=3000)
-            def server(loop, stream, cid):
+            def id(loop, stream, id):
                 ...
 
-        Accept TCP connections with :mod:`Pyjo.IOLoop.Server`, takes the same arguments
-        as :meth:`Pyjo.IOLoop.Server.listen`. ::
-
-            # Listen on port 3000
-            @Pyjo.IOLoop.server(port=3000)
-            def server(loop, stream, cid):
-                ...
+        Accept TCP/IP and UNIX domain socket connections with
+        :mod:`Pyjo.IOLoop.Server` and create stream objects (usually
+        :mod:`Pyjo.IOLoop.Stream`), takes the same arguments as
+        :meth:`Pyjo.IOLoop.Server.listen`. ::
 
             # Listen on random port
-            @Pyjo.IOLoop.server(address='127.0.0.1')
-            def server(loop, stream, cid):
-                ...
-
-            port = Pyjo.IOLoop.acceptor(server).port
+            id = Pyjo.IOLoop.server(lambda loop, stream, id: ..., address='127.0.0.1')
+            port = Pyjo.IOLoop.acceptor(id).port
         """
+        # Not in Mojolicious: a decorator
         if cb is None:
 
-            def wrap(func):
-                return self.server(func, **kwargs)
+            def decorator(cb: ServerCallback) -> str:
+                return self.server(cb, **options)
 
-            return wrap
+            return decorator
 
-        server = Pyjo.IOLoop.Server.new()
+        server: Any = Pyjo.IOLoop.Server.new()
+        ref = weakref.ref(self)
 
-        def accept_cb(server, handle):
-            # Enforce connection limit (randomize to improve load balancing)
-            max_accepts = self.max_accepts
-            if max_accepts:
-                if self._accepts is None:
-                    self._accepts = max_accepts - int(rand(max_accepts / 2))
-                self._accepts -= 1
-                if self._accepts <= 0:
-                    self.stop_gracefully()
-
+        def accept(server: Any, handle: Any) -> None:
+            if (loop := ref()) is None:
+                return
             stream = Pyjo.IOLoop.Stream.new(handle)
-            cb(self, stream, self.stream(stream))
+            id = loop._stream(stream, loop._id(), True)
+            cb(loop, stream, id)
+
+            # Enforce connection limit (randomize to improve load balancing)
+            if max := loop.max_accepts:
+                if loop._accepts is None:
+                    loop._accepts = max - int(random.random() * max / 2)
+                loop._accepts -= 1
+                if loop._accepts <= 0:
+                    loop.stop_gracefully()
 
             # Stop accepting if connection limit has been reached
-            if self._limit():
-                self._not_accepting()
+            if loop._limit():
+                loop._not_accepting()
 
-        server.on('accept', accept_cb)
-        server.listen(**kwargs)
+        server.on('accept', accept)
+        server.listen(**options)
 
         return self.acceptor(server)
 
-    def start(self):
+    @classmethod
+    def singleton(cls) -> 'Pyjo_IOLoop':
+        """::
+
+            loop = Pyjo.IOLoop.object.singleton()
+            loop = Pyjo.IOLoop.singleton
+
+        The global :mod:`Pyjo.IOLoop` singleton, used to access a single shared
+        event loop object from everywhere inside the process, which is also the
+        :data:`singleton` of the module. ::
+
+            # Many methods also allow you to take shortcuts
+            Pyjo.IOLoop.timer(2, lambda loop: Pyjo.IOLoop.stop())
+            Pyjo.IOLoop.start()
+
+            # Restart active timer
+            id = Pyjo.IOLoop.timer(3, lambda loop: print('Timeout!'))
+            Pyjo.IOLoop.singleton.reactor.again(id)
+
+            # Watch a file descriptor if it becomes readable
+            Pyjo.IOLoop.singleton.reactor.io(fd, lambda reactor, writable: print(
+                'Handle is writable' if writable else 'Handle is readable'
+            )).watch(fd, True, False)
+        """
+        global _singleton
+        if _singleton is None:
+            _singleton = Pyjo_IOLoop()
+        return _singleton
+
+    def start(self) -> None:
         """::
 
             Pyjo.IOLoop.start()
             loop.start()
 
-        Start the event loop, this will block until :meth:`stop` is called. Note that
-        some reactors stop automatically if there are no events being watched anymore. ::
+        Start the event loop, this will block until :meth:`stop` is called.
+        Note that some reactors stop automatically if there are no events being
+        watched anymore. ::
 
             # Start event loop only if it is not running already
             if not Pyjo.IOLoop.is_running():
                 Pyjo.IOLoop.start()
         """
         if self.is_running:
-            raise Error('Pyjo.IOLoop already running')
+            Pyjo.Exception.object.throw('Pyjo.IOLoop already running')
         self.reactor.start()
 
-    def stop(self):
+    def stop(self) -> None:
         """::
 
             Pyjo.IOLoop.stop()
             loop.stop()
 
-        Stop the event loop, this will not interrupt any existing connections and the
-        event loop can be restarted by running :meth:`start` again.
+        Stop the event loop, this will not interrupt any existing connections
+        and the event loop can be restarted by running :meth:`start` again.
         """
         self.reactor.stop()
 
-    def stop_gracefully(self):
+    def stop_gracefully(self) -> None:
         """::
 
             Pyjo.IOLoop.stop_gracefully()
             loop.stop_gracefully()
 
-        Stop accepting new connections and wait for all existing connections to be
-        closed before stopping the event loop.
+        Stop accepting new connections and wait for already accepted
+        connections to be closed, before stopping the event loop.
         """
         self._not_accepting()
+        self._stop += 1
+        if not len(self.emit('finish')._in):
+            self.stop()
 
-        if self._stop_timer is None:
-
-            def finish_cb(loop):
-                loop._stop()
-
-            self._stop_timer = self.emit('finish').recurring(finish_cb, 1)
-
-    def stream(self, stream):
+    def stream(self, stream: Any) -> Any:
         """::
 
-            stream = Pyjo.IOLoop.stream(cid)
-            stream = loop.stream(cid)
-            cid = loop.stream(Pyjo.IOLoop.Stream.new())
+            stream = Pyjo.IOLoop.stream(id)
+            stream = loop.stream(id)
+            id = loop.stream(Pyjo.IOLoop.Stream.new(handle))
 
-        Get :mod:`Pyjo.IOLoop.Stream` object for id or turn object into a connection. ::
+        Get :mod:`Pyjo.IOLoop.Stream` object for id or turn object into a
+        connection. ::
 
             # Increase inactivity timeout for connection to 300 seconds
-            Pyjo.IOLoop.stream(cid).timeout = 300
+            Pyjo.IOLoop.stream(id).timeout = 300
         """
-        # Find stream for id
-        if isinstance(stream, str):
-            if stream in self._connections:
-                return self._connections[stream]['stream']
-            else:
-                return
+        if not isinstance(stream, str):
+            return self._stream(stream, self._id())
+        c = self._in.get(stream) or self._out.get(stream) or {}
+        return c.get('stream')
 
-        return self._stream(stream, self._id())
+    # Left out from Mojolicious: subprocess, as Mojo::IOLoop::Subprocess is not ported
 
-    @decoratormethod
-    def timer(self, cb, after):
+    @overload
+    def timer(self, after: float, cb: TimerCallback) -> str: ...
+
+    @overload
+    def timer(self, after: float) -> Callable[[TimerCallback], str]: ...
+
+    def timer(self, after: float, cb: TimerCallback | None = None) -> Any:
         """::
 
-            tid = Pyjo.IOLoop.timer(cb, 3)
-            tid = loop.timer(cb, 0)
-            tid = loop.timer(cb, 0.25)
+            id = Pyjo.IOLoop.timer(3, lambda loop: ...)
+            id = loop.timer(0, lambda loop: ...)
+            id = loop.timer(0.25, lambda loop: ...)
 
-        Create a new timer, invoking the callback after a given amount of time in
-        seconds. ::
+        Create a new timer, invoking the callback after a given amount of time
+        in seconds. ::
 
             # Perform operation in 5 seconds
-            @Pyjo.IOLoop.timer(5)
-            def timer_cb(loop):
-                ...
+            Pyjo.IOLoop.timer(5, lambda loop: ...)
         """
-        if DEBUG:
-            warn(f'-- Timer after {after} cb {cb}')
-        return self._timer(cb, 'timer', after)
+        return self._timer('timer', after, cb)
 
-    def _id(self):
-        taskid = None
+    def _id(self) -> str:
         while True:
-            taskid = md5_sum(f'c{steady_time()}{rand()}'.encode('ascii'))
-            if taskid not in self._connections and taskid not in self._acceptors:
-                break
-        return taskid
+            id = md5_sum(f'c{time.monotonic()}{random.random()}'.encode())
+            if id not in self._in and id not in self._out and id not in self._acceptors:
+                return id
 
-    def _limit(self):
-        if self._stop_timer:
-            return True
-        else:
-            return len(self._connections) >= self.max_connections
+    def _limit(self) -> bool:
+        return True if self._stop else len(self._in) >= self.max_connections
 
-    def _maybe_accepting(self):
-        if self._accepting_timer or self._limit():
+    def _maybe_accepting(self) -> None:
+        if self._accepting or self._limit():
             return
-        else:
-            for acceptor in self._acceptors.values():
-                acceptor.start()
-            self._accepting_timer = True
+        for acceptor in self._acceptors.values():
+            acceptor.start()
+        self._accepting = True
 
-    def _not_accepting(self):
-        accepting = self._accepting_timer
-        self._accepting_timer = False
-        if not accepting:
+    def _not_accepting(self) -> Self:
+        if not self._accepting:
             return self
-        else:
-            for acceptor in self._acceptors.values():
-                acceptor.stop()
-            return self
+        self._accepting = False
+        for acceptor in self._acceptors.values():
+            acceptor.stop()
+        return self
 
-    def _remove(self, taskid):
+    def _remove(self, id: str) -> None:
+        # Timer
+        if self.reactor.remove(id):
+            return
+
         # Acceptor
-        if taskid in self._acceptors:
-            self._acceptors[taskid].unsubscribe('accept').close()
-            del self._acceptors[taskid]
+        if (acceptor := self._acceptors.pop(id, None)) is not None:
+            # Perl closes the acceptor it frees at once, Python later
+            acceptor.close()
             return self._not_accepting()._maybe_accepting()
 
-        # Connections
-        if taskid in self._connections:
-            if 'client' in self._connections[taskid]:
-                self._connections[taskid]['client'].unsubscribe('connect').close()
-            del self._connections[taskid]
-            self._maybe_accepting()
-            if DEBUG:
-                warn(f'-- Removed connection {taskid} ({len(self._connections)} connections)')
+        # Connection
+        if (connection := self._in.pop(id, None) or self._out.pop(id, None)) is None:
             return
-
-        # Timer
-        reactor = self.reactor
-
-        if not reactor:
-            return
-
-        if reactor.remove(taskid):
-            return
-
-    def _stop(self):
-        if self._connections:
-            return
-
-        self._remove(self._stop_timer)
-        self._stop_timer = None
-        self.stop()
-
-    def _stream(self, stream, cid):
-        # Connect stream with reactor
-        self._connections[cid] = {'stream': stream}
-
+        # Perl closes the client it frees at once, Python later
+        if (client := connection.get('client')) is not None:
+            client.close()
+        if self._stop and not len(self._in):
+            return self.stop()
+        self._maybe_accepting()
         if DEBUG:
-            warn(f'-- New connection {cid} ({len(self._connections)} connections)')
+            warn(f'-- {id} <<< {os.getpid()} ({len(self._in)}:{len(self._out)})')
 
-        stream.reactor = weakref.proxy(self.reactor)
-        loop = weakref.proxy(self)
+    def _stream(self, stream: Any, id: str, server: bool = False) -> str:
+        # Connect stream with reactor
+        stream.reactor = self.reactor
+        (self._in if server else self._out).setdefault(id, {})['stream'] = stream
+        if DEBUG:
+            warn(f'-- {id} >>> {os.getpid()} ({len(self._in)}:{len(self._out)})')
 
-        def close_cb(stream):
-            if isalive(loop):
-                loop._remove(cid)
+        ref = weakref.ref(self)
 
-        stream.on('close', close_cb)
+        def close(stream: Any) -> None:
+            if (loop := ref()) is not None:
+                loop._remove(id)
+
+        stream.on('close', close)
         stream.start()
 
-        return cid
+        return id
 
-    def _timer(self, cb, method, after):
-        loop = weakref.proxy(self)
+    def _timer(self, method: str, after: float, cb: TimerCallback | None) -> Any:
+        # Not in Mojolicious: a decorator
+        if cb is None:
 
-        def timer_cb(reactor):
-            if isalive(loop):
-                cb(loop)
+            def decorator(cb: TimerCallback) -> Any:
+                return self._timer(method, after, cb)
 
-        return getattr(self.reactor, method)(after, timer_cb)
+            return decorator
+
+        ref = weakref.ref(self)
+        callback = cb
+
+        def timer(reactor: Pyjo.Reactor.object) -> None:
+            callback(ref())
+
+        return getattr(self.reactor, method)(after, timer)
 
 
-def new(*args, **kwargs):
-    return Pyjo_IOLoop(*args, **kwargs)
+def _name(cls: type) -> str:
+    return f'{cls.__module__}.{cls.__qualname__}'
 
 
-singleton = Pyjo_IOLoop()
+new = Pyjo_IOLoop.new
+object = Pyjo_IOLoop
+
+# Left out from Mojolicious: $SIG{PIPE} = 'IGNORE', which Python does already
+
+# Initialize singleton reactor early
+singleton = Pyjo_IOLoop.singleton()
 """::
 
     loop = Pyjo.IOLoop.singleton
 
-The global :mod:`Pyjo.IOLoop` singleton, used to access a single shared event
-loop object from everywhere inside the process. ::
-
-    # Many methods also allow you to take shortcuts
-    Pyjo.IOLoop.timer(lambda loop: Pyjo.IOLoop.stop(), 2)
-    Pyjo.IOLoop.start()
-
-    # Restart active timer
-    @Pyjo.IOLoop.timer(3)
-    def timeouter(loop):
-        print('Timeout!')
-
-    Pyjo.IOLoop.singleton.reactor.again(timeouter)
+The global :mod:`Pyjo.IOLoop` singleton, as :meth:`Pyjo_IOLoop.singleton`
+gives it.
 """
+singleton.reactor
+
+# What Mojo calls on the class works with the singleton
+acceptor = singleton.acceptor
+client = singleton.client
+next_tick = singleton.next_tick
+one_tick = singleton.one_tick
+recurring = singleton.recurring
+remove = singleton.remove
+reset = singleton.reset
+server = singleton.server
+start = singleton.start
+stop = singleton.stop
+stop_gracefully = singleton.stop_gracefully
+stream = singleton.stream
+timer = singleton.timer
 
 
-def acceptor(acceptor):
-    return singleton.acceptor(acceptor)
+def is_running() -> bool:
+    """::
 
+        boolean = Pyjo.IOLoop.is_running()
 
-def client(cb=None, **kwargs):
-    if cb is None:
-
-        def wrap(func):
-            return singleton.client(func, **kwargs)
-
-        return wrap
-
-    return singleton.client(cb, **kwargs)
-
-
-def delay(*args):
-    return singleton.delay(*args)
-
-
-def is_running():
+    Check if the :data:`singleton` is running.
+    """
     return singleton.is_running
-
-
-@decorator
-def next_tick(cb):
-    return singleton.next_tick(cb)
-
-
-def one_tick():
-    return singleton.one_tick()
-
-
-@decorator
-def recurring(cb, after):
-    return singleton.recurring(cb, after)
-
-
-def remove(taskid):
-    return singleton.remove(taskid)
-
-
-def reset():
-    return singleton.reset()
-
-
-def server(cb=None, **kwargs):
-    if cb is None:
-
-        def wrap(func):
-            return singleton.server(func, **kwargs)
-
-        return wrap
-
-    return singleton.server(cb, **kwargs)
-
-
-def start():
-    return singleton.start()
-
-
-def stop():
-    return singleton.stop()
-
-
-def stop_gracefully():
-    return singleton.stop_gracefully()
-
-
-def stream(stream):
-    return singleton.stream(stream)
-
-
-@decorator
-def timer(cb, after=None):
-    return singleton.timer(cb, after)
-
-
-object = Pyjo_IOLoop

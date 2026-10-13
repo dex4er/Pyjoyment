@@ -2,7 +2,12 @@ from Pyjo.Test import *
 
 import contextlib
 import io
+import os
 import sys
+
+
+# The documentation describes the default reactor
+os.environ.pop('PYJO_REACTOR', None)
 
 
 with subtest('Synopsis'):
