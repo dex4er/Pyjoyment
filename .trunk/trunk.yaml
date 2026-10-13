@@ -21,6 +21,7 @@ lint:
     - git-diff-check
     - markdownlint@0.49.1
     - prettier@3.9.9
+    - pyright@1.1.414
     # The format command of ruff is disabled in the plugin by default
     - ruff@0.17.0:
         commands:
@@ -40,6 +41,16 @@ lint:
     # Pyjo/IOLoop/certs/server.key is the default self-signed TLS key, like
     # in Mojo, and is tracked on purpose
     - trufflehog
+  ignore:
+    # Examples that compare Pyjoyment with other libraries, which are not
+    # installed for the project
+    - linters:
+        - pyright
+      paths:
+        - examples/microhttpd_ev.py
+        - examples/microhttpd_gevent.py
+        - examples/microhttpd_twisted.py
+        - examples/resolv_dns.py
 actions:
   enabled:
     - git-blame-ignore-revs

@@ -90,3 +90,4 @@ jobs:
           grep -q 'Pyjo/IOLoop/certs/server.crt' wheel.txt
           grep -q 'Pyjo/IOLoop/certs/server.key' wheel.txt
           grep -q 'Pyjoyment/__init__.py' wheel.txt
+          grep -q 'Pyjo/py.typed' wheel.txt

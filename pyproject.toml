@@ -105,3 +105,8 @@ lines-after-imports = 2
 [tool.ruff.lint.per-file-ignores]
 # Tests use `from Pyjo.Test import *`, like `use Test::More` in Perl
 "t/**" = ["F403", "F405"]
+
+[tool.pyright]
+pythonVersion = "3.12"
+typeCheckingMode = "off"
+strict = ["Pyjo/Test.py"]
