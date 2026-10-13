@@ -280,6 +280,23 @@ copy:
   HTTP headers are such characters too, as `http.client` has them: bytes
   from the wire are decoded as ISO-8859-1.
 - An environment variable `MOJO_*` is `PYJO_*`.
+- Where Mojo uses an optional XS module for speed, as `Mojo::JSON` uses
+  `Cpanel::JSON::XS`, the port uses the module of the standard library in its
+  place and keeps the port of the pure-Perl code behind a `PYJO_NO_*`
+  variable. Mojo's tests of the pure-Perl code set the variable, and those of
+  the XS module run against the standard library.
+- `TO_JSON` is `__json__`.
+- `redo` in an `until` loop starts the body again without checking the
+  condition. A `while` with `continue` checks it, so the port is a
+  `while True:` inside an `if not ...:`.
+- After a match of no length, Perl does not let the next `/gc` match be of no
+  length at the same position, so `/\G\z/gc` fails right after
+  `/\G\s*/gc` skipped nothing. A parser ported from Mojo that reports
+  "before end of data" this way, as `Mojo::JSON` does, has to keep it where
+  Mojo's tests expect it.
+- Python's recursion limit is 1000 calls. A recursive parser that must reach
+  a nesting depth like `Mojo::JSON`'s 512 makes one call for each level,
+  not two.
 - Methods that Mojo makes in a loop with `monkey_patch`, such as the
   shortcuts of `Mojo::Headers`, are class attributes, one for each, made
   with a descriptor class.
