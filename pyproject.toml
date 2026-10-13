@@ -143,6 +143,8 @@ strict = [
   "Pyjo/Parameters.py",
   "Pyjo/Path.py",
   "Pyjo/Prove.py",
+  "Pyjo/Reactor/__init__.py",
+  "Pyjo/Reactor/Asyncio.py",
   "Pyjo/String/Bytes.py",
   "Pyjo/String/Unicode.py",
   "Pyjo/Test.py",
