@@ -611,7 +611,7 @@ if __name__ == '__main__':
     is_ok(url.host, 'FOO.BAR', 'right host')
     is_ok(url.ihost, 'foo.bar', 'right internationalized host')
     is_ok(str(url.path), '/%E4/', 'right path')
-    is_deeply_ok(url.path.parts, [b'\xe4'], 'right structure')
+    is_deeply_ok(url.path.parts, ['\xe4'], 'right structure')
     ok(url.path.leading_slash, 'has leading slash')
     ok(url.path.trailing_slash, 'has trailing slash')
     is_ok(str(url.query), '%E5=%E4', 'right query')

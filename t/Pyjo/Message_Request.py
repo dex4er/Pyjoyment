@@ -562,7 +562,7 @@ if __name__ == '__main__':
     def on_progress_cb1(req, state, offset):
         if req.content.is_parsing_body:
             if not bufprogress.get():
-                bufprogress.set(req.url.path.to_bytes())
+                bufprogress.set(bytes(req.url.path))
 
     req.on(on_progress_cb1, 'progress')
 
