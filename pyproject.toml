@@ -121,4 +121,4 @@ lines-after-imports = 2
 [tool.pyright]
 pythonVersion = "3.12"
 typeCheckingMode = "off"
-strict = ["Pyjo/Prove.py", "Pyjo/Test.py"]
+strict = ["Pyjo/Date.py", "Pyjo/Prove.py", "Pyjo/Test.py"]

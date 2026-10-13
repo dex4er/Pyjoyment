@@ -95,7 +95,9 @@ because the output is standard TAP; `.proverc` supplies its
 `--ext=py --exec=python`.
 
 - `t/Pyjo/` holds the module tests, ported from Mojo's `t/mojo/*.t`.
-- `t/docs/` checks the examples from the module documentation.
+- `t/docs/` checks that the code in the module documentation is correct: it
+  is the same code as in the docstrings, in the same order, with `print` and
+  the comments that show a result turned into assertions.
 - `t/examples/` runs the scripts from `examples/`.
 - `t/lib/` holds helpers shared by the tests. Run on their own, they skip with
   `plan(skip_all=...)`, so `-r t` reports them as skipped instead of failing.
@@ -163,10 +165,16 @@ For each module:
    order. Mojo's tests are the specification.
 2. Port the module from `lib/Mojo/*.pm` until the tests pass.
 3. Port its POD into the docstrings: the same sections in the same order
-   (synopsis, description, events, attributes, methods, see also) and Mojo's
-   wording, with Python names and examples. The POD is the source of the
-   Python documentation.
-4. Record the Mojolicious version the module was ported from.
+   (synopsis, description, events, attributes, methods, operators, see also)
+   and Mojo's wording, with Python names and examples. The POD is the source of
+   the Python documentation. Sphinx lists the classes after the module
+   docstring, so "See also" ends the module docstring, before them. A test in
+   `t/docs/` runs the examples.
+4. Name the source at the end of "See also", as a link to the file at the
+   tag (`https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/Date.pm`),
+   annotate the module and put it on pyright's strict list.
+5. Check the module off in the porting inventory issue, which lists every
+   module of the target Mojolicious with its Pyjoyment counterpart.
 
 Moving a ported module to a newer target is the difference between the two
 versions, applied to code, tests and docstrings alike:
@@ -185,6 +193,18 @@ copy:
   `bool(proxy)` raise `ReferenceError` for a dead proxy.
 - `"\$"` in a double-quoted Perl string is a plain `$`; in Python it keeps the
   backslash.
+- Overloaded operators become special methods: `""` is `__str__` and `bool`
+  is `__bool__`. `to_string` is `to_str`, the counterpart of `to_bytes` in
+  `Pyjo.String.Mixin`.
+- `None` is not `undef` everywhere: `time.gmtime(None)` is the current time,
+  `gmtime(undef)` is the epoch. Python's `tm_wday` counts from Monday, Perl's
+  from Sunday.
+- A Perl scalar keeps the form it was given (`'1.0'` stays `'1.0'`), and a
+  number stringifies without a trailing `.0`. A port converts input to `int`
+  or `float`, and formats it the Perl way where the output depends on it.
+- A Perl quirk that only a warning reveals is not ported. `undef` counts as `0`
+  with a warning, so `Mojo::Date` reads an unknown month name as January;
+  `Pyjo.Date` rejects the date.
 
 ## Linting and Formatting
 
