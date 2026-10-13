@@ -117,7 +117,7 @@ class Pyjo_IOLoop_Delay(Pyjo.EventEmitter.object):
     """
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__()
 
         self.ioloop = notnone(kwargs.get('ioloop'), lambda: Pyjo.IOLoop.singleton)
         """::
@@ -292,12 +292,12 @@ class Pyjo_IOLoop_Delay(Pyjo.EventEmitter.object):
         def error_cb(delay, *args):
             delay._die(*args)
 
-        self.once(error_cb, 'error')
+        self.once('error', error_cb)
 
         def finish_cb(delay, *args):
             delay.ioloop.stop()
 
-        self.once(finish_cb, 'finish')
+        self.once('finish', finish_cb)
 
         self.ioloop.start()
 

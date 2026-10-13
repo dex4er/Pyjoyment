@@ -187,7 +187,7 @@ class Pyjo_Transaction_WebSocket(Pyjo.Transaction.object):
         def frame_cb(ws, frame):
             ws._message(*frame)
 
-        self.on(frame_cb, 'frame')
+        self.on('frame', frame_cb)
 
     def build_frame(self, fin, rsv1, rsv2, rsv3, op, payload):
         """::

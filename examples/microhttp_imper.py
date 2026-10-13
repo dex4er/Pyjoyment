@@ -11,7 +11,7 @@ def client_cb(loop, err, stream):
         print(chunk.decode('utf-8'), end='')
         stream.close()
 
-    stream.on(read_cb, 'read')
+    stream.on('read', read_cb)
     stream.write(b'GET / HTTP/1.0\x0d\x0a\x0d\x0a')
 
 

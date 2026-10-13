@@ -48,7 +48,7 @@ for _ in range(n):
             if verbose:
                 print(f'{context.size}\r', end='')
 
-        stream.on(on_read_cb, 'read')
+        stream.on('read', on_read_cb)
 
         def on_close_cb(stream):
             t1 = steady_time()
@@ -58,7 +58,7 @@ for _ in range(n):
             if verbose:
                 print(context.size)
 
-        stream.on(on_close_cb, 'close')
+        stream.on('close', on_close_cb)
 
         # Write request
         stream.write(

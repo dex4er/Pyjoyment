@@ -97,7 +97,7 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
     """
 
     def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+        super().__init__()
 
         self.auto_decompress = kwargs.get('auto_decompress')
         """::
@@ -561,7 +561,7 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
             self._delay = True
 
         if cb:
-            self.once(cb, 'drain')
+            self.once('drain', cb)
 
         if chunk == b'':
             self._eof = True

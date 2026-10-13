@@ -87,7 +87,7 @@ class Pyjo_Content_MultiPart(Pyjo.Content.object, Pyjo.String.Mixin.object):
         def read_cb(content, chunk):
             content._read(chunk)
 
-        self.on(read_cb, 'read')
+        self.on('read', read_cb)
 
     def body_contains(self, chunk):
         """::

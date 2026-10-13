@@ -257,7 +257,7 @@ if __name__ == '__main__':
         reactor.stop()
         err.set(e)
 
-    reactor.unsubscribe('error').on(error_cb, 'error')
+    reactor.unsubscribe('error').on('error', error_cb)
 
     def die_cb(reactor):
         raise Exception('works!')

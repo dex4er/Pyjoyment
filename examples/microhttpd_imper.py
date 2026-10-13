@@ -28,7 +28,7 @@ def server_cb(loop, stream, cid):
             if not keepalive:
                 stream.close_gracefully()
 
-    stream.on(on_read_cb, 'read')
+    stream.on('read', on_read_cb)
 
 
 Pyjo.IOLoop.server(server_cb, address='0.0.0.0', port=port)

@@ -10,7 +10,7 @@ if __name__ == '__main__':
     # Parse Lighttpd CGI environment variables and body
     req = Pyjo.Message.Request.new()
     body = Value(0)
-    req.content.on(lambda content: body.inc(), 'body')
+    req.content.on('body', lambda content: body.inc())
     req.parse(
         {
             'HTTP_CONTENT_LENGTH': '11',
@@ -198,8 +198,8 @@ if __name__ == '__main__':
     req = Pyjo.Message.Request.new()
     finished = Value(None)
     progress = Value(0)
-    req.on(lambda req: finished.set(req.is_finished), 'finish')
-    req.on(lambda req, state, offset: progress.inc(), 'progress')
+    req.on('finish', lambda req: finished.set(req.is_finished))
+    req.on('progress', lambda req, state, offset: progress.inc())
     ok(not finished.get(), 'not finished')
     ok(not progress.get(), 'no progress')
     is_ok(req.content.progress, 0, 'right progress')

@@ -88,7 +88,7 @@ class Pyjo_Content_Single(Pyjo.Content.object, Pyjo.String.Mixin.object):
         def read_cb(content, chunk):
             content.set(asset=content.asset.add_chunk(chunk))
 
-        self._on_read = self.on(read_cb, 'read')
+        self._on_read = self.on('read', read_cb)
 
     def body_contains(self, chunk):
         """::

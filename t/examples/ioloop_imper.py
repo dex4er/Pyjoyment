@@ -18,7 +18,7 @@ if __name__ == '__main__':
             # Disconnect client
             stream.close_gracefully()
 
-        stream.on(on_read_cb, 'read')
+        stream.on('read', on_read_cb)
 
     server_id = Pyjo.IOLoop.server(server_cb)
 
@@ -34,7 +34,7 @@ if __name__ == '__main__':
         # Write request
         stream.write(b'GET / HTTP/1.1\x0d\x0a\x0d\x0a')
 
-        stream.on(on_read_cb, 'read')
+        stream.on('read', on_read_cb)
 
     Pyjo.IOLoop.client(client_cb, port=port)
 

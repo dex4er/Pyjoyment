@@ -346,7 +346,7 @@ class Pyjo_Server_Daemon(Pyjo.Server.Base.object):
                 def resume_cb(tx):
                     daemon._write(cid)
 
-                tx.on(resume_cb, 'resume')
+                tx.on('resume', resume_cb)
 
         # Kept alive if we have more than one request on the connection
         n = c.get('requests', 0)
@@ -389,7 +389,7 @@ class Pyjo_Server_Daemon(Pyjo.Server.Base.object):
                 def resume_cb(ws):
                     daemon._write(cid)
 
-                ws.on(resume_cb, 'resume')
+                ws.on('resume', resume_cb)
                 ws.server_open()
 
             # Failed upgrade
@@ -446,26 +446,26 @@ class Pyjo_Server_Daemon(Pyjo.Server.Base.object):
                     if isalive(daemon):
                         daemon._close(cid)
 
-                stream.on(close_cb, 'close')
+                stream.on('close', close_cb)
 
                 def error_cb(stream, err):
                     if isalive(daemon):
                         daemon.app.log.error(err)
                         daemon._close(cid)
 
-                stream.on(error_cb, 'error')
+                stream.on('error', error_cb)
 
                 def read_cb(stream, chunk):
                     if isalive(daemon):
                         daemon._read(cid, chunk)
 
-                stream.on(read_cb, 'read')
+                stream.on('read', read_cb)
 
                 def timeout_cb(stream):
                     if isalive(daemon) and c and c['tx']:
                         self.app.log.debug('Inactivity timeout')
 
-                stream.on(timeout_cb, 'timeout')
+                stream.on('timeout', timeout_cb)
 
         self.acceptors.append(server)
 

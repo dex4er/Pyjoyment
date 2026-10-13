@@ -55,7 +55,7 @@ class Pyjo_Asset(Pyjo.EventEmitter.object):
     """
 
     def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+        super().__init__()
 
         self.end_range = kwargs.get('end_range')
         """::

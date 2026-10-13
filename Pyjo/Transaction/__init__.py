@@ -79,7 +79,7 @@ class Pyjo_Transaction(Pyjo.EventEmitter.object):
     """
 
     def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+        super().__init__()
 
         self.kept_alive = kwargs.get('kept_alive')
         """::

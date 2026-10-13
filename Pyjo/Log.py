@@ -99,7 +99,7 @@ class Pyjo_Log(Pyjo.EventEmitter.object):
     """
 
     def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+        super().__init__()
 
         """::
 
@@ -176,7 +176,7 @@ class Pyjo_Log(Pyjo.EventEmitter.object):
         def message_cb(log, level, lines):
             log._message(level, lines)
 
-        self.on(message_cb, 'message')
+        self.on('message', message_cb)
 
     def __del__(self):
         try:
