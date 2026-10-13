@@ -1,14 +1,14 @@
 r"""
-Pyjo.Headers - Headers
-======================
+Pyjo.Headers - HTTP headers
+===========================
 ::
 
     import Pyjo.Headers
 
     # Parse
     headers = Pyjo.Headers.new()
-    headers.parse("Content-Length: 42\x0d\x0a")
-    headers.parse("Content-Type: text/html\x0d\x0a\x0d\x0a")
+    headers.parse('Content-Length: 42\x0d\x0a')
+    headers.parse('Content-Type: text/html\x0d\x0a\x0d\x0a')
     print(headers.content_length)
     print(headers.content_type)
 
@@ -18,9 +18,31 @@ Pyjo.Headers - Headers
     headers.content_type = 'text/plain'
     print(headers.to_str())
 
-:mod:`Pyjo.Headers` is a container for HTTP headers based on
-:rfc:`7230` and
+:mod:`Pyjo.Headers` is a container for HTTP headers, based on :rfc:`7230` and
 :rfc:`7231`.
+
+The values are strings; bytes from the wire are decoded as ISO-8859-1, as
+:mod:`http.client` does.
+
+The headers also work with the Python standard library: they take an
+:class:`email.message.Message`, such as :class:`http.client.HTTPMessage`, a
+``dict`` or a list of pairs, they are a mapping of the names to the values
+without regard to case, and they turn into an :class:`email.message.Message`
+with :meth:`to_message` or into a list of pairs with :meth:`to_list`. ::
+
+    # "text/html"
+    Pyjo.Headers.new({'Content-Type': 'text/html'})['content-type']
+
+    # [('Vary', 'Accept'), ('Vary', 'Accept-Encoding')]
+    Pyjo.Headers.new([('Vary', 'Accept'), ('Vary', 'Accept-Encoding')]).to_list()
+
+See also
+--------
+
+:mod:`Pyjoyment`, https://mojolicious.org.
+
+Ported from `Mojo::Headers <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/Headers.pm>`_
+of Mojolicious 9.49.
 
 Classes
 -------
@@ -29,272 +51,250 @@ Classes
 import Pyjo.Base
 import Pyjo.String.Mixin
 
-from Pyjo.Regexp import r
-from Pyjo.Util import b, convert, getenv, notnone, u
+from Pyjo.Util import header_params
 
-import collections
+import builtins
+import os
+import re
+
+from collections.abc import Iterator
+from email.message import Message
+from typing import Self, cast, overload
 
 
-re_line = r(rb'(.*?)\x0d?\x0a')
-re_field = r(rb'^(\S[^:]*)\s*:\s*(.*)$')
-re_startswith_space = r(rb'^\s+')
+# The module ends with `object = Pyjo_Headers`, which an annotation of
+# `object` would mean, as annotations are evaluated lazily
+type Anything = builtins.object
 
+# Common headers
+NAMES = {
+    name.lower(): name
+    for name in (
+        'Accept Accept-Charset Accept-Encoding Accept-Language Accept-Ranges Access-Control-Allow-Origin Allow '
+        'Authorization Cache-Control Connection Content-Disposition Content-Encoding Content-Language Content-Length '
+        'Content-Location Content-Range Content-Security-Policy Content-Type Cookie DNT Date ETag Expect Expires Host '
+        'If-Modified-Since If-None-Match Last-Modified Link Location Origin Proxy-Authenticate Proxy-Authorization '
+        'Range Sec-WebSocket-Accept Sec-WebSocket-Extensions Sec-WebSocket-Key Sec-WebSocket-Protocol '
+        'Sec-WebSocket-Version Server Server-Timing Set-Cookie Status Strict-Transport-Security TE Trailer '
+        'Transfer-Encoding Upgrade User-Agent Vary WWW-Authenticate'
+    ).split()
+}
 
-NORMALCASE = dict(
-    map(
-        lambda i: (b(i.lower()), b(i)),
-        [
-            'Accept',
-            'Accept-Charset',
-            'Accept-Encoding',
-            'Accept-Language',
-            'Accept-Ranges',
-            'Access-Control-Allow-Origin',
-            'Allow',
-            'Authorization',
-            'Cache-Control',
-            'Connection',
-            'Content-Disposition',
-            'Content-Encoding',
-            'Content-Language',
-            'Content-Length',
-            'Content-Location',
-            'Content-Range',
-            'Content-Security-Policy',
-            'Content-Type',
-            'Cookie',
-            'DNT',
-            'Date',
-            'ETag',
-            'Expect',
-            'Expires',
-            'Host',
-            'If-Modified-Since',
-            'If-None-Match',
-            'Last-Modified',
-            'Link',
-            'Location',
-            'Origin',
-            'Proxy-Authenticate',
-            'Proxy-Authorization',
-            'Range',
-            'Sec-WebSocket-Accept',
-            'Sec-WebSocket-Extensions',
-            'Sec-WebSocket-Key',
-            'Sec-WebSocket-Protocol',
-            'Sec-WebSocket-Version',
-            'Server',
-            'Set-Cookie',
-            'Status',
-            'Strict-Transport-Security',
-            'TE',
-            'Trailer',
-            'Transfer-Encoding',
-            'Upgrade',
-            'User-Agent',
-            'Vary',
-            'WWW-Authenticate',
-        ],
+# Hop-by-hop headers
+HOP_BY_HOP = [
+    name.lower()
+    for name in (
+        'Connection',
+        'Keep-Alive',
+        'Proxy-Authenticate',
+        'Proxy-Authorization',
+        'TE',
+        'Trailer',
+        'Transfer-Encoding',
+        'Upgrade',
     )
-)
+]
+
+
+class _Shortcut:
+    # A property for a common header, as Mojo makes them with monkey_patch
+    def __init__(self, name: str, example: str, about: str = '') -> None:
+        attr = name.lower().replace('-', '_')
+        self.name = name
+        self.__doc__ = f"""::
+
+        {attr} = headers.{attr}
+        headers.{attr} = {example}
+
+    Get or replace current header value, shortcut for the ``{name}`` header{about}.
+    """
+
+    @overload
+    def __get__(self, headers: None, owner: type | None = None) -> Self: ...
+
+    @overload
+    def __get__(self, headers: 'Pyjo_Headers', owner: type | None = None) -> str | None: ...
+
+    def __get__(self, headers: 'Pyjo_Headers | None', owner: type | None = None) -> Self | str | None:
+        return self if headers is None else headers.header(self.name)
+
+    def __set__(self, headers: 'Pyjo_Headers', value: Anything) -> None:
+        # Unlike Mojolicious: the value is checked for invalid characters, as add
+        # does; Mojo sets it directly
+        headers.header(self.name, value)
 
 
 class Pyjo_Headers(Pyjo.Base.object, Pyjo.String.Mixin.object):
     """
-    :mod:`Pyjo.Headers` inherits all attributes and methods from
-    :mod:`Pyjo.Base` and :mod:`Pyjo.String.Mixin` and implements the following new ones.
+    :mod:`Pyjo.Headers` inherits all methods from :mod:`Pyjo.Base` and
+    :mod:`Pyjo.String.Mixin` and implements the following new ones.
     """
 
-    def __init__(self, chunk=None, **kwargs):
-        r"""::
-
-            headers = Pyjo.Headers.new()
-            headers = Pyjo.Headers.new("Content-Type: text/html\x0d\x0a\x0d\x0a")
-
-        Construct a new :mod`Pyjo.Headers` object.
-        """
-
-        self.charset = kwargs.get('charset', 'utf-8')
+    def __init__(
+        self,
+        headers: 'Message | dict[str, Anything] | list[tuple[str, Anything]] | Pyjo_Headers | None' = None,
+        *,
+        max_line_size: int | None = None,
+        max_lines: int | None = None,
+    ) -> None:
         """::
 
-            charset = headers.charset
-            headers.charset = 'ascii'
+            headers = Pyjo.Headers.new()
+            headers = Pyjo.Headers.new({'Content-Type': 'text/html'})
+            headers = Pyjo.Headers.new([('Vary', 'Accept'), ('Vary', 'Accept-Encoding')])
+            headers = Pyjo.Headers.new(http_response.headers)
 
-        Charset used for encoding and decoding, defaults to ``ascii``.
+        Construct a new :mod:`Pyjo.Headers` object, from headers of the standard
+        library if they are given: an :class:`email.message.Message`, such as
+        :class:`http.client.HTTPMessage`, a ``dict``, as :meth:`from_dict` takes,
+        or a list of pairs.
         """
-
-        self.max_line_size = notnone(
-            kwargs.get('max_line_size'), lambda: convert(getenv('PYJO_MAX_LINE_SIZE'), int) or 8192
-        )
+        self.max_line_size = max_line_size or int(os.environ.get('PYJO_MAX_LINE_SIZE') or 8192)
         """::
 
             size = headers.max_line_size
             headers.max_line_size = 1024
 
         Maximum header line size in bytes, defaults to the value of the
-        ``PYJO_MAX_LINE_SIZE`` environment variable or ``8192`` (8KB).
+        ``PYJO_MAX_LINE_SIZE`` environment variable or ``8192`` (8KiB).
         """
 
-        self.max_lines = notnone(kwargs.get('max_lines'), lambda: convert(getenv('PYJO_MAX_LINES'), int) or 100)
+        self.max_lines = max_lines or int(os.environ.get('PYJO_MAX_LINES') or 100)
         """::
 
             num = headers.max_lines
             headers.max_lines = 200
 
-        Maximum number of header lines, defaults to the value of the ``PYJO_MAX_LINES``
-        environment variable or ``100``.
+        Maximum number of header lines, defaults to the value of the
+        ``PYJO_MAX_LINES`` environment variable or ``100``.
         """
 
-        self._buffer = bytearray()
-        self._cache = []
-        self._headers = collections.OrderedDict()
+        self._headers: dict[str, list[str]] = {}
+        self._names: dict[str, str] = {}
+        self._buffer = b''
+        self._cache: list[list[str]] = []
+        self._state: str | None = None
         self._limit = False
-        self._normalcase = {}
-        self._state = None
 
-        if chunk is not None:
-            self.parse(chunk)
+        # Not in Mojolicious: headers of the standard library
+        if isinstance(headers, Message | Pyjo_Headers | list):
+            pairs = (
+                headers.items()
+                if isinstance(headers, Message)
+                else headers.to_list()
+                if isinstance(headers, Pyjo_Headers)
+                else headers
+            )
+            for name, value in pairs:
+                self.add(name, value)
+        elif isinstance(headers, dict):
+            self.from_dict(headers)
 
-    def __repr__(self):
+    def __bool__(self) -> bool:
         """::
 
-            reprstring = headers()
+            boolean = bool(headers)
 
-        String representation of an object shown in console.
+        Always true, also without headers.
         """
-        return f'{self.__module__}.new().parse({self.to_str() + "\x0d\x0a\x0d\x0a"!r})'
+        return True
 
-    @property
-    def accept(self):
+    # Not in Mojolicious: the mapping protocol of the standard library
+    def __contains__(self, name: Anything) -> bool:
         """::
 
-            accept = headers.accept
-            headers.accept = 'application/json'
+            boolean = 'Content-Type' in headers
 
-        Shortcut for the ``Accept`` header.
+        Check if a header exists, without regard to case.
         """
-        return self.header(b'Accept')
+        return isinstance(name, str) and name.lower() in self._headers
 
-    @accept.setter
-    def accept(self, value):
-        self.header(b'Accept', value)
-
-    @property
-    def accept_charset(self):
+    # Not in Mojolicious: the mapping protocol of the standard library
+    def __getitem__(self, name: str) -> str:
         """::
 
-            charset = headers.accept_charset
-            headers.accept_charset = 'UTF-8'
+            value = headers['Content-Type']
 
-        Shortcut for the ``Accept-Charset`` header.
+        Same as :meth:`header`, but raises :class:`KeyError` for a header that does
+        not exist.
         """
-        return self.header(b'Accept-Charset')
+        if (value := self.header(name)) is None:
+            raise KeyError(name)
+        return value
 
-    @accept_charset.setter
-    def accept_charset(self, value):
-        self.header(b'Accept-Charset', value)
-
-    @property
-    def accept_encoding(self):
+    # Not in Mojolicious: the mapping protocol of the standard library
+    def __iter__(self) -> Iterator[str]:
         """::
 
-            encoding = headers.accept_encoding
-            headers.accept_encoding = 'gzip'
+            names = list(headers)
 
-        Shortcut for the ``Accept-Encoding`` header.
+        Iterate over :meth:`names`.
         """
-        return self.header(b'Accept-Encoding')
+        return iter(self.names())
 
-    @accept_encoding.setter
-    def accept_encoding(self, value):
-        self.header(b'Accept-Encoding', value)
-
-    @property
-    def accept_language(self):
+    # Not in Mojolicious: the mapping protocol of the standard library
+    def __len__(self) -> int:
         """::
 
-            language = headers.accept_language
-            headers.accept_language = 'de, en'
+            size = len(headers)
 
-        Shortcut for the ``Accept-Language`` header.
+        Number of headers, with the values of a header counting once.
         """
-        return self.header(b'Accept-Language')
+        return len(self._headers)
 
-    @accept_language.setter
-    def accept_language(self, value):
-        self.header(b'Accept-Language', value)
-
-    @property
-    def accept_ranges(self):
+    def __str__(self) -> str:
         """::
 
-            ranges = headers.accept_ranges
-            headers.accept_ranges = 'bytes'
+            string = str(headers)
 
-        Shortcut for the ``Accept-Ranges`` header.
+        Alias for :meth:`to_str`.
         """
-        return self.header(b'Accept-Ranges')
+        return self.to_str()
 
-    @accept_ranges.setter
-    def accept_ranges(self, value):
-        self.header(b'Accept-Ranges', value)
+    accept = _Shortcut('Accept', "'*/*'")
+    accept_charset = _Shortcut('Accept-Charset', "'UTF-8'")
+    accept_encoding = _Shortcut('Accept-Encoding', "'gzip'")
+    accept_language = _Shortcut('Accept-Language', "'de, en'")
+    accept_ranges = _Shortcut('Accept-Ranges', "'bytes'")
+    access_control_allow_origin = _Shortcut(
+        'Access-Control-Allow-Origin',
+        "'*'",
+        ' from `Cross-Origin Resource Sharing <https://www.w3.org/TR/cors/>`_',
+    )
 
-    @property
-    def access_control_allow_origin(self):
-        """::
-
-            origin = headers.access_control_allow_origin
-            headers.accept_ranges = 'bytes'
-
-        Shortcut for the ``Access-Control-Allow-Origin`` header from
-        `Cross-Origin Resource Sharing <http://www.w3.org/TR/cors/>`_.
-        """
-        return self.header(b'Access-Control-Allow-Origin')
-
-    @access_control_allow_origin.setter
-    def access_control_allow_origin(self, value):
-        self.header(b'Access-Control-Allow-Origin', value)
-
-    def add(self, name, *args):
+    def add(self, name: str, *values: Anything) -> Self:
         """::
 
             headers = headers.add('Foo', 'one value')
             headers = headers.add('Foo', 'first value', 'second value')
 
-        Add one or more header values with one or more lines. ::
+        Add header with one or more lines. ::
 
-            # "Vary: Accept"
-            # "Vary: Accept-Encoding"
-            headers.set(vary='Accept').add('Vary', 'Accept-Encoding').to_str()
+            # "Vary: Accept
+            #  Vary: Accept-Encoding"
+            headers.add('Vary', 'Accept').add('Vary', 'Accept-Encoding').to_str()
         """
+        # Not in Mojolicious: a list adds its values
+        strings = [
+            str(v)
+            for value in values
+            for v in (cast(list[Anything], value) if isinstance(value, (list, tuple)) else [value])
+        ]
+        for value in strings:
+            if '\x0d' in value or '\x0a' in value:
+                raise ValueError(f'Invalid characters in {name} header')
+
         # Make sure we have a normal case entry for name
-        name = b(name, 'ascii')
         key = name.lower()
-        if key not in NORMALCASE:
-            self._normalcase[key] = name
-        if key not in self._headers:
-            self._headers[key] = []
-        for value in args:
-            self._headers[key].append(b(value, 'ascii'))
+        if key not in NAMES:
+            self._names.setdefault(key, name)
+        self._headers.setdefault(key, []).extend(strings)
 
         return self
 
-    @property
-    def allow(self):
-        """::
+    allow = _Shortcut('Allow', "'GET, POST'")
 
-            allow = headers.allow
-            headers.allow = 'GET, POST'
-
-        Shortcut for the ``Allow`` header.
-        """
-        return self.header(b'Allow')
-
-    @allow.setter
-    def allow(self, value):
-        self.header(b'Allow', value)
-
-    def append(self, name, value):
+    def append(self, name: str, value: Anything) -> Self:
         """::
 
             headers = headers.append('Vary', 'Accept-Encoding')
@@ -308,299 +308,112 @@ class Pyjo_Headers(Pyjo.Base.object, Pyjo.String.Mixin.object):
             headers.set(vary='Accept').append('Vary', 'Accept-Encoding').to_str()
         """
         old = self.header(name)
-        return self.header(name, old + ', ' + value if old is not None else value)
+        return self.header(name, f'{old}, {value}' if old is not None else value)
 
-    @property
-    def authorization(self):
+    authorization = _Shortcut('Authorization', "'Basic Zm9vOmJhcg=='")
+    cache_control = _Shortcut('Cache-Control', "'max-age=1, no-cache'")
+
+    def clone(self) -> Self:
         """::
 
-            authorization = headers.authorization
-            headers.authorization = 'Basic Zm9vOmJhcg=='
+            clone = headers.clone()
 
-        Shortcut for the ``Authorization`` header.
+        Return a new :mod:`Pyjo.Headers` object cloned from these headers.
         """
-        return self.header(b'Authorization')
+        clone = self.new()
+        clone._names = dict(self._names)
+        clone._headers = {key: list(values) for key, values in self._headers.items()}
+        return clone
 
-    @authorization.setter
-    def authorization(self, value):
-        self.header(b'Authorization', value)
+    connection = _Shortcut('Connection', "'close'")
+    content_disposition = _Shortcut('Content-Disposition', "'foo'")
+    content_encoding = _Shortcut('Content-Encoding', "'gzip'")
+    content_language = _Shortcut('Content-Language', "'en'")
+    content_length = _Shortcut('Content-Length', '4000')
+    content_location = _Shortcut('Content-Location', "'http://127.0.0.1/foo'")
+    content_range = _Shortcut('Content-Range', "'bytes 2-8/100'")
+    content_security_policy = _Shortcut(
+        'Content-Security-Policy',
+        "'default-src https:'",
+        ' from `Content Security Policy 1.0 <https://www.w3.org/TR/CSP/>`_',
+    )
+    content_type = _Shortcut('Content-Type', "'text/plain'")
+    cookie = _Shortcut('Cookie', "'f=b'", ' from :rfc:`6265`')
+    date = _Shortcut('Date', "'Sun, 17 Aug 2008 16:27:35 GMT'")
 
-    @property
-    def cache_control(self):
+    def dehop(self) -> Self:
         """::
 
-            control = headers.cache_control
-            headers.cache_control = 'max-age=1, no-cache'
+            headers = headers.dehop()
 
-        Shortcut for the ``Cache-Control`` header.
+        Remove hop-by-hop headers that should not be retransmitted.
         """
-        return self.header(b'Cache-Control')
+        for key in HOP_BY_HOP:
+            self._headers.pop(key, None)
+        return self
 
-    @cache_control.setter
-    def cache_control(self, value):
-        self.header(b'Cache-Control', value)
+    dnt = _Shortcut(
+        'DNT',
+        '1',
+        ' (Do Not Track), which has no specification yet, but is very commonly used',
+    )
+    etag = _Shortcut('ETag', '\'"abc321"\'')
 
-    def clone(self):
+    def every_header(self, name: str) -> list[str]:
         """::
 
-            clone = headers.clone
+            all = headers.every_header('Location')
 
-        Clone headers.
+        Similar to :meth:`header`, but returns all headers sharing the same name as a
+        list. ::
+
+            # Get first header value
+            print(headers.every_header('Location')[0])
         """
-        return self.new().from_dict(self.to_dict_list())
+        return self._headers.get(name.lower(), [])
 
-    @property
-    def connection(self):
-        """::
+    expect = _Shortcut('Expect', "'100-continue'")
+    expires = _Shortcut('Expires', "'Thu, 01 Dec 1994 16:00:00 GMT'")
 
-            connection = headers.connection
-            headers.connection = 'close'
-
-        Shortcut for the ``Connection`` header.
-        """
-        return self.header(b'Connection')
-
-    @connection.setter
-    def connection(self, value):
-        self.header(b'Connection', value)
-
-    @property
-    def content_disposition(self):
-        """::
-
-            disposition = headers.content_disposition
-            headers.content_disposition = 'foo'
-
-        Shortcut for the ``Content-Disposition`` header.
-        """
-        return self.header(b'Content-Disposition')
-
-    @content_disposition.setter
-    def content_disposition(self, value):
-        self.header(b'Content-Disposition', value)
-
-    @property
-    def content_encoding(self):
-        """::
-
-            encoding = headers.content_encoding
-            headers.content_encoding = 'gzip'
-
-        Shortcut for the ``Content-Encoding`` header.
-        """
-        return self.header(b'Content-Encoding')
-
-    @content_encoding.setter
-    def content_encoding(self, value):
-        self.header(b'Content-Encoding', value)
-
-    @property
-    def content_language(self):
-        """::
-
-            language = headers.content_language
-            headers.content_language = 'en'
-
-        Shortcut for the ``Content-Language`` header.
-        """
-        return self.header(b'Content-Language')
-
-    @content_language.setter
-    def content_language(self, value):
-        self.header(b'Content-Language', value)
-
-    @property
-    def content_length(self):
-        """::
-
-            length = int(headers.content_length)
-            headers.content_length = 4000
-
-        Shortcut for the ``Content-Length`` header.
-        """
-        return self.header(b'Content-Length')
-
-    @content_length.setter
-    def content_length(self, value):
-        self.header(b'Content-Length', value)
-
-    @property
-    def content_location(self):
-        """::
-
-            location = headers.content_location
-            headers.content_location = 'http://127.0.0.1/foo'
-
-        Shortcut for the ``Content-Location`` header.
-        """
-        return self.header(b'Content-Location')
-
-    @content_location.setter
-    def content_location(self, value):
-        self.header(b'Content-Location', value)
-
-    @property
-    def content_range(self):
-        """::
-
-            content_range = headers.content_range
-            headers.content_range = 'bytes 2-8/100'
-
-        Shortcut for the ``Content-Range`` header.
-        """
-        return self.header(b'Content-Range')
-
-    @content_range.setter
-    def content_range(self, value):
-        self.header(b'Content-Range', value)
-
-    @property
-    def content_security_policy(self):
-        """::
-
-            policy = headers.content_security_policy
-            headers.content_security_policy = 'default-src https:'
-
-        Shortcut for the ``Content-Security-Policy`` header from
-        `Content Security Policy 1.0 <http://www.w3.org/TR/CSP/>`_.
-        """
-        return self.header(b'Content-Security-Policy')
-
-    @content_security_policy.setter
-    def content_security_policy(self, value):
-        self.header(b'Content-Security-Policy', value)
-
-    @property
-    def content_type(self):
-        """::
-
-            content_type = headers.content_type
-            headers.content_type = 'text/plain'
-
-        Shortcut for the ``Content-Type`` header.
-        """
-        return self.header(b'Content-Type')
-
-    @content_type.setter
-    def content_type(self, value):
-        self.header(b'Content-Type', value)
-
-    @property
-    def cookie(self):
-        """::
-
-            cookie = headers.cookie
-            headers.cookie = 'f=b'
-
-        Shortcut for the ``Cookie`` header from
-        :rfc:`6265`.
-        """
-        return self.header(b'Cookie')
-
-    @cookie.setter
-    def cookie(self, value):
-        self.header(b'Cookie', value)
-
-    @property
-    def date(self):
-        """::
-
-            date = headers.date
-            headers.date = 'Sun, 17 Aug 2008 16:27:35 GMT'
-
-        Shortcut for the ``Date`` header.
-        """
-        return self.header(b'Date')
-
-    @date.setter
-    def date(self, value):
-        self.header(b'Date', value)
-
-    @property
-    def dnt(self):
-        """::
-
-            dnt = headers.dnt
-            headers.dnt = 1
-
-        Shortcut for the ``DNT`` (Do Not Track) header, which has no specification yet,
-        but is very commonly used.
-        """
-        return self.header(b'DNT')
-
-    @dnt.setter
-    def dnt(self, value):
-        self.header(b'DNT', value)
-
-    @property
-    def etag(self):
-        """::
-
-            etag = headers.etag
-            headers.etag = '"abc321"'
-
-        Shortcut for the ``ETag`` header.
-        """
-        return self.header(b'ETag')
-
-    @etag.setter
-    def etag(self, value):
-        self.header(b'ETag', value)
-
-    @property
-    def expect(self):
-        """::
-
-            expect = headers.expect
-            headers.expect = '100-continue'
-
-        Shortcut for the ``Expect`` header.
-        """
-        return self.header(b'Expect')
-
-    @expect.setter
-    def expect(self, value):
-        self.header(b'Expect', value)
-
-    @property
-    def expires(self):
-        """::
-
-            expires = headers.expires
-            headers.expires = 'Thu, 01 Dec 1994 16:00:00 GMT'
-
-        Shortcut for the ``Expires`` header.
-        """
-        return self.header(b'Expires')
-
-    @expires.setter
-    def expires(self, value):
-        self.header(b'Expires', value)
-
-    def from_dict(self, d):
+    def from_dict(self, d: dict[str, Anything]) -> Self:
         """::
 
             headers = headers.from_dict({'Cookie': 'a=b'})
             headers = headers.from_dict({'Cookie': ['a=b', 'c=d']})
             headers = headers.from_dict({})
 
-        Parse headers from a hash reference, an empty hash removes all headers.
+        Parse headers from a ``dict``, an empty one removes all headers.
         """
-        # Empty hash deletes all headers
+        # Empty dict deletes all headers
         if not d:
             self._headers = {}
 
         # Merge
-        for header in d.keys():
-            value = d[header]
-            if isinstance(value, list):
-                self.add(header, *value)
-            else:
-                self.add(header, value)
+        for header, value in d.items():
+            self.add(header, value)
 
         return self
 
-    def header(self, name, *args):
+    # Not in Mojolicious: the mapping protocol of the standard library
+    def get(self, name: str, default: str | None = None) -> str | None:
+        """::
+
+            value = headers.get('Content-Type')
+            value = headers.get('Content-Type', 'text/plain')
+
+        Same as :meth:`header`, but returns the default for a header that does not
+        exist.
+        """
+        value = self.header(name)
+        return value if value is not None else default
+
+    @overload
+    def header(self, name: str, /) -> str | None: ...
+
+    @overload
+    def header(self, name: str, value: Anything, /, *values: Anything) -> Self: ...
+
+    def header(self, name: str, /, *values: Anything) -> Self | str | None:
         """::
 
             value = headers.header('Foo')
@@ -610,62 +423,19 @@ class Pyjo_Headers(Pyjo.Base.object, Pyjo.String.Mixin.object):
         Get or replace the current header values.
         """
         # Replace
-        if args:
-            return self.remove(name).add(name, *args)
+        if values:
+            return self.remove(name).add(name, *values)
 
-        key = b(name, 'ascii').lower()
-        if key not in self._headers:
-            return
+        if (headers := self._headers.get(name.lower())) is None:
+            return None
+        return ', '.join(headers)
 
-        return ', '.join(map(lambda i: u(i, self.charset), self._headers[key]))
-
-    @property
-    def host(self):
-        """::
-
-            host = headers.host
-            headers.host = '127.0.0.1'
-
-        Shortcut for the ``Host`` header.
-        """
-        return self.header(b'Host')
-
-    @host.setter
-    def host(self, value):
-        self.header(b'Host', value)
+    host = _Shortcut('Host', "'127.0.0.1'")
+    if_modified_since = _Shortcut('If-Modified-Since', "'Sun, 17 Aug 2008 16:27:35 GMT'")
+    if_none_match = _Shortcut('If-None-Match', '\'"abc321"\'')
 
     @property
-    def if_modified_since(self):
-        """::
-
-            date = headers.if_modified_since
-            headers.if_modified_since = 'Sun, 17 Aug 2008 16:27:35 GMT'
-
-        Shortcut for the ``If-Modified-Since`` header.
-        """
-        return self.header(b'If-Modified-Since')
-
-    @if_modified_since.setter
-    def if_modified_since(self, value):
-        self.header(b'If-Modified-Since', value)
-
-    @property
-    def if_none_match(self):
-        """::
-
-            etag = headers.if_none_match
-            headers.if_none_match = '"abc321"'
-
-        Shortcut for the ``If-None-Match`` header.
-        """
-        return self.header(b'If-None-Match')
-
-    @if_none_match.setter
-    def if_none_match(self, value):
-        self.header(b'If-None-Match', value)
-
-    @property
-    def is_finished(self):
+    def is_finished(self) -> bool:
         """::
 
             boolean = headers.is_finished
@@ -675,535 +445,281 @@ class Pyjo_Headers(Pyjo.Base.object, Pyjo.String.Mixin.object):
         return self._state == 'finished'
 
     @property
-    def is_limit_exceeded(self):
+    def is_limit_exceeded(self) -> bool:
         """::
 
             boolean = headers.is_limit_exceeded
 
         Check if headers have exceeded :attr:`max_line_size` or :attr:`max_lines`.
         """
-        return bool(self._limit)
+        return self._limit
 
-    @property
-    def last_modified(self):
+    # Not in Mojolicious: the mapping protocol of the standard library
+    def items(self) -> list[tuple[str, str]]:
         """::
 
-            date = headers.last_modified
-            headers.last_modified = 'Sun, 17 Aug 2008 16:27:35 GMT'
+            items = headers.items()
 
-        Shortcut for the ``Last-Modified`` header.
+        Return a list of :meth:`names` with the values that :meth:`header` gives.
         """
-        return self.header(b'Last-Modified')
+        return [(name, ', '.join(self._headers[name.lower()])) for name in self.names()]
 
-    @last_modified.setter
-    def last_modified(self, value):
-        self.header(b'Last-Modified', value)
-
-    @property
-    def leftovers(self):
+    # Not in Mojolicious: the mapping protocol of the standard library
+    def keys(self) -> list[str]:
         """::
 
-          chunk = headers.leftovers
+            names = headers.keys()
+
+        Alias for :meth:`names`.
+        """
+        return self.names()
+
+    last_modified = _Shortcut('Last-Modified', "'Sun, 17 Aug 2008 16:27:35 GMT'")
+
+    def leftovers(self) -> bytes:
+        """::
+
+            data = headers.leftovers()
 
         Get and remove leftover data from header parser.
         """
-        chunk = self._buffer
-        self._buffer = bytearray()
-        return chunk
+        buffer, self._buffer = self._buffer, b''
+        return buffer
+
+    link = _Shortcut('Link', '\'<http://127.0.0.1/foo/3>; rel="next"\'', ' from :rfc:`5988`')
 
     @property
-    def link(self):
+    def links(self) -> dict[str, dict[str, str]]:
         """::
 
-            link = headers.link
-            headers.link = '<http://127.0.0.1/foo/3>; rel="next"'
+            links = headers.links
+            headers.links = {'next': 'http://example.com/foo', 'prev': 'http://example.com/bar'}
 
-        Shortcut for the ``Link`` header from
-        :rfc:`5988`.
+        Get or set web links from or to ``Link`` header according to :rfc:`5988`. ::
+
+            # Extract information about next page
+            print(headers.links['next']['link'])
+            print(headers.links['next']['title'])
         """
-        return self.header(b'Link')
+        header = self.link or ''
+        data: dict[str, dict[str, str]] = {}
+        while m := re.match(r'[,\s]*<(.+?)>', header):
+            target = m[1]
+            params, header = header_params(header[m.end() :])
+            if (rel := params.get('rel')) is not None:
+                data.setdefault(rel, {**params, 'link': target})
 
-    @link.setter
-    def link(self, value):
-        self.header(b'Link', value)
+        return data
 
-    @property
-    def location(self):
+    @links.setter
+    def links(self, links: dict[str, str]) -> None:
+        self.link = ', '.join(f'<{links[rel]}>; rel="{rel}"' for rel in sorted(links))
+
+    location = _Shortcut('Location', "'http://127.0.0.1/foo'")
+
+    def names(self) -> list[str]:
         """::
 
-            location = headers.location
-            headers.location = 'http://127.0.0.1/foo'
+            names = headers.names()
 
-        Shortcut for the ``Location`` header.
-        """
-        return self.header(b'Location')
-
-    @location.setter
-    def location(self, value):
-        self.header(b'Location', value)
-
-    @property
-    def names(self):
-        """::
-
-            names = headers.names
-
-        Return a list of all currently defined headers. ::
+        Return a list with all currently defined headers. ::
 
             # Names of all headers
-            for n in headers.name:
-                print(n)
+            for name in headers.names():
+                print(name)
         """
-        return list(
-            map(
-                lambda i: u(i, 'ascii'),
-                map(
-                    lambda i: NORMALCASE[i] if i in NORMALCASE else self._normalcase[i] if i in self._normalcase else i,
-                    self._headers.keys(),
-                ),
-            )
-        )
+        return [NAMES.get(key) or self._names[key] for key in sorted(self._headers)]
 
-    @property
-    def origin(self):
-        """::
+    origin = _Shortcut('Origin', "'http://example.com'", ' from :rfc:`6454`')
 
-            origin = headers.origin
-            headers.origin = 'http://example.com'
-
-        Shortcut for the ``Origin`` header from
-        :rfc:`6454`.
-        """
-        return self.header(b'Origin')
-
-    @origin.setter
-    def origin(self, value):
-        self.header(b'Origin', value)
-
-    def parse(self, string):
+    def parse(self, chunk: str | bytes | bytearray) -> Self:
         r"""::
 
-            headers = headers.parse(b"Content-Type: text/plain\x0d\x0a\x0d\x0a")
+            headers = headers.parse('Content-Type: text/plain\x0d\x0a\x0d\x0a')
 
-        Parse formatted headers.
+        Parse formatted headers, given as characters or as bytes.
         """
         self._state = 'headers'
-        self._buffer.extend(b(string, 'ascii'))
+        # Not in Mojolicious: characters, as ISO-8859-1
+        self._buffer += bytes(chunk) if isinstance(chunk, (bytes, bytearray)) else chunk.encode('latin-1')
         headers = self._cache
         size = self.max_line_size
         lines = self.max_lines
-        pos = 0
-
-        # Iterate over a copy: on PyPy the iterator keeps the buffer exported
-        # until it is collected, and an exported bytearray cannot be resized
-        for m in re_line.finditer(bytes(self._buffer)):
-            chunk = m.group(0)
-            pos += len(chunk)
-            line = m.group(1)
+        while m := re.match(rb'(.*?)\x0d?\x0a', self._buffer):
+            line = m[1].decode('latin-1')
+            self._buffer = self._buffer[m.end() :]
 
             # Check line size limit
-            if len(chunk) > size or len(headers) >= lines:
-                self._state = 'finished'
-                self._limit = True
-                break
+            if m.end() > size or len(headers) >= lines:
+                self._state, self._limit = 'finished', True
+                return self
 
             # New header
-            m = re_field.search(line)
-            if m:
-                headers.append(list(m.groups()))
+            if header := re.match(r'^(\S[^:]*):\s*(.*)$', line):
+                headers.append([header[1], header[2]])
 
+            # Multi-line
+            elif (space := re.match(r'\s+', line)) and headers:
+                headers[-1][1] += ' ' + line[space.end() :]
+
+            # Empty line
             else:
-                # Multiline
-                if re_startswith_space.search(line):
-                    line = re_startswith_space.sub(b'', bytes(line), 1)
-                    if headers:
-                        headers[-1][1] += b' ' + line
-
-                # Empty line
-                else:
-                    for h in headers:
-                        self.add(h[0], h[1])
-                    self._state = 'finished'
-                    self._cache = []
-                    break
-
-        del self._buffer[:pos]
-        if self._state == 'finished':
-            return self
+                for name, value in headers:
+                    self.add(name, value)
+                self._state, self._cache = 'finished', []
+                return self
 
         # Check line size limit
         if len(self._buffer) > size:
-            self._state = 'finished'
-            self._limit = True
+            self._state, self._limit = 'finished', True
 
         return self
 
+    proxy_authenticate = _Shortcut('Proxy-Authenticate', '\'Basic "realm"\'')
+    proxy_authorization = _Shortcut('Proxy-Authorization', "'Basic Zm9vOmJhcg=='")
+    range = _Shortcut('Range', "'bytes=2-8'")
+
     @property
-    def proxy_authenticate(self):
+    def referer(self) -> str | None:
         """::
 
-            authenticate = headers.proxy_authenticate
-            headers.proxy_authenticate = 'Basic "realm"'
+            referrer = headers.referer
+            headers.referer = 'http://example.com'
 
-        Shortcut for the ``Proxy-Authenticate`` header.
+        Alias for :attr:`referrer`.
         """
-        return self.header(b'Proxy-Authenticate')
+        return self.referrer
 
-    @proxy_authenticate.setter
-    def proxy_authenticate(self, value):
-        self.header(b'Proxy-Authenticate', value)
+    @referer.setter
+    def referer(self, value: Anything) -> None:
+        self.referrer = value
 
     @property
-    def proxy_authorization(self):
-        """::
-
-            authorization = headers.proxy_authorization
-            headers.proxy_authorization = 'Basic Zm9vOmJhcg=='
-
-        Shortcut for the ``Proxy-Authorization`` header.
-        """
-        return self.header(b'Proxy-Authorization')
-
-    @proxy_authorization.setter
-    def proxy_authorization(self, value):
-        self.header(b'Proxy-Authorization', value)
-
-    @property
-    def range(self):
-        """::
-
-            range = headers.range
-            headers.range = 'bytes=2-8'
-
-        Shortcut for the ``Range`` header.
-        """
-        return self.header(b'Range')
-
-    @range.setter
-    def range(self, value):
-        self.header(b'Range', value)
-
-    @property
-    def referrer(self):
+    def referrer(self) -> str | None:
         """::
 
             referrer = headers.referrer
             headers.referrer = 'http://example.com'
 
-        Shortcut for the ``Referer`` header, there was a typo in
-        :rfc:`2068` which resulted in ``Referer``
-        becoming an official header.
+        Get or replace current header value, shortcut for the ``Referer`` header,
+        there was a typo in :rfc:`2068` which resulted in ``Referer`` becoming an
+        official header.
         """
-        return self.header(b'Referer')
+        return self.header('Referer')
 
     @referrer.setter
-    def referrer(self, value):
-        self.header(b'Referer', value)
+    def referrer(self, value: Anything) -> None:
+        self.header('Referer', value)
 
-    def remove(self, name):
+    def remove(self, name: str) -> Self:
         """::
 
             headers = headers.remove('Foo')
 
         Remove a header.
         """
-        key = b(name, 'ascii').lower()
-        if key in self._headers:
-            del self._headers[key]
+        self._headers.pop(name.lower(), None)
         return self
 
-    @property
-    def sec_websocket_accept(self):
+    sec_websocket_accept = _Shortcut(
+        'Sec-WebSocket-Accept',
+        "'s3pPLMBiTxaQ9kYGzzhZRbK+xOo='",
+        ' from :rfc:`6455`',
+    )
+    sec_websocket_extensions = _Shortcut('Sec-WebSocket-Extensions', "'foo'", ' from :rfc:`6455`')
+    sec_websocket_key = _Shortcut('Sec-WebSocket-Key', "'dGhlIHNhbXBsZSBub25jZQ=='", ' from :rfc:`6455`')
+    sec_websocket_protocol = _Shortcut('Sec-WebSocket-Protocol', "'sample'", ' from :rfc:`6455`')
+    sec_websocket_version = _Shortcut('Sec-WebSocket-Version', '13', ' from :rfc:`6455`')
+    server = _Shortcut('Server', "'Pyjoyment'")
+    server_timing = _Shortcut(
+        'Server-Timing',
+        "'app;desc=Pyjoyment;dur=0.0001'",
+        ' from `Server Timing <https://www.w3.org/TR/server-timing/>`_',
+    )
+    set_cookie = _Shortcut('Set-Cookie', "'f=b; path=/'", ' from :rfc:`6265`')
+    status = _Shortcut('Status', "'200 OK'", ' from :rfc:`3875`')
+    strict_transport_security = _Shortcut('Strict-Transport-Security', "'max-age=31536000'", ' from :rfc:`6797`')
+    te = _Shortcut('TE', "'chunked'")
+
+    # Not in Mojolicious: bytes for the standard library and the network
+    def to_bytes(self) -> bytes:
         """::
 
-            accept = headers.sec_websocket_accept
-            headers.sec_websocket_accept = 's3pPLMBiTxaQ9kYGzzhZRbK+xOo='
+            data = headers.to_bytes()
 
-        Shortcut for the ``Sec-WebSocket-Accept`` header from
-        :rfc:`6455`.
+        Turn headers into bytes, suitable for HTTP messages, with the characters
+        encoded as ISO-8859-1.
         """
-        return self.header(b'Sec-WebSocket-Accept')
+        return self.to_str().encode('latin-1')
 
-    @sec_websocket_accept.setter
-    def sec_websocket_accept(self, value):
-        self.header(b'Sec-WebSocket-Accept', value)
-
-    @property
-    def sec_websocket_extensions(self):
-        """::
-
-            extensions = headers.sec_websocket_extensions
-            headers.sec_websocket_extensions = 'foo'
-
-        Shortcut for the ``Sec-WebSocket-Extensions`` header from
-        :rfc:`6455`.
-        """
-        return self.header(b'Sec-WebSocket-Extensions')
-
-    @sec_websocket_extensions.setter
-    def sec_websocket_extensions(self, value):
-        self.header(b'Sec-WebSocket-Extensions', value)
-
-    @property
-    def sec_websocket_key(self):
-        """::
-
-            key = headers.sec_websocket_key
-            headers.sec_websocket_key = 'dGhlIHNhbXBsZSBub25jZQ=='
-
-        Shortcut for the ``Sec-WebSocket-Key`` header from
-        :rfc:`6455`.
-        """
-        return self.header(b'Sec-WebSocket-Key')
-
-    @sec_websocket_key.setter
-    def sec_websocket_key(self, value):
-        self.header(b'Sec-WebSocket-Key', value)
-
-    @property
-    def sec_websocket_protocol(self):
-        """::
-
-            protocol = headers.sec_websocket_protocol
-            headers.sec_websocket_protocol = 'sample'
-
-        Shortcut for the ``Sec-WebSocket-Protocol`` header from
-        :rfc:`6455`.
-        """
-        return self.header(b'Sec-WebSocket-Protocol')
-
-    @sec_websocket_protocol.setter
-    def sec_websocket_protocol(self, value):
-        self.header(b'Sec-WebSocket-Protocol', value)
-
-    @property
-    def sec_websocket_version(self):
-        """::
-
-            version = int(headers.sec_websocket_version)
-            headers.sec_websocket_version = 13
-
-        Shortcut for the ``Sec-WebSocket-Version`` header from
-        :rfc:`6455`.
-        """
-        return self.header(b'Sec-WebSocket-Version')
-
-    @sec_websocket_version.setter
-    def sec_websocket_version(self, value):
-        self.header(b'Sec-WebSocket-Version', value)
-
-    @property
-    def server(self):
-        """::
-
-            server = headers.server
-            headers.server = 'Pyjo'
-
-        Shortcut for the ``Server`` header.
-        """
-        return self.header(b'Server')
-
-    @server.setter
-    def server(self, value):
-        self.header(b'Server', value)
-
-    @property
-    def set_cookie(self):
-        """::
-
-            cookie = headers.set_cookie
-            headers.set_cookie = 'f=b; path=/'
-
-        Shortcut for the ``Set-Cookie`` header from
-        :rfc:`6265`.
-        """
-        return self.header(b'Set-Cookie')
-
-    @set_cookie.setter
-    def set_cookie(self, value):
-        self.header(b'Set-Cookie', value)
-
-    @property
-    def status(self):
-        """::
-
-            status = headers.status
-            headers.status = '200 OK'
-
-        Shortcut for the ``Status`` header from
-        :rfc:`3875`.
-        """
-        return self.header(b'Status')
-
-    @status.setter
-    def status(self, value):
-        self.header(b'Status', value)
-
-    @property
-    def strict_transport_security(self):
-        """::
-
-            policy = headers.strict_transport_security
-            headers.strict_transport_security = 'max-age=31536000'
-
-        Shortcut for the ``Strict-Transport-Security`` header from
-        :rfc:`6797`.
-        """
-        return self.header(b'Strict-Transport-Security')
-
-    @strict_transport_security.setter
-    def strict_transport_security(self, value):
-        self.header(b'Strict-Transport-Security', value)
-
-    @property
-    def te(self):
-        """::
-
-            te = headers.te
-            headers.te = 'chunked'
-
-        Shortcut for the ``TE`` header.
-        """
-        return self.header(b'TE')
-
-    @te.setter
-    def te(self, value):
-        self.header(b'TE', value)
-
-    def to_dict(self):
+    def to_dict(self, multi: bool = False) -> dict[str, str] | dict[str, list[str]]:
         """::
 
             single = headers.to_dict()
+            multi = headers.to_dict(True)
 
-        Turn headers into :class:`dict`.
+        Turn headers into ``dict``, lists to represent multiple headers with the same
+        name are disabled by default. ::
+
+            print(headers.to_dict()['DNT'])
         """
-        return dict(map(lambda i: (i, self.header(i)), self.names))
+        if multi:
+            return {name: list(self._headers[name.lower()]) for name in self.names()}
+        return dict(self.items())
 
-    def to_dict_list(self):
+    # Not in Mojolicious: a list of pairs for the standard library
+    def to_list(self) -> list[tuple[str, str]]:
         """::
 
-            multi = headers.to_dict_list()
+            pairs = headers.to_list()
 
-        Turn headers into :class:`dict` with :class:`list` as its values.
+        Turn headers into a list of pairs, one for each value, as WSGI and
+        :meth:`http.client.HTTPResponse.getheaders` have them.
         """
-        return dict(
-            map(lambda i: (i, list(map(lambda i: u(i, 'ascii'), self._headers[b(i.lower(), 'ascii')]))), self.names)
-        )
+        return [(name, value) for name in self.names() for value in self._headers[name.lower()]]
 
-    def to_bytes(self):
+    # Not in Mojolicious: email.message of the standard library
+    def to_message(self) -> Message:
         """::
 
-            bstring = headers.to_bytes()
+            message = headers.to_message()
 
-        Turn headers into a bytes string, suitable for HTTP messages.
+        Turn headers into an :class:`email.message.Message`, with each value as a
+        header of its own, as :mod:`http.client` has them.
         """
-        headers = []
+        message = Message()
+        for name, value in self.to_list():
+            message[name] = value
+        return message
 
-        # Make sure multiline values are formatted correctly
-        for name in map(lambda i: b(i, 'ascii'), self.names):
-            for v in self._headers[name.lower()]:
-                headers.append(name + b': ' + v)
-
-        return b'\x0d\x0a'.join(headers)
-
-    def to_str(self):
+    def to_str(self) -> str:
         """::
 
             string = headers.to_str()
 
         Turn headers into a string, suitable for HTTP messages.
         """
-        return u(self.to_bytes(), 'ascii')
+        # Make sure multi-line values are formatted correctly
+        return '\x0d\x0a'.join(f'{name}: {value}' for name, value in self.to_list())
 
-    @property
-    def trailer(self):
+    trailer = _Shortcut('Trailer', "'X-Foo'")
+    transfer_encoding = _Shortcut('Transfer-Encoding', "'chunked'")
+    upgrade = _Shortcut('Upgrade', "'websocket'")
+    user_agent = _Shortcut('User-Agent', "'Pyjoyment/1.0'")
+
+    # Not in Mojolicious: the mapping protocol of the standard library
+    def values(self) -> list[str]:
         """::
 
-            trailer = headers.trailer
-            headers.trailer = 'X-Foo'
+            values = headers.values()
 
-        Shortcut for the ``Trailer`` header.
+        Return a list of the values that :meth:`header` gives, in the order of
+        :meth:`names`.
         """
-        return self.header(b'Trailer')
+        return [value for _, value in self.items()]
 
-    @trailer.setter
-    def trailer(self, value):
-        self.header(b'Trailer', value)
-
-    @property
-    def transfer_encoding(self):
-        """::
-
-            encoding = headers.transfer_encoding
-            headers.transfer_encoding = 'chunked'
-
-        Shortcut for the ``Transfer-Encoding`` header.
-        """
-        return self.header(b'Transfer-Encoding')
-
-    @transfer_encoding.setter
-    def transfer_encoding(self, value):
-        self.header(b'Transfer-Encoding', value)
-
-    @property
-    def upgrade(self):
-        """::
-
-            upgrade = headers.upgrade
-            headers.upgrade = 'websocket'
-
-        Shortcut for the ``Upgrade`` header.
-        """
-        return self.header(b'Upgrade')
-
-    @upgrade.setter
-    def upgrade(self, value):
-        self.header(b'Upgrade', value)
-
-    @property
-    def user_agent(self):
-        """::
-
-            agent = headers.user_agent
-            headers.user_agent = 'Mojo/1.0'
-
-        Shortcut for the ``User-Agent`` header.
-        """
-        return self.header(b'User-Agent')
-
-    @user_agent.setter
-    def user_agent(self, value):
-        self.header(b'User-Agent', value)
-
-    @property
-    def vary(self):
-        """::
-
-            vary = headers.vary
-            headers.vary = '*'
-
-        Shortcut for the ``Vary`` header.
-        """
-        return self.header(b'Vary')
-
-    @vary.setter
-    def vary(self, value):
-        self.header(b'Vary', value)
-
-    @property
-    def www_authenticate(self):
-        """::
-
-            authenticate = headers.www_authenticate
-            headers.www_authenticate = 'Basic realm="realm"'
-
-        Shortcut for the ``WWW-Authenticate`` header.
-        """
-        return self.header(b'WWW-Authenticate')
-
-    @www_authenticate.setter
-    def www_authenticate(self, value):
-        self.header(b'WWW-Authenticate', value)
+    vary = _Shortcut('Vary', "'*'")
+    www_authenticate = _Shortcut('WWW-Authenticate', '\'Basic realm="realm"\'')
 
 
 new = Pyjo_Headers.new
