@@ -43,7 +43,7 @@ def timeouter_cb(loop):
     loop.remove(server)
 
 
-Pyjo.IOLoop.timer(timeouter_cb, 3)
+Pyjo.IOLoop.timer(3, timeouter_cb)
 
 
 # Start event loop

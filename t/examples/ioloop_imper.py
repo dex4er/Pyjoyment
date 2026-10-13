@@ -44,7 +44,7 @@ if __name__ == '__main__':
         # Shutdown server
         loop.remove(server_id)
 
-    Pyjo.IOLoop.timer(timeouter_cb, 1)
+    Pyjo.IOLoop.timer(1, timeouter_cb)
 
     # Start event loop
     Pyjo.IOLoop.start()

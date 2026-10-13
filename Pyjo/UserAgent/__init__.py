@@ -424,7 +424,7 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
             def timeout_cb(loop):
                 self._error(cid, 'Request timeout')
 
-            self.connections[id][timeout] = self._loop(nb).timer(timeout_cb, timeout)
+            self.connections[id][timeout] = self._loop(nb).timer(timeout, timeout_cb)
 
         return cid
 
