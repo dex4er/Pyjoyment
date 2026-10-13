@@ -8,7 +8,7 @@ agent, servers, event loop), and the `Pyjoyment` package is reserved for the
 `Mojolicious::*` framework layer (routes, controllers, renderer, `Lite`).
 
 The code was written against Mojo 6.x. The project is being revived: the
-target is the latest Mojolicious on Python 3.12+, with asyncio as the only I/O
+target is Mojolicious 9.49 on Python 3.12+, with asyncio as the only I/O
 core. The plan, its order and its progress live in GitHub Issues, starting from
 the open umbrella issue about the revival; this file describes how the project
 works and why, not what is left to do.
@@ -103,18 +103,39 @@ goes, so code must not rely on that: resizing a `bytearray` that a regex
 iterator still scans raises `BufferError`, and `__del__` may not run at all
 before the interpreter exits.
 
-## Syncing with Mojolicious
+## Porting from Mojolicious
 
-Mojo's tests are the specification. To sync a module, take the difference
-between the Mojo version it was synced with and the target version, port the
-changed tests first, then change the code until they pass:
+The target is **Mojolicious 9.49**: every module is ported from the `v9.49`
+tag, so the ported modules match each other. Moving to a newer Mojolicious is a
+step of its own, which changes this version and updates every ported module.
+
+A module is ported anew from the target Mojolicious, not migrated from the
+existing Python code. The existing Python module is a reference for how
+Perl idioms were translated before, not a base to patch: it follows an older
+Mojo and carries compromises that a fresh port does not need.
 
 ```sh
 git clone https://github.com/mojolicious/mojo.git
-git -C mojo diff v6.39 v9.49 -- lib/Mojo/URL.pm t/mojo/url.t
+git -C mojo checkout v9.49
 ```
 
-Keep Mojo's test names and order, so the next sync is again a diff.
+For each module:
+
+1. Port its tests from `t/mojo/*.t` first, keeping Mojo's test names and
+   order. Mojo's tests are the specification.
+2. Port the module from `lib/Mojo/*.pm` until the tests pass.
+3. Port its POD into the docstrings: the same sections in the same order
+   (synopsis, description, events, attributes, methods, see also) and Mojo's
+   wording, with Python names and examples. The POD is the source of the
+   Python documentation.
+4. Record the Mojolicious version the module was ported from.
+
+Moving a ported module to a newer target is the difference between the two
+versions, applied to code, tests and docstrings alike:
+
+```sh
+git -C mojo diff v9.49 v9.50 -- lib/Mojo/URL.pm t/mojo/url.t
+```
 
 Perl and Python differ in a few places that a port must translate rather than
 copy:
@@ -193,9 +214,9 @@ self-signed certificate for TLS servers (as in Mojo): it is tracked, and
 
 `README.rst` is for a user: what Pyjoyment is, how to install it, short
 examples. This file is for whoever changes the code: how it works and why.
-Module documentation lives in the module docstrings, in the layout of Mojo's
-POD (synopsis, events, attributes, methods), and Sphinx builds the API
-reference in `docs/` from them.
+Module documentation lives in the module docstrings, ported from Mojo's POD
+in the same layout (synopsis, events, attributes, methods), and Sphinx builds
+the API reference in `docs/` from them.
 
 Documentation describes how things are and has to stay true without anyone
 maintaining it. Keep out of it whatever goes stale on its own: issue and pull
