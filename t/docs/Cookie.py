@@ -12,6 +12,18 @@ with subtest('Synopsis'):
 
     isa_ok(MyCookie.new(), Pyjo.Cookie.object, 'MyCookie.new()')
 
+with subtest('new'):
+    import Pyjo.Cookie.Request
+
+    from http.cookies import Morsel, SimpleCookie
+
+    cookie = Pyjo.Cookie.Request.new()
+    is_ok(cookie.name, None, 'new()')
+    cookie = Pyjo.Cookie.Request.new(name='foo', value='bar')
+    is_ok(str(cookie), 'foo=bar', 'name and value')
+    cookie = Pyjo.Cookie.Request.new(SimpleCookie('foo=bar')['foo'])
+    is_ok(str(cookie), 'foo=bar', 'Morsel')
+
 with subtest('name'):
     cookie = Pyjo.Cookie.new()
     name = cookie.name
@@ -35,6 +47,13 @@ with subtest('__str__'):
 with subtest('parse'):
     string = 'foo=bar'
     throws_ok(lambda: cookie.parse(string), NotImplementedError, 'cookies = cookie.parse(string)')
+
+with subtest('to_morsel'):
+    morsel = cookie.to_morsel()
+    isa_ok(morsel, Morsel, 'morsel')
+
+    # "foo=\"b r\""
+    is_ok(Pyjo.Cookie.Request.new(name='foo', value='b r').to_morsel().OutputString(), 'foo="b r"', 'OutputString()')
 
 with subtest('to_str'):
     throws_ok(lambda: cookie.to_str(), NotImplementedError, 'string = cookie.to_str()')

@@ -6,6 +6,8 @@ import time
 with subtest('Synopsis'):
     import Pyjo.Cookie.Response
 
+    from http.cookies import SimpleCookie
+
     cookie = Pyjo.Cookie.Response.new()
     cookie.name = 'foo'
     cookie.value = 'bar'
@@ -69,6 +71,19 @@ with subtest('secure'):
 with subtest('parse'):
     cookies = Pyjo.Cookie.Response.parse('f=b; path=/')
     is_deeply_ok([(c.name, c.value, c.path) for c in cookies], [('f', 'b', '/')], 'cookies')
+    cookies = Pyjo.Cookie.Response.parse(SimpleCookie('f=b; path=/'))
+    is_deeply_ok([(c.name, c.value, c.path) for c in cookies], [('f', 'b', '/')], 'SimpleCookie')
+
+with subtest('to_morsel'):
+    morsel = cookie.to_morsel()
+    is_ok(morsel['samesite'], 'Lax', 'morsel')
+
+    # "foo=bar; Path=/; Secure"
+    is_ok(
+        Pyjo.Cookie.Response.new(name='foo', value='bar', path='/', secure=True).to_morsel().OutputString(),
+        'foo=bar; Path=/; Secure',
+        'OutputString()',
+    )
 
 with subtest('to_str'):
     string = cookie.to_str()
