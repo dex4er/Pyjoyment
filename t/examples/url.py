@@ -11,10 +11,11 @@ if __name__ == '__main__':
         'new github.com url',
     )
 
+    url = Pyjo.URL.new('https://pypi.org/search/')
     is_ok(
-        str(Pyjo.URL.new('http://metacpan.org/search').set(query={'q': 'Mojo::URL', 'size': 20})),
-        'http://metacpan.org/search?q=Mojo%3A%3AURL&size=20',
-        'new metacpan.org url',
+        str(url.set(query=[('q', 'Pyjoyment'), ('o', ''), ('c', 'Programming Language :: Python')])),
+        'https://pypi.org/search/?q=Pyjoyment&o=&c=Programming+Language+%3A%3A+Python',
+        'new pypi.org url',
     )
 
     done_testing()
