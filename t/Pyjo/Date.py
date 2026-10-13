@@ -16,6 +16,7 @@ with subtest('RFC 850/1036'):
     is_ok(Pyjo.Date.new('Friday, 13-May-11 10:00:24 GMT').epoch, 1305280824, 'right epoch value')
 
 with subtest('RFC 3339'):
+    # Renamed from Mojolicious: to_datetime is to_rfc3339
     is_ok(Pyjo.Date.new('2014-08-20T20:45:00').epoch, 1408567500, 'right epoch value')
     is_ok(Pyjo.Date.new(1408567500).to_rfc3339(), '2014-08-20T20:45:00Z', 'right format')
     is_ok(Pyjo.Date.new('2014-08-20T20:45:00.01').epoch, 1408567500.01, 'right epoch value')

@@ -93,6 +93,7 @@ class Pyjo_Date(Pyjo.Base.object, Pyjo.String.Mixin.object):
         """
         return True
 
+    # Not in Mojolicious: the epoch for the standard library
     def __float__(self) -> float:
         """::
 
@@ -108,6 +109,7 @@ class Pyjo_Date(Pyjo.Base.object, Pyjo.String.Mixin.object):
         """
         return float(self.epoch or 0)
 
+    # Not in Mojolicious: the epoch for the standard library
     def __int__(self) -> int:
         """::
 
@@ -155,7 +157,7 @@ class Pyjo_Date(Pyjo.Base.object, Pyjo.String.Mixin.object):
             print(Pyjo.Date.new('1994-11-06T08:49:37+01:00').epoch)
             print(Pyjo.Date.new('1994-11-06T08:49:37-01:00').epoch)
         """
-        # datetime of the standard library
+        # Not in Mojolicious: datetime of the standard library
         if isinstance(date, datetime):
             timestamp = date.timestamp()
             self.epoch = int(timestamp) if timestamp.is_integer() else timestamp
@@ -193,6 +195,7 @@ class Pyjo_Date(Pyjo.Base.object, Pyjo.String.Mixin.object):
         self.epoch = epoch + offset if epoch is not None and epoch + offset >= 0 else None
         return self
 
+    # Not in Mojolicious: datetime of the standard library
     def to_datetime(self) -> datetime:
         """::
 
@@ -205,6 +208,8 @@ class Pyjo_Date(Pyjo.Base.object, Pyjo.String.Mixin.object):
         """
         return datetime.fromtimestamp(self.epoch or 0, UTC)
 
+    # Renamed from Mojolicious: to_datetime, the name of the conversion to the
+    # datetime of the standard library here
     def to_rfc3339(self) -> str:
         """::
 
@@ -248,8 +253,8 @@ def _number(number: int | float) -> str:
 
 
 def _timegm(s: float, mi: int, h: int, day: int, month: int | None, year: int) -> int | float | None:
-    # Time::Local's timegm: None instead of an exception for a value out of
-    # range, and an unknown month name is invalid rather than January
+    # Time::Local's timegm, with None instead of an exception for a value out of
+    # range
 
     # Years 0 to 99 are within 50 years of the current one, 100 to 999 count
     # from 1900
@@ -263,7 +268,9 @@ def _timegm(s: float, mi: int, h: int, day: int, month: int | None, year: int) -
     elif year < 1000:
         year += 1900
 
-    # datetime, which calendar.timegm uses, ends with the year 9999
+    # Unlike Mojolicious: an unknown month name is invalid, where Perl takes undef
+    # as 0, January, with a warning; and a year after 9999 is invalid, where
+    # datetime, which calendar.timegm uses, ends
     if month is None or not 0 <= month <= 11 or year > 9999:
         return None
     month_days = calendar.monthrange(2000 if calendar.isleap(year) else 2001, month + 1)[1]

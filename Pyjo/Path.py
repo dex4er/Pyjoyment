@@ -239,6 +239,7 @@ class Pyjo_Path(Pyjo.Base.object, Pyjo.String.Mixin.object):
             Pyjo.Path.new('/foo/bar/').merge('baz/yada')
         """
         # Replace
+        # Not in Mojolicious: bytes, encoded with the charset
         if path.startswith(b'/') if isinstance(path, bytes) else str(path).startswith('/'):
             return self.parse(path)
 
@@ -257,6 +258,7 @@ class Pyjo_Path(Pyjo.Base.object, Pyjo.String.Mixin.object):
 
         Parse path, given as characters or as bytes encoded with :attr:`charset`.
         """
+        # Not in Mojolicious: bytes, encoded with the charset
         self._path = path if isinstance(path, bytes) else str(path)
         self._parts = None
         self._leading_slash = self._trailing_slash = False

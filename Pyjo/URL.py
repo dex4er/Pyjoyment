@@ -303,10 +303,11 @@ class Pyjo_URL(Pyjo.Base.object, Pyjo.String.Mixin.object):
             # "sri@example.com"
             Pyjo.URL.new().parse('mailto:sri@example.com').path
         """
-        # urllib of the standard library
+        # Not in Mojolicious: urllib of the standard library
         if isinstance(url, (SplitResult, ParseResult, SplitResultBytes, ParseResultBytes)):
             url = url.geturl()
 
+        # Not in Mojolicious: bytes, which are characters 0-255, as a Perl byte string
         if isinstance(url, bytes):
             url = url.decode('latin-1')
 
@@ -569,6 +570,7 @@ class Pyjo_URL(Pyjo.Base.object, Pyjo.String.Mixin.object):
         """
         return self._string(True)
 
+    # Not in Mojolicious: urllib of the standard library
     def to_urllib(self) -> SplitResult:
         """::
 

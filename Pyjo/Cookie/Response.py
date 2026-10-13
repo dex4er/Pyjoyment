@@ -170,7 +170,8 @@ class Pyjo_Cookie_Response(Pyjo.Cookie.object):
                 elif attr == 'expires':
                     cookie.expires = Pyjo.Date.new(value or '').epoch
                 elif attr == 'max-age':
-                    # A value that is not an integer is ignored, as RFC 6265 says
+                    # Unlike Mojolicious: a value that is not an integer is ignored, as RFC 6265
+                    # says; Mojo keeps it
                     if value is not None and re.fullmatch(r'-?\d+', value):
                         cookie.max_age = int(value)
                 elif attr == 'path':
