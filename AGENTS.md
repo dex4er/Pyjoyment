@@ -207,6 +207,12 @@ copy:
 - A Perl quirk that only a warning reveals is not ported. `undef` counts as `0`
   with a warning, so `Mojo::Date` reads an unknown month name as January;
   `Pyjo.Date` rejects the date.
+- A flag that Mojo sets to `1` and leaves `undef` otherwise is `True` or
+  `None`. A test of the end of a list, `is $cookies->[1], undef`, becomes
+  `is_ok(len(cookies), 1)`.
+- A module that is not ported yet but uses a ported one follows its API: the
+  lines that use it are taken from the target Mojolicious, and so is the
+  expectation of a test of them that the target changed.
 
 ## Linting and Formatting
 
@@ -268,13 +274,23 @@ which makes pyright ignore `include` and `exclude`, so the per-file mode is
 what limits the checks. Examples that need libraries the project does not
 install are excluded from pyright in `.trunk/trunk.yaml`.
 
+Trunk reports only the issues that a change introduces, and counts an issue
+in a file that already exists upstream as existing, even when the file has
+just been put on the strict list. Check a newly strict module with
+`trunk check --show-existing` or with `.trunk/tools/pyright` directly.
+
 Annotations use the Python 3.12 syntax: generics with type parameters
 (`class Collection[T](list[T])`, `def f[T](x: T) -> T`), `type` aliases,
 `Self` for methods that return `self` so that chains keep their type, and
 `@overload` for functions with several call forms, like `Pyjo.Test.subtest`.
-Where Mojo-style magic cannot be typed, `Any` is fine, with a comment that
-says why. `Pyjo/py.typed` (PEP 561) tells type checkers that the package is
-typed.
+A class method that returns instances of the class, like `parse`, is generic
+(`def parse[C: Pyjo_Cookie](cls: type[C], ...) -> list[C]`): with `list[Self]`,
+pyright rejects the method of a subclass as an incompatible override. A
+ported module that uses one that is not ported yet gets annotations on the
+signatures it uses (`Pyjo.Base.new`, `Pyjo.Util.split_header`), while the
+module itself stays off the strict list. Where Mojo-style magic cannot be
+typed, `Any` is fine, with a comment that says why. `Pyjo/py.typed` (PEP 561)
+tells type checkers that the package is typed.
 
 ## Session and Temporary Files
 
