@@ -967,7 +967,7 @@ if __name__ == '__main__':
     ok(req.is_finished, 'request is finished')
     is_ok(req.method, 'GET', 'right method')
     is_ok(req.version, '1.1', 'right version')
-    is_ok(req.url.base, 'http://Aladdin:open%20sesame@127.0.0.1', 'right base URL')
+    is_ok(req.url.base, 'http://127.0.0.1', 'right base URL')
     is_ok(req.url.base.userinfo, 'Aladdin:open sesame', 'right base userinfo')
     is_ok(req.url, 'http://127.0.0.1/foo/bar', 'right URL')
     is_ok(req.proxy.userinfo, 'Aladdin:open sesame', 'right proxy userinfo')
@@ -2034,7 +2034,7 @@ if __name__ == '__main__':
     ok(req.is_finished, 'request is finished')
     is_ok(req.method, 'GET', 'right method')
     is_ok(req.version, '1.1', 'right version')
-    is_ok(req.url, "/#09azAZ!$%&'()*+,-./:;=?@%5B%5C%5D%5E_%60%7B%7C%7D~%C3%9F", 'right URL')
+    is_ok(req.url, "/#09azAZ!$%25&'()*+,-./:;=?@%5B%5C%5D%5E_%60%7B%7C%7D~%C3%9F", 'right URL')
 
     # Abstract methods
     throws_ok(lambda: Pyjo.Message.new().cookies(), 'Method "cookies" not implemented by subclass', 'right error')

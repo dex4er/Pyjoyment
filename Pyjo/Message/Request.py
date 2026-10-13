@@ -203,7 +203,7 @@ class Pyjo_Message_Request(Pyjo.Message.object):
         url = self.url
 
         if self.method == 'CONNECT':
-            url.authority = m.group(2)
+            url.host_port = u(m.group(2), 'latin-1')
         else:
             url.parse(m.group(2))
 
@@ -377,7 +377,7 @@ class Pyjo_Message_Request(Pyjo.Message.object):
         if not base.host:
             host = headers.host
             if host:
-                base.authority = host
+                base.host_port = host
 
         # Basic authentication
         auth = self._parse_basic_auth(headers.authorization)
@@ -387,7 +387,7 @@ class Pyjo_Message_Request(Pyjo.Message.object):
         # Basic proxy authentication
         proxy_auth = self._parse_basic_auth(headers.proxy_authorization)
         if proxy_auth:
-            self.proxy = Pyjo.URL.new(userinfo=proxy_auth)
+            self.proxy = Pyjo.URL.new().set(userinfo=proxy_auth)
 
         # "X-Forwarded-Proto"
         if self.reverse_proxy and headers.header('X-Forwarded-Proto') == 'https':

@@ -13,4 +13,4 @@ url3 = Pyjo.URL.new('http://żółwie.pl')
 print(url3)
 
 url4 = Pyjo.URL.new('http://localhost').set(userinfo='gęślą:jaźń')
-print(url4)
+print(url4.to_unsafe_str())

@@ -5,7 +5,7 @@ if __name__ == '__main__':
 
     url = Pyjo.URL.new('https://github.com/dex4er/Pyjo')
     is_ok(
-        str(url.set(scheme='ssh+git', userinfo='git', path=f'{url.path}.git')),
+        url.set(scheme='ssh+git', userinfo='git', path=f'{url.path}.git').to_unsafe_str(),
         'ssh+git://git@github.com/dex4er/Pyjo.git',
         'new github.com url',
     )

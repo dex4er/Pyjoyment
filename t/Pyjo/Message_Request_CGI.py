@@ -186,10 +186,10 @@ if __name__ == '__main__':
     is_deeply_ok(req.param('hello'), 'world', 'right value')
     is_ok(
         req.url.to_abs().to_str(),
-        'http://Aladdin:open%20sesame@localhost:8080/test/index.cgi/foo/bar?lalala=23&bar=baz',
+        'http://localhost:8080/test/index.cgi/foo/bar?lalala=23&bar=baz',
         'right absolute URL',
     )
-    is_ok(req.url.base, 'http://Aladdin:open%20sesame@localhost:8080/test/index.cgi/', 'right base URL')
+    is_ok(req.url.base, 'http://localhost:8080/test/index.cgi/', 'right base URL')
     is_ok(req.url.base.userinfo, 'Aladdin:open sesame', 'right userinfo')
     is_ok(req.url, 'foo/bar?lalala=23&bar=baz', 'right URL')
     is_ok(req.proxy.userinfo, 'Aladdin:open sesame', 'right proxy userinfo')
@@ -245,7 +245,7 @@ if __name__ == '__main__':
     is_ok(req.param('login'), 'test', 'right value')
     is_ok(req.param('password'), '111', 'right value')
     is_ok(req.param('edition'), 'db6d8b30-16df-4ecd-be2f-c8194f94e1f4', 'right value')
-    is_ok(req.url.to_abs().to_str(), 'http://test1/index.pl', 'right absolute URL')
+    is_ok(req.url.to_abs().to_str(), 'http://test1/index.pl/', 'right absolute URL')
 
     # Parse Apache 2.2 (win32) CGI environment variables and body
     req = Pyjo.Message.Request.new()
@@ -280,7 +280,7 @@ if __name__ == '__main__':
     is_ok(req.param('login'), 'test', 'right value')
     is_ok(req.param('password'), '111', 'right value')
     is_ok(req.param('edition'), 'db6d8b30-16df-4ecd-be2f-c8194f94e1f4', 'right value')
-    is_ok(req.url.to_abs().to_str(), 'http://test1/index.pl', 'right absolute URL')
+    is_ok(req.url.to_abs().to_str(), 'http://test1/index.pl/', 'right absolute URL')
 
     # Parse Apache 2.2.14 CGI environment variables and body (root)
     req = Pyjo.Message.Request.new()
@@ -322,7 +322,7 @@ if __name__ == '__main__':
     ok(not req.is_secure, 'not secure')
     is_ok(req.body, b'hello=world', 'right content')
     is_deeply_ok(req.param('hello'), 'world', 'right parameters')
-    is_ok(req.url.to_abs().to_str(), 'http://127.0.0.1:13028/upload', 'right absolute URL')
+    is_ok(req.url.to_abs().to_str(), 'http://127.0.0.1:13028/upload/', 'right absolute URL')
 
     # Parse Apache 2.2.11 CGI environment variables and body (HTTPS=ON)
     req = Pyjo.Message.Request.new()
@@ -422,7 +422,7 @@ if __name__ == '__main__':
     is_ok(req.version, '1.0', 'right version')
     is_ok(req.body, b'hello=world', 'right content')
     is_deeply_ok(req.param('hello'), 'world', 'right parameters')
-    is_ok(req.url.to_abs().to_str(), 'http://localhost/test/index.cgi', 'right absolute URL')
+    is_ok(req.url.to_abs().to_str(), 'http://localhost/test/index.cgi/', 'right absolute URL')
 
     # Parse Apache 2.2.9 CGI environment variables (root without PATH_INFO)
     req = Pyjo.Message.Request.new()
@@ -443,7 +443,7 @@ if __name__ == '__main__':
     is_ok(req.url.path, '', 'no path')
     is_ok(req.url.base.path, '/cgi-bin/myapp/myapp.pl/', 'right base path')
     is_ok(req.version, '1.1', 'right version')
-    is_ok(req.url.to_abs().to_str(), 'http://getmyapp.org/cgi-bin/myapp/myapp.pl', 'right absolute URL')
+    is_ok(req.url.to_abs().to_str(), 'http://getmyapp.org/cgi-bin/myapp/myapp.pl/', 'right absolute URL')
 
     # Parse Apache mod_fastcgi CGI environment variables (multipart file upload)
     req = Pyjo.Message.Request.new()

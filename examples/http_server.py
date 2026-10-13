@@ -9,7 +9,7 @@ import sys
 
 opts = dict([['address', '0.0.0.0'], ['port', 3000]] + list(map(lambda a: a.split('='), sys.argv[1:])))
 
-listen = str(Pyjo.URL.new(scheme='http', host=opts['address'], port=opts['port']))
+listen = str(Pyjo.URL.new().set(scheme='http', host=opts['address'], port=opts['port']))
 
 daemon = Pyjo.Server.Daemon.new(listen=[listen])
 daemon.unsubscribe('request')

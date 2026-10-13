@@ -146,7 +146,7 @@ class Pyjo_UserAgent_CookieJar(Pyjo.Base.object):
         if tx.res.cookies:
             for cookie in tx.res.cookies:
                 # Validate domain
-                host = url.ihost
+                host = (url.ihost or '').lower()
                 if not cookie.domain:
                     cookie.domain, cookie.host_only = host, True
                 domain = cookie.domain.lower()
@@ -185,7 +185,7 @@ class Pyjo_UserAgent_CookieJar(Pyjo.Base.object):
                 print(cookie.name)
         """
         found = []
-        domain = host = url.ihost
+        domain = host = (url.ihost or '').lower()
         if not domain:
             return found
         path = url.path.to_abs_str()
