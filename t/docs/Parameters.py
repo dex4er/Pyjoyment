@@ -4,6 +4,8 @@ from Pyjo.Test import *
 with subtest('Synopsis'):
     import Pyjo.Parameters
 
+    from urllib.parse import parse_qsl, urlencode
+
     # Parse
     params = Pyjo.Parameters.new('foo=bar&baz=23')
     is_ok(params.param('baz'), '23', "params.param('baz')")
@@ -162,6 +164,8 @@ with subtest('param'):
 with subtest('parse'):
     params = params.parse('foo=b%3Bar&baz=23')
     is_deeply_ok(params.pairs, [('foo', 'b;ar'), ('baz', '23')], 'params.pairs')
+    params = Pyjo.Parameters.new().parse(parse_qsl('foo=b%3Bar&baz=23'))
+    is_deeply_ok(params.pairs, [('foo', 'b;ar'), ('baz', '23')], 'parse_qsl')
 
 with subtest('remove'):
     params = params.remove('foo')
@@ -183,5 +187,12 @@ with subtest('to_str'):
 
     # "foo=bar&baz=23"
     is_ok(Pyjo.Parameters.new().set(pairs=[('foo', 'bar'), ('baz', '23')]).to_str(), 'foo=bar&baz=23', 'set(pairs=...)')
+
+with subtest('to_urllib'):
+    pairs = params.to_urllib()
+    is_deeply_ok(pairs, [('baz', '23')], 'pairs')
+
+    # "foo=bar&foo=baz"
+    is_ok(urlencode(Pyjo.Parameters.new('foo=bar&foo=baz').to_urllib()), 'foo=bar&foo=baz', 'urlencode')
 
 done_testing()

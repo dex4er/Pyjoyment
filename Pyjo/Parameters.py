@@ -321,12 +321,16 @@ class Pyjo_Parameters(Pyjo.Base.object, Pyjo.String.Mixin.object):
         """::
 
             params = params.parse('foo=b%3Bar&baz=23')
+            params = params.parse(parse_qsl('foo=b%3Bar&baz=23'))
 
         Parse parameters, given as characters or as bytes encoded with
-        :attr:`charset`.
+        :attr:`charset`. A list of pairs, as :func:`urllib.parse.parse_qsl` gives, or
+        a ``dict``, as :func:`urllib.parse.parse_qs` gives, is appended.
         """
         # Pairs
-        if len(args) > 1 or kwargs or (args and isinstance(args[0], (tuple, Pyjo_Parameters))):
+        # Not in Mojolicious: a list of pairs or a dict, as urllib.parse.parse_qsl
+        # and parse_qs give
+        if len(args) > 1 or kwargs or (args and isinstance(args[0], (tuple, list, dict, Pyjo_Parameters))):
             return self.append(*args, **kwargs)
 
         # String
@@ -403,6 +407,20 @@ class Pyjo_Parameters(Pyjo.Base.object, Pyjo.String.Mixin.object):
 
         return '&'.join(pairs)
 
+    # Not in Mojolicious: urllib of the standard library
+    def to_urllib(self) -> list[tuple[str, str]]:
+        """::
+
+            pairs = params.to_urllib()
+
+        Turn parameters into a list of pairs, as :func:`urllib.parse.parse_qsl` gives,
+        for the standard library. ::
+
+            # "foo=bar&foo=baz"
+            urlencode(Pyjo.Parameters.new('foo=bar&foo=baz').to_urllib())
+        """
+        return list(self.pairs)
+
     def _decode(self, string: str) -> str:
         # What does not decode stays characters 0-255, as a Perl byte string
         decoded = decode(self.charset or 'latin-1', string)
@@ -425,6 +443,11 @@ def _pairs(args: tuple[Anything, ...], kwargs: dict[str, Anything]) -> Iterator[
         elif isinstance(item, tuple):
             name, value = cast(tuple[Anything, Anything], item)
             yield str(name), value
+        # Not in Mojolicious: a list of pairs or a dict of the standard library
+        elif isinstance(item, list):
+            yield from _pairs(tuple(cast(list[Anything], item)), {})
+        elif isinstance(item, dict):
+            yield from ((str(n), v) for n, v in cast(dict[Anything, Anything], item).items())
         else:
             yield str(item), next(items, None)
     yield from kwargs.items()
