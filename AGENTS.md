@@ -190,6 +190,10 @@ its POD: the examples in the POD are not tested and can be wrong. Where they
 disagree, run the Perl code from the clone (`perl -Imojo/lib -MMojo::URL -e ...`)
 and port what it does.
 
+A bug or a quirk of Mojolicious itself, found while porting, goes to the issue
+that collects them, with a Perl command that reproduces it at the tag and what
+the port does about it. Reporting it upstream is a decision of its own.
+
 Moving a ported module to a newer target is the difference between the two
 versions, applied to code, tests and docstrings alike:
 
