@@ -183,7 +183,9 @@ git -C mojo checkout v9.49
 For each module:
 
 1. Port its tests from `t/mojo/*.t` first, keeping Mojo's test names and
-   order. Mojo's tests are the specification.
+   order, one assertion for one, without folding repeated ones into a loop,
+   so that the diff of a newer Mojolicious applies to them. Mojo's tests are
+   the specification.
 2. Port the module from `lib/Mojo/*.pm` until the tests pass.
 3. Port its POD into the docstrings: the same sections in the same order
    (synopsis, description, events, attributes, methods, operators, see also)
@@ -197,13 +199,14 @@ For each module:
 5. Check the module off in the porting inventory issue, which lists every
    module of the target Mojolicious with its Pyjoyment counterpart.
 
-Code that has no counterpart in the Mojolicious module, such as a method, a
-branch or a form of an argument for Python only, has a comment that starts
-with `# Not in Mojolicious:` and says what it is for, so that the diff of a
-newer Mojolicious can be applied around it. This lists them:
+Code that has no counterpart in the Mojolicious module or in its test, such
+as a method, a branch, an assertion or a form of an argument for Python
+only, has a comment that starts with `# Not in Mojolicious:` and says what it
+is for, so that the diff of a newer Mojolicious can be applied around it.
+This lists them:
 
 ```sh
-grep -rn "Not in Mojolicious" Pyjo
+grep -rn "Not in Mojolicious" Pyjo t/Pyjo
 ```
 
 It is a comment, not a part of the docstring: the documentation describes
@@ -216,10 +219,10 @@ comment that starts with `# Renamed from Mojolicious:` and names the Mojo
 method, in the module and in its ported tests, where the diff of a newer
 Mojolicious uses the old name.
 
-A method of Mojolicious that is left out on purpose has a comment where it
-would be, in the order of the Mojo module, that starts with
-`# Left out from Mojolicious:`, names the method and says why, so that its
-absence is not taken for an omission.
+A method or an assertion of Mojolicious that is left out on purpose has a
+comment where it would be, in the order of the Mojo module or test, that
+starts with `# Left out from Mojolicious:`, names what is left out and says
+why, so that its absence is not taken for an omission.
 
 Behaviour that differs from Mojolicious on purpose has a comment that starts
 with `# Unlike Mojolicious:`, says what Mojo does, and why the port does
