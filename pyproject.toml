@@ -81,7 +81,7 @@ quote-style = "single"
 [tool.ruff.lint]
 # An explicit list, because newer ruff enables many more rules by default,
 # including N999, which rejects the Mojo-style module names on purpose.
-select = ["B", "E4", "E7", "E9", "F", "I", "UP"]
+select = ["B", "E4", "E7", "E9", "F", "I", "TID251", "UP"]
 ignore = [
   # B018 "Found useless expression. Either assign it to a variable or remove
   # it.": reading an attribute for its side effect is intentional, to build a
@@ -102,7 +102,21 @@ ignore = [
   "F403",
   # F405 "`ok` may be undefined, or defined from star imports"
   "F405",
+  # TID251 "`asyncio` is banned: ...": the tests check how a reactor works
+  # with asyncio.
+  "TID251",
 ]
+# TID251 "`asyncio` is banned: ...": the reactor is the one that uses the
+# event loop, the test harness runs the scripts with asyncio, and the examples
+# are the code of a user.
+"Pyjo/Reactor/**" = ["TID251"]
+"Pyjo/Prove.py" = ["TID251"]
+"examples/**" = ["TID251"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+# Only a reactor uses the event loop, so that another reactor can replace it.
+"asyncio".msg = "only a reactor uses the event loop, use the methods of Pyjo.Reactor"
+
 
 [tool.ruff.lint.isort]
 # Pyjo modules first, then the standard library, like Mojo modules list Mojo::*
@@ -143,6 +157,8 @@ strict = [
   "Pyjo/Parameters.py",
   "Pyjo/Path.py",
   "Pyjo/Prove.py",
+  "Pyjo/Reactor/__init__.py",
+  "Pyjo/Reactor/Asyncio.py",
   "Pyjo/String/Bytes.py",
   "Pyjo/String/Unicode.py",
   "Pyjo/Test.py",

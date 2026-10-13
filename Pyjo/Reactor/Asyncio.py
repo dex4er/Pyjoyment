@@ -1,0 +1,427 @@
+"""
+Pyjo.Reactor.Asyncio - Low-level event reactor on asyncio
+=========================================================
+::
+
+    import Pyjo.Reactor.Asyncio
+
+    # Watch if handle becomes readable or writable
+    reactor = Pyjo.Reactor.Asyncio.new()
+    reactor.io(first, lambda reactor, writable: print(
+        'First handle is writable' if writable else 'First handle is readable'
+    ))
+
+    # Change to watching only if handle becomes writable
+    reactor.watch(first, False, True)
+
+    # Watch a file descriptor if it becomes readable
+    reactor.io(fd, lambda reactor, writable: print(
+        'Second handle is writable' if writable else 'Second handle is readable'
+    )).watch(fd, True, False)
+
+    # Add a timer
+    def timeout(reactor):
+        reactor.remove(first)
+        reactor.remove(fd)
+        print('Timeout!')
+
+    reactor.timer(15, timeout)
+
+    # Start reactor if necessary
+    if not reactor.is_running:
+        reactor.start()
+
+:mod:`Pyjo.Reactor.Asyncio` is a low-level event reactor based on
+:mod:`asyncio`. It watches handles and runs timers in an asyncio event loop,
+so coroutines, tasks and other users of the loop run along with it.
+
+A reactor uses the event loop it is given, the loop that is running when it
+is created, or a new event loop of its own. In a loop that runs already, as
+inside :func:`asyncio.run`, :meth:`start` and :meth:`one_tick` return right
+away, as asyncio does not nest event loops, and the handles and timers are
+watched by that loop.
+
+See also
+--------
+
+:mod:`Pyjoyment`, https://mojolicious.org.
+
+Ported from `Mojo::Reactor::Poll <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/Reactor/Poll.pm>`_
+of Mojolicious 9.49.
+"""
+
+import Pyjo.Exception
+import Pyjo.Reactor
+
+from Pyjo.Reactor import Handle, IOCallback, TimerCallback
+from Pyjo.Util import md5_sum
+
+import asyncio
+import random
+import time
+
+from typing import Any, Self, TypedDict
+
+
+class _IO(TypedDict):
+    cb: IOCallback
+    read: bool
+    write: bool
+
+
+class _Timer(TypedDict):
+    cb: TimerCallback | None
+    after: float
+    recurring: bool
+    handle: asyncio.TimerHandle
+
+
+class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
+    """
+    :mod:`Pyjo.Reactor.Asyncio` inherits all methods from
+    :mod:`Pyjo.Reactor` and implements the following new ones.
+    """
+
+    def __init__(self, loop: asyncio.AbstractEventLoop | None = None) -> None:
+        """::
+
+            reactor = Pyjo.Reactor.Asyncio.new()
+            reactor = Pyjo.Reactor.Asyncio.new(loop=asyncio.new_event_loop())
+
+        Construct a new :mod:`Pyjo.Reactor.Asyncio` object.
+        """
+        super().__init__()
+
+        # Not in Mojolicious: the asyncio event loop
+        if loop is None:
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                self._own = True
+        self.loop = loop
+        """::
+
+            loop = reactor.loop
+
+        The :mod:`asyncio` event loop of the reactor.
+        """
+
+        self._error: BaseException | None = None
+        self._io: dict[int, _IO] = {}
+        self._next_tick: list[TimerCallback] = []
+        self._next_timer: str | None = None
+        self._one = 0
+        self._running = 0
+        self._timers: dict[str, _Timer] = {}
+
+    _own = False
+
+    def __del__(self) -> None:
+        # Not in Mojolicious: the event loop of the reactor is closed with it
+        loop = getattr(self, 'loop', None)
+        if self._own and loop is not None and not loop.is_running() and not loop.is_closed():
+            loop.close()
+
+    def again(self, id: str, after: float | None = None) -> None:
+        """::
+
+            reactor.again(id)
+            reactor.again(id, 0.5)
+
+        Restart timer and optionally change the invocation time. Note that this
+        method requires an active timer.
+        """
+        if (timer := self._timers.get(id)) is None:
+            Pyjo.Exception.object.throw('Timer not active')
+        if after is not None:
+            timer['after'] = after
+        timer['handle'].cancel()
+        timer['handle'] = self.loop.call_later(timer['after'], self._alarm, id)
+
+    def io(self, handle: Handle, cb: IOCallback) -> Self:
+        """::
+
+            reactor = reactor.io(handle, cb)
+
+        Watch handle for I/O events, invoking the callback whenever handle
+        becomes readable or writable. ::
+
+            # Callback will be executed twice if handle becomes readable and writable
+            reactor.io(handle, lambda reactor, writable: print('Handle is writable' if writable else 'Handle is readable'))
+        """
+        self._io[_fileno(handle)] = {'cb': cb, 'read': False, 'write': False}
+        return self.watch(handle, True, True)
+
+    @property
+    def is_running(self) -> bool:
+        """::
+
+            boolean = reactor.is_running
+
+        Check if reactor is running.
+        """
+        return bool(self._running)
+
+    def next_tick(self, cb: TimerCallback) -> None:
+        """::
+
+            none = reactor.next_tick(cb)
+
+        Execute callback as soon as possible, but not before returning or other
+        callbacks that have been registered with this method, always returns
+        ``None``.
+        """
+        self._next_tick.append(cb)
+        if self._next_timer is None:
+            self._next_timer = self.timer(0, Pyjo_Reactor_Asyncio._next)
+        return None
+
+    def one_tick(self) -> None:
+        """::
+
+            reactor.one_tick()
+
+        Run reactor until an event occurs or no events are being watched
+        anymore. ::
+
+            # Don't block longer than 0.5 seconds
+            id = reactor.timer(0.5, lambda reactor: None)
+            reactor.one_tick()
+            reactor.remove(id)
+        """
+        # Just one tick
+        running = self._running
+        if not running:
+            self._running = 1
+
+        try:
+            # Stop automatically if there is nothing to watch
+            if not len(self._timers) and not len(self._io):
+                return self.stop()
+
+            # Unlike Mojolicious: asyncio does not nest event loops, the one that runs already watches the events
+            loop = self.loop
+            if loop.is_running():
+                return
+
+            # Wait for one event
+            self._one += 1
+            try:
+                loop.run_forever()
+            finally:
+                self._one -= 1
+
+            # An exception of an unhandled error event
+            if (error := self._error) is not None:
+                self._error = None
+                raise error
+        finally:
+            if not running:
+                self._running = running
+
+    def recurring(self, after: float, cb: TimerCallback) -> str:
+        """::
+
+            id = reactor.recurring(0.25, cb)
+
+        Create a new recurring timer, invoking the callback repeatedly after a
+        given amount of time in seconds.
+        """
+        return self._timer(True, after, cb)
+
+    def remove(self, remove: Handle | str) -> bool:
+        """::
+
+            boolean = reactor.remove(handle)
+            boolean = reactor.remove(id)
+
+        Remove handle or timer.
+        """
+        if isinstance(remove, str):
+            if (timer := self._timers.pop(remove, None)) is None:
+                return False
+            timer['handle'].cancel()
+            return True
+        fd = _fileno(remove)
+        if (io := self._io.pop(fd, None)) is None:
+            return False
+        self._unwatch(fd, io)
+        return True
+
+    def reset(self) -> None:
+        """::
+
+            reactor.reset()
+
+        Remove all handles and timers.
+        """
+        for fd, io in self._io.items():
+            self._unwatch(fd, io)
+        for timer in self._timers.values():
+            timer['handle'].cancel()
+        self._events = {}
+        self._io = {}
+        self._next_tick = []
+        self._next_timer = None
+        self._running = 0
+        self._timers = {}
+        self._stop()
+
+    def start(self) -> None:
+        """::
+
+            reactor.start()
+
+        Start watching for I/O and timer events, this will block until
+        :meth:`stop` is called or no events are being watched anymore. ::
+
+            # Start reactor only if it is not running already
+            if not reactor.is_running:
+                reactor.start()
+        """
+        running = self._running
+        self._running = running + 1
+        try:
+            # Unlike Mojolicious: asyncio does not nest event loops, the one that runs already watches the events
+            while self._running and not self.loop.is_running():
+                self.one_tick()
+        finally:
+            self._running = running
+
+    def stop(self) -> None:
+        """::
+
+            reactor.stop()
+
+        Stop watching for I/O and timer events.
+        """
+        self._running = 0
+        self._stop()
+
+    def timer(self, after: float, cb: TimerCallback) -> str:
+        """::
+
+            id = reactor.timer(0.5, cb)
+
+        Create a new timer, invoking the callback after a given amount of time
+        in seconds.
+        """
+        return self._timer(False, after, cb)
+
+    def watch(self, handle: Handle, read: bool, write: bool) -> Self:
+        """::
+
+            reactor = reactor.watch(handle, readable, writable)
+
+        Change I/O events to watch handle for with true and false values. Note
+        that this method requires an active I/O watcher. ::
+
+            # Watch only for readable events
+            reactor.watch(handle, True, False)
+
+            # Watch only for writable events
+            reactor.watch(handle, False, True)
+
+            # Watch for readable and writable events
+            reactor.watch(handle, True, True)
+
+            # Pause watching for events
+            reactor.watch(handle, False, False)
+        """
+        fd = _fileno(handle)
+        if (io := self._io.get(fd)) is None:
+            Pyjo.Exception.object.throw('I/O watcher not active')
+
+        self._unwatch(fd, io)
+        loop = self.loop
+        if read:
+            loop.add_reader(fd, self._ready, fd, False)
+        if write:
+            loop.add_writer(fd, self._ready, fd, True)
+        io['read'], io['write'] = bool(read), bool(write)
+
+        return self
+
+    # A timer is due
+    def _alarm(self, id: str) -> None:
+        if (timer := self._timers.get(id)) is None:
+            return
+
+        # Recurring timer
+        if timer['recurring']:
+            timer['handle'] = self.loop.call_later(timer['after'], self._alarm, id)
+
+        # Normal timer
+        else:
+            self.remove(id)
+
+        if (cb := timer['cb']) is not None:
+            self._event('Timer', cb)
+
+    # An event of a watcher or a timer, which ends one_tick
+    def _event(self, what: str, cb: Any, *args: Any) -> None:
+        try:
+            self._try(what, cb, *args)
+        except Exception as e:
+            # Not in Mojolicious: asyncio logs an exception of a callback, Perl dies out of one_tick, so it is kept and
+            # raised by one_tick, unless the loop runs without it
+            if not self._one:
+                raise
+            self._error = e
+        if self._one:
+            self._stop()
+
+    def _id(self) -> str:
+        while True:
+            id = md5_sum(f't{time.monotonic()}{random.random()}'.encode())
+            if id not in self._timers:
+                return id
+
+    def _next(self) -> None:
+        self._next_timer = None
+        while len(self._next_tick):
+            self._next_tick.pop(0)(self)
+
+    # A handle is ready
+    def _ready(self, fd: int, writable: bool) -> None:
+        if (io := self._io.get(fd)) is not None:
+            self._event('I/O watcher', io['cb'], writable)
+
+    def _stop(self) -> None:
+        if self._one and self.loop.is_running():
+            self.loop.stop()
+
+    def _timer(self, recurring: bool, after: float, cb: TimerCallback) -> str:
+        id = self._id()
+        handle = self.loop.call_later(after, self._alarm, id)
+        self._timers[id] = {'cb': cb, 'after': after, 'recurring': recurring, 'handle': handle}
+        return id
+
+    def _try(self, what: str, cb: Any, *args: Any) -> None:
+        try:
+            cb(self, *args)
+        except Exception as e:
+            # Unlike Mojolicious: the message of Python has no file and line, the exception keeps the frames
+            err = Pyjo.Exception.new(e)
+            err.message = f'{what} failed: {err.message}'
+            err.__cause__ = e
+            self.emit('error', err)
+
+    def _unwatch(self, fd: int, io: _IO) -> None:
+        if io['read']:
+            self.loop.remove_reader(fd)
+        if io['write']:
+            self.loop.remove_writer(fd)
+        io['read'] = io['write'] = False
+
+
+def _fileno(handle: Handle) -> int:
+    fd = handle if isinstance(handle, int) else handle.fileno()
+    if fd < 0:
+        Pyjo.Exception.object.throw('Handle is closed')
+    return fd
+
+
+new = Pyjo_Reactor_Asyncio.new
+object = Pyjo_Reactor_Asyncio

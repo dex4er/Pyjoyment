@@ -138,7 +138,7 @@ class Pyjo_IOLoop_Stream(Pyjo.EventEmitter.object):
         """::
 
             reactor = stream.reactor
-            stream.reactor = Pyjo.Reactor.Poll.new()
+            stream.reactor = Pyjo.Reactor.Asyncio.new()
 
         Low-level event reactor, defaults to the :attr:`reactor` attribute value of the
         global :mod:`Pyjo.IOLoop` singleton.
@@ -269,7 +269,7 @@ class Pyjo_IOLoop_Stream(Pyjo.EventEmitter.object):
                 else:
                     stream._read()
 
-        reactor.io(read_write_cb, self.set(timeout=self._timeout).handle)
+        reactor.io(self.set(timeout=self._timeout).handle, read_write_cb)
 
     def stop(self):
         """::
@@ -325,7 +325,7 @@ class Pyjo_IOLoop_Stream(Pyjo.EventEmitter.object):
             if isalive(stream):
                 stream.emit('timeout').close()
 
-        self._timer = reactor.timer(timeout_cb, value)
+        self._timer = reactor.timer(value, timeout_cb)
 
     def write(self, chunk, cb=None):
         """::
