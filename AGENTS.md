@@ -82,7 +82,7 @@ with `Pyjo.Test`, which is inspired by Perl's `Test::More`. They run with
 `Pyjo.Prove`, a TAP harness inspired by Perl's `prove`:
 
 ```sh
-PYTHONPATH=. mise exec -- python -m Pyjo.Prove -j 4 t/Pyjo t/docs t/examples
+PYTHONPATH=. mise exec -- python -m Pyjo.Prove -j 4 -r t
 ```
 
 A single file runs on its own as well:
@@ -93,7 +93,8 @@ because the output is standard TAP; `.proverc` supplies its
 - `t/Pyjo/` holds the module tests, ported from Mojo's `t/mojo/*.t`.
 - `t/docs/` checks the examples from the module documentation.
 - `t/examples/` runs the scripts from `examples/`.
-- `t/lib/` holds helpers shared by the tests.
+- `t/lib/` holds helpers shared by the tests. Run on their own, they skip with
+  `plan(skip_all=...)`, so `-r t` reports them as skipped instead of failing.
 
 A test script imports the test functions and groups its tests in subtests,
 like Mojo's tests do; Python keywords give some functions an `_ok` suffix

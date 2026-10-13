@@ -14,3 +14,9 @@ class Value:
     def inc(self):
         self.value += 1
         return self.value
+
+
+if __name__ == '__main__':
+    from Pyjo.Test import plan
+
+    plan(skip_all='helper module, not a test')

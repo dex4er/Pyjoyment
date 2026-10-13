@@ -7,7 +7,7 @@ if __name__ == '__main__':
 
     from Pyjo.Util import slurp, u
 
-    from t.lib.TemporaryDirectory import TemporaryDirectory
+    from tempfile import TemporaryDirectory
 
     import Pyjo.Log
 

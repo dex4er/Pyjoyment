@@ -61,7 +61,7 @@ jobs:
       - name: Run tests
         run: |
           python --version
-          python -m Pyjo.Prove -j 4 t/Pyjo t/docs t/examples
+          python -m Pyjo.Prove -j 4 -r t
 
   build:
     name: build
