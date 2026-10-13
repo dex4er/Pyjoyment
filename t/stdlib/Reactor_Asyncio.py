@@ -76,6 +76,25 @@ with subtest('Unhandled error raised by start'):
         isa_ok(e.__cause__.__cause__, ValueError, 'cause of the error')
     ok(not reactor.is_running, 'not running')
 
+with subtest('Handles and timers move to the loop that is running'):
+    reactor = Pyjo.Reactor.Asyncio.new()
+    got = []
+    reactor.timer(0.01, lambda reactor: got.append(asyncio.get_running_loop()))
+    own = reactor.loop
+
+    async def outer():
+        # the reactor moves when it is used in the running loop
+        reactor.loop
+        await asyncio.sleep(0.05)
+        return asyncio.get_running_loop()
+
+    running = asyncio.run(outer())
+    is_deeply_ok(got, [running], 'the timer ran in the loop that was running')
+    reactor.timer(0, lambda reactor: got.append('back'))
+    reactor.start()
+    is_ok(got[-1], 'back', 'and back in a loop of its own')
+    ok(reactor.loop is own, 'the same loop of its own')
+
 with subtest('Handles'):
     reactor = Pyjo.Reactor.Asyncio.new()
     a, b = socket.socketpair()

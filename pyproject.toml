@@ -157,6 +157,7 @@ strict = [
   "Pyjo/Log.py",
   "Pyjo/Parameters.py",
   "Pyjo/Path.py",
+  "Pyjo/Promise.py",
   "Pyjo/Prove.py",
   "Pyjo/Reactor/__init__.py",
   "Pyjo/Reactor/Asyncio.py",
