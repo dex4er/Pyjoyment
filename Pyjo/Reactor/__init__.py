@@ -49,7 +49,11 @@ to, and the ``PYJO_REACTOR`` environment variable selects one for
 :mod:`Pyjo.IOLoop`. A reactor on another implementation of the asyncio event
 loop, like uvloop, is a subclass of :mod:`Pyjo.Reactor.Asyncio`, and one on
 an event loop that is not asyncio's, like the ones of Trio or gevent,
-implements the methods of :mod:`Pyjo.Reactor`. ::
+implements the methods of :mod:`Pyjo.Reactor`.
+
+A reactor is a module named ``Pyjo.Reactor.<Name>``, with a function ``new``
+that constructs it and the class as ``object``, as the modules of Pyjoyment
+have them. ::
 
     # Pyjo/Reactor/MyLoop.py of another distribution
     import Pyjo.Reactor.Asyncio
@@ -64,7 +68,19 @@ implements the methods of :mod:`Pyjo.Reactor`. ::
     new = Pyjo_Reactor_MyLoop.new
     object = Pyjo_Reactor_MyLoop
 
-and::
+The distribution contains the module and no ``__init__.py`` of ``Pyjo`` or
+``Pyjo.Reactor``: those of Pyjoyment have the base class and keep the
+namespace open with :func:`pkgutil.extend_path`, and another one would
+replace them when both are installed in the same directory. Its package
+depends on Pyjoyment and holds only the files of its own reactor::
+
+    Pyjo/
+        Reactor/
+            MyLoop.py
+
+The reactor is found when the distribution is installed next to Pyjoyment or
+in another directory of :data:`sys.path`, and the environment variable
+selects it::
 
     PYJO_REACTOR=Pyjo.Reactor.MyLoop
 
