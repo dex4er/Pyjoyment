@@ -82,7 +82,7 @@ import Pyjo.Upload
 
 from Pyjo.JSON import j
 from Pyjo.Regexp import r
-from Pyjo.Util import convert, getenv, not_implemented, notnone, u
+from Pyjo.Util import convert, decode, getenv, not_implemented, notnone, u
 
 
 re_filename = r(r'[; ]filename="((?:\\"|[^"])*)"')
@@ -747,21 +747,12 @@ class Pyjo_Message(Pyjo.EventEmitter.object):
                 part = part.asset.slurp()
 
             if charset:
-                if name:
-                    try:
-                        name = u(name, charset)
-                    except:
-                        pass
-                if filename:
-                    try:
-                        filename = u(filename, charset)
-                    except:
-                        pass
-                if not upload:
-                    try:
-                        part = u(part, charset)
-                    except:
-                        pass
+                if name and (decoded := decode(charset, name)) is not None:
+                    name = decoded
+                if filename and (decoded := decode(charset, filename)) is not None:
+                    filename = decoded
+                if not upload and (decoded := decode(charset, part)) is not None:
+                    part = decoded
 
             yield name, part, filename
 

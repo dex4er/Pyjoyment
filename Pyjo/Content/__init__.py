@@ -700,7 +700,7 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
         self._state = 'body'
 
         # Take care of leftovers
-        leftovers = self._pre_buffer = headers.leftovers
+        leftovers = self._pre_buffer = bytearray(headers.leftovers())
         self._header_size = self._raw_size - len(leftovers)
 
     def _parse_chunked_trailing_headers(self):
@@ -711,7 +711,7 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
         self._chunk_state = 'finished'
 
         # Take care of leftover and replace Transfer-Encoding with Content-Length
-        self._buffer.extend(headers.leftovers)
+        self._buffer.extend(headers.leftovers())
         headers.remove('Transfer-Encoding')
         if not headers.content_length:
             headers.content_length = self._real_size
