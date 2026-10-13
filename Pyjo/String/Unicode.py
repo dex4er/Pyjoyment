@@ -136,7 +136,7 @@ class Pyjo_String_Unicode(str):
         Escape only the characters ``&``, ``<``, ``>``, ``"`` and ``'`` in
         unicode string with :func:`Pyjo.Util.xml_escape`.
         """
-        return self.new(Pyjo.Util.xml_escape(self))
+        return self.new(Pyjo.Util.xml_escape(str(self)))
 
 
 def u(value='', charset=DEFAULT_CHARSET):

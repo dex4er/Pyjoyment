@@ -3,12 +3,12 @@ Pyjo.Util - Portable utility functions
 ======================================
 ::
 
-    from Pyjo.Util import b, b64_encode, u, url_escape, url_unescape
+    from Pyjo.Util import b64_encode, url_escape, url_unescape
 
     string = 'test=23'
-    escaped = url_escape(b(string))
-    print(u(url_unescape(escaped)))
-    print(b64_encode(escaped, ''))
+    escaped = url_escape(string)
+    print(url_unescape(escaped))
+    print(b64_encode(escaped.encode(), ''))
 
 :mod:`Pyjo.Util` provides portable utility functions for :mod:`Pyjo`.
 
@@ -19,16 +19,21 @@ Functions
 from Pyjo.Regexp import r
 
 import base64
-import binascii
+import codecs
 import functools
 import hashlib
+import hmac
 import os
 import random
 import re
 import select
 import sys
 import time
+import unicodedata
+import zlib
 
+from gzip import compress as _gzip_compress
+from gzip import decompress as _gzip_decompress
 from typing import Any, overload
 
 
@@ -37,6 +42,9 @@ class Error(Exception):
 
 
 DEFAULT_CHARSET = 'utf-8'
+
+# HTML entities
+_RE_ENTITY = re.compile(r'&(?:\#((?:[0-9]{1,7}|x[0-9a-fA-F]{1,6}));|(\w+[;=]?))')
 
 
 def b(unicodestring, charset=DEFAULT_CHARSET, errors='strict'):
@@ -54,33 +62,55 @@ def b(unicodestring, charset=DEFAULT_CHARSET, errors='strict'):
         return bytes(str(unicodestring), charset, errors)
 
 
-def b64_decode(unicodestring):
+def b64_decode(b64: str | bytes) -> bytes:
     """::
 
-        bytestring = b64_decode(unicodestring)
+        data = b64_decode(b64)
 
-    Base64 decode bytes. Ignores errors.
+    Base64 decode bytes, ignoring the characters that are not Base64 and the
+    ones after the padding, as :mod:`MIME::Base64` does.
     """
-    for _ in range(6):
-        try:
-            return base64.b64decode(unicodestring)
-        except binascii.Error:
-            unicodestring = unicodestring[:-1]
-    return b''
+    if isinstance(b64, str):
+        b64 = b64.encode('latin-1', 'ignore')
+    b64 = re.sub(rb'[^A-Za-z0-9+/=]', b'', b64).split(b'=', 1)[0]
+    if len(b64) % 4 == 1:
+        b64 = b64[:-1]
+    return base64.b64decode(b64 + b'=' * (-len(b64) % 4))
 
 
-re_chars_76 = r('(.{76})')
-
-
-def b64_encode(bstring, sep='\n'):
+def b64_encode(data: bytes, eol: str = '\n') -> str:
     r"""::
 
-        asciistring = b64_encode(bytestring)
-        asciistring = b64_encode(bytestring, "\n")
+        b64 = b64_encode(data)
+        b64 = b64_encode(data, "\n")
 
     Base64 encode bytes, the line ending defaults to a newline.
     """
-    return re_chars_76.sub(lambda m: m.group(1) + sep, u(base64.b64encode(bstring), 'ascii'))
+    b64 = base64.b64encode(data).decode('ascii')
+    return ''.join(b64[i : i + 76] + eol for i in range(0, len(b64), 76))
+
+
+def camelize(string: str) -> str:
+    """::
+
+        camelcase = camelize(snakecase)
+
+    Convert ``snake_case`` string to ``CamelCase`` and replace ``-`` with ``::``. ::
+
+        # "FooBar"
+        camelize('foo_bar')
+
+        # "FooBar::Baz"
+        camelize('foo_bar-baz')
+
+        # "FooBar::Baz"
+        camelize('FooBar::Baz')
+    """
+    if re.match(r'[A-Z]', string):
+        return string
+
+    # CamelCase words
+    return '::'.join(''.join(_ucfirst(w.lower()) for w in _split('_', part)) for part in _split('-', string))
 
 
 def convert(value, newtype, default=None):
@@ -100,6 +130,31 @@ def convert(value, newtype, default=None):
         return default
 
 
+def decamelize(string: str) -> str:
+    """::
+
+        snakecase = decamelize(camelcase)
+
+    Convert ``CamelCase`` string to ``snake_case`` and replace ``::`` with ``-``. ::
+
+        # "foo_bar"
+        decamelize('FooBar')
+
+        # "foo_bar-baz"
+        decamelize('FooBar::Baz')
+
+        # "foo_bar-baz"
+        decamelize('foo_bar-baz')
+    """
+    if not re.match(r'[A-Z]', string):
+        return string
+
+    # snake_case words
+    return '-'.join(
+        '_'.join(w.lower() for w in re.split(r'([A-Z]{1}[^A-Z]*)', part) if len(w)) for part in _split('::', string)
+    )
+
+
 def decode(charset: str, data: str | bytes) -> str | None:
     """::
 
@@ -115,7 +170,7 @@ def decode(charset: str, data: str | bytes) -> str | None:
         except UnicodeEncodeError:
             return None
     try:
-        return data.decode(charset)
+        return codecs.lookup(charset).decode(data)[0]
     except (LookupError, UnicodeDecodeError):
         return None
 
@@ -203,9 +258,14 @@ def encode(charset: str, chars: str) -> bytes:
 
         data = encode('UTF-8', chars)
 
-    Encode characters to bytes.
+    Encode characters to bytes. A character that the encoding cannot
+    represent becomes a replacement character.
     """
-    return chars.encode(charset)
+    try:
+        codecs.lookup(charset)
+    except LookupError:
+        raise LookupError(f"Unknown encoding '{charset}'") from None
+    return chars.encode(charset, 'replace')
 
 
 def getenv(name, default=None):
@@ -220,7 +280,27 @@ def getenv(name, default=None):
     return os.environ.get(name, default)
 
 
-re_entity = r(r'&(?:\#((?:\d{1,7}|x[0-9a-fA-F]{1,6}));|(\w+;?))')
+def gunzip(compressed: bytes) -> bytes:
+    """::
+
+        uncompressed = gunzip(compressed)
+
+    Uncompress bytes with :mod:`gzip`.
+    """
+    try:
+        return _gzip_decompress(compressed)
+    except (EOFError, OSError, zlib.error) as e:
+        raise ValueError(f"Couldn't gunzip: {e}") from e
+
+
+def gzip(uncompressed: bytes) -> bytes:
+    """::
+
+        compressed = gzip(uncompressed)
+
+    Compress bytes with :mod:`gzip`.
+    """
+    return _gzip_compress(uncompressed)
 
 
 re_param_name = re.compile(r'[;\s]*([^=;, ]+)\s*')
@@ -254,17 +334,62 @@ def header_params(value: str) -> tuple[dict[str, str], str]:
     return params, value[pos:]
 
 
-def html_unescape(unicodestring):
+def hmac_sha1_sum(data: bytes, secret: bytes) -> str:
     """::
 
-        unicodestring = html_unescape(unicodestring)
+        checksum = hmac_sha1_sum(data, b'passw0rd')
+
+    Generate HMAC-SHA1 checksum for bytes with :mod:`hmac`. ::
+
+        # "11cedfd5ec11adc0ec234466d8a0f2a83736aa68"
+        hmac_sha1_sum(b'foo', b'passw0rd')
+    """
+    return hmac.new(secret, data, hashlib.sha1).hexdigest()
+
+
+def html_unescape(string: str) -> str:
+    """::
+
+        string = html_unescape(escaped)
 
     Unescape all HTML entities in string. ::
 
-        # '<div>'
+        # "<div>"
         html_unescape('&lt;div&gt;')
     """
-    return re_entity.sub(lambda m: _decode(m.group(1), m.group(2)), unicodestring)
+    return _html(string, False)
+
+
+def humanize_bytes(size: int | float) -> str:
+    """::
+
+        string = humanize_bytes(1234)
+
+    Turn number of bytes into a simplified human readable format. ::
+
+        # "1B"
+        humanize_bytes(1)
+
+        # "7.5GiB"
+        humanize_bytes(8007188480)
+
+        # "13GiB"
+        humanize_bytes(13443399680)
+
+        # "-685MiB"
+        humanize_bytes(-717946880)
+    """
+    prefix = '-' if size < 0 else ''
+
+    if (size := abs(size)) < 1024:
+        return f'{prefix}{size}B'
+    if (size := size / 1024) < 1024:
+        return f'{prefix}{_round(size)}KiB'
+    if (size := size / 1024) < 1024:
+        return f'{prefix}{_round(size)}MiB'
+    if (size := size / 1024) < 1024:
+        return f'{prefix}{_round(size)}GiB'
+    return f'{prefix}{_round(size / 1024)}TiB'
 
 
 def isbytes(obj):
@@ -321,34 +446,27 @@ def isunicode(obj):
     return isinstance(obj, str)
 
 
-def md5_bytes(bytestring):
-    r"""::
-
-        md5 = md5_bytes(bytestring)
-
-    Generate binary MD5 checksum for bytes. ::
-
-        # b'\xac\xbd\x18\xdbL\xc2\xf8\\\xed\xefeO\xcc\xc4\xa4\xd8'
-        md5_bytes(b'foo')
-    """
-    m = hashlib.md5()
-    m.update(bytestring)
-    return m.hexdigest()
-
-
-def md5_sum(bytestring):
+def md5_bytes(data: bytes) -> bytes:
     """::
 
-        md5 = md5_sum(bytestring)
+        checksum = md5_bytes(data)
 
-    Generate MD5 checksum for bytes. ::
+    Generate binary MD5 checksum for bytes with :mod:`hashlib`.
+    """
+    return hashlib.md5(data).digest()
 
-        # 'acbd18db4cc2f85cedef654fccc4a4d8'
+
+def md5_sum(data: bytes) -> str:
+    """::
+
+        checksum = md5_sum(data)
+
+    Generate MD5 checksum for bytes with :mod:`hashlib`. ::
+
+        # "acbd18db4cc2f85cedef654fccc4a4d8"
         md5_sum(b'foo')
     """
-    m = hashlib.md5()
-    m.update(bytestring)
-    return m.hexdigest()
+    return hashlib.md5(data).hexdigest()
 
 
 def not_implemented(method):
@@ -458,6 +576,20 @@ def rand(value=1):
     return random.random() * value
 
 
+def secure_compare(one: str | bytes, two: str | bytes) -> bool:
+    """::
+
+        boolean = secure_compare(string1, string2)
+
+    Constant time comparison algorithm to prevent timing attacks. The secret
+    string should be the second argument, to avoid leaking information about
+    the length of the string.
+    """
+    return hmac.compare_digest(
+        one.encode('UTF-8') if isinstance(one, str) else one, two.encode('UTF-8') if isinstance(two, str) else two
+    )
+
+
 def setenv(name, value):
     """::
 
@@ -470,6 +602,29 @@ def setenv(name, value):
             del os.environ[name]
     else:
         os.environ.update({name: value})
+
+
+def sha1_bytes(data: bytes) -> bytes:
+    """::
+
+        checksum = sha1_bytes(data)
+
+    Generate binary SHA1 checksum for bytes with :mod:`hashlib`.
+    """
+    return hashlib.sha1(data).digest()
+
+
+def sha1_sum(data: bytes) -> str:
+    """::
+
+        checksum = sha1_sum(data)
+
+    Generate SHA1 checksum for bytes with :mod:`hashlib`. ::
+
+        # "0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33"
+        sha1_sum(b'foo')
+    """
+    return hashlib.sha1(data).hexdigest()
 
 
 def slurp(path, charset=DEFAULT_CHARSET):
@@ -493,6 +648,40 @@ def slurpb(path):
     """
     with open(path, 'rb') as f:
         return b(f.read())
+
+
+def slugify(value: str | int, allow_unicode: bool = False) -> str:
+    """::
+
+        slug = slugify(string)
+        slug = slugify(string, boolean)
+
+    Returns a URL slug generated from the input string. Non-word characters are
+    removed, the string is trimmed and lowercased, and whitespace characters
+    are replaced by a dash. By default, non-ASCII characters are normalized to
+    ASCII word characters or removed, but if a true value is passed as the
+    second parameter, all word characters will be allowed in the result
+    according to unicode semantics. ::
+
+        # "joel-is-a-slug"
+        slugify('Joel is a slug')
+
+        # "this-is-my-resume"
+        slugify('This is: my - résumé! ☃ ')
+
+        # "this-is-my-résumé"
+        slugify('This is: my - résumé! ☃ ', True)
+    """
+    if allow_unicode:
+        # Perl's \w matches the combining marks, Python's does not
+        value = ''.join(
+            c
+            for c in unicodedata.normalize('NFKC', str(value))
+            if re.match(r'[\w\s-]', c) or unicodedata.category(c).startswith('M')
+        )
+    else:
+        value = re.sub(r'[^a-zA-Z0-9_\t\n\x0b\f\r -]+', '', unicodedata.normalize('NFKD', str(value)))
+    return re.sub(r'[-\s]+', '-', trim(value).lower())
 
 
 # Any: the tokens are str or bytes, like the string
@@ -577,21 +766,30 @@ def squish(string):
 steady_time = time.time
 
 
-re_whitespaces_starts = r(r'^\s+')
-re_whitespaces_ends = r(r'\s+$')
+def term_escape(string: str) -> str:
+    r"""::
+
+        escaped = term_escape(string)
+
+    Escape all POSIX control characters except for ``\n``. ::
+
+        # "foo\\x09bar\\x0d\n"
+        term_escape("foo\tbar\r\n")
+    """
+    return re.sub(r'[\x00-\x09\x0b-\x1f\x7f\x80-\x9f]', lambda m: f'\\x{ord(m[0]):02x}', string)
 
 
-def trim(string):
+def trim(string: str) -> str:
     """::
 
         trimmed = trim(string)
 
     Trim whitespace characters from both ends of string. ::
 
-        # 'foo bar'
+        # "foo bar"
         trim('  foo bar  ')
     """
-    return re_whitespaces_starts.sub('', re_whitespaces_ends.sub('', string, 1), 1)
+    return re.sub(r'\s+\Z', '', re.sub(r'\A\s+', '', string))
 
 
 def u(string, charset=DEFAULT_CHARSET):
@@ -608,86 +806,94 @@ def u(string, charset=DEFAULT_CHARSET):
         return str(string)
 
 
-re_b_unquote = r(rb'^"(.*)"$')
-re_b_unquote2 = r(rb'\\\\')
-re_b_unquote3 = r(rb'\\"')
-re_u_unquote = r(r'^"(.*)"$')
-re_u_unquote2 = r(r'\\\\')
-re_u_unquote3 = r(r'\\"')
+def unindent(string: str) -> str:
+    r"""::
+
+        unindented = unindent(string)
+
+    Unindent multi-line string. ::
+
+        # "foo\nbar\nbaz\n"
+        unindent("  foo\n  bar\n  baz\n")
+    """
+    indents = [len(m[0]) for line in string.split('\n') if (m := re.match(r'[ \t]*', line)) and len(m[0])]
+    if indents:
+        string = re.sub(rf'^[ \t]{{0,{min(indents)}}}', '', string, flags=re.M)
+    return string
 
 
-def unquote(string):
+@overload
+def unquote(string: str) -> str: ...
+
+
+@overload
+def unquote(string: bytes) -> bytes: ...
+
+
+def unquote(string: str | bytes) -> str | bytes:
     """::
 
         string = unquote(quoted)
 
     Unquote string.
     """
-    if isbytes(string):
-        string, n = re_b_unquote.subn(lambda m: m.group(1), bytes(string))
-        if n:
-            string = re_b_unquote2.sub(rb'\\', string)
-            string = re_b_unquote3.sub(rb'"', string)
-    else:
-        string, n = re_u_unquote.subn(lambda m: m.group(1), string)
-        if n:
-            string = re_u_unquote2.sub(r'\\', string)
-            string = re_u_unquote3.sub(r'"', string)
-    return string
+    if isinstance(string, str):
+        string, n = re.subn(r'^"(.*)"$', lambda m: m[1], string)
+        return string.replace('\\\\', '\\').replace('\\"', '"') if n else string
+    string, n = re.subn(rb'^"(.*)"$', lambda m: m[1], bytes(string))
+    return string.replace(b'\\\\', b'\\').replace(b'\\"', b'"') if n else string
 
 
-re_url_allow_chars = r(rb'([^A-Za-z0-9\-._~])')
+@overload
+def url_escape(string: str, pattern: str | None = None) -> str: ...
 
 
-def url_escape(bstring: bytes, pattern: bytes | None = None) -> bytes:
+@overload
+def url_escape(string: bytes, pattern: bytes | None = None) -> bytes: ...
+
+
+def url_escape(string: str | bytes, pattern: str | bytes | None = None) -> str | bytes:
     r"""::
 
         escaped = url_escape(string)
         escaped = url_escape(string, r'^A-Za-z0-9\-._~')
 
-    Percent encode unsafe characters in string as described in
-    :rfc:`3986`, the pattern used defaults to
-    ``^A-Za-z0-9\-._~``. ::
+    Percent encode unsafe characters in string as described in :rfc:`3986`,
+    the pattern used defaults to ``^A-Za-z0-9\-._~``. ::
 
-        # 'foo%3Bbar'
+        # "foo%3Bbar"
         url_escape('foo;bar')
     """
-    if pattern is not None:
-        pattern = b'([' + pattern + b'])'
-        re_pattern = r(pattern)
-    else:
-        re_pattern = re_url_allow_chars
-
-    return re_pattern.sub(lambda m: b'%' + format(ord(m.group(1)), '02X').encode('ascii'), bstring)
-
-
-re_percent_chars = r(rb'%([0-9a-fA-F]{2})')
-re_u_percent_chars = r(r'%([0-9a-fA-F]{2})')
+    if isinstance(string, str):
+        regex = _url_pattern(pattern.decode('latin-1') if isinstance(pattern, bytes) else pattern or r'^A-Za-z0-9\-._~')
+        return regex.sub(lambda m: f'%{ord(m[0]):02X}', string)
+    regex = _url_pattern(pattern.encode('latin-1') if isinstance(pattern, str) else pattern or rb'^A-Za-z0-9\-._~')
+    return regex.sub(lambda m: b'%%%02X' % m[0][0], string)
 
 
 @overload
-def url_unescape(bstring: str) -> str: ...
+def url_unescape(string: str) -> str: ...
 
 
 @overload
-def url_unescape(bstring: bytes) -> bytes: ...
+def url_unescape(string: bytes) -> bytes: ...
 
 
-def url_unescape(bstring: str | bytes) -> str | bytes:
+def url_unescape(string: str | bytes) -> str | bytes:
     """::
 
         string = url_unescape(escaped)
 
-    Decode percent encoded characters in string as described in
-    :rfc:`3986`. A percent encoded byte in a string becomes the character
-    with the same code, as in Perl. ::
+    Decode percent encoded characters in string as described in :rfc:`3986`.
+    A percent encoded byte in a string becomes the character with the same
+    code, as in Perl. ::
 
-        # 'foo;bar'
+        # "foo;bar"
         url_unescape('foo%3Bbar')
     """
-    if isinstance(bstring, str):
-        return re_u_percent_chars.sub(lambda m: chr(int(m.group(1), 16)), bstring)
-    return re_percent_chars.sub(lambda m: b(chr(int(m.group(1), 16)), 'iso-8859-1'), bstring)
+    if isinstance(string, str):
+        return re.sub(r'%([0-9a-fA-F]{2})', lambda m: chr(int(m[1], 16)), string)
+    return re.sub(rb'%([0-9a-fA-F]{2})', lambda m: bytes([int(m[1], 16)]), string)
 
 
 def warn(msg, *args):
@@ -706,35 +912,38 @@ def warn(msg, *args):
 XML = {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}
 
 
-re_xml_allow_chars = r(r'([&<>"\'])')
-
-
-def xml_escape(string):
+def xml_escape(string: str | None) -> str:
     """::
 
         escaped = xml_escape(string)
 
-    Escape unsafe characters ``&``, ``<``, ``>``, ``"`` and ``'`` in string, but
-    do not escape :mod:`Pyjo.ByteStream` objects. ::
+    Escape unsafe characters ``&``, ``<``, ``>``, ``"`` and ``'`` in string,
+    but do not escape :mod:`Pyjo.String.Unicode` objects. ::
 
-        # '&lt;div&gt;'
+        # "&lt;div&gt;"
         xml_escape('<div>')
 
-        # '<div>'
-        from Pyjo.Util import b
-        xml_escape(b('<div>'))
+        # "<div>"
+        from Pyjo.String.Unicode import u
+        xml_escape(u('<div>'))
     """
-    return re_xml_allow_chars.sub(lambda m: XML[m.group(1)], string)
+    import Pyjo.String.Unicode
+
+    if isinstance(string, Pyjo.String.Unicode.Pyjo_String_Unicode):
+        return string
+    return re.sub(r'[&<>"\']', lambda m: XML[m[0]], string if string is not None else '')
 
 
-def xor_encode(data, mask):
+def xor_encode(data: bytes, key: bytes) -> bytes:
     """::
 
-        encoded = xor_encode(string, key)
+        encoded = xor_encode(data, key)
 
     XOR encode string with variable length key.
     """
-    return bytearray(a ^ b for a, b in zip(*map(bytearray, [data, mask]), strict=False))
+    size = len(data)
+    key = (bytes(key) * (size // len(key) + 1))[:size]
+    return (int.from_bytes(data) ^ int.from_bytes(key)).to_bytes(size)
 
 
 ENTITIES = {
@@ -2972,24 +3181,25 @@ ENTITIES = {
 }
 
 
-def _decode(point, name):
-    rest = ''
+def _entity(point: str | None, name: str | None, attr: bool) -> str:
 
     # Code point
     if name is None:
-        if point.startswith('x'):
-            return chr(int(point[1:], 16))
-        else:
-            return chr(int(point))
+        assert point is not None
+        code = int(point[1:], 16) if point.startswith('x') else int(point)
+        # Unlike Mojolicious: Perl makes a character of any number, Python only
+        # up to 0x10FFFF, so a larger one is the replacement character, as in HTML5
+        return chr(code) if code <= 0x10FFFF else '\ufffd'
 
+    # Named character reference
+    rest = last = ''
     while len(name):
-        if name in ENTITIES:
-            return '' + ENTITIES[name] + rest
-
-        rest = name[-1] + rest
+        if name in ENTITIES and (not attr or name.endswith(';') or not re.match(r'[A-Za-z0-9=]', last)):
+            return ENTITIES[name] + rest[::-1]
+        last = name[-1]
+        rest += last
         name = name[:-1]
-
-    return '&' + rest
+    return '&' + rest[::-1]
 
 
 re_header = r(rb'^[,;\s]*([^=;, ]+)\s*')
@@ -3057,9 +3267,17 @@ def _header(string, cookie):
     return tree
 
 
+def _html(string: str, attr: bool) -> str:
+    return _RE_ENTITY.sub(lambda m: _entity(m[1], m[2], attr), string)
+
+
 def _readable(fd):
     readable, _, _ = select.select([fd], [], [], 0)
     return fd in readable
+
+
+def _round(number: float) -> str:
+    return f'{int(number * 10 + 0.5) / 10 if number < 10 else int(number + 0.5):.15g}'
 
 
 def _stash(obj, stash, *args, **kwargs):
@@ -3072,3 +3290,23 @@ def _stash(obj, stash, *args, **kwargs):
         return tuple(map(lambda k: stash[k], args))
     else:
         return stash
+
+
+# Perl's split, which drops the empty fields at the end
+def _split(pattern: str, string: str) -> list[str]:
+    fields = re.split(pattern, string)
+    while fields and fields[-1] == '':
+        fields.pop()
+    return fields
+
+
+# Perl's ucfirst
+def _ucfirst(string: str) -> str:
+    return string[:1].title() + string[1:]
+
+
+@functools.cache
+def _url_pattern[T: (str, bytes)](pattern: T) -> re.Pattern[T]:
+    if isinstance(pattern, str):
+        return re.compile('[' + pattern.replace('[', '\\[') + ']')
+    return re.compile(b'[' + pattern.replace(b'[', b'\\[') + b']')
