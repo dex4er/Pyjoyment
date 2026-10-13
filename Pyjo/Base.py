@@ -28,6 +28,8 @@ Pyjo.Base - Minimal base class
 :mod:`Pyjo.Base` is a simple base class for :mod:`Pyjo` projects.
 """
 
+from typing import Any, Self
+
 
 class Pyjo_Base:
     """::
@@ -40,13 +42,13 @@ class Pyjo_Base:
     """
 
     @classmethod
-    def new(cls, *args, **kwargs):
+    def new(cls, *args: Any, **kwargs: Any) -> Self:
         """
         Factory method for :mod:`Pyjo.Base` class.
         """
         return cls(*args, **kwargs)
 
-    def set(self, **kwargs):
+    def set(self, **kwargs: Any) -> Self:
         """::
 
             obj = obj.set(name='value')
@@ -57,7 +59,7 @@ class Pyjo_Base:
             setattr(self, k, v)
         return self
 
-    def tap(self, *args, **kwargs):
+    def tap(self, *args: Any, **kwargs: Any) -> Self:
         """::
 
             obj = obj.tap(lambda obj: expression)
