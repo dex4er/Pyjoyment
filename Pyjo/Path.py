@@ -32,7 +32,7 @@ Classes
 import Pyjo.Base
 import Pyjo.String.Mixin
 
-from Pyjo.Util import url_escape, url_unescape
+from Pyjo.Util import decode, url_escape, url_unescape
 
 import re
 
@@ -385,19 +385,10 @@ class Pyjo_Path(Pyjo.Base.object, Pyjo.String.Mixin.object):
         return string if isinstance(string, bytes) else string.encode(self.charset or 'latin-1')
 
     def _decode(self, path: str | bytes) -> str:
-        # Characters 0-255 are bytes, as a Perl byte string; a string with other
-        # characters stays as it is, as Perl fails to decode it
-        if isinstance(path, str):
-            try:
-                path = path.encode('latin-1')
-            except UnicodeEncodeError:
-                return path
-
-        # Bytes that do not decode stay characters 0-255, as in a Perl byte string
-        try:
-            return path.decode(self.charset or 'latin-1')
-        except UnicodeDecodeError:
-            return path.decode('latin-1')
+        # What does not decode stays characters 0-255, as a Perl byte string
+        if (decoded := decode(self.charset or 'latin-1', path)) is not None:
+            return decoded
+        return path if isinstance(path, str) else path.decode('latin-1')
 
     def _parse(self) -> list[str]:
         if self._parts is None:

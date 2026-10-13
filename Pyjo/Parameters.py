@@ -41,7 +41,7 @@ Classes
 import Pyjo.Base
 import Pyjo.String.Mixin
 
-from Pyjo.Util import url_escape, url_unescape
+from Pyjo.Util import decode, url_escape, url_unescape
 
 import builtins
 import re
@@ -403,18 +403,9 @@ class Pyjo_Parameters(Pyjo.Base.object, Pyjo.String.Mixin.object):
         return '&'.join(pairs)
 
     def _decode(self, string: str) -> str:
-        # Characters 0-255 are bytes, as a Perl byte string; a string with other
-        # characters stays as it is, as Perl fails to decode it
-        try:
-            data = string.encode('latin-1')
-        except UnicodeEncodeError:
-            return string
-
-        # Bytes that do not decode stay characters 0-255, as in a Perl byte string
-        try:
-            return data.decode(self.charset or 'latin-1')
-        except UnicodeDecodeError:
-            return string
+        # What does not decode stays characters 0-255, as a Perl byte string
+        decoded = decode(self.charset or 'latin-1', string)
+        return decoded if decoded is not None else string
 
     def _encode(self, string: str | bytes) -> bytes:
         # Without a charset, a character is a byte, as in a Perl byte string
