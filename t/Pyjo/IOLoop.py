@@ -300,10 +300,75 @@ with subtest('Removed connection (with promise)'):
     is_ok(removed, 1, 'connection has been removed')
 
 with subtest('Stream throttling'):
-    skip('bytes_waiting of Mojo::IOLoop::Stream 9.49 is not ported yet', 5)
+    client = server = client_after = server_before = server_after = None
+    waiting = []
+
+    def server_cb(loop, stream, id):
+        def read(stream, chunk):
+            global server
+
+            def first(loop):
+                global server_before
+
+                def second(loop):
+                    global server_after, client_after
+                    server_after = server
+                    client_after = client
+                    waiting.append(stream.bytes_waiting)
+                    stream.start()
+                    Pyjo.IOLoop.timer(0.5, lambda loop: Pyjo.IOLoop.stop())
+
+                server_before = server
+                stream.stop()
+                stream.write(b'works!')
+                waiting.append(stream.bytes_waiting)
+                Pyjo.IOLoop.timer(0.5, second)
+
+            if not server:
+                Pyjo.IOLoop.timer(0.5, first)
+            server = (server or b'') + chunk
+
+        stream.timeout = 0
+        stream.on('read', read)
+
+    id = Pyjo.IOLoop.server(server_cb, address='127.0.0.1')
+    port = Pyjo.IOLoop.acceptor(id).port
+
+    def client_cb(loop, err, stream):
+        def drain(stream):
+            stream.write(b'1', drain)
+
+        def read(stream, chunk):
+            global client
+            client = (client or b'') + chunk
+
+        drain(stream)
+        stream.on('read', read)
+
+    Pyjo.IOLoop.client(client_cb, port=port)
+    Pyjo.IOLoop.start()
+    is_ok(server_before, server_after, 'stream has been paused')
+    ok(len(server) > len(server_after), 'stream has been resumed')
+    is_ok(client, client_after, 'stream was writable while paused')
+    is_ok(client, b'works!', 'full message has been written')
+    is_deeply_ok(waiting, [6, 0], 'right buffer sizes')
 
 with subtest('Watermarks'):
-    skip('high_water_mark and can_write of Mojo::IOLoop::Stream 9.49 are not ported yet', 6)
+    fake = socket.create_server(('127.0.0.1', 0), backlog=5)
+    stream = Pyjo.IOLoop.Stream.new(fake)
+    stream.start()
+    stream.high_water_mark = 10
+    stream.write(b'abcd')
+    is_ok(stream.bytes_waiting, 4, 'four bytes waiting')
+    ok(stream.can_write, 'stream is still writable')
+    stream.write(b'efghijk')
+    is_ok(stream.bytes_waiting, 11, 'eleven bytes waiting')
+    ok(not stream.can_write, 'stream is not writable anymore')
+    stream.high_water_mark = 12
+    ok(stream.can_write, 'stream is writable again')
+    stream.close()
+    ok(not stream.can_write, 'closed stream is not writable anymore')
+    del stream
 
 with subtest('Graceful shutdown'):
     err = None
