@@ -369,6 +369,14 @@ copy:
   of `Mojo::Cache`, replaces it in the class. Mojo's chain of an attribute and
   the method, `$cache->max_keys(1)->set(one => 1)`, is then an assignment
   followed by the call.
+- Perl passes arguments by reference, so a callback can change a string of
+  its caller through `$_[1]`; in Python, the caller passes a mutable object,
+  like `io.StringIO`, and the callback changes it.
+- The name of the class of an object in a message, `blessed $self` or
+  `ref $self`, is `module.qualname` of its class, as
+  `Pyjo.EventEmitter.Pyjo_EventEmitter`.
+- A method that subscribes a callback, like `on` of `Pyjo.EventEmitter`,
+  takes it last, as Mojo does, and is a decorator without it.
 - A module that is not ported yet but uses a ported one follows its API: the
   lines that use it are taken from the target Mojolicious, and so is the
   expectation of a test of them that the target changed.

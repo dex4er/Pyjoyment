@@ -1,173 +1,201 @@
-class TestException(Exception):
-    pass
+import Pyjo.EventEmitter
+
+from Pyjo.Test import *
+
+import io
 
 
-if __name__ == '__main__':
-    from Pyjo.Test import *  # noqa
+def eval_(cb):
+    try:
+        cb()
+    except Exception as e:
+        return e
 
-    import Pyjo.EventEmitter
 
-    from t.lib.Value import Value
+e = Pyjo.EventEmitter.new()
 
-    # Normal event
-    e = Pyjo.EventEmitter.new()
-    called = Value(0)
+with subtest('Normal event'):
+    called = 0
 
-    @e.on
-    def test1(e):
-        called.inc()
+    def called_cb(*args):
+        global called
+        called += 1
 
+    e.on('test1', called_cb)
     e.emit('test1')
-    is_ok(called.get(), 1, 'event was emitted once')
+    is_ok(called, 1, 'event was emitted once')
+    e.unsubscribe('test1')
 
-    # Error
-    @e.on
-    def die(e):
-        raise TestException('works!')
+with subtest('Error'):
 
-    try:
-        e.emit('die')
-    except TestException:
-        pass_ok('right error')
-    except:
-        fail_ok('right error')
-    else:
-        fail_ok('right error')
+    def die_cb(*args):
+        raise Exception('works!\n')
 
-    try:
-        e.emit('error', 'works')
-    except Exception as ex:
-        is_ok(str(ex), 'works', 'right error')
-    else:
-        fail_ok('right error')
+    e.on('die', die_cb)
+    err = eval_(lambda: e.emit('die'))
+    is_ok(str(err), 'works!\n', 'right error')
 
-    # Catch
-    value = Value('')
+with subtest('Unhandled error event'):
+    err = eval_(lambda: e.emit('error', 'works'))
+    like_ok(str(err), r'^Pyjo\.EventEmitter\.Pyjo_EventEmitter: works', 'right error')
+
+with subtest('Catch'):
+    err = None
+
+    def catch_cb(*args):
+        global err
+        err = args[-1]
+
     ok(not e.has_subscribers('foo'), 'no subscribers')
-    e.catch(lambda e, err: value.set(err))
+    e.catch(catch_cb)
     ok(e.has_subscribers('error'), 'has subscribers')
     e.emit('error', 'just works!')
-    is_ok(value.get(), 'just works!', 'right error')
+    is_ok(err, 'just works!', 'right error')
 
-    # Exception in error event
-    e.once(lambda e, err: value.set(err + 'entional'), 'error')
-    e.emit('error', 'int')
-    is_ok(value.get(), 'intentional', 'right error')
+with subtest('Exception in error event'):
 
-    # Normal event again
+    def entional_cb(e, err):
+        raise Exception(f'{err}entional')
+
+    e.once('error', entional_cb)
+    err = eval_(lambda: e.emit('error', 'int'))
+    like_ok(str(err), r'^intentional', 'right error')
+
+with subtest('Normal event again'):
+    called = 0
+    e.on('test1', lambda *args: called_cb())
     e.emit('test1')
-    is_ok(called.get(), 2, 'event was emitted twice')
+    is_ok(called, 1, 'event was emitted once')
     is_ok(len(e.subscribers('test1')), 1, 'one subscriber')
     e.emit('test1')
     e.unsubscribe('test1', e.subscribers('test1')[0])
-    is_ok(called.get(), 3, 'event was emitted three times')
+    is_ok(called, 2, 'event was emitted twice')
     is_ok(len(e.subscribers('test1')), 0, 'no subscribers')
     e.emit('test1')
-    is_ok(called.get(), 3, 'event was not emitted again')
+    is_ok(called, 2, 'event was not emitted again')
     e.emit('test1')
-    is_ok(called.get(), 3, 'event was not emitted again')
+    is_ok(called, 2, 'event was not emitted again')
 
-    # One-time event
-    once = Value(0)
-    e.once(lambda e: once.inc(), 'one_time1')
-    is_ok(len(e.subscribers('one_time1')), 1, 'one subscriber')
-    e.unsubscribe('one_time1', lambda e: None)
-    is_ok(len(e.subscribers('one_time1')), 1, 'one subscriber')
-    e.emit('one_time1')
-    is_ok(once.get(), 1, 'event was emitted once')
-    is_ok(len(e.subscribers('one_time1')), 0, 'no subscribers')
-    e.emit('one_time1')
-    is_ok(once.get(), 1, 'event was not emitted again')
-    e.emit('one_time1')
-    is_ok(once.get(), 1, 'event was not emitted again')
-    e.emit('one_time1')
-    is_ok(once.get(), 1, 'event was not emitted again')
+with subtest('One-time event'):
+    once = 0
 
-    @e.once
-    def one_time2(e):
-        e.once(lambda e: once.inc(), 'one_time2')
+    def once_cb(*args):
+        global once
+        once += 1
 
-    e.emit('one_time2')
-    is_ok(once.get(), 1, 'event was emitted once')
-    e.emit('one_time2')
-    is_ok(once.get(), 2, 'event was emitted again')
-    e.emit('one_time2')
-    is_ok(once.get(), 2, 'event was not emitted again')
-    e.once(lambda e: once.set(e.has_subscribers('one_time2')), 'one_time2')
-    e.emit('one_time2')
-    ok(not once.get(), 'no subscribers')
+    e.once('one_time', once_cb)
+    is_ok(len(e.subscribers('one_time')), 1, 'one subscriber')
+    e.unsubscribe('one_time', lambda *args: None)
+    is_ok(len(e.subscribers('one_time')), 1, 'one subscriber')
+    e.emit('one_time')
+    is_ok(once, 1, 'event was emitted once')
+    is_ok(len(e.subscribers('one_time')), 0, 'no subscribers')
+    e.emit('one_time')
+    is_ok(once, 1, 'event was not emitted again')
+    e.emit('one_time')
+    is_ok(once, 1, 'event was not emitted again')
+    e.emit('one_time')
+    is_ok(once, 1, 'event was not emitted again')
+    e.once('one_time', lambda e: e.once('one_time', once_cb))
+    e.emit('one_time')
+    is_ok(once, 1, 'event was emitted once')
+    e.emit('one_time')
+    is_ok(once, 2, 'event was emitted again')
+    e.emit('one_time')
+    is_ok(once, 2, 'event was not emitted again')
 
-    # Nested one-time events
-    once = Value(0)
+    def has_subscribers_cb(e):
+        global once
+        once = e.has_subscribers('one_time')
 
-    @e.once
-    def one_time3(e):
-        @e.once
-        def one_time3(e):
-            e.once(lambda e: once.inc(), 'one_time3')
+    e.once('one_time', has_subscribers_cb)
+    e.emit('one_time')
+    ok(not once, 'no subscribers')
 
-    is_ok(len(e.subscribers('one_time3')), 1, 'one subscriber')
-    e.emit('one_time3')
-    is_ok(once.get(), 0, 'only first event was emitted')
-    is_ok(len(e.subscribers('one_time3')), 1, 'one subscriber')
-    e.emit('one_time3')
-    is_ok(once.get(), 0, 'only second event was emitted')
-    is_ok(len(e.subscribers('one_time3')), 1, 'one subscriber')
-    e.emit('one_time3')
-    is_ok(once.get(), 1, 'third event was emitted')
-    is_ok(len(e.subscribers('one_time3')), 0, 'no subscribers')
-    e.emit('one_time3')
-    is_ok(once.get(), 1, 'event was not emitted again')
-    e.emit('one_time3')
-    is_ok(once.get(), 1, 'event was not emitted again')
-    e.emit('one_time3')
-    is_ok(once.get(), 1, 'event was not emitted again')
+with subtest('Nested one-time events'):
+    once = 0
+    e.once('one_time', lambda e: e.once('one_time', lambda e: e.once('one_time', once_cb)))
+    is_ok(len(e.subscribers('one_time')), 1, 'one subscriber')
+    e.emit('one_time')
+    is_ok(once, 0, 'only first event was emitted')
+    is_ok(len(e.subscribers('one_time')), 1, 'one subscriber')
+    e.emit('one_time')
+    is_ok(once, 0, 'only second event was emitted')
+    is_ok(len(e.subscribers('one_time')), 1, 'one subscriber')
+    e.emit('one_time')
+    is_ok(once, 1, 'third event was emitted')
+    is_ok(len(e.subscribers('one_time')), 0, 'no subscribers')
+    e.emit('one_time')
+    is_ok(once, 1, 'event was not emitted again')
+    e.emit('one_time')
+    is_ok(once, 1, 'event was not emitted again')
+    e.emit('one_time')
+    is_ok(once, 1, 'event was not emitted again')
 
-    # Unsubscribe
+with subtest('One-time event used directly'):
     e = Pyjo.EventEmitter.new()
-    counter = Value(0)
+    ok(not e.has_subscribers('foo'), 'no subscribers')
+    once = 0
+    cb = e.once('foo', once_cb)
+    ok(e.has_subscribers('foo'), 'has subscribers')
+    cb()
+    is_ok(once, 1, 'event was emitted once')
+    ok(not e.has_subscribers('foo'), 'no subscribers')
 
-    @e.on
-    def foo(e):
-        counter.inc()
+with subtest('Unsubscribe'):
+    e = Pyjo.EventEmitter.new()
+    counter = 0
 
-    e.on(lambda e: counter.inc(), 'foo')
-    e.on(lambda e: counter.inc(), 'foo')
-    e.unsubscribe('foo', e.once(lambda e: counter.inc(), 'foo'))
+    def counter_cb(*args):
+        global counter
+        counter += 1
+
+    cb = e.on('foo', lambda *args: counter_cb())
+    e.on('foo', lambda *args: counter_cb())
+    e.on('foo', lambda *args: counter_cb())
+    e.unsubscribe('foo', e.once('foo', lambda *args: counter_cb()))
     is_ok(len(e.subscribers('foo')), 3, 'three subscribers')
-    e.emit('foo').unsubscribe('foo', foo)
-    is_ok(counter.get(), 3, 'event was emitted three times')
+    e.emit('foo').unsubscribe('foo', cb)
+    is_ok(counter, 3, 'event was emitted three times')
     is_ok(len(e.subscribers('foo')), 2, 'two subscribers')
     e.emit('foo')
-    is_ok(counter.get(), 5, 'event was emitted two times')
+    is_ok(counter, 5, 'event was emitted two times')
     ok(e.has_subscribers('foo'), 'has subscribers')
     ok(not e.unsubscribe('foo').has_subscribers('foo'), 'no subscribers')
     is_ok(len(e.subscribers('foo')), 0, 'no subscribers')
     e.emit('foo')
-    is_ok(counter.get(), 5, 'event was not emitted again')
+    is_ok(counter, 5, 'event was not emitted again')
 
-    # Unsubscribe all
+with subtest('Manipulate events'):
     e = Pyjo.EventEmitter.new()
-    counter = Value(0)
-    e.on(lambda e: counter.inc(), 'foo')
-    e.on(lambda e: counter.inc(), 'foo')
-    e.unsubscribe_all()
-    is_ok(len(e.subscribers('foo')), 0, 'no subscribers')
+    buffer = ''
+
+    def buffer_cb(string):
+        global buffer
+        buffer += string
+
+    e.subscribers('foo').append(lambda e: buffer_cb('one'))
+    e.subscribers('foo').append(lambda e: buffer_cb('two'))
+    e.subscribers('foo').append(lambda e: buffer_cb('three'))
     e.emit('foo')
-    is_ok(counter.get(), 0, 'event was not emitted again')
+    is_ok(buffer, 'onetwothree', 'right result')
+    e.subscribers('foo').reverse()
+    e.emit('foo')
+    is_ok(buffer, 'onetwothreethreetwoone', 'right result')
 
-    # Pass by reference and assignment to $_
+with subtest('Pass by reference and assignment to $_'):
     e = Pyjo.EventEmitter.new()
-    buf = Value('')
-    e.on(lambda e, s: buf.set(buf.get() + 'abc' + s), 'one')
-    e.on(lambda e, s: buf.set(buf.get() + '123' + s), 'one')
-    is_ok(buf.get(), '', 'no result')
-    e.emit('one', 'two')
-    is_ok(buf.get(), 'abctwo123two', 'right result')
-    e.once(lambda e, s: buf.set(buf.get() + 'def'), 'one')
-    e.emit('one', 'three')
-    is_ok(buf.get(), 'abctwo123twoabcthree123threedef', 'right result')
-    e.emit('one', 'x')
-    is_ok(buf.get(), 'abctwo123twoabcthree123threedefabcx123x', 'right result')
+    # Unlike Mojolicious: Python has no aliased arguments, the callbacks change a mutable buffer
+    buffer = io.StringIO()
+    e.on('one', lambda e, buffer, string: buffer.write('abc' + string))
+    e.on('one', lambda e, buffer, string: buffer.write('123' + string))
+    is_ok(buffer.getvalue(), '', 'no result')
+    e.emit('one', buffer, 'two')
+    is_ok(buffer.getvalue(), 'abctwo123two', 'right result')
+    e.once('one', lambda e, buffer, string: buffer.write('def'))
+    e.emit('one', buffer, 'three')
+    is_ok(buffer.getvalue(), 'abctwo123twoabcthree123threedef', 'right result')
+    e.emit('one', buffer, 'x')
+    is_ok(buffer.getvalue(), 'abctwo123twoabcthree123threedefabcx123x', 'right result')
 
-    done_testing()
+done_testing()

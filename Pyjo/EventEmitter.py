@@ -1,5 +1,3 @@
-# flake8: ignore=E731
-
 """
 Pyjo.EventEmitter - Event emitter base class
 ============================================
@@ -9,15 +7,15 @@ Pyjo.EventEmitter - Event emitter base class
 
     class Cat(Pyjo.EventEmitter.object):
         # Emit events
-        def poke(self, times):
+        def poke(self):
             self.emit('roar', 3)
 
     # Subscribe to events
     tiger = Cat.new()
 
-    @tiger.on
-    def road(cat, times):
-        for _ in range(0, times):
+    @tiger.on('roar')
+    def roar(tiger, times):
+        for _ in range(times):
             print('RAWR!')
 
     tiger.poke()
@@ -33,76 +31,75 @@ error
 ~~~~~
 ::
 
-    @e.on
-    def error(e, err):
-        ...
+    e.on('error', lambda e, err: ...)
 
 This is a special event for errors, it will not be emitted directly by this
-class but is fatal if unhandled. ::
+class, but is fatal if unhandled. Subclasses may choose to emit it, but are
+not required to do so. ::
 
-    @e.on
-    def error(e, err):
-        print("This looks bad: {0}".format(err))
+    e.on('error', lambda e, err: print(f'This looks bad: {err}'))
+
+An unhandled error raises a :mod:`Pyjo.Exception` with the name of the class
+and the error in its message, and an error that is an exception is its cause.
 
 Debugging
 ---------
 
 You can set the ``PYJO_EVENTEMITTER_DEBUG`` environment variable to get some
-advanced diagnostics information printed to ``stderr``. ::
+advanced diagnostics information printed to ``sys.stderr``. ::
 
     PYJO_EVENTEMITTER_DEBUG=1
 
-Classes
--------
+See also
+--------
+
+:mod:`Pyjoyment`, https://mojolicious.org.
+
+Ported from `Mojo::EventEmitter <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/EventEmitter.pm>`_
+of Mojolicious 9.49.
 """
 
 import Pyjo.Base
+import Pyjo.Exception
 
-from Pyjo.Util import getenv, isalive, warn
+from Pyjo.Util import warn
 
+import os
 import weakref
 
+from collections.abc import Callable
+from typing import Any, Self, overload
 
-DEBUG = getenv('PYJO_EVENTEMITTER_DEBUG', False)
 
+# A subscriber gets the emitter and the arguments of the event
+type Callback = Callable[..., Any]
 
-class Error(Exception):
-    """
-    Exception raised on unhandled error event.
-    """
-
-    pass
+DEBUG = bool(os.environ.get('PYJO_EVENTEMITTER_DEBUG'))
 
 
 class Pyjo_EventEmitter(Pyjo.Base.object):
     """
-    :mod:`Pyjo.EventEmitter` inherits all attributes and methods from
-    :mod:`Pyjo.Base` and implements the following new ones.
+    :mod:`Pyjo.EventEmitter` inherits all methods from :mod:`Pyjo.Base` and
+    implements the following new ones.
     """
 
-    def __init__(self, **kwargs):
-        self._events = {}
+    def __init__(self) -> None:
+        self._events: dict[str, list[Callback]] = {}
 
-    def catch(self, cb):
+    def catch(self, cb: Callback) -> Self:
         """::
 
             e = e.catch(lambda e, err: ...)
 
-            @e.catch
-            def cb(e, err):
-                ...
-
-        Subscribe to ``error`` event. ::
+        Subscribe to the ``error`` event. ::
 
             # Longer version
-            @e.on
-            def error(e, err):
-                ...
+            e.on('error', lambda e, err: ...)
         """
-        self.on(cb, 'error')
+        self.on('error', cb)
         return self
 
-    def emit(self, name, *args, **kwargs):
+    def emit(self, name: str, *args: Any) -> Self:
         """::
 
             e = e.emit('foo')
@@ -110,88 +107,123 @@ class Pyjo_EventEmitter(Pyjo.Base.object):
 
         Emit event.
         """
-        if name in self._events:
-            s = self._events[name]
-
+        # Unlike Mojolicious: an empty list of subscribers, as subscribers() leaves it, is no subscriber, and Mojo
+        # swallows an unhandled error then
+        if s := self._events.get(name):
             if DEBUG:
-                warn(f'-- Emit {name} in {self} ({len(s)})')
-
+                warn(f'-- Emit {name} in {_name(type(self))} ({len(s)})')
             for cb in s:
-                cb(self, *args, **kwargs)
+                cb(self, *args)
         else:
             if DEBUG:
-                warn(f'-- Emit {name} in {self} (0)')
-
+                warn(f'-- Emit {name} in {_name(type(self))} (0)')
             if name == 'error':
-                raise Error(*args, **kwargs)
+                err = args[0] if args else ''
+                e = Pyjo.Exception.new(f'{_name(type(self))}: {err}')
+                # Not in Mojolicious: an error that is an exception is the cause
+                if isinstance(err, BaseException):
+                    raise e from err
+                raise e
 
         return self
 
-    def has_subscribers(self, name):
+    def has_subscribers(self, name: str) -> bool:
         """::
 
             boolean = e.has_subscribers('foo')
 
         Check if event has subscribers.
         """
-        return name in self._events
+        # Unlike Mojolicious: an empty list of subscribers is no subscriber
+        return bool(self._events.get(name))
 
-    def on(self, cb, name=None):
+    @overload
+    def on[F: Callback](self, name: F, cb: None = None) -> F: ...
+
+    @overload
+    def on[F: Callback](self, name: str, cb: None = None) -> Callable[[F], F]: ...
+
+    @overload
+    def on[F: Callback](self, name: str, cb: F) -> F: ...
+
+    def on(self, name: str | Callback, cb: Callback | None = None) -> Any:
         """::
 
-            cb = e.on(cb, 'foo')
+            cb = e.on('foo', lambda e, *args: ...)
 
-        Subscribe to event. Can be used as decorator. ::
+        Subscribe to event. ::
+
+            e.on('foo', lambda e, *args: ...)
+
+        Without a callback, it is a decorator, with the name of the event or
+        of the function. ::
+
+            @e.on('foo')
+            def cb(e, *args):
+                ...
 
             @e.on
-            def foo(e, *args, **kwargs):
+            def foo(e, *args):
                 ...
         """
-        if not callable(cb):
-            raise TypeError('cb argument is not callable')
+        # Not in Mojolicious: a decorator
+        if not isinstance(name, str):
+            return self.on(name.__name__, name)
+        if cb is None:
+            event = name
 
-        if name is None:
-            name = cb.__name__
+            def decorator(cb: Callback) -> Callback:
+                return self.on(event, cb)
 
-        if name in self._events:
-            self._events[name].append(cb)
-        else:
-            self._events[name] = [cb]
+            return decorator
 
+        self._events.setdefault(name, []).append(cb)
         return cb
 
-    def once(self, cb, name=None):
+    @overload
+    def once(self, name: Callback, cb: None = None) -> Callback: ...
+
+    @overload
+    def once(self, name: str, cb: None = None) -> Callable[[Callback], Callback]: ...
+
+    @overload
+    def once(self, name: str, cb: Callback) -> Callback: ...
+
+    def once(self, name: str | Callback, cb: Callback | None = None) -> Any:
         """::
 
-            cb = e.once(cb, 'foo')
+            cb = e.once('foo', lambda e, *args: ...)
 
-        Subscribe to event and unsubscribe again after it has been emitted once.
-        Can be used as decorator. ::
+        Subscribe to event and unsubscribe again after it has been emitted
+        once. ::
 
-            @e.once
-            def foo(e, *args, **kwargs):
-                ...
+            e.once('foo', lambda e, *args: ...)
+
+        Without a callback, it is a decorator, as :meth:`on` is.
         """
-        if not callable(cb):
-            raise TypeError('cb argument is not callable')
+        # Not in Mojolicious: a decorator
+        if not isinstance(name, str):
+            return self.once(name.__name__, name)
+        event = name
+        if cb is None:
 
-        if name is None:
-            name = cb.__name__
+            def once_decorator(cb: Callback) -> Callback:
+                return self.once(event, cb)
 
+            return once_decorator
+
+        callback = cb
         emitter = weakref.proxy(self)
 
-        def wrap_cb(*args, **kwargs):
-            if isalive(emitter):
-                emitter.unsubscribe(name, wrap_cb)
-                return cb(*args, **kwargs)
+        def wrapper(*args: Any) -> Any:
+            emitter.unsubscribe(event, wrapper)
+            return callback(*args)
 
-        wrap_cb.__name__ = name
+        self.on(event, wrapper)
 
-        self.on(wrap_cb, name)
+        return wrapper
 
-        return wrap_cb
-
-    def subscribers(self, name):
+    def subscribers(self, name: str) -> list[Callback]:
         """::
 
             subscribers = e.subscribers('foo')
@@ -200,13 +232,13 @@ class Pyjo_EventEmitter(Pyjo.Base.object):
 
             # Unsubscribe last subscriber
             e.unsubscribe('foo', e.subscribers('foo')[-1])
-        """
-        if name in self._events:
-            return self._events[name]
-        else:
-            return []
 
-    def unsubscribe(self, name, cb=None):
+            # Change order of subscribers
+            e.subscribers('foo').reverse()
+        """
+        return self._events.setdefault(name, [])
+
+    def unsubscribe(self, name: str, cb: Callback | None = None) -> Self:
         """::
 
             e = e.unsubscribe('foo')
@@ -214,28 +246,22 @@ class Pyjo_EventEmitter(Pyjo.Base.object):
 
         Unsubscribe from event.
         """
-        if name in self._events:
-            # One
-            if cb:
-                self._events[name] = [c for c in self._events[name] if c != cb]
-                if not len(self._events[name]):
-                    del self._events[name]
-
-            # All
-            else:
+        # One
+        if cb is not None:
+            self._events[name] = [c for c in self._events.get(name, []) if c != cb]
+            if not self._events[name]:
                 del self._events[name]
 
+        # All
+        else:
+            self._events.pop(name, None)
+
         return self
 
-    def unsubscribe_all(self):
-        """::
 
-            e = e.unsubscribe_all()
-
-        Unsubscribe from all events.
-        """
-        self._events = {}
-        return self
+# The name of a class, as Perl's blessed gives the name of a package
+def _name(cls: type) -> str:
+    return f'{cls.__module__}.{cls.__qualname__}'
 
 
 new = Pyjo_EventEmitter.new
