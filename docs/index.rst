@@ -2,10 +2,8 @@
 Pyjoyment |release| documentation
 =================================
 
-A next generation web framework for the Python programming language.
-
-Based on Mojolicious.
-
+A real-time web framework for the Python programming language, ported from
+`Mojolicious <https://mojolicious.org>`_.
 
 Contents:
 
@@ -17,5 +15,4 @@ Contents:
     installation
     examples
     api/index
-    authors
     license

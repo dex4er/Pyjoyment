@@ -1,5 +1,3 @@
-.. image:: https://img.shields.io/pypi/v/Pyjoyment.png
-   :target: https://pypi.python.org/pypi/Pyjoyment
 .. image:: https://github.com/dex4er/Pyjoyment/actions/workflows/tests.yaml/badge.svg?branch=master
    :target: https://github.com/dex4er/Pyjoyment/actions/workflows/tests.yaml
 .. image:: https://app.readthedocs.org/projects/pyjoyment/badge/?version=latest
@@ -8,47 +6,71 @@
 Pyjoyment
 =========
 
-An asynchronous, event driven web framework for the Python programming language.
+.. begin-intro
 
-Pyjoyment provides own reactor which handles I/O and timer events in its own
-main event loop but it supports other loops, ie. *libev*, *asyncio*.
+A real-time web framework for the Python programming language, ported from
+`Mojolicious <https://mojolicious.org>`_, the real-time web framework for Perl.
+Pyjoyment keeps the API of Mojolicious with Python names, so its documentation
+and experience carry over.
 
-Pyjoyment uses intensively own event emitter which should be familiar for
-Node.JS programmers.
+The ``Pyjo`` package is the web development toolkit, ported from the ``Mojo``
+modules, which can be used for all kinds of applications independently of the
+web framework:
 
-It provides tool set for parsing and creating HTTP messages and HTML documents.
-It also supports WSGI interface.
+* HTTP and WebSocket client and server.
+* Non-blocking I/O web server, which also runs as a WSGI or CGI application.
+* HTML/XML parser with CSS selector support, and JSON with JSON Pointers.
+* Containers for URLs, paths, query strings, headers, cookies and HTTP
+  messages.
+* Event emitter, event loop, logger and utility functions.
+* Test scripts which print the `Test Anything Protocol <https://testanything.org/>`_
+  (TAP), with ``Pyjo.Test``, inspired by Perl's ``Test::More``, and a test
+  harness, ``Pyjo.Prove``, inspired by Perl's ``prove``.
 
-Pyjoyment requires Python 3.12 or newer and runs on PyPy. It doesn't require
-any external libraries or compilers.
+The ``Pyjoyment`` package is reserved for the web framework itself: routes,
+controllers, renderer and ``Pyjoyment.Lite``.
 
-See http://www.pyjoyment.net/
+Pyjoyment requires Python 3.12 or newer and runs on PyPy on a best-effort
+basis. It needs nothing besides the Python standard library.
 
-Pyjoyment is based on `Mojolicious <http://mojolicio.us>`_: a next generation
-web framework for the Perl programming language.
+.. end-intro
 
 Status
 ======
 
-Early developement stage. Implemented already:
+.. begin-status
 
-* WSGI adapter
-* HTTP standalone async-io server
-* WebSockets client and server
-* HTTP user agent with TLS/SSL support
-* JSON pointers implementation based on ``RFC6901``
-* Embedded files loader
-* HTML/XML DOM parser with CSS selectors
-* URL parser with container classes for URL, path and querystring
-* Non-blocking TCP client and server
-* Simple logging object
-* Synchronizer and sequentializer of multiple events
-* Main event loop which handle IO and timer events
-* Event emitter with subscriptions
-* Low level event reactor based on ``select(2)`` and ``poll(2)``
-* Convenient functions and classed for unicode and byte strings and lists
-* Lazy properties for objects
-* Test units with API based on Perl's ``Test::More`` and `TAP <http://testanything.org/>`_ protocol
+Pyjoyment was written against Mojolicious 6 and is being revived as a port of
+Mojolicious 9.49, with ``asyncio`` as its event loop. The modules are ported
+anew one by one, and a ported module names the Mojolicious version it was
+ported from in its documentation. The other modules still follow Mojolicious
+6, with an event loop of their own based on ``select(2)`` and ``poll(2)``, and
+the web framework is not there yet.
+
+The progress is tracked in `GitHub Issues <https://github.com/dex4er/Pyjoyment/issues>`_.
+
+.. end-status
+
+Installation
+============
+
+.. begin-installation
+
+Pyjoyment is installed from its Git repository, as the release on PyPI
+predates the revival: ::
+
+    pip install git+https://github.com/dex4er/Pyjoyment
+
+or, in a project managed with `uv <https://docs.astral.sh/uv/>`_: ::
+
+    uv add git+https://github.com/dex4er/Pyjoyment
+
+.. end-installation
+
+Documentation
+=============
+
+The documentation is on `Read the Docs <https://pyjoyment.readthedocs.io/>`_.
 
 Examples
 ========
@@ -193,3 +215,17 @@ Standalone HTTP server serving embedded template file
 
 
    daemon.run()
+
+Copyright and license
+=====================
+
+.. begin-license
+
+Copyright (C) 2014-2026, Piotr Roszatycki.
+
+Based on Mojolicious: Copyright (C) 2008-2025, Sebastian Riedel and others.
+
+This program is free software, you can redistribute it and/or modify it under
+the terms of the Artistic License version 2.0.
+
+.. end-license
