@@ -30,16 +30,25 @@ lint:
     - taplo@0.10.0
     - yamllint@1.38.0
   disabled:
-    # ruff covers formatting, import sorting and the bandit rules
+    # bandit: security checks for Python code; not used here
     - bandit
+    # black: Python formatter; ruff formats the code
     - black
-    - isort
+    # checkov: scanner for infrastructure as code; there is none here
     - checkov
+    # isort: sorts Python imports; ruff sorts them (rule I)
+    - isort
+    # osv-scanner: known vulnerabilities in dependency lockfiles; there are no
+    # runtime dependencies
     - osv-scanner
+    # renovate: validates the Renovate configuration; Renovate validates it
+    # itself on every run, and the linter is a heavy npm package
     - renovate
+    # trivy: scanner for containers, infrastructure as code and dependencies;
+    # nothing to scan here
     - trivy
-    # Pyjo/IOLoop/certs/server.key is the default self-signed TLS key, like
-    # in Mojo, and is tracked on purpose
+    # trufflehog: secret scanner; not needed here, and it would report the
+    # default self-signed TLS key in Pyjo/IOLoop/certs, tracked on purpose
     - trufflehog
   ignore:
     # Examples that compare Pyjoyment with other libraries, which are not
