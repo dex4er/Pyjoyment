@@ -80,6 +80,10 @@ jobs:
         with:
           version: 2026.10.4 # datasource=github-releases depName=jdx/mise
 
+      # uv.lock has to match pyproject.toml.
+      - name: Check uv.lock
+        run: uv lock --check
+
       - name: Build sdist and wheel
         run: uv build
 

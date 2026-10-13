@@ -71,6 +71,10 @@ Python the project does not use. Run tools through mise:
 mise exec -- python --version
 ```
 
+`uv.lock` locks the Python dependencies; there are none at run time yet. After
+a change to `pyproject.toml`, run `mise exec -- uv lock`; CI checks that the
+lock matches with `uv lock --check`.
+
 `mise install` re-locks only the platform it runs on. After changing a tool
 version, run `mise lock` so every platform in `mise.lock` is refreshed; CI
 installs with `--locked` and fails on a tool that is not in the lock.
