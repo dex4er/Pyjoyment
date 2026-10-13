@@ -126,6 +126,7 @@ strict = [
   "Pyjo/Cookie/Request.py",
   "Pyjo/Cookie/Response.py",
   "Pyjo/Date.py",
+  "Pyjo/Headers.py",
   "Pyjo/Parameters.py",
   "Pyjo/Path.py",
   "Pyjo/Prove.py",

@@ -24,6 +24,7 @@ import functools
 import hashlib
 import os
 import random
+import re
 import select
 import sys
 import time
@@ -220,6 +221,37 @@ def getenv(name, default=None):
 
 
 re_entity = r(r'&(?:\#((?:\d{1,7}|x[0-9a-fA-F]{1,6}));|(\w+;?))')
+
+
+re_param_name = re.compile(r'[;\s]*([^=;, ]+)\s*')
+re_param_quoted = re.compile(r'=\s*("(?:\\\\|\\"|[^"])*")')
+re_param_unquoted = re.compile(r'=\s*([^;, ]*)')
+
+
+def header_params(value: str) -> tuple[dict[str, str], str]:
+    """::
+
+        params, remainder = header_params('one=foo; two="bar", three=baz')
+
+    Extract HTTP header field parameters until the first comma according to
+    :rfc:`5987`.
+    """
+    params: dict[str, str] = {}
+    pos = 0
+    while m := re_param_name.match(value, pos):
+        name, pos = m[1], m.end()
+
+        # Quoted value
+        if quoted := re_param_quoted.match(value, pos):
+            params.setdefault(name, unquote(quoted[1]))
+            pos = quoted.end()
+
+        # Unquoted value
+        elif unquoted := re_param_unquoted.match(value, pos):
+            params.setdefault(name, unquoted[1])
+            pos = unquoted.end()
+
+    return params, value[pos:]
 
 
 def html_unescape(unicodestring):

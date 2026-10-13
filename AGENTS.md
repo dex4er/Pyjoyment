@@ -169,6 +169,7 @@ brought to the target when a ported module needs it, without changing what
 the modules that are not ported yet get from it: typed signatures, and a
 variant for `str` next to the one for `bytes` where Mojo works on
 characters, like `url_unescape`.
+Its subtests from `t/mojo/util.t` come to `t/Pyjo/Util.py` with it.
 
 A module is ported anew from the target Mojolicious, not migrated from the
 existing Python code. The existing Python module is a reference for how
@@ -276,6 +277,12 @@ copy:
   encoded with the charset of the module. Perl keeps bytes that do not decode
   as a byte string, which is a `str` of the characters 0-255 in Python:
   `.decode('latin-1')`.
+  HTTP headers are such characters too, as `http.client` has them: bytes
+  from the wire are decoded as ISO-8859-1.
+- An environment variable `MOJO_*` is `PYJO_*`.
+- Methods that Mojo makes in a loop with `monkey_patch`, such as the
+  shortcuts of `Mojo::Headers`, are class attributes, one for each, made
+  with a descriptor class.
 - `None` is not `undef` everywhere: `time.gmtime(None)` is the current time,
   `gmtime(undef)` is the epoch. Python's `tm_wday` counts from Monday, Perl's
   from Sunday.
@@ -368,6 +375,8 @@ Annotations use the Python 3.12 syntax: generics with type parameters
 (`class Collection[T](list[T])`, `def f[T](x: T) -> T`), `type` aliases,
 `Self` for methods that return `self` so that chains keep their type, and
 `@overload` for functions with several call forms, like `Pyjo.Test.subtest`.
+A descriptor class with an overloaded `__get__` types what Mojo makes with
+`monkey_patch`: a `property` made by a call is `Any` to pyright.
 A class method that returns instances of the class, like `parse`, is generic
 (`def parse[C: Pyjo_Cookie](cls: type[C], ...) -> list[C]`): with `list[Self]`,
 pyright rejects the method of a subclass as an incompatible override. A

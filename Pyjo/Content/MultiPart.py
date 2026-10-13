@@ -255,8 +255,6 @@ class Pyjo_Content_MultiPart(Pyjo.Content.object, Pyjo.String.Mixin.object):
 
             # New part
             part = Pyjo.Content.Single.new(relaxed=True)
-            if self.charset:
-                part.headers.charset = self.charset
             self.emit('part', part)
             self.parts.append(part)
             self._multi_state = 'multipart_body'

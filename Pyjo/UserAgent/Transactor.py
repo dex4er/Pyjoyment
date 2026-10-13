@@ -185,7 +185,7 @@ class Pyjo_UserAgent_Transactor(Pyjo.Base.object):
                 .content.set(headers=req.headers.clone())
                 .headers
             )
-            for n in filter(lambda n: n.lower().startswith('content-'), headers.names):
+            for n in filter(lambda n: n.lower().startswith('content-'), headers.names()):
                 headers.remove(n)
 
         headers = new.req.set(url=location).headers
