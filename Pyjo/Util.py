@@ -570,7 +570,7 @@ def url_escape(bstring: bytes, pattern: bytes | None = None) -> bytes:
     else:
         re_pattern = re_url_allow_chars
 
-    return re_pattern.sub(lambda m: b'%' + format(ord(m.group(1)), 'X').encode('ascii'), bstring)
+    return re_pattern.sub(lambda m: b'%' + format(ord(m.group(1)), '02X').encode('ascii'), bstring)
 
 
 re_percent_chars = r(rb'%([0-9a-fA-F]{2})')
