@@ -3,15 +3,23 @@ Pyjo.Cookie.Request - HTTP request cookie
 =========================================
 ::
 
-    Pyjo.Cookie.Request
+    import Pyjo.Cookie.Request
 
     cookie = Pyjo.Cookie.Request.new()
     cookie.name = 'foo'
     cookie.value = 'bar'
     print(cookie)
 
-:mod:`Pyjo.Cookie.Request` is a container for HTTP request cookies based on
+:mod:`Pyjo.Cookie.Request` is a container for HTTP request cookies, based on
 :rfc:`6265`.
+
+See also
+--------
+
+:mod:`Pyjoyment`, https://mojolicious.org.
+
+Ported from `Mojo::Cookie::Request <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/Cookie/Request.pm>`_
+of Mojolicious 9.49.
 
 Classes
 -------
@@ -19,11 +27,9 @@ Classes
 
 import Pyjo.Cookie
 
-from Pyjo.Regexp import r
-from Pyjo.Util import notnone, quote, split_header
+from Pyjo.Util import quote, split_header
 
-
-re_quoted = r('[,;" ]')
+import re
 
 
 class Pyjo_Cookie_Request(Pyjo.Cookie.object):
@@ -33,41 +39,34 @@ class Pyjo_Cookie_Request(Pyjo.Cookie.object):
     """
 
     @classmethod
-    def parse(self, string=''):
+    def parse[C: Pyjo_Cookie_Request](cls: type[C], string: str | None = None) -> list[C]:
         """::
 
             cookies = Pyjo.Cookie.Request.parse('f=b; g=a')
 
         Parse cookies.
         """
-        cookies = []
-
-        for pairs in split_header(string):
-            for name, value in pairs:
-                if name.startswith('$'):
-                    continue
-                cookies.append(self.new(name=name, value=notnone(value, '')))
+        cookies: list[C] = []
+        tree: list[list[list[str | None]]] = split_header(string or '')
+        for name, value in (pair for pairs in tree for pair in pairs):
+            if name is None or name.startswith('$'):
+                continue
+            cookies.append(cls.new(name=name, value=value or ''))
         return cookies
 
-    def to_str(self):
+    def to_str(self) -> str:
         """::
 
             string = cookie.to_str()
 
         Render cookie.
         """
-        name = str(notnone(self.name, ''))
-        if not name:
+        if not (name := self.name or ''):
             return ''
-
-        value = str(notnone(self.value, ''))
-        if re_quoted.search(value):
-            value = quote(value)
-        return '='.join([name, value])
+        value = self.value or ''
+        return '='.join([name, quote(value) if re.search(r'[,;" ]', value) else value])
 
 
 parse = Pyjo_Cookie_Request.parse
-
-
 new = Pyjo_Cookie_Request.new
 object = Pyjo_Cookie_Request
