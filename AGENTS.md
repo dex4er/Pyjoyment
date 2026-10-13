@@ -345,6 +345,18 @@ copy:
   `None`. A test of the end of a list, `is $cookies->[1], undef`, becomes
   `is_ok(len(cookies), 1)`, or `is_ok(collection.get(1), None)` for a
   `Pyjo.Collection`.
+- A function named after a keyword of Python has a trailing underscore, as
+  `raise` of `Mojo::Exception` is `raise_`. The functions of `Pyjo.Test` are
+  the exception: they have an `_ok` suffix, as `is_ok`.
+- A name of a Perl package, as `Mojo::Exception` takes them, is a dotted name
+  of a class in Python (`'MyApp.X.Foo'`), resolved by importing the longest
+  prefix that is a module.
+- A stack trace, Perl's `caller` frames, is a list of
+  `traceback.FrameSummary`, the most recent first, as Mojo keeps it.
+- `like` of `Test::More` stringifies what it checks, `like_ok` does not:
+  a test of an object is `like_ok(str(obj), ...)`.
+- A test that depends on the layout of its own source lines, as the context
+  of `Mojo::Exception` does, is kept from the formatter with `# fmt: off`.
 - Perl frees a temporary object at the end of the statement, Python as soon
   as nothing refers to it. Where an object holds a resource, like the
   temporary directory of `Pyjo.File.tempdir()`, an object made from it, like
