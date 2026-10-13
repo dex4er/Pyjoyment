@@ -15,8 +15,12 @@ with subtest('Synopsis'):
     like_ok(str(date), r'^\w{3}, \d{2} \w{3} \d{4} \d{2}:\d{2}:\d{2} GMT$', 'date')
 
 with subtest('new'):
+    from datetime import UTC, datetime
+
     date = Pyjo.Date.new()
     isa_ok(date, Pyjo.Date.object, 'date')
+    date = Pyjo.Date.new(datetime.now(UTC))
+    ok(date.epoch >= int(time.time()), 'datetime')
     date = Pyjo.Date.new('Sun Nov  6 08:49:37 1994')
     is_ok(date.epoch, 784111777, 'date.epoch')
 
@@ -30,6 +34,21 @@ with subtest('__bool__'):
     boolean = bool(date)
     is_ok(boolean, True, 'boolean')
 
+with subtest('__float__'):
+    number = float(date)
+    is_ok(number, 784111777.0, 'number')
+
+    # datetime.datetime(1994, 11, 6, 8, 49, 37, tzinfo=datetime.timezone.utc)
+    is_ok(
+        datetime.fromtimestamp(float(Pyjo.Date.new(784111777)), UTC),
+        datetime(1994, 11, 6, 8, 49, 37, tzinfo=UTC),
+        'datetime.fromtimestamp(float(date), UTC)',
+    )
+
+with subtest('__int__'):
+    number = int(date)
+    is_ok(number, 784111777, 'number')
+
 with subtest('__str__'):
     string = str(date)
     is_ok(string, 'Sun, 06 Nov 1994 08:49:37 GMT', 'string')
@@ -37,6 +56,10 @@ with subtest('__str__'):
 with subtest('parse'):
     date = date.parse('Sun Nov  6 08:49:37 1994')
     is_ok(date.epoch, 784111777, 'date.epoch')
+    date = date.parse(datetime.now(UTC))
+    ok(date.epoch >= int(time.time()), 'datetime')
+    date = date.parse(datetime(1994, 11, 6, 8, 49, 37, 210000, tzinfo=UTC))
+    is_ok(date.epoch, 784111777.21, 'datetime with microseconds')
 
     # Epoch
     is_ok(Pyjo.Date.new('784111777').epoch, 784111777, "Pyjo.Date.new('784111777').epoch")
@@ -79,17 +102,28 @@ with subtest('parse'):
     )
 
 with subtest('to_datetime'):
-    string = date.to_datetime()
-    is_ok(string, '1994-11-06T08:49:37Z', 'string')
+    dt = date.to_datetime()
+    is_ok(dt, datetime(1994, 11, 6, 8, 49, 37, 210000, tzinfo=UTC), 'dt')
+
+    # datetime.datetime(1994, 11, 6, 8, 49, 37, tzinfo=datetime.timezone.utc)
+    is_ok(
+        Pyjo.Date.new(784111777).to_datetime(),
+        datetime(1994, 11, 6, 8, 49, 37, tzinfo=UTC),
+        'Pyjo.Date.new(784111777).to_datetime()',
+    )
+
+with subtest('to_rfc3339'):
+    string = date.to_rfc3339()
+    is_ok(string, '1994-11-06T08:49:37.21Z', 'string')
 
     # "1994-11-06T08:49:37Z"
-    is_ok(Pyjo.Date.new(784111777).to_datetime(), '1994-11-06T08:49:37Z', 'Pyjo.Date.new(784111777).to_datetime()')
+    is_ok(Pyjo.Date.new(784111777).to_rfc3339(), '1994-11-06T08:49:37Z', 'Pyjo.Date.new(784111777).to_rfc3339()')
 
     # "1994-11-06T08:49:37.21Z"
     is_ok(
-        Pyjo.Date.new(784111777.21).to_datetime(),
+        Pyjo.Date.new(784111777.21).to_rfc3339(),
         '1994-11-06T08:49:37.21Z',
-        'Pyjo.Date.new(784111777.21).to_datetime()',
+        'Pyjo.Date.new(784111777.21).to_rfc3339()',
     )
 
 with subtest('to_str'):

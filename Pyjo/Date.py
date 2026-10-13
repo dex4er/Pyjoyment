@@ -37,6 +37,7 @@ import calendar
 import re
 import time
 
+from datetime import UTC, datetime
 from typing import Self
 
 
@@ -61,11 +62,12 @@ class Pyjo_Date(Pyjo.Base.object, Pyjo.String.Mixin.object):
 
     epoch: int | float | None
 
-    def __init__(self, date: str | float | None = None) -> None:
+    def __init__(self, date: str | float | datetime | None = None) -> None:
         """::
 
             date = Pyjo.Date.new()
             date = Pyjo.Date.new('Sun Nov  6 08:49:37 1994')
+            date = Pyjo.Date.new(datetime.now(UTC))
 
         Construct a new :mod:`Pyjo.Date` object and :meth:`parse` date if necessary.
         """
@@ -91,6 +93,30 @@ class Pyjo_Date(Pyjo.Base.object, Pyjo.String.Mixin.object):
         """
         return True
 
+    def __float__(self) -> float:
+        """::
+
+            number = float(date)
+
+        The epoch, for the standard library. Before Python 3.15,
+        :meth:`datetime.datetime.fromtimestamp` and :func:`time.gmtime` take only an
+        ``int`` or a ``float``, not an object that converts to one, so they get
+        ``float(date)``. ::
+
+            # datetime.datetime(1994, 11, 6, 8, 49, 37, tzinfo=datetime.timezone.utc)
+            datetime.fromtimestamp(float(Pyjo.Date.new(784111777)), UTC)
+        """
+        return float(self.epoch or 0)
+
+    def __int__(self) -> int:
+        """::
+
+            number = int(date)
+
+        The epoch in whole seconds, for the standard library.
+        """
+        return int(self.epoch or 0)
+
     def __str__(self) -> str:
         """::
 
@@ -100,12 +126,14 @@ class Pyjo_Date(Pyjo.Base.object, Pyjo.String.Mixin.object):
         """
         return self.to_str()
 
-    def parse(self, date: str | float) -> Self:
+    def parse(self, date: str | float | datetime) -> Self:
         """::
 
             date = date.parse('Sun Nov  6 08:49:37 1994')
+            date = date.parse(datetime.now(UTC))
 
-        Parse date. ::
+        Parse date. A :class:`datetime.datetime` gives its timestamp, so a naive
+        one is local time, as for :meth:`datetime.datetime.timestamp`. ::
 
             # Epoch
             print(Pyjo.Date.new('784111777').epoch)
@@ -127,6 +155,12 @@ class Pyjo_Date(Pyjo.Base.object, Pyjo.String.Mixin.object):
             print(Pyjo.Date.new('1994-11-06T08:49:37+01:00').epoch)
             print(Pyjo.Date.new('1994-11-06T08:49:37-01:00').epoch)
         """
+        # datetime of the standard library
+        if isinstance(date, datetime):
+            timestamp = date.timestamp()
+            self.epoch = int(timestamp) if timestamp.is_integer() else timestamp
+            return self
+
         date = str(date)
 
         # epoch (784111777)
@@ -159,18 +193,30 @@ class Pyjo_Date(Pyjo.Base.object, Pyjo.String.Mixin.object):
         self.epoch = epoch + offset if epoch is not None and epoch + offset >= 0 else None
         return self
 
-    def to_datetime(self) -> str:
+    def to_datetime(self) -> datetime:
         """::
 
-            string = date.to_datetime()
+            dt = date.to_datetime()
+
+        Turn date into a :class:`datetime.datetime` in UTC, for the standard library. ::
+
+            # datetime.datetime(1994, 11, 6, 8, 49, 37, tzinfo=datetime.timezone.utc)
+            Pyjo.Date.new(784111777).to_datetime()
+        """
+        return datetime.fromtimestamp(self.epoch or 0, UTC)
+
+    def to_rfc3339(self) -> str:
+        """::
+
+            string = date.to_rfc3339()
 
         Render :rfc:`3339` date and time. ::
 
             # "1994-11-06T08:49:37Z"
-            Pyjo.Date.new(784111777).to_datetime()
+            Pyjo.Date.new(784111777).to_rfc3339()
 
             # "1994-11-06T08:49:37.21Z"
-            Pyjo.Date.new(784111777.21).to_datetime()
+            Pyjo.Date.new(784111777.21).to_rfc3339()
         """
         # RFC 3339 (1994-11-06T08:49:37Z)
         epoch = self.epoch or 0
