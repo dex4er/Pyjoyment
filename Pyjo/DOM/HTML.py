@@ -5,20 +5,82 @@ Pyjo.DOM.HTML - HTML/XML engine
 
     import Pyjo.DOM.HTML
 
+    # Turn HTML into DOM tree
     html = Pyjo.DOM.HTML.new()
     html.parse('<div><p id="a">Test</p><p id="b">123</p></div>')
     tree = html.tree
 
-Classes
--------
+:mod:`Pyjo.DOM.HTML` is the HTML/XML engine used by :mod:`Pyjo.DOM`, based on
+the `HTML Living Standard <https://html.spec.whatwg.org>`_ and the
+`Extensible Markup Language (XML) 1.0 <https://www.w3.org/TR/xml/>`_.
+
+See also
+--------
+
+:mod:`Pyjoyment`, https://mojolicious.org.
+
+Ported from `Mojo::DOM::HTML <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/DOM/HTML.pm>`_
+of Mojolicious 9.49.
+
+Functions
+---------
 """
 
 import Pyjo.Base
-import Pyjo.DOM
 
-from Pyjo.Regexp import r
-from Pyjo.Util import html_unescape, xml_escape
+from Pyjo.Util import html_attr_unescape, html_unescape, xml_escape
 
+import re
+
+from collections.abc import Callable
+from typing import Any, Self, cast
+
+
+# Any: a node is a list of its type, its content and its parent, and a tag also
+# of its name, its attributes and its child nodes, as in Mojo
+type Tree = list[Any]
+
+_ATTR = r"""
+  ([^<>=\s/0-9.\-][^<>=\s/]*|/)                        # Key
+  (?:
+    \s*=\s*
+    (?s:(?P<quote>["'])(.*?)(?P=quote)|([^>\s]*))      # Value
+  )?
+  \s*
+"""
+_ATTR_RE = re.compile(_ATTR, re.X)
+# Unlike Mojolicious: Mojo makes a match of the text and one of the tag with a
+# lazy "??" and the rule of Perl that a match of no length cannot follow
+# another one at the same position; Python has no such rule, so the text, the
+# tag and a runaway "<" are alternatives
+_TOKEN_RE = re.compile(
+    rf"""
+  (?:
+    ([^<]+)                                                                    # Text
+  |
+    <(?:
+      !(?:
+        DOCTYPE(
+        \s+\w+                                                                 # Doctype
+        (?:(?:\s+\w+)?(?:\s+(?:"[^"]*"|'[^']*'))+)?                            # External ID
+        (?:\s+\[.+?\])?                                                        # Int Subset
+        \s*)
+      |
+        --(.*?)(?:--!?|(?<=<!--)-?(?=>))                                       # Comment
+      |
+        \[CDATA\[(.*?)\]\]                                                     # CDATA
+      )
+    |
+      \?(.*?)\?                                                                # Processing Instruction
+    |
+      ((?:/\s*)?[^<>\s/0-9.\-][^<>\s/]*\s*(?:(?:{_ATTR}){{0,32766}})*+)        # Tag
+    )>
+  |
+    (<)                                                                        # Runaway "<"
+  )
+""",
+    re.X | re.I | re.S,
+)
 
 # HTML elements that only contain raw text
 RAW = {'script', 'style'}
@@ -30,309 +92,65 @@ RCDATA = {'title', 'textarea'}
 END = {'body': 'head', 'optgroup': 'optgroup', 'option': 'option'}
 
 # HTML elements that break paragraphs
-for _ in (
-    'address',
-    'article',
-    'aside',
-    'blockquote',
-    'dir',
-    'div',
-    'dl',
-    'fieldset',
-    'footer',
-    'form',
-    'h1',
-    'h2',
-    'h3',
-    'h4',
-    'h5',
-    'h6',
-    'header',
-    'hr',
-    'main',
-    'menu',
-    'nav',
-    'ol',
-    'p',
-    'pre',
-    'section',
-    'table',
-    'ul',
+for _name in (
+    *'address article aside blockquote details dialog div dl fieldset figcaption figure footer form h1 h2 h3 h4 h5 h6'.split(),
+    *'header hgroup hr main menu nav ol p pre section table ul'.split(),
 ):
-    END[_] = 'p'
+    END[_name] = 'p'
+
+# Container HTML elements that create their own scope
+SCOPE = {'math', 'svg'}
 
 # HTML table elements with optional end tags
 TABLE = {'colgroup', 'tbody', 'td', 'tfoot', 'th', 'thead', 'tr'}
 
 # HTML elements with optional end tags and scoping rules
-CLOSE = {
-    'li': ({'li'}, {'ul', 'ol'}),
-    'tr': ({'tr'}, {'table'}),
-    'colgroup': (TABLE, {'table'}),
-    'tbody': (TABLE, {'table'}),
-    'tfoot': (TABLE, {'table'}),
-    'thead': (TABLE, {'table'}),
-    'dd': ({'dd', 'dt'}, {'dl'}),
-    'dt': ({'dd', 'dt'}, {'dl'}),
-    'rp': ({'rp', 'rt'}, {'ruby'}),
-    'rt': ({'rp', 'rt'}, {'ruby'}),
-    'td': ({'th', 'td'}, {'table'}),
-    'th': ({'th', 'td'}, {'table'}),
-}
+CLOSE: dict[str, tuple[set[str], set[str]]] = {'li': ({'li'}, {'ul', 'ol'}), 'tr': ({'tr'}, {'table'})}
+for _name in ('colgroup', 'tbody', 'tfoot', 'thead'):
+    CLOSE[_name] = (TABLE, {'table'})
+for _name in ('dd', 'dt'):
+    CLOSE[_name] = ({'dd', 'dt'}, {'dl'})
+for _name in ('rp', 'rt'):
+    CLOSE[_name] = ({'rp', 'rt'}, {'ruby'})
+for _name in ('td', 'th'):
+    CLOSE[_name] = ({'th', 'td'}, {'table'})
+
+# HTML parent elements that signal no more content when closed, but that are also phrasing content
+NO_MORE_CONTENT = {'ruby': ['rt', 'rp'], 'select': ['option', 'optgroup']}
 
 # HTML elements without end tags
-EMPTY = {
-    'area',
-    'base',
-    'br',
-    'col',
-    'embed',
-    'hr',
-    'img',
-    'input',
-    'keygen',
-    'link',
-    'menuitem',
-    'metaparam',
-    'source',
-    'track',
-    'wbr',
-}
+EMPTY = set('area base br col embed hr img input keygen link menuitem meta param source track wbr'.split())
 
 # HTML elements categorized as phrasing content (and obsolete inline elements)
-PHRASING = {
-    'a',
-    'abbr',
-    'area',
-    'audio',
-    'b',
-    'bdi',
-    'bdo',
-    'br',
-    'button',
-    'canvas',
-    'cite',
-    'code',
-    'data',
-    'datalist',
-    'del',
-    'dfn',
-    'em',
-    'embed',
-    'i',
-    'iframe',
-    'img',
-    'input',
-    'ins',
-    'kbd',
-    'keygen',
-    'label',
-    'link',
-    'map',
-    'mark',
-    'math',
-    'meta',
-    'meter',
-    'noscript',
-    'object',
-    'output',
-    'picture',
-    'progress',
-    'q',
-    'ruby',
-    's',
-    'samp',
-    'script',
-    'select',
-    'small',
-    'span',
-    'strong',
-    'sub',
-    'sup',
-    'svg',
-    'template',
-    'textarea',
-    'time',
-    'u',
-    'var',
-    'video',
-    'wbr',
-}
-
-OBSOLETE = {'acronym', 'applet', 'basefont', 'big', 'font', 'strike', 'tt'}
-PHRASING = OBSOLETE | PHRASING
+PHRASING = set(
+    (
+        'a abbr area audio b bdi bdo br button canvas cite code data datalist del dfn em embed i iframe img input ins kbd '
+        'keygen label link map mark math meta meter noscript object output picture progress q ruby s samp script select '
+        'slot small span strong sub sup svg template textarea time u var video wbr '
+        'acronym applet basefont big font strike tt'
+    ).split()
+)
 
 # HTML elements that don't get their self-closing flag acknowledged
-BLOCK = {
-    'a',
-    'address',
-    'applet',
-    'article',
-    'aside',
-    'b',
-    'big',
-    'blockquote',
-    'body',
-    'button',
-    'caption',
-    'center',
-    'code',
-    'col',
-    'colgroup',
-    'dd',
-    'details',
-    'dialog',
-    'dir',
-    'div',
-    'dl',
-    'dt',
-    'em',
-    'fieldset',
-    'figcaption',
-    'figure',
-    'font',
-    'footer',
-    'form',
-    'frameset',
-    'h1',
-    'h2',
-    'h3',
-    'h4',
-    'h5',
-    'h6',
-    'head',
-    'header',
-    'hgroup',
-    'html',
-    'i',
-    'iframe',
-    'li',
-    'listing',
-    'main',
-    'marquee',
-    'menu',
-    'nav',
-    'nobr',
-    'noembed',
-    'noframes',
-    'noscript',
-    'object',
-    'ol',
-    'optgroup',
-    'option',
-    'p',
-    'plaintext',
-    'pre',
-    'rp',
-    'rt',
-    's',
-    'script',
-    'section',
-    'select',
-    'small',
-    'strike',
-    'strong',
-    'style',
-    'summary',
-    'table',
-    'tbody',
-    'td',
-    'template',
-    'textarea',
-    'tfoot',
-    'th',
-    'thead',
-    'title',
-    'tr',
-    'tt',
-    'u',
-    'ul',
-    'xmp',
-}
-
-ATTR_PAT = r"""
-  ([^<>=\s\/]+|\/)   # Key
-  (?:
-    \s*=\s*
-    (?:
-      "([^"]*?)"     # Quotation marks
-    |
-      '([^']*?)'     # Apostrophes
-    |
-      ([^>\s]*)      # Unquoted
-    )
-  )?
-  \s*
-"""
-
-TOKEN_1_PAT = r"""
-  (?P<text>[^<]+)?                                     # Text
-  (?:
-    <(?:
-      !(?:
-        DOCTYPE(?P<doctype>
-        \s+\w+                                        # Doctype
-        (?:(?:\s+\w+)?(?:\s+(?:"[^"]*"|'[^']*'))+)?   # External ID
-        (?:\s+\[.+?\])?                               # Int Subset
-        \s*)
-      |
-        --(?P<comment>.*?)--\s*                       # Comment
-      |
-        \[CDATA\[(?P<cdata>.*?)\]\]                   # CDATA
-      )
-    |
-      \?(?P<pi>.*?)\?                                 # Processing Instruction
-    |
-"""
-
-RAW_PAT = (
-    r"""
-      \s*(?P<rawtag>
-        (?P<rawtagname>"""
-    + '|'.join(RAW | RCDATA)
-    + r""")\s*
-        (?:"""
-    + ATTR_PAT
-    + r""")*
-      )>
-      (?P<raw>.*?)                                    # Raw
-      <\s*/\s*(?P=rawtagname)\s*
-    |
-"""
+BLOCK = set(
+    (
+        'a address applet article aside b big blockquote body button caption center code col colgroup dd details dialog '
+        'dir div dl dt em fieldset figcaption figure font footer form frameset h1 h2 h3 h4 h5 h6 head header hgroup html '
+        'i iframe li listing main marquee menu nav nobr noembed noframes noscript object ol optgroup option p plaintext '
+        'pre rp rt s script section select small strike strong style summary table tbody td template textarea tfoot th '
+        'thead title tr tt u ul xmp'
+    ).split()
 )
-
-TOKEN_2_PAT = (
-    r"""
-      \s*(?P<tag>[^<>\s]+\s*(?:"""
-    + ATTR_PAT
-    + """)*) # Tag
-    )>
-    | (?P<runaway><)                                  # Runaway "<"
-  )?
-"""
-)
-
-XML_TOKEN_PAT = TOKEN_1_PAT + TOKEN_2_PAT
-
-HTML_TOKEN_PAT = TOKEN_1_PAT + RAW_PAT + TOKEN_2_PAT
-
-
-re_startswith_xml = r(r'<\?\s*xml\b', 'is')
-re_xml_token = r(XML_TOKEN_PAT, 'isx')
-re_html_token = r(HTML_TOKEN_PAT, 'isx')
-re_end_tag = r(r'^\/\s*(\S+)')
-re_start_tag = r(r'^([^\s/]+)([\s\S]*)')
-re_attr = r(ATTR_PAT, 'x')
 
 
 class Pyjo_DOM_HTML(Pyjo.Base.object):
     """
-    :mod:`Pyjo.DOM.HTML` inherits all attributes and methods from
-    :mod:`Pyjo.Base` and implements the following new ones.
+    :mod:`Pyjo.DOM.HTML` inherits all methods from :mod:`Pyjo.Base` and
+    implements the following new ones.
     """
 
-    def __init__(self, **kwargs):
-        self.tree = kwargs.get('tree', ['root'])
+    def __init__(self, tree: Tree | None = None, **kwargs: bool | None) -> None:
+        self.tree: Tree = tree if tree is not None else ['root']
         """::
 
             tree = html.tree
@@ -341,284 +159,330 @@ class Pyjo_DOM_HTML(Pyjo.Base.object):
         Document Object Model. Note that this structure should only be used very
         carefully since it is very dynamic.
         """
+        self._xml: bool | None = None
+        self._xml_set = False
+        if 'xml' in kwargs:
+            self.xml = kwargs['xml']
 
-        self.xml = kwargs.get('xml')
+    @property
+    def xml(self) -> bool | None:
         """::
 
-            bool = html.xml
-            html.xml = bool
+            boolean = html.xml
+            html.xml = boolean
 
-        Disable HTML semantics in parser and activate case sensitivity, defaults to
-        auto detection based on processing instructions.
+        Disable HTML semantics in parser and activate case-sensitivity, defaults
+        to auto-detection based on XML declarations.
         """
+        return self._xml
 
-    def parse(self, html):
+    @xml.setter
+    def xml(self, value: bool | None) -> None:
+        self._xml = value
+        self._xml_set = True
+
+    def parse(self, html: object) -> Self:
         """::
 
-            html = html.parse(u'<foo bar="baz">I ♥ Pyjo!</foo>')
+            html = html.parse('<foo bar="baz">I ♥ Pyjoyment!</foo>')
 
         Parse HTML/XML fragment.
         """
+        string = str(html)
+
         xml = self.xml
-        tree = ['root']
-        current = tree
-        text = None
+        tree: Tree = ['root']
+        current = [tree]
+        pos = 0
+        while m := _TOKEN_RE.match(string, pos):
+            pos = m.end()
+            text, doctype, comment, cdata, pi, tag, runaway = (m[i] for i in (1, 2, 3, 4, 5, 6, 11))
 
-        if isinstance(html, Pyjo.DOM.object):
-            html = html.to_str()
-
-        if xml is None and re_startswith_xml.search(html[:1024]):
-            xml = True
-            self.xml = xml
-
-        if xml:
-            re_token = re_xml_token
-        else:
-            re_token = re_html_token
-
-        for m in re_token.finditer(html):
-            text, doctype, comment, cdata, pi, tag, runaway = m.group(
-                'text', 'doctype', 'comment', 'cdata', 'pi', 'tag', 'runaway'
-            )
-            raw = m.group('raw') if not xml else None
-            rawtag = m.group('rawtag') if not xml else None
-            if rawtag is not None:
-                tag = rawtag
-
+            # Text (and runaway "<")
             if runaway is not None:
-                if text is not None:
-                    text += '<'
-                else:
-                    text = '<'
-
+                text = (text or '') + '<'
             if text is not None:
-                node = self._node(current, 'text', html_unescape(text))
-                if node:
-                    current = node
+                _node(current[0], 'text', html_unescape(text))
 
             # Tag
             if tag is not None:
                 # End
-                m = re_end_tag.search(tag)
-                if m:
-                    node = self._end(m.group(1) if xml else m.group(1).lower(), xml, current)
-                    if node:
-                        current = node
+                if end_m := re.match(r'/\s*(\S+)', tag):
+                    end = end_m[1] if xml else end_m[1].lower()
+
+                    # No more content
+                    if not xml and (tags := NO_MORE_CONTENT.get(end)):
+                        for t in tags:
+                            _end(t, xml, current)
+
+                    _end(end, xml, current)
 
                 # Start
-                else:
-                    m = re_start_tag.search(tag)
-                    if m:
-                        start, attr = m.group(1, 2)
-                        if not xml:
-                            start = start.lower()
+                elif start_m := re.match(r'([^\s/]+)([\s\S]*)', tag):
+                    start, attr = start_m[1] if xml else start_m[1].lower(), start_m[2]
 
-                        attrs = {}
-                        closing = False
+                    # Attributes
+                    attrs: dict[str, str | None] = {}
+                    closing = False
+                    for a in _ATTR_RE.finditer(attr):
+                        key = a[1] if xml else a[1].lower()
+                        value = a[3] if a[3] is not None else a[4]
 
-                        # Attributes
-                        for m in re_attr.finditer(attr):
-                            if xml:
-                                key = m.group(1)
-                            else:
-                                key = m.group(1).lower()
-
-                            if m.group(2) is not None:
-                                value = m.group(2)
-                            elif m.group(3) is not None:
-                                value = m.group(3)
-                            else:
-                                value = m.group(4)
-
-                            # Empty tag
-                            if key == '/':
-                                closing = True
-                                continue
-
-                            if value is not None:
-                                attrs[key] = html_unescape(value)
-                            else:
-                                attrs[key] = value
-
-                        # "image" is an alias for "img"
-                        if not xml and start == 'image':
-                            start = 'img'
-
-                        current = self._start(start, attrs, xml, current)
-
-                        # Element without end tag (self-closing)
-                        if not xml and start in EMPTY or (xml or start not in BLOCK) and closing:
-                            current = self._end(start, xml, current)
-
-                        # Raw text elements
-                        if xml or start not in RAW and start not in RCDATA:
+                        # Empty tag
+                        if key == '/':
+                            closing = True
                             continue
-                        if rawtag is None:
-                            continue
-                        current = self._node(current, 'raw', html_unescape(raw) if start in RCDATA else raw)
-                        node = self._end(start, 0, current)
-                        if node:
-                            current = node
+
+                        attrs[key] = html_attr_unescape(value) if value is not None else value
+
+                    # "image" is an alias for "img"
+                    if not xml and start == 'image':
+                        start = 'img'
+                    _start(start, attrs, xml, current)
+
+                    # Element without end tag (self-closing)
+                    if not xml and start in EMPTY or (xml or start not in BLOCK) and closing:
+                        _end(start, xml, current)
+
+                    # Raw text elements
+                    if xml or start not in RAW and start not in RCDATA:
+                        continue
+
+                    if start == 'script':
+                        script, found_end, pos = _script_content(string, pos)
+                        if len(script):
+                            _node(current[0], 'raw', script)
+                        if found_end:
+                            _end(start, False, current)
+                        continue
+
+                    if not (
+                        raw := re.compile(rf'(.*?)</{re.escape(start)}(?:\s+|\s*>)', re.S | re.I).match(string, pos)
+                    ):
+                        continue
+                    pos = raw.end()
+                    _node(current[0], 'raw', html_unescape(raw[1]) if start in RCDATA else raw[1])
+                    _end(start, False, current)
 
             # DOCTYPE
             elif doctype is not None:
-                node = self._node(current, 'doctype', doctype)
-                if node:
-                    current = node
+                _node(current[0], 'doctype', doctype)
 
             # Comment
             elif comment is not None:
-                node = self._node(current, 'comment', comment)
-                if node:
-                    current = node
+                _node(current[0], 'comment', comment)
 
             # CDATA
             elif cdata is not None:
-                node = self._node(current, 'cdata', cdata)
-                if node:
-                    current = node
+                _node(current[0], 'cdata', cdata)
 
-            # Processing instruction
+            # Processing instruction (try to detect XML)
             elif pi is not None:
-                node = self._node(current, 'pi', pi)
-                if node:
-                    current = node
+                if not self._xml_set and re.search(r'xml', pi, re.I):
+                    self.xml = xml = True
+                _node(current[0], 'pi', pi)
 
         self.tree = tree
         return self
 
-    def render(self):
+    def render(self) -> str:
         """::
 
             string = html.render()
 
         Render DOM to HTML/XML.
         """
-        return self._render(self.tree, self.xml)
+        return _render(self.tree, self.xml)
 
-    def _end(self, end, xml, current):
+    def tag(self, name: str, content: str | Callable[[], str] | None = None, /, **attrs: Any) -> Self:
+        """::
 
-        # Search stack for start tag
-        nextnode = current
-        while nextnode is not None:
-            # Ignore useless end tag
-            if nextnode[0] == 'root':
-                return
+            html = html.tag('div', 'safe content', id='foo')
 
-            # Right tag
-            if nextnode[1] == end:
-                return nextnode[3]
+        Generate HTML/XML tag.
+        """
+        self.tree = ['root', _tag(name, content, attrs)]
+        return self
 
-            # Phrasing content can only cross phrasing content
-            if not xml and end in PHRASING and nextnode[1] not in PHRASING:
-                return
 
-            nextnode = nextnode[3]
-            if nextnode is None:
-                break
+def tag_to_html(name: str, content: str | Callable[[], str] | None = None, /, **attrs: Any) -> str:
+    """::
 
-    def _node(self, current, nodetype, content):
-        new = [nodetype, content, current]
-        current.append(new)
-        return current
+        string = tag_to_html('div', 'safe content', id='foo')
 
-    def _render(self, tree, xml):
-        nodetype = tree[0]
+    Generate HTML/XML tag and render it right away. This is a significantly
+    faster alternative to :meth:`~Pyjo_DOM_HTML.tag` for template systems that
+    have to generate a lot of tags.
+    """
+    return _render(_tag(name, content, attrs), None)
 
-        # Text (escaped)
-        if nodetype == 'text':
-            return xml_escape(tree[1])
 
-        # Raw text
-        if nodetype == 'raw':
-            return tree[1]
+def _end(end: str, xml: bool | None, current: list[Tree]) -> None:
 
-        # DOCTYPE
-        if nodetype == 'doctype':
-            return '<!DOCTYPE' + tree[1] + '>'
+    # Search stack for start tag
+    next: Tree | None = current[0]
+    while next is not None:
+        # Ignore useless end tag
+        if next[0] == 'root':
+            return
 
-        # Comment
-        if nodetype == 'comment':
-            return '<!--' + tree[1] + '-->'
+        # Don’t traverse a container tag
+        if next[1] in SCOPE and next[1] != end:
+            return
 
-        # CDATA
-        if nodetype == 'cdata':
-            return '<![CDATA[' + tree[1] + ']]>'
+        # Right tag
+        if next[1] == end:
+            current[0] = next[3]
+            return
 
-        # Processing instruction
-        if nodetype == 'pi':
-            return '<?' + tree[1] + '?>'
+        # Phrasing content can only cross phrasing content
+        if not xml and end in PHRASING and next[1] not in PHRASING:
+            return
 
+        next = next[3]
+
+
+def _node(current: Tree, type: str, content: str) -> None:
+    current.append([type, content, current])
+
+
+def _render(tree: Tree, xml: bool | None) -> str:
+
+    # Tag
+    type = tree[0]
+    if type == 'tag':
         # Start tag
-        result = ''
-        if nodetype == 'tag':
-            # Open tag
-            tag = tree[1]
-            result += '<' + tag
+        tag = tree[1]
+        result = f'<{tag}'
 
-            # Attributes
-            attrs = []
+        # Attributes
+        for key in sorted(tree[2]):
+            value = tree[2][key]
+            if value is None:
+                result += f' {key}="{key}"' if xml else f' {key}'
+                continue
+            result += f' {key}="' + xml_escape(value if isinstance(value, str) else str(value)) + '"'
 
-            for key in sorted(tree[2].keys()):
-                # No value
-                if key not in tree[2] or tree[2][key] is None:
-                    attrs.append(key)
-                else:
-                    value = tree[2][key]
-                    attrs.append(key + '="' + xml_escape(value) + '"')
+        # No children
+        if len(tree) <= 4:
+            return f'{result} />' if xml else f'{result}>' if tag in EMPTY else f'{result}></{tag}>'
 
-            if attrs:
-                result += ' ' + ' '.join(attrs)
-
-            # Element without end tag
-            if len(tree) <= 4:
-                if xml:
-                    return result + ' />'
-                elif tag in EMPTY:
-                    return result + '>'
-                else:
-                    return result + '></' + tag + '>'
-
-            # Close tag
-            result += '>'
-
-        # Render whole tree
-        if nodetype == 'root':
-            start = 1
-        else:
-            start = 4
-        for t in tree[start:]:
-            result += self._render(t, xml)
+        # Children
+        result += '>' + ''.join(_render(n, xml) for n in tree[4:])
 
         # End tag
-        if nodetype == 'tag':
-            result += '</' + tree[1] + '>'
+        return f'{result}</{tag}>'
 
-        return result
+    # Text (escaped)
+    if type == 'text':
+        return xml_escape(tree[1])
 
-    def _start(self, start, attrs, xml, current):
-        # Autoclose optional HTML elements
-        if not xml and current[0] != 'root':
-            if start in END:
-                node = self._end(END[start], 0, current)
-                if node:
-                    current = node
-            elif start in CLOSE:
-                allowed, scope = CLOSE[start]
+    # Raw text
+    if type == 'raw':
+        return tree[1]
 
-                # Close allowed parent elements in scope
-                parent = current
-                while parent[0] != 'root' and parent[1] not in scope:
-                    if parent[1] in allowed:
-                        node = self._end(parent[1], 0, current)
-                        if node:
-                            current = node
-                    parent = parent[3]
+    # Root
+    if type == 'root':
+        return ''.join(_render(n, xml) for n in tree[1:])
 
-        # New tag
-        new = ['tag', start, attrs, current]
-        current.append(new)
-        return new
+    # DOCTYPE
+    if type == 'doctype':
+        return '<!DOCTYPE' + tree[1] + '>'
+
+    # Comment
+    if type == 'comment':
+        return '<!--' + tree[1] + '-->'
+
+    # CDATA
+    if type == 'cdata':
+        return '<![CDATA[' + tree[1] + ']]>'
+
+    # Processing instruction
+    if type == 'pi':
+        return '<?' + tree[1] + '?>'
+
+    # Everything else
+    return ''
+
+
+_SCRIPT_END_RE = re.compile(r'</script(?:\s+|\s*>)', re.S | re.I)
+
+
+def _script_content(html: str, pos: int) -> tuple[str, bool, int]:
+    start = pos
+
+    state = 0
+
+    while True:
+        pos = re.compile(r'[^<]*' if state == 0 else r'[^<\-]*', re.S).match(html, pos).end()  # pyright: ignore[reportOptionalMemberAccess]
+
+        p = pos
+        if p >= len(html):
+            return html[start:], False, pos
+
+        if state == 0:
+            if m := _SCRIPT_END_RE.match(html, pos):
+                return html[start:p], True, m.end()
+            elif html.startswith('<!--', pos):
+                pos, state = pos + 4, 1
+            else:
+                pos = p + 1
+        elif state == 1:
+            if m := _SCRIPT_END_RE.match(html, pos):
+                return html[start:p], True, m.end()
+            elif html.startswith('-->', pos):
+                pos, state = pos + 3, 0
+            elif m := re.compile(r'<script(?=[\s/>])', re.S | re.I).match(html, pos):
+                pos, state = m.end(), 2
+            else:
+                pos = p + 1
+        else:
+            if m := _SCRIPT_END_RE.match(html, pos):
+                pos, state = m.end(), 1
+            elif html.startswith('-->', pos):
+                pos, state = pos + 3, 0
+            else:
+                pos = p + 1
+
+
+def _start(start: str, attrs: dict[str, str | None], xml: bool | None, current: list[Tree]) -> None:
+
+    # Autoclose optional HTML elements
+    if not xml and current[0][0] != 'root':
+        if end := END.get(start):
+            _end(end, False, current)
+
+        elif close := CLOSE.get(start):
+            allowed, scope = close
+
+            # Close allowed parent elements in scope
+            parent = current[0]
+            while parent[0] != 'root' and parent[1] not in scope:
+                if parent[1] in allowed:
+                    _end(parent[1], False, current)
+                parent = parent[3]
+
+    # New tag
+    new: Tree = ['tag', start, attrs, current[0]]
+    current[0].append(new)
+    current[0] = new
+
+
+def _tag(name: str, content: str | Callable[[], str] | None, attrs: dict[str, Any]) -> Tree:
+    tree: Tree = ['tag', name, None, None]
+
+    # Content
+    if content is not None:
+        tree.append(['raw', content()] if callable(content) else ['text', content])
+
+    # Attributes
+    tree[2] = attrs = dict(attrs)
+    if not isinstance(data := attrs.get('data'), dict):
+        return tree
+    del attrs['data']
+    for key, value in cast(dict[Any, Any], data).items():
+        attrs['data-' + str(key).replace('_', '-').lower()] = value
+    return tree
 
 
 new = Pyjo_DOM_HTML.new

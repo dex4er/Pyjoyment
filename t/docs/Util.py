@@ -42,6 +42,15 @@ with subtest('hmac_sha1_sum'):
     # "11cedfd5ec11adc0ec234466d8a0f2a83736aa68"
     is_ok(hmac_sha1_sum(b'foo', b'passw0rd'), '11cedfd5ec11adc0ec234466d8a0f2a83736aa68', 'foo')
 
+with subtest('html_attr_unescape'):
+    from Pyjo.Util import html_attr_unescape
+
+    # "foo=bar&ltest=baz"
+    is_ok(html_attr_unescape('foo=bar&ltest=baz'), 'foo=bar&ltest=baz', 'not an entity in an attribute')
+
+    # "foo=bar<est=baz"
+    is_ok(html_attr_unescape('foo=bar&lt;est=baz'), 'foo=bar<est=baz', 'an entity')
+
 with subtest('html_unescape'):
     from Pyjo.Util import html_unescape
 

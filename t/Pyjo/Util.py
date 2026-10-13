@@ -11,6 +11,7 @@ from Pyjo.Util import (
     gzip,
     header_params,
     hmac_sha1_sum,
+    html_attr_unescape,
     html_unescape,
     humanize_bytes,
     md5_bytes,
@@ -156,6 +157,13 @@ with subtest('html_unescape (nothing to unescape)'):
 
 with subtest('html_unescape (relaxed)'):
     is_ok(html_unescape('&0&Ltf&amp&0oo&nbspba;&ltr'), '&0&Ltf&&0oo\xa0ba;<r', 'right HTML unescaped result')
+
+with subtest('html_attr_unescape'):
+    is_ok(html_attr_unescape('/?foo&lt=bar'), '/?foo&lt=bar', 'right HTML unescaped result')
+    is_ok(html_attr_unescape('/?f&ltoo=bar'), '/?f&ltoo=bar', 'right HTML unescaped result')
+    is_ok(html_attr_unescape('/?f&lt-oo=bar'), '/?f<-oo=bar', 'right HTML unescaped result')
+    is_ok(html_attr_unescape('/?foo=&lt'), '/?foo=<', 'right HTML unescaped result')
+    is_ok(html_attr_unescape('/?f&lt;oo=bar'), '/?f<oo=bar', 'right HTML unescaped result')
 
 with subtest('url_unescape (bengal numbers with nothing to unescape)'):
     is_ok(html_unescape('&#০৩৯;&#x০৩৯;'), '&#০৩৯;&#x০৩৯;', 'no changes')

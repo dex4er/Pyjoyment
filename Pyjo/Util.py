@@ -268,7 +268,7 @@ def encode(charset: str, chars: str) -> bytes:
     return chars.encode(charset, 'replace')
 
 
-def getenv(name, default=None):
+def getenv(name: str, default: str | None = None) -> str | None:
     """::
 
         envvar = getenv(name)
@@ -345,6 +345,24 @@ def hmac_sha1_sum(data: bytes, secret: bytes) -> str:
         hmac_sha1_sum(b'foo', b'passw0rd')
     """
     return hmac.new(secret, data, hashlib.sha1).hexdigest()
+
+
+def html_attr_unescape(string: str) -> str:
+    """::
+
+        string = html_attr_unescape(escaped)
+
+    Same as :func:`html_unescape`, but handles special rules from the
+    `HTML Living Standard <https://html.spec.whatwg.org>`_ for HTML
+    attributes. ::
+
+        # "foo=bar&ltest=baz"
+        html_attr_unescape('foo=bar&ltest=baz')
+
+        # "foo=bar<est=baz"
+        html_attr_unescape('foo=bar&lt;est=baz')
+    """
+    return _html(string, True)
 
 
 def html_unescape(string: str) -> str:
@@ -896,7 +914,7 @@ def url_unescape(string: str | bytes) -> str | bytes:
     return re.sub(rb'%([0-9a-fA-F]{2})', lambda m: bytes([int(m[1], 16)]), string)
 
 
-def warn(msg, *args):
+def warn(msg: str, *args: object) -> None:
     """::
 
         warn(string)

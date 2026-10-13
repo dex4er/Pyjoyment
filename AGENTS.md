@@ -259,7 +259,9 @@ copy:
   Python pattern; in the middle of one, use the scoped form `(?i:...)`.
 - Perl's `weaken` is ported as `weakref.proxy`. Check whether the object
   behind a proxy still exists with `Pyjo.Util.isalive`; `dir(proxy)` and
-  `bool(proxy)` raise `ReferenceError` for a dead proxy.
+  `bool(proxy)` raise `ReferenceError` for a dead proxy. A `list` cannot be
+  weakly referenced, so the parent of a node in the tree of `Pyjo.DOM` is a
+  plain reference, and the garbage collector frees the cycles.
 - `"\$"` in a double-quoted Perl string is a plain `$`; in Python it keeps the
   backslash.
 - Overloaded operators become special methods: `""` is `__str__`, `bool` is
@@ -311,7 +313,11 @@ copy:
   length at the same position, so `/\G\z/gc` fails right after
   `/\G\s*/gc` skipped nothing. A parser ported from Mojo that reports
   "before end of data" this way, as `Mojo::JSON` does, has to keep it where
-  Mojo's tests expect it.
+  Mojo's tests expect it. A tokenizer that matches the text and then the tag
+  of the same position in two matches, with a lazy `??` and this rule, as
+  `Mojo::DOM::HTML` does, has them as alternatives in Python.
+- Python has no relative backreference like `\g{-2}`; a named group takes
+  its place, and works also where the pattern is embedded in another one.
 - Python's recursion limit is 1000 calls. A recursive parser that must reach
   a nesting depth like `Mojo::JSON`'s 512 makes one call for each level,
   not two.
@@ -337,7 +343,11 @@ copy:
   `Pyjo.Date` rejects the date.
 - A flag that Mojo sets to `1` and leaves `undef` otherwise is `True` or
   `None`. A test of the end of a list, `is $cookies->[1], undef`, becomes
-  `is_ok(len(cookies), 1)`.
+  `is_ok(len(cookies), 1)`, or `is_ok(collection.get(1), None)` for a
+  `Pyjo.Collection`.
+- A method that Mojo calls on the class or on an object, like
+  `Mojo::DOM->new_tag` and `$dom->new_tag`, is a descriptor that passes either
+  of them.
 - A module that is not ported yet but uses a ported one follows its API: the
   lines that use it are taken from the target Mojolicious, and so is the
   expectation of a test of them that the target changed.
@@ -409,7 +419,10 @@ just been put on the strict list. Check a newly strict module with
 
 Python 3.12 evaluates the annotations of a function when it defines it, so
 a module in an import cycle, like `Pyjo.String.Unicode` and
-`Pyjo.String.Bytes`, quotes the annotations that name the other module.
+`Pyjo.String.Bytes`, quotes the annotations that name the other module. So
+does a package that names its own submodules, as `Pyjo.DOM.CSS` in
+`Pyjo/DOM/__init__.py`: `Pyjo.DOM` is not an attribute of `Pyjo` until the
+package is loaded.
 
 A module that ends with `object = Pyjo_X` cannot use `object` in its
 annotations: they are evaluated lazily (PEP 649, Python 3.14), when `object`

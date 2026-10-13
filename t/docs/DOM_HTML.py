@@ -1,29 +1,42 @@
-if __name__ == '__main__':
-    from Pyjo.Test import *  # noqa
+from Pyjo.Test import *
 
+
+with subtest('Synopsis'):
     import Pyjo.DOM.HTML
 
+    # Turn HTML into DOM tree
     html = Pyjo.DOM.HTML.new()
-    isa_ok(html, Pyjo.DOM.HTML.object, 'html')
-    ok(html.parse('<div><p id="a">Test</p><p id="b">123</p></div>'), 'html.parse()')
+    html.parse('<div><p id="a">Test</p><p id="b">123</p></div>')
     tree = html.tree
-    isa_ok(tree, list, 'tree')
-    is_ok(tree[0], 'root', 'tree[0]')
+    is_ok(tree[1][1], 'div', 'tree')
 
-    # new
-    html = Pyjo.DOM.HTML.new()
-    isa_ok(html, Pyjo.DOM.HTML.object, 'html')
+with subtest('tag_to_html'):
+    from Pyjo.DOM.HTML import tag_to_html
+
+    string = tag_to_html('div', 'safe content', id='foo')
+    is_ok(string, '<div id="foo">safe content</div>', 'string')
+
+with subtest('tree'):
     tree = html.tree
-    is_deeply_ok(tree, ['root'], 'tree')
-    xml = html.xml
-    ok(not xml, 'not xml')
+    html.tree = ['root']
+    is_deeply_ok(html.tree, ['root'], 'tree')
 
-    # parse
-    html = html.parse('<foo bar="baz">I ♥ Pyjo!</foo>')
-    isa_ok(html, Pyjo.DOM.HTML.object, 'html')
+with subtest('xml'):
+    boolean = html.xml
+    none_ok(boolean, 'auto-detection')
+    html.xml = True
+    ok(html.xml, 'xml')
 
-    # render
+with subtest('parse'):
+    html = html.parse('<foo bar="baz">I ♥ Pyjoyment!</foo>')
+    is_ok(html.render(), '<foo bar="baz">I ♥ Pyjoyment!</foo>', 'parse')
+
+with subtest('render'):
     string = html.render()
-    is_ok(string, '<foo bar="baz">I ♥ Pyjo!</foo>', 'string')
+    is_ok(string, '<foo bar="baz">I ♥ Pyjoyment!</foo>', 'string')
 
-    done_testing()
+with subtest('tag'):
+    html = html.tag('div', 'safe content', id='foo')
+    is_ok(html.render(), '<div id="foo">safe content</div>', 'tag')
+
+done_testing()
