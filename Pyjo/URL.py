@@ -480,7 +480,7 @@ class Pyjo_URL(Pyjo.Base.object, Pyjo.String.Mixin.object):
             # "http://example.com?a=2&a=3"
             Pyjo.URL.new('http://example.com?a=1&b=2').set(query={'a': [2, 3]})
 
-            # "http://example.com?a=2&b=2&c=3"
+            # "http://example.com?b=2&a=2&c=3"
             Pyjo.URL.new('http://example.com?a=1&b=2').merge(query={'a': 2, 'c': 3})
 
             # "http://example.com?b=2"

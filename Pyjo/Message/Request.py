@@ -302,7 +302,7 @@ class Pyjo_Message_Request(Pyjo.Message.object):
         """
         return notnone(self.headers.header('X-Requested-With'), '').lower().find('xmlhttprequest') >= 0
 
-    def param(self, name, value=None):
+    def param(self, name, *values):
         """::
 
             value = req.param('name')
@@ -317,7 +317,7 @@ class Pyjo_Message_Request(Pyjo.Message.object):
         ``POST`` parameters, so you have to make sure it is not excessively large,
         there's a 16MB limit by default.
         """
-        return self.params.param(name, value)
+        return self.params.param(name, *values)
 
     @property
     def params(self):

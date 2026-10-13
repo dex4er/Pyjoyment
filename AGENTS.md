@@ -185,6 +185,11 @@ For each module:
 5. Check the module off in the porting inventory issue, which lists every
    module of the target Mojolicious with its Pyjoyment counterpart.
 
+Mojo's tests and the behaviour of its code at the tag are the reference, not
+its POD: the examples in the POD are not tested and can be wrong. Where they
+disagree, run the Perl code from the clone (`perl -Imojo/lib -MMojo::URL -e ...`)
+and port what it does.
+
 Moving a ported module to a newer target is the difference between the two
 versions, applied to code, tests and docstrings alike:
 
@@ -205,7 +210,9 @@ copy:
 - Overloaded operators become special methods: `""` is `__str__`, `bool` is
   `__bool__`, and `@{}` is `__getitem__`, `__iter__` and `__len__`.
   `to_string` is `to_str`, the counterpart of `to_bytes` in
-  `Pyjo.String.Mixin`.
+  `Pyjo.String.Mixin`. `to_hash` is `to_dict`, and a flat list of
+  names and values, like the pairs of `Mojo::Parameters`, is a list of
+  `(name, value)` tuples.
 - A Perl string of characters is a `str`, and bytes in Python are `bytes`,
   encoded with the charset of the module. Perl keeps bytes that do not decode
   as a byte string, which is a `str` of the characters 0-255 in Python:
@@ -216,6 +223,8 @@ copy:
 - A Perl scalar keeps the form it was given (`'1.0'` stays `'1.0'`), and a
   number stringifies without a trailing `.0`. A port converts input to `int`
   or `float`, and formats it the Perl way where the output depends on it.
+  Where Mojo only stores and prints a value, like a parameter, the port stores
+  it as a `str`.
 - A Perl quirk that only a warning reveals is not ported. `undef` counts as `0`
   with a warning, so `Mojo::Date` reads an unknown month name as January;
   `Pyjo.Date` rejects the date.
@@ -290,6 +299,11 @@ Trunk reports only the issues that a change introduces, and counts an issue
 in a file that already exists upstream as existing, even when the file has
 just been put on the strict list. Check a newly strict module with
 `trunk check --show-existing` or with `.trunk/tools/pyright` directly.
+
+A module that ends with `object = Pyjo_X` cannot use `object` in its
+annotations: they are evaluated lazily (PEP 649, Python 3.14), when `object`
+is the class. Such a module declares `type Anything = builtins.object` and
+uses that.
 
 Annotations use the Python 3.12 syntax: generics with type parameters
 (`class Collection[T](list[T])`, `def f[T](x: T) -> T`), `type` aliases,

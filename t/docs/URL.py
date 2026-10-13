@@ -214,7 +214,7 @@ if __name__ == '__main__':
     is_ok(str(url), 'http://example.com?a=2&a=3', 'url')
 
     url = Pyjo.URL.new('http://example.com?a=1&b=2').merge(query={'a': 2, 'c': 3})
-    is_ok(str(url), 'http://example.com?a=2&b=2&c=3', 'url')
+    is_ok(str(url), 'http://example.com?b=2&a=2&c=3', 'url')
 
     url = Pyjo.URL.new('http://example.com?a=1&b=2').merge(query={'a': None})
     is_ok(str(url), 'http://example.com?b=2', 'url')

@@ -1,6 +1,7 @@
-if __name__ == '__main__':
-    from Pyjo.Test import *  # noqa
+from Pyjo.Test import *
 
+
+with subtest('Synopsis'):
     import Pyjo.Parameters
 
     # Parse
@@ -8,129 +9,179 @@ if __name__ == '__main__':
     is_ok(params.param('baz'), '23', "params.param('baz')")
 
     # Build
-    params = Pyjo.Parameters.new(('foo', 'bar'), ('baz', 23))
-    params.append(i='♥ pyjo')
-    is_ok(str(params), 'foo=bar&baz=23&i=%E2%99%A5+pyjo', 'params')
+    params = Pyjo.Parameters.new('foo', 'bar', 'baz', 23)
+    params.pairs.append(('i', '♥ pyjoyment'))
+    is_ok(str(params), 'foo=bar&baz=23&i=%E2%99%A5+pyjoyment', 'params')
 
-    # __init__
+with subtest('Description'):
     params = Pyjo.Parameters.new()
-    is_ok(str(params), '', 'params')
+    params.append(('foo', 'bar'), ('baz', 23))
+    params.append('foo', 'bar', 'baz', 23)
+    params.append(foo='bar', baz=23)
+    is_ok(str(params), 'foo=bar&baz=23&foo=bar&baz=23&foo=bar&baz=23', 'params')
 
+with subtest('new'):
+    params = Pyjo.Parameters.new()
+    is_ok(str(params), '', 'new()')
     params = Pyjo.Parameters.new('foo=b%3Bar&baz=23')
-    is_ok(str(params), 'foo=b%3Bar&baz=23', 'params')
-
-    params = Pyjo.Parameters.new(foo='b&ar')
-    is_ok(str(params), 'foo=b%26ar', 'params')
-
-    params = Pyjo.Parameters.new(foo=['ba&r', 'baz'])
-    is_ok(str(params), 'foo=ba%26r&foo=baz', 'params')
-
+    is_ok(str(params), 'foo=b%3Bar&baz=23', 'string')
+    params = Pyjo.Parameters.new('foo', 'b&ar')
+    is_ok(str(params), 'foo=b%26ar', 'pair')
+    params = Pyjo.Parameters.new('foo', ['ba&r', 'baz'])
+    is_ok(str(params), 'foo=ba%26r&foo=baz', 'multiple values')
+    params = Pyjo.Parameters.new('foo', ['bar', 'baz'], 'bar', 23)
+    is_ok(str(params), 'foo=bar&foo=baz&bar=23', 'pairs')
     params = Pyjo.Parameters.new(foo=['bar', 'baz'], bar=23)
-    is_ok(str(params), 'bar=23&foo=bar&foo=baz', 'params')
+    is_ok(str(params), 'foo=bar&foo=baz&bar=23', 'keyword arguments')
 
-    # charset
-    params = Pyjo.Parameters.new('foo=bar&baz=23')
+with subtest('charset'):
     charset = params.charset
-    is_ok(charset, 'utf-8', 'charset')
-    params.charset = 'utf-8'
-    charset = params.charset
-    is_ok(charset, 'utf-8', 'charset')
+    is_ok(charset, 'UTF-8', 'charset')
+    params.charset = 'UTF-8'
+    is_ok(params.charset, 'UTF-8', 'params.charset')
 
-    # __iter__
+    # Disable encoding and decoding
+    params.charset = None
+    is_ok(params.charset, None, 'params.charset')
+
+with subtest('__bool__'):
+    boolean = bool(params)
+    is_ok(boolean, True, 'boolean')
+
+with subtest('__getitem__'):
     params = Pyjo.Parameters.new('foo=bar&baz=23')
-    l = [v for v in params]
-    is_deeply_ok(l, [('foo', 'bar'), ('baz', '23')], '[v for v in params]')
+    pair = params[0]
+    is_ok(pair, ('foo', 'bar'), 'pair')
 
-    # __bool__
-    ok(Pyjo.Parameters.new(), 'Pyjo.Parameters.new()')
+with subtest('__iter__'):
+    pairs = list(params)
+    is_deeply_ok(pairs, [('foo', 'bar'), ('baz', '23')], 'pairs')
+    is_deeply_ok([(name, value) for name, value in params], [('foo', 'bar'), ('baz', '23')], 'for name, value')
 
-    # append
-    params = Pyjo.Parameters.new('foo=bar').append(Pyjo.Parameters.new('foo=baz'))
-    is_ok(str(params), 'foo=bar&foo=baz', 'params')
+with subtest('__len__'):
+    size = len(params)
+    is_ok(size, 2, 'size')
 
-    params = Pyjo.Parameters.new('foo=bar').append(foo='baz')
-    is_ok(str(params), 'foo=bar&foo=baz', 'params')
+with subtest('__str__'):
+    string = str(params)
+    is_ok(string, 'foo=bar&baz=23', 'string')
 
-    params = Pyjo.Parameters.new('foo=bar').append(foo=['baz', 'yada'])
-    is_ok(str(params), 'foo=bar&foo=baz&foo=yada', 'params')
+with subtest('append'):
+    params = Pyjo.Parameters.new()
+    params = params.append('foo', 'ba&r')
+    params = params.append('foo', ['ba&r', 'baz'])
+    params = params.append('foo', ['bar', 'baz'], 'bar', 23)
+    params = params.append(Pyjo.Parameters.new())
+    is_ok(str(params), 'foo=ba%26r&foo=ba%26r&foo=baz&foo=bar&foo=baz&bar=23', 'params')
 
-    params = Pyjo.Parameters.new('foo=bar').append(('foo', ['baz', 'yada']), ('bar', 23))
-    is_ok(str(params), 'foo=bar&foo=baz&foo=yada&bar=23', 'params')
+    # "foo=bar&foo=baz"
+    is_ok(
+        str(Pyjo.Parameters.new('foo=bar').append(Pyjo.Parameters.new('foo=baz'))),
+        'foo=bar&foo=baz',
+        'append(Pyjo.Parameters)',
+    )
 
-    # clone
-    params = Pyjo.Parameters.new('foo=b%3Bar&baz=23')
+    # "foo=bar&foo=baz"
+    is_ok(str(Pyjo.Parameters.new('foo=bar').append('foo', 'baz')), 'foo=bar&foo=baz', 'append pair')
+
+    # "foo=bar&foo=baz&foo=yada"
+    is_ok(
+        str(Pyjo.Parameters.new('foo=bar').append('foo', ['baz', 'yada'])),
+        'foo=bar&foo=baz&foo=yada',
+        'append multiple values',
+    )
+
+    # "foo=bar&foo=baz&foo=yada&bar=23"
+    is_ok(
+        str(Pyjo.Parameters.new('foo=bar').append('foo', ['baz', 'yada'], 'bar', 23)),
+        'foo=bar&foo=baz&foo=yada&bar=23',
+        'append pairs',
+    )
+
+with subtest('clone'):
     params2 = params.clone()
-    is_ok(str(params2), 'foo=b%3Bar&baz=23', 'params2')
-    isnt_ok(id(params), id(params2), 'params')
+    is_ok(str(params2), str(params), 'params2')
+    isnt_ok(id(params2), id(params), 'another object')
 
-    # every_param
-    params = Pyjo.Parameters.new('bar=23&foo=bar&foo=baz')
+with subtest('every_param'):
+    params = Pyjo.Parameters.new('foo=bar&foo=baz')
     values = params.every_param('foo')
-    is_deeply_ok(values, ['bar', 'baz'], "params.every_param('foo')")
+    is_deeply_ok(values, ['bar', 'baz'], 'values')
 
     # Get first value
-    value = params.every_param('foo')[0]
-    is_ok(value, 'bar', "params.every_param('foo')[0]")
+    is_ok(params.every_param('foo')[0], 'bar', 'first value')
 
-    # merge
+with subtest('merge'):
     params = Pyjo.Parameters.new()
-    params = params.merge(
-        ('foo', 'ba&r'),
-    )
-    is_ok(str(params), 'foo=ba%26r', 'params')
-    params = params.merge(foo='baz')
-    is_ok(str(params), 'foo=baz', 'params')
-    params = params.merge(foo=['ba&r', 'baz'])
-    is_ok(str(params), 'foo=ba%26r&foo=baz', 'params')
-    params = params.merge(('foo', ['bar', 'baz']), ('bar', 23))
-    is_ok(str(params), 'foo=bar&foo=baz&bar=23', 'params')
+    params = params.merge('foo', 'ba&r')
+    params = params.merge('foo', ['ba&r', 'baz'])
+    params = params.merge('foo', ['bar', 'baz'], 'bar', 23)
     params = params.merge(Pyjo.Parameters.new())
-    is_ok(str(params), 'foo=bar&foo=baz&bar=23', 'params')
+    is_ok(str(params), 'bar=23&foo=bar&foo=baz', 'params')
 
-    params = Pyjo.Parameters.new('foo=bar').merge(Pyjo.Parameters.new('foo=baz'))
-    is_ok(str(params), 'foo=baz', 'params')
+    # "foo=baz"
+    is_ok(
+        str(Pyjo.Parameters.new('foo=bar').merge(Pyjo.Parameters.new('foo=baz'))), 'foo=baz', 'merge(Pyjo.Parameters)'
+    )
 
-    params = Pyjo.Parameters.new('foo=bar&yada=yada').merge(foo='baz')
-    is_ok(str(params), 'foo=baz&yada=yada', 'params')
+    # "yada=yada&foo=baz"
+    is_ok(str(Pyjo.Parameters.new('foo=bar&yada=yada').merge('foo', 'baz')), 'yada=yada&foo=baz', 'merge pair')
 
-    params = Pyjo.Parameters.new('foo=bar&yada=yada').merge(foo=None)
-    is_ok(str(params), 'yada=yada', 'params')
+    # "yada=yada"
+    is_ok(str(Pyjo.Parameters.new('foo=bar&yada=yada').merge('foo', None)), 'yada=yada', 'merge None')
 
-    # names
-    params = Pyjo.Parameters.new('foo=bar&baz=23')
-    names = params.names
-    is_deeply_ok(names, ['baz', 'foo'], 'params.param()')
+with subtest('names'):
+    params = Pyjo.Parameters.new('foo=bar&baz=23&foo=yada')
+    names = params.names()
+    is_deeply_ok(names, ['baz', 'foo'], 'names')
 
-    # pairs
-    pairs = Pyjo.Parameters.new('foo=bar&baz=23')
-    array = params.pairs
-    is_deeply_ok(array, [('foo', 'bar'), ('baz', '23')], 'params.pairs')
-    params.pairs = [('foo', 'b&ar'), ('baz', 23)]
-    is_ok(str(params), 'foo=b%26ar&baz=23', 'pairs')
+    # Names of all parameters
+    is_deeply_ok([name for name in params.names()], ['baz', 'foo'], 'for name in params.names()')
 
-    # param
-    params = Pyjo.Parameters.new('foo=bar&baz=23')
+with subtest('pairs'):
+    pairs = params.pairs
+    is_deeply_ok(pairs, [('foo', 'bar'), ('baz', '23'), ('foo', 'yada')], 'pairs')
+    params.pairs = [('foo', 'b&ar'), ('baz', '23')]
+    is_ok(str(params), 'foo=b%26ar&baz=23', 'params')
+
+    # Remove all parameters
+    params.pairs = []
+    is_ok(str(params), '', 'params')
+
+with subtest('param'):
+    params = Pyjo.Parameters.new('foo=bar')
     value = params.param('foo')
-    is_ok(value, 'bar', "params.param('foo')")
-    foo, baz = params.param(['foo', 'baz'])
-    is_ok(foo, 'bar', "params.param(['foo', 'baz'])[0]")
-    is_ok(baz, '23', "params.param(['foo', 'baz'])[1]")
+    is_ok(value, 'bar', 'value')
     params = params.param('foo', 'ba&r')
-    is_ok(str(params), 'foo=ba%26r&baz=23', "params.param('foo', 'ba&r')")
+    is_ok(str(params), 'foo=ba%26r', 'single value')
+    params = params.param('foo', 'ba&r', 'baz')
+    is_ok(str(params), 'foo=ba%26r&foo=baz', 'values')
     params = params.param('foo', ['ba;r', 'baz'])
-    is_ok(str(params), 'foo=ba%3Br&baz=23&foo=baz', "params.param('foo', ['ba;r', 'baz'])")
+    is_ok(str(params), 'foo=ba%3Br&foo=baz', 'list of values')
 
-    # parse
-    params = Pyjo.Parameters.new()
+with subtest('parse'):
     params = params.parse('foo=b%3Bar&baz=23')
-    is_deeply_ok(params.pairs, [('foo', 'b;ar'), ('baz', '23')], "params.parse('foo=b%3Bar&baz=23')")
+    is_deeply_ok(params.pairs, [('foo', 'b;ar'), ('baz', '23')], 'params.pairs')
 
-    # remove
-    params = Pyjo.Parameters.new('foo=bar&foo=baz&bar=yada').remove('foo')
-    is_ok(str(params), 'bar=yada', "params.remove('foo')")
+with subtest('remove'):
+    params = params.remove('foo')
+    is_ok(str(params), 'baz=23', 'params')
 
-    # to_dict
-    d = Pyjo.Parameters.new('foo=bar&foo=baz').to_dict()
-    is_deeply_ok(d, {'foo': ['bar', 'baz']}, 'params.to_dict()')
+    # "bar=yada"
+    is_ok(str(Pyjo.Parameters.new('foo=bar&foo=baz&bar=yada').remove('foo')), 'bar=yada', "remove('foo')")
 
-    done_testing()
+with subtest('to_dict'):
+    d = params.to_dict()
+    is_deeply_ok(d, {'baz': '23'}, 'd')
+
+    # "baz"
+    is_ok(Pyjo.Parameters.new('foo=bar&foo=baz').to_dict()['foo'][1], 'baz', "to_dict()['foo'][1]")
+
+with subtest('to_str'):
+    string = params.to_str()
+    is_ok(string, 'baz=23', 'string')
+
+    # "foo=bar&baz=23"
+    is_ok(Pyjo.Parameters.new().set(pairs=[('foo', 'bar'), ('baz', '23')]).to_str(), 'foo=bar&baz=23', 'set(pairs=...)')
+
+done_testing()

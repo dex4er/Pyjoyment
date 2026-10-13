@@ -7,5 +7,6 @@ from Pyjo.String.Unicode import u
 url = Pyjo.URL.new('https://github.com/dex4er/Pyjoyment')
 print(url.set(scheme='ssh+git', userinfo='git', path=u(url.path) + '.git'))
 
-# 'http://metacpan.org/search?q=Mojo::URL&size=20'
-print(Pyjo.URL.new('http://metacpan.org/search').set(query={'q': 'Mojo::URL', 'size': 20}))
+# 'https://pypi.org/search/?q=Pyjoyment&o=&c=Programming+Language+%3A%3A+Python'
+url = Pyjo.URL.new('https://pypi.org/search/')
+print(url.set(query=[('q', 'Pyjoyment'), ('o', ''), ('c', 'Programming Language :: Python')]))
