@@ -2,8 +2,8 @@
    :target: https://pypi.python.org/pypi/Pyjoyment
 .. image:: https://github.com/dex4er/Pyjoyment/actions/workflows/tests.yaml/badge.svg?branch=master
    :target: https://github.com/dex4er/Pyjoyment/actions/workflows/tests.yaml
-.. image:: https://readthedocs.org/projects/pyjoyment/badge/?version=latest
-   :target: http://pyjoyment.readthedocs.org/en/latest/
+.. image:: https://app.readthedocs.org/projects/pyjoyment/badge/?version=latest
+   :target: https://pyjoyment.readthedocs.io/en/latest/
 
 Pyjoyment
 =========
