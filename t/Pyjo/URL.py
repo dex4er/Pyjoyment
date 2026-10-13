@@ -1,43 +1,47 @@
-if __name__ == '__main__':
-    from Pyjo.Test import *  # noqa
+import Pyjo.Parameters
+import Pyjo.URL
 
-    import Pyjo.URL
+from Pyjo.Test import *
 
-    # Simple
+
+with subtest('Simple'):
     url = Pyjo.URL.new('HtTp://Example.Com')
     is_ok(url.scheme, 'HtTp', 'right scheme')
     is_ok(url.protocol, 'http', 'right protocol')
     is_ok(url.host, 'Example.Com', 'right host')
-    is_ok(url.ihost, 'example.com', 'right internationalized host')
-    is_ok(url.authority, 'example.com', 'right authority')
-    is_ok(str(url), 'http://example.com', 'right format')
+    is_ok(url.ihost, 'Example.Com', 'right internationalized host')
+    is_ok(str(url), 'http://Example.Com', 'right format')
 
-    # Advanced
+with subtest('Advanced'):
     url = Pyjo.URL.new('https://sri:foobar@example.com:8080/x/index.html?monkey=biz&foo=1#/!%?@3')
     ok(url.is_abs, 'is absolute')
     is_ok(url.scheme, 'https', 'right scheme')
     is_ok(url.protocol, 'https', 'right protocol')
     is_ok(url.userinfo, 'sri:foobar', 'right userinfo')
+    is_ok(url.username, 'sri', 'right username')
+    is_ok(url.password, 'foobar', 'right password')
     is_ok(url.host, 'example.com', 'right host')
     is_ok(url.port, 8080, 'right port')
-    is_ok(url.authority, 'sri:foobar@example.com:8080', 'right authority')
     is_ok(str(url.path), '/x/index.html', 'right path')
     is_ok(str(url.query), 'monkey=biz&foo=1', 'right query')
     is_ok(url.path_query, '/x/index.html?monkey=biz&foo=1', 'right path and query')
     is_ok(url.fragment, '/!%?@3', 'right fragment')
-    is_ok(str(url), 'https://sri:foobar@example.com:8080/x/index.html?monkey=biz&foo=1#/!%?@3', 'right format')
+    is_ok(str(url), 'https://example.com:8080/x/index.html?monkey=biz&foo=1#/!%25?@3', 'right format')
     url.path = '/index.xml'
-    is_ok(str(url), 'https://sri:foobar@example.com:8080/index.xml?monkey=biz&foo=1#/!%?@3', 'right format')
+    is_ok(str(url), 'https://example.com:8080/index.xml?monkey=biz&foo=1#/!%25?@3', 'right format')
 
-    # Advanced userinfo and fragment roundtrip
-    url = Pyjo.URL.new("ws://AZaz09-._~!$&'()*+,;=:@localhost#AZaz09-._~!$&'()*+,;=%:@/?")
+with subtest('Advanced userinfo and fragment roundtrip'):
+    url = Pyjo.URL.new("ws://AZaz09-._~!$&'()*+,;=:@localhost#AZaz09-._~!$&'()*+,;=:@/?")
     is_ok(url.scheme, 'ws', 'right scheme')
     is_ok(url.userinfo, "AZaz09-._~!$&'()*+,;=:", 'right userinfo')
+    is_ok(url.username, "AZaz09-._~!$&'()*+,;=", 'right username')
+    is_ok(url.password, '', 'right password')
     is_ok(url.host, 'localhost', 'right host')
-    is_ok(url.fragment, "AZaz09-._~!$&'()*+,;=%:@/?", 'right fragment')
-    is_ok(str(url), "ws://AZaz09-._~!$&'()*+,;=:@localhost#AZaz09-._~!$&'()*+,;=%:@/?", 'right format')
+    is_ok(url.fragment, "AZaz09-._~!$&'()*+,;=:@/?", 'right fragment')
+    is_ok(str(url), "ws://localhost#AZaz09-._~!$&'()*+,;=:@/?", 'right format')
+    is_ok(url.to_unsafe_str(), "ws://AZaz09-._~!$&'()*+,;=:@localhost#AZaz09-._~!$&'()*+,;=:@/?", 'right format')
 
-    # Parameters
+with subtest('Parameters'):
     url = Pyjo.URL.new('http://sri:foobar@example.com:8080?_monkey=biz%3B&_monkey=23#23')
     ok(url.is_abs, 'is absolute')
     is_ok(url.scheme, 'http', 'right scheme')
@@ -48,37 +52,39 @@ if __name__ == '__main__':
     is_ok(str(url.query), '_monkey=biz%3B&_monkey=23', 'right query')
     is_deeply_ok(url.query.to_dict(), {'_monkey': ['biz;', '23']}, 'right structure')
     is_ok(url.fragment, '23', 'right fragment')
-    is_ok(str(url), 'http://sri:foobar@example.com:8080?_monkey=biz%3B&_monkey=23#23', 'right format')
-    url.query = [('monkey', 'foo')]
-    is_ok(str(url), 'http://sri:foobar@example.com:8080?monkey=foo#23', 'right format')
-    url.query.merge(
-        ('monkey', 'bar'),
-    )
-    is_ok(str(url), 'http://sri:foobar@example.com:8080?monkey=bar#23', 'right format')
-    url.query.append(
-        ('foo', 'bar'),
-    )
-    is_ok(str(url), 'http://sri:foobar@example.com:8080?monkey=bar&foo=bar#23', 'right format')
+    is_ok(str(url), 'http://example.com:8080?_monkey=biz%3B&_monkey=23#23', 'right format')
+    url.query = ('monkey', 'foo')
+    is_ok(str(url), 'http://example.com:8080?monkey=foo#23', 'right format')
+    url.query = {'monkey': 'bar'}
+    is_ok(str(url), 'http://example.com:8080?monkey=bar#23', 'right format')
+    url.query = ['foo', 'bar']
+    is_ok(str(url), 'http://example.com:8080?monkey=bar&foo=bar#23', 'right format')
     url.query = 'foo'
-    is_ok(str(url), 'http://sri:foobar@example.com:8080?foo#23', 'right format')
+    is_ok(str(url), 'http://example.com:8080?foo#23', 'right format')
     url.query = 'foo=bar'
-    is_ok(str(url), 'http://sri:foobar@example.com:8080?foo=bar#23', 'right format')
-    url.query.merge(foo=None)
-    is_ok(str(url), 'http://sri:foobar@example.com:8080#23', 'right format')
-    url.query.append(('foo', 23), ('bar', 24), ('baz', 25))
-    is_ok(str(url), 'http://sri:foobar@example.com:8080?foo=23&bar=24&baz=25#23', 'right format')
-    url.query.merge(foo=26, bar=None, baz=None)
-    is_ok(str(url), 'http://sri:foobar@example.com:8080?foo=26#23', 'right format')
+    is_ok(str(url), 'http://example.com:8080?foo=bar#23', 'right format')
+    url.query = {'foo': None}
+    is_ok(str(url), 'http://example.com:8080#23', 'right format')
+    url.query = ['foo', 23, 'bar', 24, 'baz', 25]
+    is_ok(str(url), 'http://example.com:8080?foo=23&bar=24&baz=25#23', 'right format')
+    url.query = {'foo': 26, 'bar': None, 'baz': None}
+    is_ok(str(url), 'http://example.com:8080?foo=26#23', 'right format')
+    url.query = ('c', 3)
+    is_ok(str(url), 'http://example.com:8080?c=3#23', 'right format')
     url.query = Pyjo.Parameters.new('a=1&b=2')
-    is_ok(str(url), 'http://sri:foobar@example.com:8080?a=1&b=2#23', 'right format')
-    url.query = {'c': 3}
-    is_ok(str(url), 'http://sri:foobar@example.com:8080?c=3#23', 'right format')
+    is_deeply_ok(url.query.to_dict(), {'a': '1', 'b': '2'}, 'right structure')
+    is_ok(str(url), 'http://example.com:8080?a=1&b=2#23', 'right format')
+    url.query = Pyjo.Parameters.new('%E5=%E4').set(charset=None)
+    is_deeply_ok(url.query.to_dict(), {'\xe5': '\xe4'}, 'right structure')
+    is_ok(str(url), 'http://example.com:8080?%E5=%E4#23', 'right format')
 
-    # Query string
-    url = Pyjo.URL.new('wss://sri:foobar@example.com:8080?_monkeybiz%3B&_monkey;23#23')
+with subtest('Query string'):
+    url = Pyjo.URL.new('wss://sri:foo:bar@example.com:8080?_monkeybiz%3B&_monkey;23#23')
     ok(url.is_abs, 'is absolute')
     is_ok(url.scheme, 'wss', 'right scheme')
-    is_ok(url.userinfo, 'sri:foobar', 'right userinfo')
+    is_ok(url.userinfo, 'sri:foo:bar', 'right userinfo')
+    is_ok(url.username, 'sri', 'right username')
+    is_ok(url.password, 'foo:bar', 'right password')
     is_ok(url.host, 'example.com', 'right host')
     is_ok(url.port, 8080, 'right port')
     is_ok(str(url.path), '', 'no path')
@@ -86,11 +92,13 @@ if __name__ == '__main__':
     is_deeply_ok(url.query.pairs, [('_monkeybiz;', ''), ('_monkey;23', '')], 'right structure')
     is_ok(str(url.query), '_monkeybiz%3B=&_monkey%3B23=', 'right query')
     is_ok(url.fragment, '23', 'right fragment')
-    is_ok(str(url), 'wss://sri:foobar@example.com:8080?_monkeybiz%3B=&_monkey%3B23=#23', 'right format')
+    is_ok(str(url), 'wss://example.com:8080?_monkeybiz%3B=&_monkey%3B23=#23', 'right format')
     url = Pyjo.URL.new('https://example.com/0?0#0')
     ok(url.is_abs, 'is absolute')
     is_ok(url.scheme, 'https', 'right scheme')
     is_ok(url.userinfo, None, 'no userinfo')
+    is_ok(url.username, None, 'no username')
+    is_ok(url.password, None, 'no password')
     is_ok(url.host, 'example.com', 'right host')
     is_ok(url.port, None, 'no port')
     is_ok(url.host_port, 'example.com', 'right host and port')
@@ -99,14 +107,13 @@ if __name__ == '__main__':
     is_ok(url.fragment, '0', 'right fragment')
     is_ok(str(url), 'https://example.com/0?0#0', 'right format')
 
-    # No authority
+with subtest('No authority'):
     url = Pyjo.URL.new('DATA:image/png;base64,helloworld123')
     is_ok(url.scheme, 'DATA', 'right scheme')
     is_ok(url.protocol, 'data', 'right protocol')
     is_ok(url.userinfo, None, 'no userinfo')
     is_ok(url.host, None, 'no host')
     is_ok(url.port, None, 'no port')
-    is_ok(url.authority, None, 'no authority')
     is_ok(str(url.path), 'image/png;base64,helloworld123', 'right path')
     is_ok(str(url.query), '', 'no query')
     is_ok(url.fragment, None, 'no fragment')
@@ -117,7 +124,6 @@ if __name__ == '__main__':
     is_ok(url.userinfo, None, 'no userinfo')
     is_ok(url.host, None, 'no host')
     is_ok(url.port, None, 'no port')
-    is_ok(url.authority, None, 'no authority')
     is_ok(str(url.path), 'image/png;base64,helloworld123', 'right path')
     is_ok(str(url.query), '', 'no query')
     is_ok(url.fragment, None, 'no fragment')
@@ -134,11 +140,10 @@ if __name__ == '__main__':
     is_ok(str(url.query), 'foo=bar', 'right query')
     is_ok(url.fragment, 'baz', 'right fragment')
     is_ok(str(url), 'foo:/test/123?foo=bar#baz', 'right format')
-    is_ok(str(url.set(scheme='Bar')), 'bar:/test/123?foo=bar#baz', 'right format')
+    is_ok(url.set(scheme='Bar').to_str(), 'bar:/test/123?foo=bar#baz', 'right format')
     is_ok(url.scheme, 'Bar', 'right scheme')
     is_ok(url.protocol, 'bar', 'right protocol')
     is_ok(url.host, None, 'no host')
-    is_ok(url.authority, None, 'no authority')
     is_ok(str(url.path), '/test/123', 'right path')
     is_ok(str(url.query), 'foo=bar', 'right query')
     is_ok(url.fragment, 'baz', 'right fragment')
@@ -159,7 +164,8 @@ if __name__ == '__main__':
     is_ok(str(url.path), '0', 'right path')
     is_ok(str(url), 'foo:0', 'right format')
 
-    # Relative
+with subtest('Relative'):
+    is_ok(str(Pyjo.URL.new().to_abs()), '', 'no result')
     url = Pyjo.URL.new('foo?foo=bar#23')
     is_ok(url.path_query, 'foo?foo=bar', 'right path and query')
     ok(not url.is_abs, 'is not absolute')
@@ -169,7 +175,7 @@ if __name__ == '__main__':
     ok(not url.is_abs, 'is not absolute')
     is_ok(str(url), '/foo?foo=bar#23', 'right relative version')
 
-    # Relative without scheme
+with subtest('Relative without scheme'):
     url = Pyjo.URL.new('//localhost/23/')
     ok(not url.is_abs, 'is not absolute')
     is_ok(url.scheme, None, 'no scheme')
@@ -179,8 +185,10 @@ if __name__ == '__main__':
     is_ok(str(url), '//localhost/23/', 'right relative version')
     is_ok(str(url.to_abs(Pyjo.URL.new('http://'))), 'http://localhost/23/', 'right absolute version')
     is_ok(str(url.to_abs(Pyjo.URL.new('https://'))), 'https://localhost/23/', 'right absolute version')
-    is_ok(str(url.to_abs(Pyjo.URL.new('http://mojolicio.us'))), 'http://localhost/23/', 'right absolute version')
-    is_ok(str(url.to_abs(Pyjo.URL.new('http://mojolicio.us:8080'))), 'http://localhost/23/', 'right absolute version')
+    is_ok(str(url.to_abs(Pyjo.URL.new('http://mojolicious.org'))), 'http://localhost/23/', 'right absolute version')
+    is_ok(
+        str(url.to_abs(Pyjo.URL.new('http://mojolicious.org:8080'))), 'http://localhost/23/', 'right absolute version'
+    )
     url = Pyjo.URL.new('///bar/23/')
     ok(not url.is_abs, 'is not absolute')
     is_ok(url.host, '', 'no host')
@@ -192,7 +200,7 @@ if __name__ == '__main__':
     is_ok(str(url.path), '//bar//23/', 'right path')
     is_ok(str(url), '////bar//23/', 'right relative version')
 
-    # Relative path
+with subtest('Relative path'):
     url = Pyjo.URL.new('http://example.com/foo/?foo=bar#23')
     url.path = 'bar'
     is_ok(str(url), 'http://example.com/foo/bar?foo=bar#23', 'right path')
@@ -211,7 +219,7 @@ if __name__ == '__main__':
     url.path.canonicalize()
     is_ok(str(url), 'http://example.com/baz?foo=bar#23', 'right absolute path')
 
-    # Absolute (base without trailing slash)
+with subtest('Absolute (base without trailing slash)'):
     url = Pyjo.URL.new('/foo?foo=bar#23')
     url.base.parse('http://example.com/bar')
     ok(not url.is_abs, 'not absolute')
@@ -225,14 +233,19 @@ if __name__ == '__main__':
     ok(not url.is_abs, 'not absolute')
     is_ok(str(url.to_abs()), 'http://www.aviary.com/cages/birds.gif', 'right absolute version')
 
-    # Absolute with path
+with subtest('Absolute with path'):
     url = Pyjo.URL.new('../foo?foo=bar#23')
     url.base.parse('http://example.com/bar/baz/')
     ok(not url.is_abs, 'not absolute')
     is_ok(str(url.to_abs()), 'http://example.com/bar/foo?foo=bar#23', 'right absolute version')
     is_ok(str(url.to_abs().base), 'http://example.com/bar/baz/', 'right base')
 
-    # Clone (advanced)
+with subtest('Absolute with query'):
+    url = Pyjo.URL.new('?foo=bar#23')
+    url.base.parse('http://example.com/bar/baz/')
+    is_ok(str(url.to_abs()), 'http://example.com/bar/baz/?foo=bar#23', 'right absolute version')
+
+with subtest('Clone (advanced)'):
     url = Pyjo.URL.new('ws://sri:foobar@example.com:8080/test/index.html?monkey=biz&foo=1#23')
     clone = url.clone()
     ok(clone.is_abs, 'is absolute')
@@ -243,11 +256,11 @@ if __name__ == '__main__':
     is_ok(str(clone.path), '/test/index.html', 'right path')
     is_ok(str(clone.query), 'monkey=biz&foo=1', 'right query')
     is_ok(clone.fragment, '23', 'right fragment')
-    is_ok(str(clone), 'ws://sri:foobar@example.com:8080/test/index.html?monkey=biz&foo=1#23', 'right format')
+    is_ok(str(clone), 'ws://example.com:8080/test/index.html?monkey=biz&foo=1#23', 'right format')
     clone.path = '/index.xml'
-    is_ok(str(clone), 'ws://sri:foobar@example.com:8080/index.xml?monkey=biz&foo=1#23', 'right format')
+    is_ok(str(clone), 'ws://example.com:8080/index.xml?monkey=biz&foo=1#23', 'right format')
 
-    # Clone (with base)
+with subtest('Clone (with base)'):
     url = Pyjo.URL.new('/test/index.html')
     url.base.parse('http://127.0.0.1')
     is_ok(str(url), '/test/index.html', 'right format')
@@ -259,9 +272,9 @@ if __name__ == '__main__':
     is_ok(clone.base.scheme, 'http', 'right base scheme')
     is_ok(clone.base.host, '127.0.0.1', 'right base host')
     is_ok(str(clone.path), '/test/index.html', 'right path')
-    is_ok(str(clone.to_abs()), 'http://127.0.0.1/test/index.html', 'right absolute version')
+    is_ok(clone.to_abs().to_str(), 'http://127.0.0.1/test/index.html', 'right absolute version')
 
-    # Clone (with base path)
+with subtest('Clone (with base path)'):
     url = Pyjo.URL.new('test/index.html')
     url.base.parse('http://127.0.0.1/foo/')
     is_ok(str(url), 'test/index.html', 'right format')
@@ -273,9 +286,9 @@ if __name__ == '__main__':
     is_ok(clone.base.scheme, 'http', 'right base scheme')
     is_ok(clone.base.host, '127.0.0.1', 'right base host')
     is_ok(str(clone.path), 'test/index.html', 'right path')
-    is_ok(str(clone.to_abs()), 'http://127.0.0.1/foo/test/index.html', 'right absolute version')
+    is_ok(clone.to_abs().to_str(), 'http://127.0.0.1/foo/test/index.html', 'right absolute version')
 
-    # IPv6
+with subtest('IPv6'):
     url = Pyjo.URL.new('wss://[::1]:3000/')
     ok(url.is_abs, 'is absolute')
     is_ok(url.scheme, 'wss', 'right scheme')
@@ -284,7 +297,17 @@ if __name__ == '__main__':
     is_ok(str(url.path), '/', 'right path')
     is_ok(str(url), 'wss://[::1]:3000/', 'right format')
 
-    # IDNA
+with subtest('Escaped host'):
+    url = Pyjo.URL.new('http+unix://%2FUsers%2Fsri%2Ftest.sock/index.html')
+    ok(url.is_abs, 'is absolute')
+    is_ok(url.scheme, 'http+unix', 'right scheme')
+    is_ok(url.host, '/Users/sri/test.sock', 'right host')
+    is_ok(url.port, None, 'no port')
+    is_ok(url.host_port, '/Users/sri/test.sock', 'right host and port')
+    is_ok(str(url.path), '/index.html', 'right path')
+    is_ok(str(url), 'http+unix://%2FUsers%2Fsri%2Ftest.sock/index.html', 'right format')
+
+with subtest('IDNA'):
     url = Pyjo.URL.new('http://bücher.ch:3000/foo')
     ok(url.is_abs, 'is absolute')
     is_ok(url.scheme, 'http', 'right scheme')
@@ -311,24 +334,40 @@ if __name__ == '__main__':
     is_ok(url.port, 3000, 'right port')
     is_ok(str(url.path), '/foo', 'right path')
     is_ok(str(url), 'http://xn--bcher-kva.xn--bcher-kva.xn--bcher-kva.ch:3000/foo', 'right format')
+    url = Pyjo.URL.new().set(scheme='http', ihost='xn--n3h.xn--n3h.net')
+    is_ok(url.scheme, 'http', 'right scheme')
+    is_ok(url.host, '☃.☃.net', 'right host')
+    is_ok(url.ihost, 'xn--n3h.xn--n3h.net', 'right internationalized host')
+    is_ok(str(url), 'http://xn--n3h.xn--n3h.net', 'right format')
 
-    # IDNA (escaped userinfo and host)
-    url = Pyjo.URL.new('https://foo:b%C3%A4r@kr%C3%A4ih.com:3000')
+with subtest('IDNA (escaped userinfo and host)'):
+    url = Pyjo.URL.new('https://%E2%99%A5:%E2%99%A5@kr%E4ih.com:3000')
+    is_ok(url.userinfo, '♥:♥', 'right userinfo')
+    is_ok(url.username, '♥', 'right username')
+    is_ok(url.password, '♥', 'right password')
     is_ok(url.host, 'kr\xe4ih.com', 'right host')
     is_ok(url.ihost, 'xn--krih-moa.com', 'right internationalized host')
     is_ok(url.port, 3000, 'right port')
-    is_ok(str(url), 'https://foo:b%C3%A4r@xn--krih-moa.com:3000', 'right format')
+    is_ok(str(url), 'https://xn--krih-moa.com:3000', 'right format')
 
-    # IDNA (snowman)
-    url = Pyjo.URL.new('http://☃.net/')
+with subtest('IDNA (snowman)'):
+    url = Pyjo.URL.new('http://☃:☃@☃.☃.de/☃?☃#☃')
     ok(url.is_abs, 'is absolute')
     is_ok(url.scheme, 'http', 'right scheme')
-    is_ok(url.host, '☃.net', 'right host')
-    is_ok(url.ihost, 'xn--n3h.net', 'right internationalized host')
-    is_ok(str(url.path), '/', 'right path')
-    is_ok(str(url), 'http://xn--n3h.net/', 'right format')
+    is_ok(url.userinfo, '☃:☃', 'right userinfo')
+    is_ok(url.host, '☃.☃.de', 'right host')
+    is_ok(url.ihost, 'xn--n3h.xn--n3h.de', 'right internationalized host')
+    is_ok(str(url.path), '/%E2%98%83', 'right path')
+    is_ok(str(url.query), '%E2%98%83', 'right query')
+    is_ok(url.fragment, '☃', 'right fragment')
+    is_ok(str(url), 'http://xn--n3h.xn--n3h.de/%E2%98%83?%E2%98%83#%E2%98%83', 'right format')
+    is_ok(
+        url.to_unsafe_str(),
+        'http://%E2%98%83:%E2%98%83@xn--n3h.xn--n3h.de/%E2%98%83?%E2%98%83#%E2%98%83',
+        'right format',
+    )
 
-    # IRI/IDNA
+with subtest('IRI/IDNA'):
     url = Pyjo.URL.new('http://☃.net/♥/?q=♥☃')
     is_ok(url.path.parts[0], '♥', 'right path part')
     is_ok(str(url.path), '/%E2%99%A5/', 'right path')
@@ -338,11 +377,11 @@ if __name__ == '__main__':
     ok(url.is_abs, 'is absolute')
     is_ok(url.scheme, 'http', 'right scheme')
     is_ok(url.host, '☃.Net', 'right host')
-    is_ok(url.ihost, 'xn--n3h.net', 'right internationalized host')
+    is_ok(url.ihost, 'xn--n3h.Net', 'right internationalized host')
     is_ok(str(url.path), '/%E2%99%A5/%E2%99%A5/', 'right path')
     is_deeply_ok(url.path.parts, ['♥', '♥'], 'right structure')
     is_ok(url.query.param('♥'), '☃', 'right query value')
-    is_ok(str(url), 'http://xn--n3h.net/%E2%99%A5/%E2%99%A5/?%E2%99%A5=%E2%98%83', 'right format')
+    is_ok(str(url), 'http://xn--n3h.Net/%E2%99%A5/%E2%99%A5/?%E2%99%A5=%E2%98%83', 'right format')
     url = Pyjo.URL.new('http://xn--n3h.net/%E2%99%A5/%E2%99%A5/?%E2%99%A5=%E2%98%83')
     ok(url.is_abs, 'is absolute')
     is_ok(url.scheme, 'http', 'right scheme')
@@ -353,11 +392,22 @@ if __name__ == '__main__':
     is_ok(url.query.param('♥'), '☃', 'right query value')
     is_ok(str(url), 'http://xn--n3h.net/%E2%99%A5/%E2%99%A5/?%E2%99%A5=%E2%98%83', 'right format')
 
-    # Already absolute
+with subtest('Already absolute'):
     url = Pyjo.URL.new('http://foo.com/')
     is_ok(str(url.to_abs()), 'http://foo.com/', 'right absolute version')
 
-    # Empty path elements
+with subtest('"0"'):
+    url = Pyjo.URL.new('http://0@foo.com#0')
+    is_ok(url.scheme, 'http', 'right scheme')
+    is_ok(url.userinfo, '0', 'right userinfo')
+    is_ok(url.username, '0', 'right username')
+    is_ok(url.password, None, 'no password')
+    is_ok(url.host, 'foo.com', 'right host')
+    is_ok(url.fragment, '0', 'right fragment')
+    is_ok(str(url), 'http://foo.com#0', 'right format')
+    is_ok(url.to_unsafe_str(), 'http://0@foo.com#0', 'right format')
+
+with subtest('Empty path elements'):
     url = Pyjo.URL.new('http://example.com/foo//bar/23/')
     ok(url.is_abs, 'is absolute')
     is_ok(str(url.path), '/foo//bar/23/', 'right path')
@@ -371,7 +421,7 @@ if __name__ == '__main__':
     is_ok(str(url.path), '/foo///bar/23/', 'right path')
     is_ok(str(url), 'http://example.com/foo///bar/23/', 'right format')
 
-    # Merge relative path
+with subtest('Merge relative path'):
     url = Pyjo.URL.new('http://foo.bar/baz?yada')
     is_ok(str(url.base), '', 'no base')
     is_ok(url.scheme, 'http', 'right scheme')
@@ -393,7 +443,7 @@ if __name__ == '__main__':
     is_ok(url.fragment, None, 'no fragment')
     is_ok(str(url), 'http://foo.bar/zzz?Zzz', 'right absolute URL')
 
-    # Merge relative path with directory
+with subtest('Merge relative path with directory'):
     url = Pyjo.URL.new('http://foo.bar/baz/index.html?yada')
     is_ok(str(url.base), '', 'no base')
     is_ok(url.scheme, 'http', 'right scheme')
@@ -415,7 +465,7 @@ if __name__ == '__main__':
     is_ok(url.fragment, None, 'no fragment')
     is_ok(str(url), 'http://foo.bar/baz/zzz?Zzz', 'right absolute URL')
 
-    # Merge absolute path
+with subtest('Merge absolute path'):
     url = Pyjo.URL.new('http://foo.bar/baz/index.html?yada')
     is_ok(str(url.base), '', 'no base')
     is_ok(url.scheme, 'http', 'right scheme')
@@ -437,7 +487,7 @@ if __name__ == '__main__':
     is_ok(url.fragment, None, 'no fragment')
     is_ok(str(url), 'http://foo.bar/zzz?Zzz', 'right absolute URL')
 
-    # Merge absolute path without query
+with subtest('Merge absolute path without query'):
     url = Pyjo.URL.new('http://foo.bar/baz/index.html?yada')
     is_ok(str(url.base), '', 'no base')
     is_ok(url.scheme, 'http', 'right scheme')
@@ -459,7 +509,7 @@ if __name__ == '__main__':
     is_ok(url.fragment, None, 'no fragment')
     is_ok(str(url), 'http://foo.bar/zzz', 'right absolute URL')
 
-    # Merge absolute path with fragment
+with subtest('Merge absolute path with fragment'):
     url = Pyjo.URL.new('http://foo.bar/baz/index.html?yada#test1')
     is_ok(str(url.base), '', 'no base')
     is_ok(url.scheme, 'http', 'right scheme')
@@ -481,7 +531,7 @@ if __name__ == '__main__':
     is_ok(url.fragment, 'test2', 'right fragment')
     is_ok(str(url), 'http://foo.bar/zzz#test2', 'right absolute URL')
 
-    # Merge relative path with fragment
+with subtest('Merge relative path with fragment'):
     url = Pyjo.URL.new('http://foo.bar/baz/index.html?yada#test1')
     is_ok(str(url.base), '', 'no base')
     is_ok(url.scheme, 'http', 'right scheme')
@@ -503,7 +553,7 @@ if __name__ == '__main__':
     is_ok(url.fragment, 'test2', 'right fragment')
     is_ok(str(url), 'http://foo.bar/baz/zzz#test2', 'right absolute URL')
 
-    # Merge absolute path without fragment
+with subtest('Merge absolute path without fragment'):
     url = Pyjo.URL.new('http://foo.bar/baz/index.html?yada#test1')
     is_ok(str(url.base), '', 'no base')
     is_ok(url.scheme, 'http', 'right scheme')
@@ -525,7 +575,7 @@ if __name__ == '__main__':
     is_ok(url.fragment, None, 'no fragment')
     is_ok(str(url), 'http://foo.bar/zzz', 'right absolute URL')
 
-    # Merge relative path without fragment
+with subtest('Merge relative path without fragment'):
     url = Pyjo.URL.new('http://foo.bar/baz/index.html?yada#test1')
     is_ok(str(url.base), '', 'no base')
     is_ok(url.scheme, 'http', 'right scheme')
@@ -547,9 +597,9 @@ if __name__ == '__main__':
     is_ok(url.fragment, None, 'no fragment')
     is_ok(str(url), 'http://foo.bar/baz/zzz', 'right absolute URL')
 
-    # Hosts
-    url = Pyjo.URL.new('http://mojolicio.us')
-    is_ok(url.host, 'mojolicio.us', 'right host')
+with subtest('Hosts'):
+    url = Pyjo.URL.new('http://mojolicious.org')
+    is_ok(url.host, 'mojolicious.org', 'right host')
     url = Pyjo.URL.new('http://[::1]')
     is_ok(url.host, '[::1]', 'right host')
     url = Pyjo.URL.new('http://127.0.0.1')
@@ -558,8 +608,8 @@ if __name__ == '__main__':
     is_ok(url.host, '0::127.0.0.1', 'right host')
     url = Pyjo.URL.new('http://[0::127.0.0.1]')
     is_ok(url.host, '[0::127.0.0.1]', 'right host')
-    url = Pyjo.URL.new('http://mojolicio.us:3000')
-    is_ok(url.host, 'mojolicio.us', 'right host')
+    url = Pyjo.URL.new('http://mojolicious.org:3000')
+    is_ok(url.host, 'mojolicious.org', 'right host')
     url = Pyjo.URL.new('http://[::1]:3000')
     is_ok(url.host, '[::1]', 'right host')
     url = Pyjo.URL.new('http://127.0.0.1:3000')
@@ -573,7 +623,7 @@ if __name__ == '__main__':
     url = Pyjo.URL.new('http://1.1.1.1.1.1/')
     is_ok(url.host, '1.1.1.1.1.1', 'right host')
 
-    # Heavily escaped path and empty fragment
+with subtest('Heavily escaped path and empty fragment'):
     url = Pyjo.URL.new('http://example.com/mojo%2Fg%2B%2B-4%2E2_4%2E2%2E3-2ubuntu7_i386%2Edeb#')
     ok(url.is_abs, 'is absolute')
     is_ok(url.scheme, 'http', 'right scheme')
@@ -587,21 +637,27 @@ if __name__ == '__main__':
     url.path.canonicalize()
     is_ok(str(url), 'http://example.com/mojo/g++-4.2_4.2.3-2ubuntu7_i386.deb#', 'right format')
 
-    # "%" in path
-    url = Pyjo.URL.new('http://mojolicio.us/100%_fun')
+with subtest('"%" in path'):
+    url = Pyjo.URL.new('http://mojolicious.org/100%_fun')
     is_ok(url.path.parts[0], '100%_fun', 'right part')
     is_ok(str(url.path), '/100%25_fun', 'right path')
-    is_ok(str(url), 'http://mojolicio.us/100%25_fun', 'right format')
-    url = Pyjo.URL.new('http://mojolicio.us/100%fun')
+    is_ok(str(url), 'http://mojolicious.org/100%25_fun', 'right format')
+    url = Pyjo.URL.new('http://mojolicious.org/100%fun')
     is_ok(url.path.parts[0], '100%fun', 'right part')
     is_ok(str(url.path), '/100%25fun', 'right path')
-    is_ok(str(url), 'http://mojolicio.us/100%25fun', 'right format')
-    url = Pyjo.URL.new('http://mojolicio.us/100%25_fun')
+    is_ok(str(url), 'http://mojolicious.org/100%25fun', 'right format')
+    url = Pyjo.URL.new('http://mojolicious.org/100%25_fun')
     is_ok(url.path.parts[0], '100%_fun', 'right part')
     is_ok(str(url.path), '/100%25_fun', 'right path')
-    is_ok(str(url), 'http://mojolicio.us/100%25_fun', 'right format')
+    is_ok(str(url), 'http://mojolicious.org/100%25_fun', 'right format')
 
-    # No charset
+with subtest('Trailing dot'):
+    url = Pyjo.URL.new('http://☃.net./♥')
+    is_ok(url.ihost, 'xn--n3h.net.', 'right internationalized host')
+    is_ok(url.host, '☃.net.', 'right host')
+    is_ok(str(url), 'http://xn--n3h.net./%E2%99%A5', 'right format')
+
+with subtest('No charset'):
     url = Pyjo.URL.new()
     url.path.charset = None
     url.query.charset = None
@@ -609,54 +665,39 @@ if __name__ == '__main__':
     is_ok(url.scheme, 'HTTP', 'right scheme')
     is_ok(url.protocol, 'http', 'right protocol')
     is_ok(url.host, 'FOO.BAR', 'right host')
-    is_ok(url.ihost, 'foo.bar', 'right internationalized host')
+    is_ok(url.ihost, 'FOO.BAR', 'right internationalized host')
     is_ok(str(url.path), '/%E4/', 'right path')
     is_deeply_ok(url.path.parts, ['\xe4'], 'right structure')
     ok(url.path.leading_slash, 'has leading slash')
     ok(url.path.trailing_slash, 'has trailing slash')
     is_ok(str(url.query), '%E5=%E4', 'right query')
     is_ok(url.query.param('\xe5'), '\xe4', 'right value')
-    is_ok(str(url), 'http://foo.bar/%E4/?%E5=%E4', 'right format')
+    is_ok(str(url), 'http://FOO.BAR/%E4/?%E5=%E4', 'right format')
 
-    # Resolve RFC 1808 examples
+with subtest('Resolve RFC 1808 examples'):
     base = Pyjo.URL.new('http://a/b/c/d?q#f')
-    url = Pyjo.URL.new('g')
-    is_ok(str(url.to_abs(base)), 'http://a/b/c/g', 'right absolute version')
-    url = Pyjo.URL.new('./g')
-    is_ok(str(url.to_abs(base)), 'http://a/b/c/g', 'right absolute version')
-    url = Pyjo.URL.new('g/')
-    is_ok(str(url.to_abs(base)), 'http://a/b/c/g/', 'right absolute version')
-    url = Pyjo.URL.new('//g')
-    is_ok(str(url.to_abs(base)), 'http://g', 'right absolute version')
-    url = Pyjo.URL.new('?y')
-    is_ok(str(url.to_abs(base)), 'http://a/b/c/d?y', 'right absolute version')
-    url = Pyjo.URL.new('g?y')
-    is_ok(str(url.to_abs(base)), 'http://a/b/c/g?y', 'right absolute version')
-    url = Pyjo.URL.new('g?y/./x')
-    is_ok(str(url.to_abs(base)), 'http://a/b/c/g?y/./x', 'right absolute version')
-    url = Pyjo.URL.new('#s')
-    is_ok(str(url.to_abs(base)), 'http://a/b/c/d?q#s', 'right absolute version')
-    url = Pyjo.URL.new('g#s')
-    is_ok(str(url.to_abs(base)), 'http://a/b/c/g#s', 'right absolute version')
-    url = Pyjo.URL.new('g#s/./x')
-    is_ok(str(url.to_abs(base)), 'http://a/b/c/g#s/./x', 'right absolute version')
-    url = Pyjo.URL.new('g?y#s')
-    is_ok(str(url.to_abs(base)), 'http://a/b/c/g?y#s', 'right absolute version')
-    url = Pyjo.URL.new('.')
-    is_ok(str(url.to_abs(base)), 'http://a/b/c', 'right absolute version')
-    url = Pyjo.URL.new('./')
-    is_ok(str(url.to_abs(base)), 'http://a/b/c/', 'right absolute version')
-    url = Pyjo.URL.new('..')
-    is_ok(str(url.to_abs(base)), 'http://a/b', 'right absolute version')
-    url = Pyjo.URL.new('../')
-    is_ok(str(url.to_abs(base)), 'http://a/b/', 'right absolute version')
-    url = Pyjo.URL.new('../g')
-    is_ok(str(url.to_abs(base)), 'http://a/b/g', 'right absolute version')
-    url = Pyjo.URL.new('../..')
-    is_ok(str(url.to_abs(base)), 'http://a/', 'right absolute version')
-    url = Pyjo.URL.new('../../')
-    is_ok(str(url.to_abs(base)), 'http://a/', 'right absolute version')
-    url = Pyjo.URL.new('../../g')
-    is_ok(str(url.to_abs(base)), 'http://a/g', 'right absolute version')
+    for relative, absolute in [
+        ('g', 'http://a/b/c/g'),
+        ('./g', 'http://a/b/c/g'),
+        ('g/', 'http://a/b/c/g/'),
+        ('//g', 'http://g'),
+        ('?y', 'http://a/b/c/d?y'),
+        ('g?y', 'http://a/b/c/g?y'),
+        ('g?y/./x', 'http://a/b/c/g?y/./x'),
+        ('#s', 'http://a/b/c/d?q#s'),
+        ('g#s', 'http://a/b/c/g#s'),
+        ('g#s/./x', 'http://a/b/c/g#s/./x'),
+        ('g?y#s', 'http://a/b/c/g?y#s'),
+        ('.', 'http://a/b/c'),
+        ('./', 'http://a/b/c/'),
+        ('..', 'http://a/b'),
+        ('../', 'http://a/b/'),
+        ('../g', 'http://a/b/g'),
+        ('../..', 'http://a/'),
+        ('../../', 'http://a/'),
+        ('../../g', 'http://a/g'),
+    ]:
+        url = Pyjo.URL.new(relative)
+        is_ok(str(url.to_abs(base)), absolute, 'right absolute version')
 
-    done_testing()
+done_testing()

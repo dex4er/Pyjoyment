@@ -1,12 +1,12 @@
 """
-Pyjo.URL- Uniform Resource Locator
-==================================
+Pyjo.URL - Uniform Resource Locator
+===================================
 ::
 
     import Pyjo.URL
 
     # Parse
-    url = Pyjo.URL.new('http://sri:foobar@example.com:3000/foo/bar?foo=bar#23')
+    url = Pyjo.URL.new('http://sri:foo@example.com:3000/foo?foo=bar#23')
     print(url.scheme)
     print(url.userinfo)
     print(url.host)
@@ -18,19 +18,24 @@ Pyjo.URL- Uniform Resource Locator
     # Build
     url = Pyjo.URL.new()
     url.scheme = 'http'
-    url.userinfo = 'sri:foobar'
     url.host = 'example.com'
     url.port = 3000
     url.path = '/foo/bar'
-    url.query.param('foo', 'bar')
-    url.fragment = 23
+    url.query = ('foo', 'bar')
+    url.fragment = '23'
     print(url)
 
-:mod:`Pyjo.URL` implements a subset of
-:rfc:`3986`,
-:rfc:`3987` and the
+:mod:`Pyjo.URL` implements a subset of :rfc:`3986`, :rfc:`3987` and the
 `URL Living Standard <https://url.spec.whatwg.org>`_ for Uniform Resource
 Locators with support for IDNA and IRIs.
+
+See also
+--------
+
+:mod:`Pyjoyment`, https://mojolicious.org.
+
+Ported from `Mojo::URL <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/URL.pm>`_
+of Mojolicious 9.49.
 
 Classes
 -------
@@ -41,24 +46,26 @@ import Pyjo.Parameters
 import Pyjo.Path
 import Pyjo.String.Mixin
 
-from Pyjo.Regexp import r
-from Pyjo.Util import b, convert, u, url_escape, url_unescape
+from Pyjo.Util import decode, punycode_decode, punycode_encode, url_escape, url_unescape
+
+import builtins
+import re
+
+from typing import Self, cast
 
 
-re_authority = r(rb'^([^\@]+)\@')
-re_port = r(rb':(\d+)$')
-re_non_ascii = r(rb'[^\x00-\x7f]')
-re_idn = r(rb'^xn--(.+)$')
-re_url = r(rb'^(([^:/?#]+):)?(//([^/?#]*))?([^?#]*)(\?([^#]*))?(#(.*))?')
+# The module ends with `object = Pyjo_URL`, which an annotation of `object`
+# would mean, as annotations are evaluated lazily
+type Anything = builtins.object
 
 
 class Pyjo_URL(Pyjo.Base.object, Pyjo.String.Mixin.object):
     """
-    :mod:`Pyjo.URL` inherits all attributes and methods from
-    :mod:`Pyjo.Base` and :mod:`Pyjo.String.Mixin` and implements the following new ones.
+    :mod:`Pyjo.URL` inherits all methods from :mod:`Pyjo.Base` and
+    :mod:`Pyjo.String.Mixin` and implements the following new ones.
     """
 
-    def __init__(self, url=None, **kwargs):
+    def __init__(self, url: str | bytes | None = None) -> None:
         """::
 
             url = Pyjo.URL.new()
@@ -66,63 +73,74 @@ class Pyjo_URL(Pyjo.Base.object, Pyjo.String.Mixin.object):
 
         Construct a new :mod:`Pyjo.URL` object and :meth:`parse` URL if necessary.
         """
+        self._base: Pyjo_URL | None = None
+        self._path: Pyjo.Path.object | None = None
+        self._query: Pyjo.Parameters.object | None = None
 
-        self.fragment = kwargs.get('fragment')
+        self.fragment: str | None = None
         """::
 
             fragment = url.fragment
-            url.fragment = u'♥pyjo♥'
+            url.fragment = '♥pyjoyment♥'
 
-        Fragment part of this URL.
+        Fragment part of this URL. ::
+
+            # "yada"
+            Pyjo.URL.new('http://example.com/foo?bar=baz#yada').fragment
         """
 
-        self.host = kwargs.get('host')
+        self.host: str | None = None
         """::
 
             host = url.host
             url.host = '127.0.0.1'
 
-        Host part of this URL.
+        Host part of this URL. ::
+
+            # "example.com"
+            Pyjo.URL.new('http://sri:t3st@example.com:8080/foo').host
         """
 
-        self.port = kwargs.get('port')
+        self.port: int | None = None
         """::
 
             port = url.port
             url.port = 8080
 
-        Port part of this URL.
+        Port part of this URL. ::
+
+            # 8080
+            Pyjo.URL.new('http://sri:t3st@example.com:8080/foo').port
         """
 
-        self.scheme = kwargs.get('scheme')
+        self.scheme: str | None = None
         """::
 
             scheme = url.scheme
             url.scheme = 'http'
 
-        Scheme part of this URL.
+        Scheme part of this URL. ::
 
+            # "http"
+            Pyjo.URL.new('http://example.com/foo').scheme
         """
 
-        self.userinfo = kwargs.get('userinfo')
+        self.userinfo: str | None = None
         """::
 
             info = url.userinfo
-            url.userinfo = u'root:♥'
+            url.userinfo = 'root:♥'
 
-        Userinfo part of this URL.
+        Userinfo part of this URL. ::
+
+            # "sri:t3st"
+            Pyjo.URL.new('https://sri:t3st@example.com/foo').userinfo
         """
-
-        self._base = None
-        self._path = None
-        self._query = None
 
         if url is not None:
             self.parse(url)
-        elif kwargs:
-            self.set(**kwargs)
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
         """::
 
             boolean = bool(url)
@@ -131,147 +149,86 @@ class Pyjo_URL(Pyjo.Base.object, Pyjo.String.Mixin.object):
         """
         return True
 
-    def append(self, **kwargs):
+    def __str__(self) -> str:
         """::
 
-            params = params.append(query={'foo': 'bar'})
-            # calls params.query.append(foo='bar')
+            string = str(url)
 
-        Calls :meth:`append` method on each attribute from ``kwargs``.
+        Alias for :meth:`to_str`.
         """
-        for k, v in kwargs.items():
-            m = getattr(self, k)
-            if isinstance(
-                v,
-                (
-                    list,
-                    tuple,
-                ),
-            ):
-                m.append(*v)
-            elif isinstance(v, dict):
-                m.append(**v)
-            else:
-                m.append(v)
-        return self
+        return self.to_str()
 
     @property
-    def authority(self):
-        """::
-
-            authority = url.authority
-            url.authority = 'root:%E2%99%A5@localhost:8080'
-
-        Authority part of this URL. ::
-
-            # "root:%E2%99%A5@xn--n3h.net:8080"
-            Pyjo.URL.new(u'http://root:♥@☃.net:8080/test').authority
-
-            # "root@example.com"
-            Pyjo.URL.new('http://root@example.com/test').authority
-        """
-        # Build authority
-        authority = self.host_port
-        if authority is None:
-            return
-
-        info = self.userinfo
-        if info is None:
-            return authority
-        info = u(url_escape(b(info), rb'^A-Za-z0-9\-._~!$&\'()*+,;=:'))
-
-        return info + '@' + authority
-
-    @authority.setter
-    def authority(self, authority):
-        if authority is None:
-            return self
-
-        authority = b(authority)
-
-        # Userinfo
-        m = re_authority.search(authority)
-        if m:
-            authority = re_authority.sub(b'', authority, 1)
-            self.userinfo = u(url_unescape(m.group(1)))
-
-        # Port
-        m = re_port.search(authority)
-        if m:
-            authority = re_port.sub(b'', authority, 1)
-            self.port = convert(m.group(1), int, None)
-
-        # Host
-        host = url_unescape(authority)
-        if re_non_ascii.search(host):
-            self.ihost = host
-        else:
-            self.host = str(u(host))
-
-        return self
-
-    @property
-    def base(self):
+    def base(self) -> 'Pyjo_URL':
         """::
 
             base = url.base
             url.base = Pyjo.URL.new()
 
-        Base of this URL, defaults to a :mod:`Pyjo.URL` object.
+        Base of this URL, defaults to a :mod:`Pyjo.URL` object. ::
+
+            # "http://example.com/a/b?c"
+            Pyjo.URL.new('/a/b?c').set(base=Pyjo.URL.new('http://example.com')).to_abs()
         """
         if self._base is None:
-            self._base = Pyjo.URL.new()
+            self._base = Pyjo_URL()
         return self._base
 
     @base.setter
-    def base(self, value):
+    def base(self, value: 'Pyjo_URL') -> None:
         self._base = value
-        return self
 
-    def clone(self):
+    def clone(self) -> Self:
         """::
 
             url2 = url.clone()
 
-        Clone this URL.
+        Return a new :mod:`Pyjo.URL` object cloned from this URL.
         """
         clone = self.new()
-        clone.fragment = self.fragment
-        clone.host = self.host
-        clone.port = self.port
-        clone.scheme = self.scheme
-        clone.userinfo = self.userinfo
-        if self._base is not None:
-            clone._base = self._base.clone()
-        if self._path is not None:
-            clone._path = self._path.clone()
-        if self._query is not None:
-            clone._query = self._query.clone()
+        clone.fragment, clone.host, clone.port = self.fragment, self.host, self.port
+        clone.scheme, clone.userinfo = self.scheme, self.userinfo
+        clone._base = self._base.clone() if self._base is not None else None
+        clone._path = self._path.clone() if self._path is not None else None
+        clone._query = self._query.clone() if self._query is not None else None
         return clone
 
     @property
-    def host_port(self):
+    def host_port(self) -> str | None:
         """::
 
             host_port = url.host_port
+            url.host_port = 'example.com:8080'
 
         Normalized version of :attr:`host` and :attr:`port`. ::
 
             # "xn--n3h.net:8080"
-            Pyjo.URL.new(u'http://☃.net:8080/test').host_port
+            Pyjo.URL.new('http://☃.net:8080/test').host_port
 
             # "example.com"
             Pyjo.URL.new('http://example.com/test').host_port
         """
-        host = self.ihost
-        port = self.port
-        if port is not None:
-            return f'{host}:{port}'
-        else:
+        if (host := self.ihost) is None:
+            return None
+        if (port := self.port) is None:
             return host
+        return f'{host}:{port}'
+
+    @host_port.setter
+    def host_port(self, value: str | None) -> None:
+        if value is None:
+            return
+        if m := re.search(r':(\d+)$', value):
+            self.port = int(m[1])
+            value = value[: m.start()]
+        host = url_unescape(value)
+        if re.search(r'[^\x00-\x7f]', host):
+            self.ihost = host
+        else:
+            self.host = host
 
     @property
-    def ihost(self):
+    def ihost(self) -> str | None:
         """::
 
             ihost = url.ihost
@@ -280,33 +237,31 @@ class Pyjo_URL(Pyjo.Base.object, Pyjo.String.Mixin.object):
         Host part of this URL in punycode format. ::
 
             # "xn--n3h.net"
-            Pyjo.URL.new(u'http://☃.net').ihost
+            Pyjo.URL.new('http://☃.net').ihost
 
             # "example.com"
             Pyjo.URL.new('http://example.com').ihost
         """
-        if self.host is None:
-            return
-
-        if not re_non_ascii.search(b(self.host)):
-            return self.host.lower()
+        # Check if host needs to be encoded
+        if (host := self.host) is None:
+            return None
+        if not re.search(r'[^\x00-\x7f]', host):
+            return host
 
         # Encode
-        parts = map(
-            lambda s: ('xn--' + s.encode('punycode').decode('ascii')) if re_non_ascii.search(b(s)) else s,
-            self.host.split('.'),
+        return '.'.join(
+            f'xn--{punycode_encode(label)}' if re.search(r'[^\x00-\x7f]', label) else label for label in host.split('.')
         )
-        return '.'.join(parts).lower()
 
     @ihost.setter
-    def ihost(self, value):
+    def ihost(self, value: str) -> None:
         # Decode
-        parts = map(lambda s: s[4:].decode('punycode') if re_idn.search(s) else u(s), b(value).split(b'.'))
-        self.host = '.'.join(parts)
-        return self
+        self.host = '.'.join(
+            punycode_decode(m[1]) if (m := re.match(r'^xn--(.+)$', label)) else label for label in value.split('.')
+        )
 
     @property
-    def is_abs(self):
+    def is_abs(self) -> bool:
         """::
 
             boolean = url.is_abs
@@ -324,106 +279,105 @@ class Pyjo_URL(Pyjo.Base.object, Pyjo.String.Mixin.object):
         """
         return bool(self.scheme)
 
-    def merge(self, **kwargs):
-        """::
-
-            params = params.merge(query={'foo': 'bar'})
-            # calls params.query.merge(foo='bar')
-
-        Calls :meth:`merge` method on each attribute from ``kwargs``.
-        """
-        for k, v in kwargs.items():
-            m = getattr(self, k)
-            if isinstance(
-                v,
-                (
-                    list,
-                    tuple,
-                ),
-            ):
-                m.merge(*v)
-            elif isinstance(v, dict):
-                m.merge(**v)
-            else:
-                m.merge(v)
-        return self
-
-    def parse(self, url):
+    def parse(self, url: str | bytes) -> Self:
         """::
 
             url = url.parse('http://127.0.0.1:3000/foo/bar?fo=o&baz=23#foo')
 
-        Parse relative or absolute URL. ::
+        Parse relative or absolute URL. Bytes are characters 0-255, as a Perl
+        byte string. ::
 
             # "/test/123"
-            url.parse('/test/123?foo=bar').path
+            Pyjo.URL.new().parse('/test/123?foo=bar').path
 
             # "example.com"
-            url.parse('http://example.com/test/123?foo=bar').host
+            Pyjo.URL.new().parse('http://example.com/test/123?foo=bar').host
 
             # "sri@example.com"
-            url.parse('mailto:sri@example.com').path
+            Pyjo.URL.new().parse('mailto:sri@example.com').path
         """
-        m = re_url.search(b(url))
-        if m:
-            scheme, authority, path, query, fragment = m.group(2, 4, 5, 7, 9)
-            if scheme is not None:
-                self.scheme = u(scheme)
-            if authority is not None:
-                self.authority = authority
-            if path is not None:
-                self.path = path
-            if query is not None:
-                self.query = query
-            if fragment is not None:
-                self.fragment = u(url_unescape(fragment))
+        if isinstance(url, bytes):
+            url = url.decode('latin-1')
+
+        # Official regex from RFC 3986
+        m = re.match(r'^(([^:/?#]+):)?(//([^/?#]*))?([^?#]*)(\?([^#]*))?(#(.*))?', url)
+        assert m is not None
+        if m[2] is not None:
+            self.scheme = m[2]
+        if m[5] is not None:
+            self.path = m[5]
+        if m[7] is not None:
+            self.query = m[7]
+        if m[9] is not None:
+            self.fragment = _decode(url_unescape(m[9]))
+        if (auth := m[4]) is not None:
+            if info := re.match(r'^([^@]+)@', auth):
+                self.userinfo = _decode(url_unescape(info[1]))
+                auth = auth[info.end() :]
+            self.host_port = auth
+
         return self
 
     @property
-    def path(self):
+    def password(self) -> str | None:
+        """::
+
+            password = url.password
+
+        Password part of :attr:`userinfo`. ::
+
+            # "s3cret"
+            Pyjo.URL.new('http://isabel:s3cret@pyjoyment.org').password
+
+            # "s:3:c:r:e:t"
+            Pyjo.URL.new('http://isabel:s:3:c:r:e:t@pyjoyment.org').password
+        """
+        m = re.search(r':(.*)$', self.userinfo or '')
+        return m[1] if m else None
+
+    @property
+    def path(self) -> Pyjo.Path.object:
         """::
 
             path = url.path
-            url.path = '/foo/bar'
             url.path = 'foo/bar'
+            url.path = '/foo/bar'
             url.path = Pyjo.Path.new()
 
-        Path part of this URL, relative paths will be merged with the existing path,
-        defaults to a :mod:`Mojo::Path` object. ::
+        Path part of this URL, relative paths will be merged with
+        :meth:`Pyjo.Path.Pyjo_Path.merge`, defaults to a :mod:`Pyjo.Path` object. ::
 
-            # "perldoc"
-            Pyjo.URL.new('http://example.com/perldoc/Mojo').path.parts[0]
+            # "test"
+            Pyjo.URL.new('http://example.com/test/Pyjo').path.parts[0]
+
+            # "/test/DOM/HTML"
+            Pyjo.URL.new('http://example.com/test/Pyjo').path.merge('DOM/HTML')
 
             # "http://example.com/DOM/HTML"
-            Pyjo.URL.new('http://example.com/perldoc/Mojo').set(path='/DOM/HTML')
+            Pyjo.URL.new('http://example.com/test/Pyjo').set(path='/DOM/HTML')
 
-            # "http://example.com/perldoc/DOM/HTML"
-            Pyjo.URL.new('http://example.com/perldoc/Mojo').set(path='DOM/HTML')
+            # "http://example.com/test/DOM/HTML"
+            Pyjo.URL.new('http://example.com/test/Pyjo').set(path='DOM/HTML')
 
-            # "http://example.com/perldoc/Mojo/DOM/HTML"
-            Pyjo.URL.new('http://example.com/perldoc/Mojo/').set(path='DOM/HTML')
+            # "http://example.com/test/Pyjo/DOM/HTML"
+            Pyjo.URL.new('http://example.com/test/Pyjo/').set(path='DOM/HTML')
         """
+        # Old path
         if self._path is None:
             self._path = Pyjo.Path.new()
         return self._path
 
     @path.setter
-    def path(self, value):
-        # Old path
-        if self._path is None:
-            self._path = Pyjo.Path.new()
-
+    def path(self, value: str | bytes | Pyjo.Path.object) -> None:
         # New path
-        if isinstance(value, Pyjo.Path.object):
-            self._path = value
-        else:
-            self._path.merge(value)
+        self._path = value if isinstance(value, Pyjo.Path.object) else self.path.merge(value)
 
     @property
-    def path_query(self):
+    def path_query(self) -> str:
         """::
 
             path_query = url.path_query
+            url.path_query = '/foo/bar?a=1&b=2'
 
         Normalized version of :attr:`path` and :attr:`query`. ::
 
@@ -434,14 +388,20 @@ class Pyjo_URL(Pyjo.Base.object, Pyjo.String.Mixin.object):
             Pyjo.URL.new('http://example.com/').path_query
         """
         query = self.query.to_str()
-        if len(query):
-            query = '?' + query
-        else:
-            query = ''
-        return self.path.to_str() + query
+        return self.path.to_str() + (f'?{query}' if query else '')
+
+    @path_query.setter
+    def path_query(self, value: str | None) -> None:
+        if value is None:
+            return
+        m = re.match(r'^([^?#]*)(?:\?([^#]*))?', value)
+        assert m is not None
+        self.path = m[1]
+        if m[2] is not None:
+            self.query = m[2]
 
     @property
-    def protocol(self):
+    def protocol(self) -> str:
         """::
 
             proto = url.protocol
@@ -451,181 +411,198 @@ class Pyjo_URL(Pyjo.Base.object, Pyjo.String.Mixin.object):
             # "http"
             Pyjo.URL.new('HtTp://example.com').protocol
         """
-        scheme = self.scheme
-
-        if scheme is None:
-            return ''
-
-        return scheme.lower()
+        return (self.scheme or '').lower()
 
     @property
-    def query(self):
+    def query(self) -> Pyjo.Parameters.object:
         """::
 
             query = url.query
-            url.query = ['param', 'value']
-            url.query = {'param': 'value'}
-            url.query.append('append', 'to')
-            url.query.merge('replace', 'with')
+            url.query = {'merge': 'to'}
+            url.query = ['append', 'with']
+            url.query = ('replace', 'with')
+            url.query = 'a=1&b=2'
             url.query = Pyjo.Parameters.new()
 
-        Query part of this URL as :mod:`Pyjo.Parameters` object. ::
+        Query part of this URL, key/value pairs in a ``list`` will be appended with
+        :meth:`Pyjo.Parameters.Pyjo_Parameters.append`, key/value pairs in a
+        ``dict`` merged with :meth:`Pyjo.Parameters.Pyjo_Parameters.merge`, and
+        key/value pairs in a ``tuple`` replace the parameters, defaults to a
+        :mod:`Pyjo.Parameters` object. ::
 
             # "2"
             Pyjo.URL.new('http://example.com?a=1&b=2').query.param('b')
 
+            # "b=2&a=2&c=3"
+            Pyjo.URL.new('http://example.com?a=1&b=2').query.merge('a', 2, 'c', 3)
+
             # "http://example.com?a=2&c=3"
-            Pyjo.URL.new('http://example.com?a=1&b=2').set(query=['a', 2, 'c', 3])
+            Pyjo.URL.new('http://example.com?a=1&b=2').set(query=('a', 2, 'c', 3))
 
             # "http://example.com?a=2&a=3"
-            Pyjo.URL.new('http://example.com?a=1&b=2').set(query={'a': [2, 3]})
+            Pyjo.URL.new('http://example.com?a=1&b=2').set(query=('a', [2, 3]))
 
             # "http://example.com?b=2&a=2&c=3"
-            Pyjo.URL.new('http://example.com?a=1&b=2').merge(query={'a': 2, 'c': 3})
+            Pyjo.URL.new('http://example.com?a=1&b=2').set(query={'a': 2, 'c': 3})
 
             # "http://example.com?b=2"
-            Pyjo.URL.new('http://example.com?a=1&b=2').merge(query={'a': None})
+            Pyjo.URL.new('http://example.com?a=1&b=2').set(query={'a': None})
 
             # "http://example.com?a=1&b=2&a=2&c=3"
-            Pyjo.URL.new('http://example.com?a=1&b=2').append(query=['a', 2, 'c', 3])
+            Pyjo.URL.new('http://example.com?a=1&b=2').set(query=['a', 2, 'c', 3])
         """
+        # Old parameters
         if self._query is None:
             self._query = Pyjo.Parameters.new()
         return self._query
 
     @query.setter
-    def query(self, value):
-        # Old parameters
-        if self._query is None:
-            self._query = Pyjo.Parameters.new()
+    def query(self, value: Anything) -> None:
+        q = self.query
 
-        # Replace with dict
-        if isinstance(value, dict):
-            self._query = Pyjo.Parameters.new(**value)
+        # Replace with tuple
+        if isinstance(value, tuple):
+            q.pairs = []
+            q.append(*cast(tuple[Anything, ...], value))
 
-        # Replace with list or tuple
-        elif isinstance(
-            value,
-            (
-                list,
-                tuple,
-            ),
-        ):
-            self._query = Pyjo.Parameters.new(*value)
+        # Merge with dict
+        elif isinstance(value, dict):
+            q.merge(*(x for pair in cast(dict[Anything, Anything], value).items() for x in pair))
+
+        # Append list
+        elif isinstance(value, list):
+            q.append(*cast(list[Anything], value))
 
         # New parameters
         elif isinstance(value, Pyjo.Parameters.object):
             self._query = value
-
         else:
-            self._query = self._query.parse(value)
+            q.parse(value)
 
-        return self
+    def to_abs(self, base: 'Pyjo_URL | None' = None) -> Self:
+        """::
 
-    def to_abs(self, base=None):
-        r"""::
+            abs = url.to_abs()
+            abs = url.to_abs(Pyjo.URL.new('http://example.com/foo'))
 
-            absolute = url.to_abs()
-            absolute = url.to_abs(Pyjo.URL.new('http://example.com/foo'))
-
-        Clone relative URL and turn it into an absolute one using :attr:`base` or
-        provided base URL. ::
+        Return a new :mod:`Pyjo.URL` object cloned from this relative URL and turn it
+        into an absolute one using :attr:`base` or provided base URL. ::
 
             # "http://example.com/foo/baz.xml?test=123"
-            Pyjo.URL.new('baz.xml?test=123') \
-                .to_abs(Pyjo.URL.new('http://example.com/foo/bar.html'))
+            Pyjo.URL.new('baz.xml?test=123').to_abs(Pyjo.URL.new('http://example.com/foo/bar.html'))
 
             # "http://example.com/baz.xml?test=123"
-            Pyjo.URL.new('/baz.xml?test=123') \
-                .to_abs(Pyjo.URL.new('http://example.com/foo/bar.html'))
+            Pyjo.URL.new('/baz.xml?test=123').to_abs(Pyjo.URL.new('http://example.com/foo/bar.html'))
 
             # "http://example.com/foo/baz.xml?test=123"
-            Pyjo.URL.new('//example.com/foo/baz.xml?test=123') \
-                .to_abs(Pyjo.URL.new('http://example.com/foo/bar.html'))
+            Pyjo.URL.new('//example.com/foo/baz.xml?test=123').to_abs(Pyjo.URL.new('http://example.com/foo/bar.html'))
         """
-        absolute = self.clone()
-        if absolute.is_abs:
-            return absolute
+        abs = self.clone()
+        if abs.is_abs:
+            return abs
 
         # Scheme
-        if base is None:
-            base = absolute.base
-        else:
-            absolute.base = base
-        absolute.scheme = base.scheme
+        base = base if base is not None else abs.base
+        abs.base = base
+        abs.scheme = base.scheme
 
         # Authority
-        if absolute.authority:
-            return absolute
-        absolute.authority = base.authority
+        if abs.host:
+            return abs
+        abs.userinfo, abs.host, abs.port = base.userinfo, base.host, base.port
 
         # Absolute path
-        path = absolute.path
+        path = abs.path
         if path.leading_slash:
-            return absolute
+            return abs
 
         # Inherit path
-        base_path = base.path
-
         if not path.parts:
-            path = absolute.set(path=base_path.clone()).path.set(trailing_slash=False).canonicalize()
+            abs.path = base.path.clone().canonicalize()
 
             # Query
-            if len(absolute.query.to_str()):
-                return absolute
-
-            absolute.query = base.query.clone()
+            if not abs.query.to_str():
+                abs.query = base.query.clone()
 
         # Merge paths
         else:
-            absolute.path = base_path.clone().merge(path).canonicalize()
+            abs.path = base.path.clone().merge(path).canonicalize()
 
-        return absolute
+        return abs
 
-    def to_bytes(self):
-        """::
-
-            bstring = url.to_bytes()
-
-        Turn URL into a bytes string.
-        """
-        return self.to_str().encode('ascii')
-
-    def to_str(self):
+    def to_str(self) -> str:
         """::
 
             string = url.to_str()
 
-        Turn URL into a string.
+        Turn URL into a string. Note that :attr:`userinfo` will not be included for
+        security reasons. ::
+
+            # "http://pyjoyment.org"
+            Pyjo.URL.new().set(scheme='http', host='pyjoyment.org').to_str()
+
+            # "http://pyjoyment.org"
+            Pyjo.URL.new('http://daniel:s3cret@pyjoyment.org').to_str()
         """
+        return self._string(False)
+
+    def to_unsafe_str(self) -> str:
+        """::
+
+            string = url.to_unsafe_str()
+
+        Same as :meth:`to_str`, but includes :attr:`userinfo`. ::
+
+            # "http://daniel:s3cret@pyjoyment.org"
+            Pyjo.URL.new('http://daniel:s3cret@pyjoyment.org').to_unsafe_str()
+        """
+        return self._string(True)
+
+    @property
+    def username(self) -> str | None:
+        """::
+
+            username = url.username
+
+        Username part of :attr:`userinfo`. ::
+
+            # "isabel"
+            Pyjo.URL.new('http://isabel:s3cret@pyjoyment.org').username
+        """
+        m = re.match(r'^([^:]+)', self.userinfo or '')
+        return m[1] if m else None
+
+    def _string(self, unsafe: bool) -> str:
         # Scheme
         url = ''
-        proto = self.protocol
-
-        if proto:
-            url += proto + ':'
+        if proto := self.protocol:
+            url += f'{proto}:'
 
         # Authority
-        authority = self.authority
-
-        if authority is not None:
-            url += '//' + authority
+        auth = self.host_port
+        if auth is not None:
+            auth = _encode(auth, rb"^A-Za-z0-9\-._~!$&'()*+,;=:\[\]")
+        if unsafe and (info := self.userinfo) is not None:
+            auth = _encode(info, rb"^A-Za-z0-9\-._~!$&'()*+,;=:") + '@' + (auth or '')
+        if auth is not None:
+            url += f'//{auth}'
 
         # Path and query
         path = self.path_query
-
-        if not authority or path == '' or path.startswith('/') or path.startswith('?'):
-            url += path
-        else:
-            url += '/' + path
+        url += path if not auth or not path or re.match(r'[/?]', path) else f'/{path}'
 
         # Fragment
-        fragment = self.fragment
-
-        if fragment is None:
+        if (fragment := self.fragment) is None:
             return url
+        return url + '#' + _encode(fragment, rb"^A-Za-z0-9\-._~!$&'()*+,;=:@/?")
 
-        return url + '#' + u(url_escape(b(fragment), rb'^A-Za-z0-9\-._~!$&\'()*+,;=%:@\/?'))
+
+def _decode(string: str) -> str:
+    return decoded if (decoded := decode('UTF-8', string)) is not None else string
+
+
+def _encode(string: str, pattern: bytes) -> str:
+    return url_escape(string.encode('UTF-8'), pattern).decode('ascii')
 
 
 new = Pyjo_URL.new
