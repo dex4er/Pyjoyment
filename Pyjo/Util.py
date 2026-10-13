@@ -551,7 +551,7 @@ def unquote(string):
 re_url_allow_chars = r(rb'([^A-Za-z0-9\-._~])')
 
 
-def url_escape(bstring, pattern=None):
+def url_escape(bstring: bytes, pattern: bytes | None = None) -> bytes:
     r"""::
 
         escaped = url_escape(string)
@@ -574,19 +574,31 @@ def url_escape(bstring, pattern=None):
 
 
 re_percent_chars = r(rb'%([0-9a-fA-F]{2})')
+re_u_percent_chars = r(r'%([0-9a-fA-F]{2})')
 
 
-def url_unescape(bstring):
+@overload
+def url_unescape(bstring: str) -> str: ...
+
+
+@overload
+def url_unescape(bstring: bytes) -> bytes: ...
+
+
+def url_unescape(bstring: str | bytes) -> str | bytes:
     """::
 
-        str = url_unescape $escaped;
+        string = url_unescape(escaped)
 
     Decode percent encoded characters in string as described in
-    :rfc:`3986`. ::
+    :rfc:`3986`. A percent encoded byte in a string becomes the character
+    with the same code, as in Perl. ::
 
         # 'foo;bar'
         url_unescape('foo%3Bbar')
     """
+    if isinstance(bstring, str):
+        return re_u_percent_chars.sub(lambda m: chr(int(m.group(1), 16)), bstring)
     return re_percent_chars.sub(lambda m: b(chr(int(m.group(1), 16)), 'iso-8859-1'), bstring)
 
 
