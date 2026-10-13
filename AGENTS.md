@@ -377,6 +377,15 @@ copy:
   `Pyjo.EventEmitter.Pyjo_EventEmitter`.
 - A method that subscribes a callback, like `on` of `Pyjo.EventEmitter`,
   takes it last, as Mojo does, and is a decorator without it.
+- An object that undoes something when it goes away, like the one that
+  `capture` of `Mojo::Log` returns, is a context manager: PyPy does not free
+  it when the last reference goes, and `with` says where it ends.
+- An attribute with a default that Mojo builds on first use, like `format`
+  and `handle` of `Mojo::Log`, is a property that builds and keeps it; a
+  default that only reads the environment is set by the constructor.
+- `die` or `croak` with a message raises a `Pyjo.Exception`. An error of the
+  system, `$!`, is the `OSError` itself, with the message of Mojo in front of
+  its `strerror`.
 - A module that is not ported yet but uses a ported one follows its API: the
   lines that use it are taken from the target Mojolicious, and so is the
   expectation of a test of them that the target changed.
