@@ -5,15 +5,17 @@ Pyjo.Test - Writing test scripts
 
     from Pyjo.Test import *
 
+    import os
+
     if not os.getenv('TEST_ONLINE'):
         plan(skip_all='set TEST_ONLINE to enable this test')
 
     ok(got == expected, 'test name')
 
     is_ok(got, expected, 'test name')
-    isnt_ok(got, expected, 'test name')
+    isnt_ok(got, unexpected, 'test name')
     like_ok(got, r'expected', 'test name')
-    unlike_ok(got, r'expected', 'test name')
+    unlike_ok(got, r'unexpected', 'test name')
     cmp_ok(got, '==', expected, 'test name')
     is_deeply_ok(got_complex_structure, expected_complex_structure, 'test name')
     isa_ok(obj, cls)
@@ -421,7 +423,7 @@ def not_in_ok(got: Any, elem: object, test_name: str | None = None) -> bool:
 def note(*messages: object) -> None:
     """::
 
-        note('Tempfile is', tempfile)
+        note(f'Tempfile is {tempfile}')
 
     Print a message to the standard output as a TAP comment, which the test
     harness hides unless asked to show it.
@@ -434,7 +436,7 @@ def note(*messages: object) -> None:
 def ok(check: object, test_name: str | None = None) -> bool:
     """::
 
-        ok(exp(9) == 81, 'simple exponential')
+        ok(3**4 == 81, 'simple exponential')
         ok(isinstance(film, Film), 'set_db()')
         ok(None not in items, 'all items defined')
 
@@ -663,7 +665,7 @@ def throws_ok(
 def unlike_ok(got: Any, expected: _Pattern, test_name: str | None = None) -> bool:
     """::
 
-        unlike_ok(got, r'expected', 'test name')
+        unlike_ok(got, r'unexpected', 'test name')
 
     The opposite of :func:`like_ok`: check if the value does not match the
     regular expression.
