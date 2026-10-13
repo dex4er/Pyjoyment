@@ -1,15 +1,3 @@
-import Pyjo.Test
-
-
-class NoseTest(Pyjo.Test.NoseTest):
-    script = __file__
-    srcdir = '../..'
-
-
-class UnitTest(Pyjo.Test.UnitTest):
-    script = __file__
-
-
 if __name__ == '__main__':
     from Pyjo.Test import *  # noqa
 
