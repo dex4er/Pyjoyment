@@ -34,7 +34,7 @@ t0 = steady_time()
 
 print(url)
 
-for i in range(n):
+for _ in range(n):
 
     def on_connect_cb(loop, err, stream):
         class context:

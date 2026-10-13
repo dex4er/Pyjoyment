@@ -34,7 +34,7 @@ t0 = steady_time()
 
 print(url)
 
-for i in range(n):
+for _ in range(n):
 
     @Pyjo.IOLoop.client(address=url.host, port=(url.port or 80))
     def client(loop, err, stream):
