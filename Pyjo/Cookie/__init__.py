@@ -6,34 +6,38 @@ Pyjo.Cookie - HTTP cookie base class
     import Pyjo.Cookie
 
     class MyCookie(Pyjo.Cookie.object):
-        def parse(self, string):
-            ...
+        @classmethod
+        def parse(cls, string=None): ...
 
-        def to_str(self):
-            ...
+        def to_str(self): ...
 
-:mod:`Pyjo.Cookie` is an abstract base class for HTTP cookie containers based on
-:rfc:`6265`, like
-:mod:`Pyjo.Cookie.Request` and :mod:`Pyjo.Cookie.Response`.
+:mod:`Pyjo.Cookie` is an abstract base class for HTTP cookie containers, based on
+:rfc:`6265`, like :mod:`Pyjo.Cookie.Request` and :mod:`Pyjo.Cookie.Response`.
 
-Classess
+See also
 --------
+
+:mod:`Pyjoyment`, https://mojolicious.org.
+
+Ported from `Mojo::Cookie <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/Cookie.pm>`_
+of Mojolicious 9.49.
+
+Classes
+-------
 """
 
 import Pyjo.Base
 import Pyjo.String.Mixin
 
-from Pyjo.Util import not_implemented
-
 
 class Pyjo_Cookie(Pyjo.Base.object, Pyjo.String.Mixin.object):
     """
-    :mod:`Pyjo.Cookie` inherits all methods from :mod:`Pyjo.Base` and :mod:`Pyjo.String.Mixin`
-    and implements the following new ones.
+    :mod:`Pyjo.Cookie` inherits all methods from :mod:`Pyjo.Base` and
+    :mod:`Pyjo.String.Mixin` and implements the following new ones.
     """
 
-    def __init__(self, **kwargs):
-        self.name = kwargs.get('name')
+    def __init__(self, *, name: str | None = None, value: str | None = None) -> None:
+        self.name = name
         """::
 
             name = cookie.name
@@ -42,7 +46,7 @@ class Pyjo_Cookie(Pyjo.Base.object, Pyjo.String.Mixin.object):
         Cookie name.
         """
 
-        self.value = kwargs.get('value')
+        self.value = value
         """::
 
             value = cookie.value
@@ -51,34 +55,42 @@ class Pyjo_Cookie(Pyjo.Base.object, Pyjo.String.Mixin.object):
         Cookie value.
         """
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
         """::
 
-            boolean = bool(path)
+            boolean = bool(cookie)
 
         Always true.
         """
         return True
 
-    @not_implemented
-    def parse(self, string):
+    def __str__(self) -> str:
+        """::
+
+            string = str(cookie)
+
+        Alias for :meth:`to_str`.
+        """
+        return self.to_str()
+
+    @classmethod
+    def parse[C: Pyjo_Cookie](cls: type[C], string: str | None = None) -> list[C]:
         """::
 
             cookies = cookie.parse(string)
 
         Parse cookies. Meant to be overloaded in a subclass.
         """
-        pass
+        raise NotImplementedError('Method "parse" not implemented by subclass')
 
-    @not_implemented
-    def to_str(self):
+    def to_str(self) -> str:
         """::
 
             string = cookie.to_str()
 
         Render cookie. Meant to be overloaded in a subclass.
         """
-        pass
+        raise NotImplementedError('Method "to_str" not implemented by subclass')
 
 
 new = Pyjo_Cookie.new

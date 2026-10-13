@@ -91,8 +91,7 @@ class Pyjo_UserAgent_CookieJar(Pyjo.Base.object):
                 continue
 
             # Replace cookie
-            origin = notnone(cookie.origin, '')
-            domain = notnone(cookie.domain, origin).lower()
+            domain = notnone(cookie.domain, '').lower()
             if not domain:
                 continue
 
@@ -110,7 +109,7 @@ class Pyjo_UserAgent_CookieJar(Pyjo.Base.object):
             if domain not in self._jar:
                 self._jar[domain] = []
 
-            jar = [c for c in self._jar[domain] if self._compare(c, path, name, origin)]
+            jar = [c for c in self._jar[domain] if self._compare(c, path, name, domain)]
             jar.append(cookie)
             self._jar[domain] = jar
 
@@ -148,8 +147,9 @@ class Pyjo_UserAgent_CookieJar(Pyjo.Base.object):
             for cookie in tx.res.cookies:
                 # Validate domain
                 host = url.ihost
-                # notnone() calls the lambda at once, within this iteration
-                domain = notnone(cookie.domain, lambda: cookie.set(origin=host).origin).lower()  # noqa: B023
+                if not cookie.domain:
+                    cookie.domain, cookie.host_only = host, True
+                domain = cookie.domain.lower()
                 if domain.startswith('.'):
                     domain = domain[1:]
                 if host != domain and (not host.endswith('.' + domain) or re_endswith_numeric_domain.search(host)):
@@ -196,7 +196,7 @@ class Pyjo_UserAgent_CookieJar(Pyjo.Base.object):
                 # Grab cookies
                 new = self._jar[domain] = []
                 for cookie in old:
-                    if not (cookie.domain or host == cookie.origin):
+                    if cookie.host_only and host != cookie.domain:
                         continue
 
                     # Check if cookie has expired
@@ -235,15 +235,8 @@ class Pyjo_UserAgent_CookieJar(Pyjo.Base.object):
         req = tx.req
         req.set_cookie(*self.find(req.url))
 
-    def _compare(self, cookie, path, name, origin):
-        """
-        return 1 if $cookie->path ne $path || $cookie->name ne $name;
-        return ($cookie->origin // '') ne $origin;
-        """
-        if cookie.path != path or cookie.name != name:
-            return True
-        else:
-            return notnone(cookie.origin, '') != origin
+    def _compare(self, cookie, path, name, domain):
+        return cookie.path != path or cookie.name != name or cookie.domain != domain
 
     def _path(self, path1, path2):
         return path1 == '/' or path1 == path2 or path2.find(path1 + '/') == 0

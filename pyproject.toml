@@ -121,4 +121,11 @@ lines-after-imports = 2
 [tool.pyright]
 pythonVersion = "3.12"
 typeCheckingMode = "off"
-strict = ["Pyjo/Date.py", "Pyjo/Prove.py", "Pyjo/Test.py"]
+strict = [
+  "Pyjo/Cookie/__init__.py",
+  "Pyjo/Cookie/Request.py",
+  "Pyjo/Cookie/Response.py",
+  "Pyjo/Date.py",
+  "Pyjo/Prove.py",
+  "Pyjo/Test.py",
+]
