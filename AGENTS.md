@@ -218,6 +218,25 @@ versions. The ruff `UP` rules and `target-version` keep it that way; with a
 newer target, the formatter would use syntax such as `except A, B:` (PEP 758,
 Python 3.14), which also looks like Python 2's `except A, e:`.
 
+## Type Hints
+
+Modules are annotated as they are ported, and pyright checks them in strict
+mode; the code that has not been ported yet is not type-checked. The
+configuration in `pyproject.toml` turns type checking off for everything and
+lists the annotated modules under `strict`. A ported module goes on that list
+in the same change. Trunk passes the changed files to pyright explicitly,
+which makes pyright ignore `include` and `exclude`, so the per-file mode is
+what limits the checks. Examples that need libraries the project does not
+install are excluded from pyright in `.trunk/trunk.yaml`.
+
+Annotations use the Python 3.12 syntax: generics with type parameters
+(`class Collection[T](list[T])`, `def f[T](x: T) -> T`), `type` aliases,
+`Self` for methods that return `self` so that chains keep their type, and
+`@overload` for functions with several call forms, like `Pyjo.Test.subtest`.
+Where Mojo-style magic cannot be typed, `Any` is fine, with a comment that
+says why. `Pyjo/py.typed` (PEP 561) tells type checkers that the package is
+typed.
+
 ## Session and Temporary Files
 
 Files created while working on a task, such as scratch scripts, command
