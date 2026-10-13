@@ -132,6 +132,8 @@ strict = [
   "Pyjo/Parameters.py",
   "Pyjo/Path.py",
   "Pyjo/Prove.py",
+  "Pyjo/String/Bytes.py",
+  "Pyjo/String/Unicode.py",
   "Pyjo/Test.py",
   "Pyjo/URL.py",
 ]
