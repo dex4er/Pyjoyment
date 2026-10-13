@@ -77,7 +77,7 @@ class _Timer(TypedDict):
     cb: TimerCallback | None
     after: float
     recurring: bool
-    handle: asyncio.TimerHandle
+    handle: asyncio.Handle
 
 
 class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
@@ -159,9 +159,11 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
         alive = old is not None and not old.is_closed()
         for id, timer in self._timers.items():
             handle = timer['handle']
-            after = max(0.0, handle.when() - old.time()) if old is not None and alive else timer['after']
+            after = timer['after']
+            if old is not None and alive and isinstance(handle, asyncio.TimerHandle):
+                after = max(0.0, handle.when() - old.time())
             handle.cancel()
-            timer['handle'] = new.call_later(after, Pyjo_Reactor_Asyncio._weak_alarm, weakref.ref(self), id)
+            timer['handle'] = self._schedule(new, after, id)
         for fd, io in self._io.items():
             if old is not None and alive:
                 if io['read']:
@@ -187,7 +189,7 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
         if after is not None:
             timer['after'] = after
         timer['handle'].cancel()
-        timer['handle'] = self.loop.call_later(timer['after'], Pyjo_Reactor_Asyncio._weak_alarm, weakref.ref(self), id)
+        timer['handle'] = self._schedule(self.loop, timer['after'], id)
 
     # Not in Mojolicious: a future of the loop
     def awaitable(self, promise: Any) -> Awaitable[None]:
@@ -440,6 +442,13 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
 
         return self
 
+    # A timer of no time runs before the I/O of the next iteration of the loop, as the timers of Mojo's reactor run in
+    # the same tick, after its I/O; call_later would run it after the I/O of the next iteration
+    def _schedule(self, loop: asyncio.AbstractEventLoop, after: float, id: str) -> asyncio.Handle:
+        if after <= 0:
+            return loop.call_soon(Pyjo_Reactor_Asyncio._weak_alarm, weakref.ref(self), id)
+        return loop.call_later(after, Pyjo_Reactor_Asyncio._weak_alarm, weakref.ref(self), id)
+
     # The loop refers to the reactor weakly, so that the reactor and its loop do not make a cycle
     @staticmethod
     def _weak_alarm(ref: 'weakref.ref[Any]', id: str) -> None:
@@ -458,9 +467,7 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
 
         # Recurring timer
         if timer['recurring']:
-            timer['handle'] = self.loop.call_later(
-                timer['after'], Pyjo_Reactor_Asyncio._weak_alarm, weakref.ref(self), id
-            )
+            timer['handle'] = self._schedule(self.loop, timer['after'], id)
 
         # Normal timer
         else:
@@ -504,7 +511,7 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
 
     def _timer(self, recurring: bool, after: float, cb: TimerCallback) -> str:
         id = self._id()
-        handle = self.loop.call_later(after, Pyjo_Reactor_Asyncio._weak_alarm, weakref.ref(self), id)
+        handle = self._schedule(self.loop, after, id)
         self._timers[id] = {'cb': cb, 'after': after, 'recurring': recurring, 'handle': handle}
         return id
 
