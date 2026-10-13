@@ -37,7 +37,7 @@ class Pyjo_Collection(list):
     :class:`list` and implements the following new ones.
     """
 
-    def __new__(cls, value=[]):
+    def __new__(cls, value=()):
         return super().__new__(cls, value)
 
     def __repr__(self):
@@ -251,7 +251,7 @@ class Pyjo_Collection(list):
             )
 
     @classmethod
-    def new(cls, value=[]):
+    def new(cls, value=()):
         """::
 
             collection = Pyjo.Collection.new([1, 2, 3])
@@ -353,10 +353,10 @@ class Pyjo_Collection(list):
             Pyjo.Collection.new(['a', 'b', 'c']).zip([1, 2, 3])
 
         """
-        return Pyjo.Collection.new(zip(self, list2))
+        return Pyjo.Collection.new(zip(self, list2, strict=False))
 
 
-def c(value=[]):
+def c(value=()):
     """::
 
         collection = c([1, 2, 3])

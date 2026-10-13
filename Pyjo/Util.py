@@ -622,7 +622,7 @@ def xor_encode(data, mask):
 
     XOR encode string with variable length key.
     """
-    return bytearray(a ^ b for a, b in zip(*map(bytearray, [data, mask])))
+    return bytearray(a ^ b for a, b in zip(*map(bytearray, [data, mask]), strict=False))
 
 
 ENTITIES = {

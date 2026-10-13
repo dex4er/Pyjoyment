@@ -16,7 +16,7 @@ else:
 try:
     url = sys.argv[1]
 except IndexError:
-    raise Exception('get.py url opts')
+    raise Exception('get.py url opts') from None
 
 opts = dict(map(lambda a: a.split('='), sys.argv[2:]))
 

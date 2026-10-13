@@ -78,14 +78,27 @@ quote-style = "single"
 [tool.ruff.lint]
 # An explicit list, because newer ruff enables many more rules by default,
 # including N999, which rejects the Mojo-style module names on purpose.
-select = ["E4", "E7", "E9", "F", "I", "UP"]
+select = ["B", "E4", "E7", "E9", "F", "I", "UP"]
 ignore = [
-  # Bare except: ported from Perl's eval {}, which catches everything; narrowing
-  # it to Exception changes behaviour.
+  # B018 "Found useless expression. Either assign it to a variable or remove
+  # it.": reading an attribute for its side effect is intentional, to build a
+  # lazy attribute or to raise ReferenceError for a dead weakref proxy.
+  "B018",
+  # E722 "Do not use bare `except`": ported from Perl's eval {}, which catches
+  # everything; narrowing it to Exception changes behaviour.
   "E722",
-  # Ambiguous variable names such as `l`, as in the Mojo code they were ported
-  # from.
+  # E741 "Ambiguous variable name: `l`": names as in the Mojo code they were
+  # ported from.
   "E741",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Test scripts import all test functions, like `use Test::More` in Perl.
+"t/**" = [
+  # F403 "`from Pyjo.Test import *` used; unable to detect undefined names"
+  "F403",
+  # F405 "`ok` may be undefined, or defined from star imports"
+  "F405",
 ]
 
 [tool.ruff.lint.isort]
@@ -101,10 +114,6 @@ section-order = [
 ]
 lines-between-types = 1
 lines-after-imports = 2
-
-[tool.ruff.lint.per-file-ignores]
-# Tests use `from Pyjo.Test import *`, like `use Test::More` in Perl
-"t/**" = ["F403", "F405"]
 
 [tool.pyright]
 pythonVersion = "3.12"

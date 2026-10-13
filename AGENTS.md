@@ -207,6 +207,14 @@ A commit that only reformats code goes into `.git-blame-ignore-revs`, so that
 `git blame` and GitHub's blame view skip it. The trunk action
 `git-blame-ignore-revs` points `blame.ignoreRevsFile` at the file locally.
 
+The linters are there to keep plain mistakes out, not to enforce PEP 8: the
+project bends Python's conventions on purpose, and a rule that fights its
+style is turned off. Every disabled rule or linter carries a comment with the
+linter's own message for it, not just the code (`B018 "Found useless
+expression..."`, not `B018`), and why it does not fit. A single false
+positive is silenced where it happens (`# noqa: B023`), with a comment on the
+line above.
+
 The ruff configuration lives in `pyproject.toml`. Its rule list is explicit:
 newer ruff versions enable many more rules by default, including one that
 rejects the Mojo-style module names. Formatting uses single quotes and a line

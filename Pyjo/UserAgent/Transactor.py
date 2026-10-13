@@ -195,7 +195,7 @@ class Pyjo_UserAgent_Transactor(Pyjo.Base.object):
         new.previous = old
         return new
 
-    def tx(self, method, url, headers={}, body=None, **kwargs):
+    def tx(self, method, url, headers=None, body=None, **kwargs):
         # Method and URL
         tx = Pyjo.Transaction.HTTP.new()
         req = tx.req
@@ -232,7 +232,7 @@ class Pyjo_UserAgent_Transactor(Pyjo.Base.object):
         # TODO websocket
         pass
 
-    def websocket(self, url, headers={}, **kwargs):
+    def websocket(self, url, headers=None, **kwargs):
         # TODO websocket
         pass
 

@@ -634,9 +634,7 @@ class Pyjo_DOM(Pyjo.Base.object, Pyjo.String.Mixin.object):
 
         Return :mod:`Pyjo.DOM` object for root node.
         """
-        tree = None
-        for tree in self._ancestors(True):
-            break
+        tree = next(iter(self._ancestors(True)), None)
 
         if not tree:
             return self
@@ -1002,10 +1000,7 @@ class Pyjo_DOM(Pyjo.Base.object, Pyjo.String.Mixin.object):
         new = self._parse(new)
         first = new
         while True:
-            node = None
-            for node in self._nodes(first, True):
-                break
-            first = node
+            first = next(iter(self._nodes(first, True)), None)
             if not first:
                 break
             current = first

@@ -170,7 +170,7 @@ class Pyjo_Reactor_Select(Pyjo.Reactor.Base.object):
                 except OSError as e:
                     # Ctrl-c generates EINTR on Python 2.x
                     if e.args[0] != errno.EINTR:
-                        raise Exception(e)
+                        raise Exception(e) from e
 
             # Wait for timeout if poll can't be used
             elif timeout:

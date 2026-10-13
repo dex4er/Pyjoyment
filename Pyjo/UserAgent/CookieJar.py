@@ -148,7 +148,8 @@ class Pyjo_UserAgent_CookieJar(Pyjo.Base.object):
             for cookie in tx.res.cookies:
                 # Validate domain
                 host = url.ihost
-                domain = notnone(cookie.domain, lambda: cookie.set(origin=host).origin).lower()
+                # notnone() calls the lambda at once, within this iteration
+                domain = notnone(cookie.domain, lambda: cookie.set(origin=host).origin).lower()  # noqa: B023
                 if domain.startswith('.'):
                     domain = domain[1:]
                 if host != domain and (not host.endswith('.' + domain) or re_endswith_numeric_domain.search(host)):

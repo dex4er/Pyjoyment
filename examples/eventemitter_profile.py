@@ -20,5 +20,5 @@ def event(ev):
     pass
 
 
-for i in range(n):
+for _ in range(n):
     ev.emit('event')

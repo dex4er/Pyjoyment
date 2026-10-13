@@ -35,7 +35,7 @@ if __name__ == '__main__':
 
     pass_ok(url)
 
-    for i in range(n):
+    for _ in range(n):
 
         @Pyjo.IOLoop.client(address=url.host, port=(url.port or 80))
         def client(loop, err, stream):

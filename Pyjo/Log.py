@@ -51,6 +51,7 @@ import Pyjo.EventEmitter
 from Pyjo.Util import getenv, notnone, u
 
 import codecs
+import errno
 import os
 import sys
 import time
@@ -73,9 +74,9 @@ if os.name == 'posix':
         try:
             fcntl.flock(file.fileno(), fcntl.LOCK_EX)
         except OSError as err:
-            #  IOError: [Errno 11] Resource temporarily unavailable
-            if err[0] == 11:
-                raise LockException(LockException.LOCK_FAILED, err[1])
+            # Resource temporarily unavailable
+            if err.errno == errno.EAGAIN:
+                raise LockException(LockException.LOCK_FAILED, err.strerror) from err
             else:
                 raise
 

@@ -1,6 +1,6 @@
 class JSONTest:
-    def __init__(self, something={}):
-        self.something = something
+    def __init__(self, something=None):
+        self.something = {} if something is None else something
 
     def to_json(self):
         return self.something
