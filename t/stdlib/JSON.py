@@ -47,8 +47,8 @@ with subtest('Same result as json.loads'):
     is_ok(json.loads(encode_json(json.loads(text))), json.loads(text), 'json.loads reads encode_json')
 
 with subtest('Subclasses of standard types'):
-    is_ok(encode_json(Pyjo.Collection.new([1, 2, 3])), b'[1,2,3]', 'Pyjo.Collection is a list')
+    is_ok(encode_json(Pyjo.Collection.new(1, 2, 3)), b'[1,2,3]', 'Pyjo.Collection is a list')
     is_ok(encode_json(Pyjo.String.Unicode.new('test')), b'"test"', 'Pyjo.String.Unicode is a str')
-    is_ok(json.dumps(Pyjo.Collection.new([1, 2, 3])), '[1, 2, 3]', 'json.dumps of Pyjo.Collection')
+    is_ok(json.dumps(Pyjo.Collection.new(1, 2, 3)), '[1, 2, 3]', 'json.dumps of Pyjo.Collection')
 
 done_testing()

@@ -14,7 +14,7 @@ Pyjo.DOM - Minimalistic HTML/XML DOM parser with CSS selectors
     dom.find('[id]').map('attr', 'id').join("\n")
 
     # Iterate
-    dom.find('p[id]').reverse().each(lambda i: print(i.attr('id')))
+    dom.find('p[id]').reverse().each(lambda e, num: print(e.attr('id')))
 
     # Loop
     for i in dom.find('p[id]').each():
@@ -618,7 +618,7 @@ class Pyjo_DOM(Pyjo.Base.object, Pyjo.String.Mixin.object):
 
             # "<p><b>123</b></p>"
             dom.parse('<p>Test</p>') \
-               .at('p').child_nodes.item(0).replace('<b>123</b>').root
+               .at('p').child_nodes[0].replace('<b>123</b>').root
         """
         tree = self.tree
         if tree[0] == 'root':
@@ -824,7 +824,7 @@ class Pyjo_DOM(Pyjo.Base.object, Pyjo.String.Mixin.object):
 
     def _collect(self, results):
         xml = self.xml
-        return Pyjo.Collection.new(map(lambda a: self._build(a, xml), results) if results else [])
+        return Pyjo.Collection.object(map(lambda a: self._build(a, xml), results or []))
 
     def _content(self, start, offset, new):
         tree = self.tree
@@ -907,7 +907,7 @@ class Pyjo_DOM(Pyjo.Base.object, Pyjo.String.Mixin.object):
         if selector is None:
             return collection
         else:
-            return collection.new(filter(lambda i: i.matches(selector), collection))
+            return collection.grep('matches', selector)
 
     def _siblings(self, tags, i=None):
         parent = self.parent
