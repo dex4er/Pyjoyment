@@ -345,6 +345,11 @@ copy:
   `None`. A test of the end of a list, `is $cookies->[1], undef`, becomes
   `is_ok(len(cookies), 1)`, or `is_ok(collection.get(1), None)` for a
   `Pyjo.Collection`.
+- Perl frees a temporary object at the end of the statement, Python as soon
+  as nothing refers to it. Where an object holds a resource, like the
+  temporary directory of `Pyjo.File.tempdir()`, an object made from it, like
+  its `child()`, keeps it, so that `tempdir().child('x').spew(...)` works as in
+  Perl.
 - A method that Mojo calls on the class or on an object, like
   `Mojo::DOM->new_tag` and `$dom->new_tag`, is a descriptor that passes either
   of them.
