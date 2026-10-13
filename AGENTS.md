@@ -36,6 +36,16 @@ of them is a regression.
   `Pyjo.String.Bytes(bytes)`, and `Pyjo.String.Mixin`, which lets URL, Path,
   Headers and others behave like strings. Monkey-patching `str`, `list` or any
   other builtin is not.
+- **The standard library comes first at the boundary.** Inside, a module keeps
+  Mojolicious' semantics; at its boundary, it works with the Python standard
+  library. Constructors take the standard types
+  (`Pyjo.URL.new(urlsplit(...))`, `Pyjo.Date.new(datetime(...))`), objects
+  implement the protocols that the standard library's constructors use, with
+  the meaning it expects (`float(date)` is the epoch), and explicit
+  conversions are methods named after the library or the type
+  (`url.to_urllib()`, `date.to_datetime()`). Where a Mojo method has the name
+  of such a conversion, the conversion keeps it, and the Mojo method gets a
+  name that says what it renders: Mojo's `to_datetime` is `to_rfc3339`.
 - **Asyncio is the event loop.** Mojo's reactor exists because Perl has no
   standard event loop; Python has one. Mojo 9 moved from callbacks and
   `Mojo::IOLoop::Delay` to promises and async/await, and the Python
@@ -100,6 +110,8 @@ because the output is standard TAP; `.proverc` supplies its
   the comments that show a result turned into assertions. Documented code
   that prints TAP itself or ends the script, as in `Pyjo.Test`, runs as a
   script of its own, and the test checks its output and exit status.
+- `t/stdlib/` checks the interaction with the Python standard library,
+  written for Pyjoyment, as Mojolicious has no counterpart.
 - `t/examples/` runs the scripts from `examples/`.
 - `t/lib/` holds helpers shared by the tests. Run on their own, they skip with
   `plan(skip_all=...)`, so `-r t` reports them as skipped instead of failing.
