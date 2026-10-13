@@ -122,6 +122,7 @@ lines-after-imports = 2
 pythonVersion = "3.12"
 typeCheckingMode = "off"
 strict = [
+  "Pyjo/Cache.py",
   "Pyjo/Collection.py",
   "Pyjo/Cookie/__init__.py",
   "Pyjo/Cookie/Request.py",
