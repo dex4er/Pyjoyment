@@ -81,12 +81,11 @@ import Pyjo.IOLoop.Client
 import Pyjo.IOLoop.Delay
 import Pyjo.IOLoop.Server
 import Pyjo.IOLoop.Stream
-import Pyjo.Reactor.Base
+import Pyjo.Reactor
 
 from Pyjo.Util import decorator, decoratormethod, getenv, isalive, md5_sum, notnone, rand, steady_time, warn
 
-import importlib
-import traceback
+import sys
 import weakref
 
 
@@ -143,16 +142,14 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
         on if the value of :attr:`max_connections` is smaller than ``50``.
         """
 
-        module = importlib.import_module(Pyjo.Reactor.Base.detect())
-
-        self.reactor = notnone(kwargs.get('reactor'), module.new())
+        self.reactor = notnone(kwargs.get('reactor'), lambda: sys.modules[Pyjo.Reactor.detect()].new())
         """::
 
             reactor = loop.reactor
             loop.reactor = Pyjo.Reactor.new()
 
-        Low-level event reactor, usually a :mod:`Pyjo.Reactor.Poll` or
-        :mod:`Pyjo.Reactor.Select` object with a default subscriber to the event
+        Low-level event reactor, usually a :mod:`Pyjo.Reactor.Asyncio`
+        object with a default subscriber to the event
         ``error``. ::
 
             # Watch if handle becomes readable or writable
@@ -162,7 +159,7 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
                 else:
                     print('Handle is readable')
 
-            loop.reactor.io(io_cb, handle)
+            loop.reactor.io(handle, io_cb)
 
             # Change to watching only if handle becomes writable
             loop.reactor.watch(handle, read=False, write=True)
@@ -180,8 +177,8 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
         if DEBUG:
             warn(f'-- Reactor initialized ({self.reactor})')
 
-        def catch_cb(reactor, e, event):
-            warn(f'{reactor}: {event}\n{traceback.format_exc()}')
+        def catch_cb(reactor, err):
+            warn(f'{type(reactor).__module__}.{type(reactor).__qualname__}: {err}')
 
         self.reactor.catch(catch_cb)
 
@@ -689,7 +686,7 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
             if isalive(loop):
                 cb(loop)
 
-        return getattr(self.reactor, method)(timer_cb, after)
+        return getattr(self.reactor, method)(after, timer_cb)
 
 
 def new(*args, **kwargs):

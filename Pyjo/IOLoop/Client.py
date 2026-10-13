@@ -105,7 +105,7 @@ class Pyjo_IOLoop_Client(Pyjo.EventEmitter.object):
         """::
 
             reactor = client.reactor
-            client.reactor = Pyjo.Reactor.Poll.new()
+            client.reactor = Pyjo.Reactor.Asyncio.new()
 
         Low-level event reactor, defaults to the :attr:`reactor` attribute value of the
         global :mod:`Pyjo.IOLoop` singleton.
@@ -231,7 +231,7 @@ class Pyjo_IOLoop_Client(Pyjo.EventEmitter.object):
             if isalive(client):
                 client.emit('error', 'Connect timeout')
 
-        self._timer = reactor.timer(timeout_cb, timeout)
+        self._timer = reactor.timer(timeout, timeout_cb)
 
         # Blocking name resolution
         def resolved_cb(reactor):
@@ -292,7 +292,7 @@ class Pyjo_IOLoop_Client(Pyjo.EventEmitter.object):
             if isalive(client):
                 client._ready(**kwargs)
 
-        self.reactor.io(ready_cb, handle).watch(handle, False, True)
+        self.reactor.io(handle, ready_cb).watch(handle, False, True)
 
     def _port(self, **kwargs):
         port = int(kwargs.get('port'))

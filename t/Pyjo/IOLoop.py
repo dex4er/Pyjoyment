@@ -3,8 +3,7 @@ if __name__ == '__main__':
 
     from Pyjo.Util import getenv, setenv, steady_time
 
-    setenv('PYJO_REACTOR', 'Pyjo.Reactor.Select')
-    setenv('PYJO_REACTOR_DIE', '1')
+    setenv('PYJO_REACTOR', 'Pyjo.Reactor.Asyncio')
 
     import Pyjo.IOLoop.Client
     import Pyjo.IOLoop.Delay
@@ -13,13 +12,16 @@ if __name__ == '__main__':
 
     from t.lib.Value import Value
 
+    import contextlib
+    import io
     import platform
+    import re
     import socket
 
     # Reactor detection
     setenv('PYJO_REACTOR', 'MyReactorDoesNotExist')
     loop = Pyjo.IOLoop.new()
-    like_ok(loop.reactor.__class__.__name__, '^Pyjo.Reactor.(Select|Poll)$', 'right class')
+    like_ok(loop.reactor.__class__.__name__, '^Pyjo_Reactor_Asyncio$', 'right class')
     setenv('PYJO_REACTOR', 't.lib.TestReactor')
     loop = Pyjo.IOLoop.new()
     is_ok(loop.reactor.__class__.__name__, 'TestReactor', 'right class')
@@ -288,19 +290,16 @@ if __name__ == '__main__':
     is_ok(loop.max_accepts, 1, 'right value')
 
     # Exception in timer
-    loop = Pyjo.IOLoop.new()
+    with contextlib.redirect_stderr(io.StringIO()) as stderr:
+        loop = Pyjo.IOLoop.new()
 
-    @loop.timer(0)
-    def cb4(loop):
-        raise Exception('Bye!')
+        @loop.timer(0)
+        def cb4(loop):
+            raise Exception('Bye!')
 
-    err = ''
-    try:
         loop.start()
-    except Exception as ex:
-        err = str(ex)
-
-    is_ok(err, 'Bye!', 'right error')
+    name = f'{type(loop.reactor).__module__}.{type(loop.reactor).__qualname__}'
+    like_ok(stderr.getvalue(), rf'^{re.escape(name)}:.*Bye!', 'right error')
 
     # Defaults
     is_ok(Pyjo.IOLoop.Client.new().reactor, Pyjo.IOLoop.singleton.reactor, 'right default')

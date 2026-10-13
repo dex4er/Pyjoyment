@@ -1,8 +1,8 @@
-import Pyjo.Reactor.Select
+import Pyjo.Reactor.Asyncio
 
 
 # Dummy reactor
-class TestReactor(Pyjo.Reactor.Select.object):
+class TestReactor(Pyjo.Reactor.Asyncio.object):
     pass
 
 

@@ -104,7 +104,7 @@ class Pyjo_IOLoop_Server(Pyjo.EventEmitter.object):
         """::
 
             reactor = server.reactor
-            server.reactor = Pyjo.Reactor.Poll.new()
+            server.reactor = Pyjo.Reactor.Asyncio.new()
 
         Low-level event reactor, defaults to the :attr:`reactor` attribute value of the
         global :mod:`Pyjo.IOLoop` singleton.
@@ -334,7 +334,7 @@ class Pyjo_IOLoop_Server(Pyjo.EventEmitter.object):
         def ready_cb(reactor, write):
             server._accept()
 
-        self.reactor.io(ready_cb, self.handle)
+        self.reactor.io(self.handle, ready_cb)
 
     def stop(self):
         """::
@@ -379,7 +379,7 @@ class Pyjo_IOLoop_Server(Pyjo.EventEmitter.object):
         def tls_cb(reactor, write):
             server._tls(handle)
 
-        self.reactor.io(tls_cb, handle)
+        self.reactor.io(handle, tls_cb)
 
     def _tls(self, handle):
         handle = self._handles[handle]
