@@ -29,7 +29,12 @@ of them is a regression.
   standard library equivalent.
 - **Every return value chains.** Functions return the framework's own types so
   the next method is available: `slurp` returns a string, `Collection.join`
-  returns `Pyjo.String.Unicode`, DOM queries return `Pyjo.Collection`.
+  returns `Pyjo.String.Unicode`, DOM queries return `Pyjo.Collection`. A
+  function of the standard library that would wrap the chain from the front
+  has a method form that continues it, such as `Collection.zip`, the
+  conversions like `to_set()` and `Collection.get`, the expression form of an
+  index with a default. A method that only repeats what a postfix operator
+  does, like `item(0)` for `[0]`, is not needed.
 - **Builtin types are never patched.** New types that subclass or mirror a
   standard one and add framework behaviour are welcome, even when they look
   redundant: `Pyjo.Collection(list)`, `Pyjo.String.Unicode(str)`,
@@ -261,8 +266,9 @@ copy:
   `__bool__`, and `@{}` is `__getitem__`, `__iter__` and `__len__`.
   `to_string` is `to_str`, the counterpart of `to_bytes` in
   `Pyjo.String.Mixin`, and `to_unsafe_string` is `to_unsafe_str`.
-  `to_hash` is `to_dict`, and a flat list of names and values, like the
-  pairs of `Mojo::Parameters`, is a list of `(name, value)` tuples.
+  `to_hash` is `to_dict`, `to_array` is `to_list`, and a flat list of names
+  and values, like the pairs of `Mojo::Parameters`, is a list of
+  `(name, value)` tuples.
 - Mojo's attributes and getter/setter methods are attributes and properties
   (`url.host`, `url.path`). A method without arguments that describes the
   object, like `is_abs` or `protocol`, is a property too: as a method,
@@ -289,6 +295,12 @@ copy:
 - `Mojo::ByteStream` is `Pyjo.String.Unicode` for characters and
   `Pyjo.String.Bytes` for bytes. A Mojo test's `b(...)` is `u(...)` or
   `b(...)`, by what the string holds.
+- A callback that Mojo calls with `$_` gets the element as its first
+  argument. A method name in a string, as in `$collection->map('text')`, can
+  name a property, which is how a Mojo attribute is ported.
+- A method of `Mojo::Collection` that has the name of a `list` method, like
+  `sort` and `reverse`, returns a new collection, as in Mojo, and
+  `list.sort(collection)` sorts in place.
 - Perl's `split` is `Pyjo.String.Unicode.split`, not `str.split` or
   `re.split`: its pattern is a regular expression, a match of no length at
   the beginning makes no field, and the empty fields at the end are left out.

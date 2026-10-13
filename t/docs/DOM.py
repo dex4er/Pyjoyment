@@ -275,7 +275,7 @@ if __name__ == '__main__':
     )
 
     is_ok(
-        dom.parse('<p>Test</p>').at('p').child_nodes.item(0).replace('<b>123</b>').root,
+        dom.parse('<p>Test</p>').at('p').child_nodes[0].replace('<b>123</b>').root,
         '<p><b>123</b></p>',
         'replace result',
     )

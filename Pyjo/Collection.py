@@ -6,373 +6,534 @@ Pyjo.Collection - Collection
     import Pyjo.Collection
 
     # Manipulate collection
-    collection = Pyjo.Collection.new(['just', 'works'])
+    collection = Pyjo.Collection.new('just', 'works')
     collection.insert(0, 'it')
     print(collection.join("\n"))
 
     # Chain methods
-    collection.map(lambda word: word.capitalize()).shuffle() \
-        .each(lambda word, num: print('{0}: {1}'.format(word, num)))
+    collection.map(lambda e: e.capitalize()).shuffle().each(lambda word, num: print(f'{num}: {word}'))
 
     # Use the alternative constructor
     from Pyjo.Collection import c
-    c(['a', 'b', 'c']).join('/').encode().url_escape().decode().say()
+    c('a', 'b', 'c').join('/').url_escape().say()
 
-:mod:`Pyjo.Collection` is a container for list-based collections which
-inherits all methods from :class:`list` and provides own methods.
+:mod:`Pyjo.Collection` is a :class:`list` for collections. The class itself
+takes an iterable, as :class:`list` does. ::
 
-Classes
--------
+    # Access list directly to manipulate collection
+    collection = Pyjo.Collection.new(*range(1, 26))
+    collection[23] += 100
+    for e in collection:
+        print(e)
+
+    # Make a collection of an iterable
+    collection = Pyjo.Collection.object(range(1, 26))
+
+See also
+--------
+
+:mod:`Pyjoyment`, https://mojolicious.org.
+
+Ported from `Mojo::Collection <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/Collection.pm>`_
+of Mojolicious 9.49.
+
+Functions
+---------
 """
 
 import Pyjo.String.Unicode
 
+import builtins
+import functools
+import random
+import re
 
-DEFAULT_CHARSET = 'utf-8'
+from collections.abc import Callable, Iterable, Iterator
+from typing import Any, Self, cast, overload
 
 
-class Pyjo_Collection(list):
+type Anything = builtins.object
+
+
+class Pyjo_Collection[T](list[T]):
     """
-    :mod:`Pyjo.Collection` inherits all methods from
-    :class:`list` and implements the following new ones.
+    :mod:`Pyjo.Collection` inherits all methods from :class:`list` and
+    implements the following new ones.
     """
 
-    def __new__(cls, value=()):
-        return super().__new__(cls, value)
+    def __repr__(self) -> str:
+        return f'{self.__module__}.new({", ".join(map(repr, self))})'
 
-    def __repr__(self):
-        return f'{self.__module__}.new({super().__repr__()})'
+    def __json__(self) -> list[T]:
+        """::
 
-    def compact(self):
+            array = collection.__json__()
+
+        Alias for :meth:`to_list`.
+        """
+        return self.to_list()
+
+    def compact(self) -> Self:
         """::
 
             new = collection.compact()
 
-        Create a new collection with all elements that are defined and not an empty
-        string or list. ::
+        Create a new collection with all elements that are not ``None`` and not
+        an empty string. ::
 
             # "0, 1, 2, 3"
-            Pyjo.Collection.new([0, 1, None, 2, '', 3]).compact().join(', ')
+            c(0, 1, None, 2, '', 3).compact().join(', ')
         """
-        return self.new(filter(lambda i: i is not None and not (hasattr(i, '__len__') and not len(i)), self))
+        return type(self)(e for e in self if e is not None and (not isinstance(e, (str, bytes)) or len(e)))
 
-    def get(self, index, default=None):
+    @overload
+    def each(self) -> list[T]: ...
+
+    @overload
+    def each(self, cb: Callable[[T, int], Any]) -> Self: ...
+
+    def each(self, cb: Callable[[T, int], Any] | None = None) -> list[T] | Self:
         """::
 
-            value = collection.get(index)
-            value = collection.get(index, default)
-
-        Return the value for index if index is in the collection, else default.
-        If default is not given, it defaults to None, so that this method never
-        raises a KeyError. ::
-
-            import sys
-            from Pyjo.Util import die
-            address = c(sys.argv).get(1) or die('address missing')
-            port = int(c(sys.argv).get(2, '80'))
-        """
-        if len(self) > index:
-            return self[index]
-        else:
-            return default
-
-    def each(self, cb=None):
-        """::
-
-            iterator = collection.each()
+            elements = collection.each()
             collection = collection.each(lambda e, num: ...)
 
-        Evaluate callback for each element in collection or return all elements as an
-        iterator if none has been provided. The element will be the first argument passed
-        to the callback. ::
+        Evaluate callback for each element in collection, or return all
+        elements as a list if none has been provided. The element will be the
+        first argument passed to the callback, and its number the second. ::
 
             # Make a numbered list
-            @collection.each
-            def cb(e, num):
-                print("{0}: {1}".format(e, num))
+            collection.each(lambda e, num: print(f'{num}: {e}'))
         """
         if cb is None:
-            return self.to_iter()
-        else:
-            num = 1
-            for i in self:
-                cb(i, num)
-                num += 1
-            return self
+            return self.to_list()
+        for i, e in enumerate(self, 1):
+            cb(e, i)
+        return self
 
-    def first(self, matched=None):
+    def first(
+        self, cb: Callable[..., Any] | str | re.Pattern[str] | None = None, *args: Any, **kwargs: Any
+    ) -> T | None:
         """::
 
             first = collection.first()
-            first = collection.first('string')
-            first = collection.first(m(r'pattern', 'flags'))
-            first = collection.first(lambda i: ...)
+            first = collection.first(re.compile(r'foo'))
+            first = collection.first(lambda e: ...)
+            first = collection.first('some_method')
+            first = collection.first('some_method', *args)
 
-        Evaluate string or regular expression or callback for each element in collection and
-        return the first one that matched the string or regular expression, or for which the
-        callback returned true. The element will be the first argument passed to the
-        callback. ::
+        Evaluate regular expression/callback for, or call method on, each
+        element in collection and return the first one that matched the
+        regular expression, or for which the callback/method returned true.
+        The element will be the first argument passed to the callback. ::
 
-            # Find first value that contains the word "mojo"
-            interesting = collection.first(m('pyjo', 'i'))
+            # Longer version
+            first = collection.first(lambda e: e.some_method(*args))
+
+            # Find first value that contains the word "pyjo"
+            interesting = collection.first(re.compile(r'pyjo', re.I))
 
             # Find first value that is greater than 5
-            greater = collection.first(lambda i: i > 5)
-
-        Return the first element in collection or :class:`None` if collection is empty.
+            greater = collection.first(lambda e: e > 5)
         """
-        if matched is None:
-            if len(self) > 0:
-                return self[0]
-        elif callable(matched):
-            for i in self:
-                if matched(i):
-                    return i
-        else:
-            for i in self:
-                if i == matched:
-                    return i
-        return
+        if cb is None:
+            return self[0] if len(self) else None
+        if isinstance(cb, re.Pattern):
+            return next((e for e in self if cb.search(_str(e))), None)
+        return next((e for e in self if _call(e, cb, args, kwargs)), None)
 
-    def flatten(self):
+    def flatten(self) -> 'Pyjo_Collection[Any]':
         """::
 
             new = collection.flatten()
 
-        Flatten nested collections/lists/tuples recursively and create a new collection with
-        all elements. ::
+        Flatten nested collections/lists/tuples recursively and create a new
+        collection with all elements. ::
 
             # "1, 2, 3, 4, 5, 6, 7"
-            Pyjo.Collection.new([1, [2, [3, 4], 5, [6]], 7]).flatten().join(', ').say()
+            c(1, [2, [3, 4], 5, [6]], 7).flatten().join(', ')
         """
-        return self.new(_flatten(self))
+        return cast(Pyjo_Collection[Any], type(self)(_flatten(self)))
 
-    def grep(self, matched):
+    # Not in Mojolicious: the expression form of an index with a default, as
+    # dict.get() is
+    @overload
+    def get(self, index: int) -> T | None: ...
+
+    @overload
+    def get[D](self, index: int, default: D) -> T | D: ...
+
+    def get(self, index: int, default: Any = None) -> Any:
         """::
 
-            new = collection.grep('string')
-            new = collection.grep(m(r'pattern', 'flags'))
-            new = collection.grep(lambda i: ...)
+            element = collection.get(index)
+            element = collection.get(index, default)
 
-        Evaluate string or regular expression or callback for each element in collection and
-        create a new collection with all elements that matched the regular expression,
-        or for which the callback returned true. The element will be the first
-        argument passed to the callback.
+        Return the element at the index, or the default, which is ``None``
+        unless given, if there is no such element. A negative index counts
+        from the end. ::
 
-            # Find all values that contain the word "mojo"
-            interesting = collection.grep(m('mojo', 'i'))
+            import sys
+            from Pyjo.Util import die
+            address = c(*sys.argv).get(1) or die('address missing')
+            port = int(c(*sys.argv).get(2, '80'))
+        """
+        return self[index] if -len(self) <= index < len(self) else default
+
+    def grep(self, cb: Callable[..., Any] | str | re.Pattern[str], *args: Any, **kwargs: Any) -> Self:
+        """::
+
+            new = collection.grep(re.compile(r'foo'))
+            new = collection.grep(lambda e: ...)
+            new = collection.grep('some_method')
+            new = collection.grep('some_method', *args)
+
+        Evaluate regular expression/callback for, or call method on, each
+        element in collection and create a new collection with all elements
+        that matched the regular expression, or for which the callback/method
+        returned true. The element will be the first argument passed to the
+        callback. ::
+
+            # Longer version
+            new = collection.grep(lambda e: e.some_method(*args))
+
+            # Find all values that contain the word "pyjo"
+            interesting = collection.grep(re.compile(r'pyjo', re.I))
 
             # Find all values that are greater than 5
-            greater = collection.grep(lambda i: i > 5)
+            greater = collection.grep(lambda e: e > 5)
         """
-        if callable(matched):
-            return self.new(filter(lambda i: matched(i), self))
-        else:
-            return self.new(filter(lambda i: i == matched, self))
+        if isinstance(cb, re.Pattern):
+            return type(self)(e for e in self if cb.search(_str(e)))
+        return type(self)(e for e in self if _call(e, cb, args, kwargs))
 
-    def item(self, offset):
+    def head(self, size: int) -> Self:
         """::
 
-            item = collection.item(0)
+            new = collection.head(4)
+            new = collection.head(-2)
 
-        Return element from collection. ::
+        Create a new collection with up to the specified number of elements
+        from the beginning of the collection. A negative number will count
+        from the end. ::
 
-            # the same as
-            item = collection[0]
+            # "A B C"
+            c('A', 'B', 'C', 'D', 'E').head(3).join(' ')
+
+            # "A B"
+            c('A', 'B', 'C', 'D', 'E').head(-3).join(' ')
         """
-        return self[offset]
+        return type(self)(self[:size])
 
-    def join(self, string=''):
+    def join(self, string: str | None = None) -> 'Pyjo.String.Unicode.object':
         r"""::
 
-            stream = collection.join()
-            stream = collection.join("\n")
+            string = collection.join()
+            string = collection.join("\n")
 
-        Turn collection into :mod:`Pyjo.String.Bytes`. ::
+        Turn collection into :mod:`Pyjo.String.Unicode`. ::
 
             # Join all values with commas
             collection.join(', ').say()
         """
-        return Pyjo.String.Unicode.new(string.join(map(lambda s: Pyjo.Util.u(s), self)))
+        return Pyjo.String.Unicode.new((string or '').join(map(_str, self)))
 
-    def last(self):
+    def last(self) -> T | None:
         """::
 
             last = collection.last()
 
-        Return the last element in collection or :class:`None` if collection is empty.
+        Return the last element in collection.
         """
-        if len(self) > 0:
-            return self[-1]
-        else:
-            return
+        return self[-1] if len(self) else None
 
-    def map(self, *args, **kwargs):
+    def map(self, cb: Callable[..., Any] | str, *args: Any, **kwargs: Any) -> 'Pyjo_Collection[Any]':
         """::
 
-            new = collection.map(lambda a: ...)
-            new = collection.map(attribute)
-            new = collection.map(attribute, value)
-            new = collection.map(method)
-            new = collection.map(method, *args, **kwargs)
+            new = collection.map(lambda e: ...)
+            new = collection.map('some_method')
+            new = collection.map('some_method', *args)
 
-        Evaluate callback for, or get/set attribute from,
-        or call method on, each element in collection and
-        create a new collection from the results. The element will be the first
-        argument passed to the callback. ::
+        Evaluate callback for, or call method on, each element in collection
+        and create a new collection from the results. The element will be the
+        first argument passed to the callback. ::
 
-            # Longer version for attribute
-            new = collection.map(lambda a: getattr(a, attribute))
-            new = collection.map(lambda a: setattr(a, attribute, value))
-
-            # Longer version for method
-            new = collection.map(lambda a: getattr(a, method)(*args))
+            # Longer version
+            new = collection.map(lambda e: e.some_method(*args))
 
             # Append the word "pyjo" to all values
-            pyjoified = collection.map(lambda a: a + 'pyjo')
+            pyjoified = collection.map(lambda e: e + 'pyjo')
         """
-        assert args
-        attribute = args[0]
-        args = args[1:]
-        if callable(attribute):
-            return self.new(map(attribute, self))
-        else:
-            return self.new(
-                map(
-                    lambda a: (
-                        getattr(a, attribute)(*args, **kwargs)
-                        if callable(getattr(a, attribute))
-                        else getattr(a, attribute, setattr(a, attribute, args[0]))
-                        if args
-                        else getattr(a, attribute)
-                    ),
-                    self,
-                )
-            )
+        return cast(Pyjo_Collection[Any], type(self)(_call(e, cb, args, kwargs) for e in self))
 
     @classmethod
-    def new(cls, value=()):
+    def new(cls, *elements: T) -> Self:
         """::
 
-            collection = Pyjo.Collection.new([1, 2, 3])
+            collection = Pyjo.Collection.new(1, 2, 3)
 
         Construct a new :mod:`Pyjo.Collection` object.
         """
-        return Pyjo_Collection(value)
+        return cls(elements)
 
-    def reverse(self):
+    def reduce(self, cb: Callable[[Any, T], Any], *initial: Any) -> Any:
+        """::
+
+            result = collection.reduce(lambda a, b: ...)
+            result = collection.reduce(lambda a, b: ..., initial)
+
+        Reduce elements in collection with a callback and return its final
+        result, passing ``a`` and ``b`` each time the callback is executed. The
+        first time ``a`` will be an optional initial value or the first element
+        in the collection. And from then on ``a`` will be the return value of
+        the callback, while ``b`` will always be the next element in the
+        collection. ::
+
+            # Calculate the sum of all values
+            total = collection.reduce(lambda a, b: a + b)
+
+            # Count how often each value occurs in collection
+            counts = collection.reduce(lambda a, b: a | {b: a.get(b, 0) + 1}, {})
+        """
+        elements = [*initial, *self]
+        return functools.reduce(cb, elements) if len(elements) else None
+
+    # Mojo's reverse creates a new collection, list.reverse() reverses in place
+    def reverse(self) -> Self:  # pyright: ignore[reportIncompatibleMethodOverride]
         """::
 
             new = collection.reverse()
 
         Create a new collection with all elements in reverse order.
         """
-        new = self.new(self)
-        super(Pyjo_Collection, new).reverse()
-        return new
+        return type(self)(reversed(self))
 
-    @property
-    def size(self):
+    def shuffle(self) -> Self:
         """::
 
-            size = collection.size()
+            new = collection.shuffle()
+
+        Create a new collection with all elements in random order.
+        """
+        return type(self)(random.sample(self, len(self)))
+
+    @property
+    def size(self) -> int:
+        """::
+
+            size = collection.size
 
         Number of elements in collection.
         """
         return len(self)
 
-    def to_dict(self):
+    # Mojo's sort creates a new collection, list.sort() sorts in place
+    def sort(  # pyright: ignore[reportIncompatibleMethodOverride]
+        self, *, key: Callable[[T], Any] | None = None, reverse: bool = False
+    ) -> Self:
         """::
 
-            d = params.to_dict()
+            new = collection.sort()
+            new = collection.sort(key=lambda e: ...)
+            new = collection.sort(reverse=True)
 
-        Turn collection of pairs of key and value into a :class:`dict`. ::
+        Sort elements based on return value of a key function and create a new
+        collection from the results, as :func:`sorted` does. ::
 
-            # {'b': 2, 'a': 1, 'c': 3}
-            Pyjo.Collection.new([('a', 1), ('b', 2), ('c', 3)]).to_dict()
+            # Sort values case-insensitive
+            case_insensitive = collection.sort(key=str.upper)
         """
-        return list(self)
+        # Unlike Mojolicious: Mojo takes a function that compares $a and $b, which
+        # Python 3 has no use for; the key and reverse arguments are sorted()'s
+        return type(self)(sorted(cast(list[Any], self), key=key, reverse=reverse))
 
-    def to_iter(self):
+    def tail(self, size: int) -> Self:
         """::
 
-            i = params.to_iter()
+            new = collection.tail(4)
+            new = collection.tail(-2)
 
-        Turn collection into a :class:`iter` iterator. ::
+        Create a new collection with up to the specified number of elements
+        from the end of the collection. A negative number will count from the
+        beginning. ::
 
-            for i in Pyjo.Collection.new([1, 2, 3]).to_iter():
-                print(i)
+            # "C D E"
+            c('A', 'B', 'C', 'D', 'E').tail(3).join(' ')
+
+            # "D E"
+            c('A', 'B', 'C', 'D', 'E').tail(-3).join(' ')
+        """
+        return type(self)(self[max(len(self) - size, 0) :] if size >= 0 else self[-size:])
+
+    def tap(self, cb: Callable[..., Any] | str, *args: Any, **kwargs: Any) -> Self:
+        """::
+
+            collection = collection.tap(lambda c: ...)
+
+        Alias for :meth:`Pyjo.Base.tap`.
+        """
+        if callable(cb):
+            cb(self, *args, **kwargs)
+        else:
+            getattr(self, cb)(*args, **kwargs)
+        return self
+
+    # Not in Mojolicious: a conversion to a type of the standard library
+    def to_dict[K, V](self: 'Pyjo_Collection[tuple[K, V]]') -> dict[K, V]:
+        """::
+
+            d = collection.to_dict()
+
+        Turn collection of pairs of key and value into :class:`dict`. ::
+
+            # {'a': 1, 'b': 2, 'c': 3}
+            c(('a', 1), ('b', 2), ('c', 3)).to_dict()
+        """
+        return dict(self)
+
+    # Not in Mojolicious: a conversion to a type of the standard library
+    def to_iter(self) -> Iterator[T]:
+        """::
+
+            i = collection.to_iter()
+
+        Turn collection into an iterator. ::
+
+            for e in c(1, 2, 3).to_iter():
+                print(e)
         """
         return iter(self)
 
-    def to_list(self):
+    def to_list(self) -> list[T]:
         """::
 
-            l = params.to_list()
+            array = collection.to_list()
 
-        Turn collection into a :class:`list`. ::
-
-            # [1, 2, 3]
-            Pyjo.Collection.new([1, 2, 3]).to_list()
+        Turn collection into :class:`list`.
         """
         return list(self)
 
-    def to_set(self):
+    # Not in Mojolicious: a conversion to a type of the standard library
+    def to_set(self) -> set[T]:
         """::
 
-            s = params.to_set()
+            s = collection.to_set()
 
-        Turn collection into a :class:`set`. ::
+        Turn collection into :class:`set`. ::
 
             # {1, 2, 3}
-            Pyjo.Collection.new([1, 2, 3]).to_set()
+            c(1, 2, 3, 2).to_set()
         """
         return set(self)
 
-    def to_tuple(self):
+    # Not in Mojolicious: a conversion to a type of the standard library
+    def to_tuple(self) -> tuple[T, ...]:
         """::
 
-            t = params.to_tuple()
+            t = collection.to_tuple()
 
-        Turn collection into a :class:`tuple`. ::
+        Turn collection into :class:`tuple`. ::
 
             # (1, 2, 3)
-            Pyjo.Collection.new([1, 2, 3]).to_tuple()
+            c(1, 2, 3).to_tuple()
         """
         return tuple(self)
 
-    def zip(self, list2):
+    def uniq(self, cb: Callable[..., Any] | str | None = None, *args: Any, **kwargs: Any) -> Self:
         """::
 
-            new = collection.zip([1, 2, 3])
+            new = collection.uniq()
+            new = collection.uniq(lambda e: ...)
+            new = collection.uniq('some_method')
+            new = collection.uniq('some_method', *args)
 
-        Agregates elements from collection and iterable and returns new
-        collection of pairs. ::
+        Create a new collection without duplicate elements, using the string
+        representation of either the elements or the return value of the
+        callback/method to decide uniqueness. Note that ``None`` and empty
+        string are treated the same. ::
+
+            # Longer version
+            new = collection.uniq(lambda e: e.some_method(*args))
+
+            # "foo bar baz"
+            c('foo', 'bar', 'bar', 'baz').uniq().join(' ')
+
+            # [[1, 2], [2, 1]]
+            c([1, 2], [2, 1], [3, 2]).uniq(lambda e: e[1]).to_list()
+        """
+        seen: set[str] = set()
+        new = type(self)()
+        for e in self:
+            value = e if cb is None else _call(e, cb, args, kwargs)
+            if (key := '' if value is None else _str(value)) not in seen:
+                seen.add(key)
+                new.append(e)
+        return new
+
+    # Left out from Mojolicious: with_roles, as Pyjoyment has no roles
+
+    # Not in Mojolicious: the method form of zip(), for a chain
+    @overload
+    def zip[U](self, iterable: Iterable[U], /, *, strict: bool = False) -> 'Pyjo_Collection[tuple[T, U]]': ...
+
+    @overload
+    def zip(self, *iterables: Iterable[Any], strict: bool = False) -> 'Pyjo_Collection[tuple[Any, ...]]': ...
+
+    def zip(self, *iterables: Iterable[Any], strict: bool = False) -> 'Pyjo_Collection[tuple[Any, ...]]':
+        """::
+
+            new = collection.zip(iterable)
+            new = collection.zip(iterable, strict=True)
+
+        Create a new collection of tuples of the elements of the collection and
+        of the iterables, as :func:`zip` does. ::
 
             # [('a', 1), ('b', 2), ('c', 3)]
-            Pyjo.Collection.new(['a', 'b', 'c']).zip([1, 2, 3])
+            c('a', 'b', 'c').zip([1, 2, 3]).to_list()
 
+            # {'a': 1, 'b': 2, 'c': 3}
+            c('a', 'b', 'c').zip([1, 2, 3]).to_dict()
         """
-        return Pyjo.Collection.new(zip(self, list2, strict=False))
+        return cast(
+            Pyjo_Collection[tuple[Any, ...]], type(self)(cast(Iterable[Any], zip(self, *iterables, strict=strict)))
+        )
 
 
-def c(value=()):
+def c[T](*elements: T) -> Pyjo_Collection[T]:
     """::
 
-        collection = c([1, 2, 3])
+        collection = c(1, 2, 3)
 
     Construct a new :mod:`Pyjo.Collection` object.
     """
-    return Pyjo_Collection(value)
+    return Pyjo_Collection(elements)
 
 
-def _flatten(array):
-    for item in array:
-        if isinstance(item, (list, tuple)):
-            yield from _flatten(item)
+# A method of the element, or Mojo's attribute, which is a property
+def _call(element: Any, cb: Callable[..., Any] | str, args: tuple[Any, ...], kwargs: dict[str, Any]) -> Any:
+    if callable(cb):
+        return cb(element, *args, **kwargs)
+    value = getattr(element, cb)
+    if callable(value):
+        return value(*args, **kwargs)
+    if len(args):
+        setattr(element, cb, args[0])
+        return element
+    return value
+
+
+def _flatten(elements: Iterable[Any]) -> Iterable[Any]:
+    for e in elements:
+        if isinstance(e, (list, tuple)):
+            yield from _flatten(cast(Iterable[Any], e))
         else:
-            yield item
+            yield e
 
 
-new = Pyjo_Collection.new
+def _str(element: Anything) -> str:
+    return Pyjo.String.Unicode.new(element).to_str()
+
+
+# Any: the type of the elements is not known before they are given
+new = Pyjo_Collection[Any].new
 object = Pyjo_Collection

@@ -337,7 +337,7 @@ class Pyjo_String_Bytes(bytes):
     # Perl's split, which Mojo uses, is not bytes.split()
     def split(  # pyright: ignore[reportIncompatibleMethodOverride]
         self, pattern: str | bytes | re.Pattern[str] | re.Pattern[bytes], limit: int = 0
-    ) -> 'Pyjo.Collection.object':
+    ) -> 'Pyjo.Collection.object[Self | None]':
         """::
 
             collection = data.split(b',')
@@ -400,7 +400,6 @@ class Pyjo_String_Bytes(bytes):
         """
         return bytes(self)
 
-    # Renamed from Mojolicious: to_string
     def to_str(self) -> str:
         """::
 

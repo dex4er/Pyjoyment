@@ -325,7 +325,7 @@ class Pyjo_String_Unicode(str):
     # Perl's split, which Mojo uses, is not str.split()
     def split(  # pyright: ignore[reportIncompatibleMethodOverride]
         self, pattern: str | re.Pattern[str], limit: int = 0
-    ) -> 'Pyjo.Collection.object':
+    ) -> 'Pyjo.Collection.object[Self | None]':
         """::
 
             collection = string.split(',')
@@ -382,7 +382,6 @@ class Pyjo_String_Unicode(str):
         """
         return self.to_str().encode('UTF-8')
 
-    # Renamed from Mojolicious: to_string
     def to_str(self) -> str:
         """::
 
