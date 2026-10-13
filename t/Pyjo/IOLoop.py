@@ -2,6 +2,7 @@ import Pyjo.IOLoop
 import Pyjo.IOLoop.Client
 import Pyjo.IOLoop.Server
 import Pyjo.IOLoop.Stream
+import Pyjo.Promise
 
 from Pyjo.Test import *
 
@@ -195,7 +196,64 @@ with subtest('Reset events'):
     ok(not Pyjo.IOLoop.singleton.has_subscribers('finish'), 'no subscribers')
 
 with subtest('Stream'):
-    skip('Pyjo.Promise is not ported yet', 7)
+    buffer = b''
+
+    def server_cb(loop, stream, id):
+        global buffer
+        buffer += b'accepted'
+
+        def read(stream, chunk):
+            global buffer
+            buffer += chunk
+            if buffer != b'acceptedhello':
+                return
+            stream.write(b'wo').write(b'').write(b'rld', lambda stream: stream.close())
+
+        stream.on('read', read)
+
+    id = Pyjo.IOLoop.server(server_cb, address='127.0.0.1')
+    port = Pyjo.IOLoop.acceptor(id).port
+    promise = Pyjo.Promise.new()
+    handle = None
+
+    def client_cb(loop, err, stream):
+        global handle
+
+        def close(stream):
+            global buffer
+            buffer += b'should not happen'
+
+        def error(stream, err):
+            global buffer
+            buffer += b'should not happen either'
+
+        handle = stream.steal_handle()
+        promise.resolve()
+        stream.on('close', close)
+        stream.on('error', error)
+
+    Pyjo.IOLoop.client(client_cb, port=port)
+    promise.wait()
+    stream = Pyjo.IOLoop.Stream.new(handle)
+    is_ok(stream.timeout, 15, 'right default')
+    stream.timeout = 16
+    is_ok(stream.timeout, 16, 'right timeout')
+    id = Pyjo.IOLoop.stream(stream)
+
+    def read(stream, chunk):
+        global buffer
+        buffer += chunk
+
+    stream.on('close', lambda stream: Pyjo.IOLoop.stop())
+    stream.on('read', read)
+    stream.write(b'hello')
+    ok(Pyjo.IOLoop.stream(id), 'stream exists')
+    is_ok(stream.timeout, 16, 'right timeout')
+    Pyjo.IOLoop.start()
+    Pyjo.IOLoop.timer(0.25, lambda loop: Pyjo.IOLoop.stop())
+    Pyjo.IOLoop.start()
+    ok(not Pyjo.IOLoop.stream(id), 'stream does not exist anymore')
+    is_ok(buffer, b'acceptedhelloworld', 'right result')
 
 with subtest('Removed listen socket'):
     loop = Pyjo.IOLoop.new()
@@ -218,7 +276,28 @@ with subtest('Removed listen socket'):
     ok(not loop.acceptor(id), 'acceptor has been removed')
 
 with subtest('Removed connection (with promise)'):
-    skip('Pyjo.Promise is not ported yet', 1)
+    removed = 0
+    promise = Pyjo.Promise.new()
+
+    def removed_cb(*values):
+        global removed
+        removed += 1
+
+    def server_cb(loop, stream, id):
+        stream.on('close', lambda stream: promise.resolve())
+
+    promise.then(removed_cb)
+    id = Pyjo.IOLoop.server(server_cb, address='127.0.0.1')
+    port = Pyjo.IOLoop.acceptor(id).port
+    promise2 = Pyjo.Promise.new()
+
+    def client_cb(loop, err, stream):
+        stream.on('close', lambda stream: promise2.resolve())
+        loop.remove(id)
+
+    id = Pyjo.IOLoop.client(client_cb, port=port)
+    Pyjo.Promise.all(promise, promise2).wait()
+    is_ok(removed, 1, 'connection has been removed')
 
 with subtest('Stream throttling'):
     skip('bytes_waiting of Mojo::IOLoop::Stream 9.49 is not ported yet', 5)

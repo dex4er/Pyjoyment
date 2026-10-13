@@ -420,6 +420,14 @@ copy:
 - `die` or `croak` with a message raises a `Pyjo.Exception`. An error of the
   system, `$!`, is the `OSError` itself, with the message of Mojo in front of
   its `strerror`.
+- A callback returns a list in Perl and one value in Python. Where Mojo
+  makes values of what a callback returns, as `then` of `Mojo::Promise` does,
+  the return value is one value, `None` is none, as Perl's `return;`, and a
+  promise of several values passes them on.
+- `async sub` of Mojo is an `async def` that the reactor runs as a promise,
+  `Pyjo.Promise.async_`, and Mojo's `AWAIT_*` methods are `__await__`. A
+  reactor without asyncio drives a coroutine that awaits promises of
+  Pyjoyment; the asyncio reactor runs it as a task.
 - A method that the base class of Mojo leaves to a subclass raises
   `NotImplementedError` with the message of Mojo's croak,
   `Method "x" not implemented by subclass`.

@@ -104,6 +104,25 @@ with subtest('reset'):
     reactor.start()
     pass_ok('nothing to watch')
 
+with subtest('awaitable and coroutine'):
+    import Pyjo.IOLoop
+    import Pyjo.Promise
+
+    reactor = Pyjo.Reactor.Asyncio.new()
+    loop = Pyjo.IOLoop.new(reactor=reactor)
+    promise = Pyjo.Promise.new().set(ioloop=loop).timer(0.01, 'done')
+    future = reactor.awaitable(promise)
+    isa_ok(future, asyncio.Future, 'future of the loop')
+
+    async def coro():
+        await asyncio.sleep(0)
+        return await promise
+
+    got = []
+    reactor.coroutine(coro(), got.append, got.append)
+    Pyjo.Promise.new().set(ioloop=loop).timer(0.05).wait()
+    is_deeply_ok(got, ['done'], 'task of the loop')
+
 with subtest('watch'):
     handle, peer = socket.socketpair()
     reactor = Pyjo.Reactor.Asyncio.new()

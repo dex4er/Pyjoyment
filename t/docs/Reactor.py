@@ -85,6 +85,23 @@ print(type(reactor).__name__, type(reactor.loop._selector).__name__)
     result = subprocess.run([sys.executable, '-c', code], env=env, capture_output=True, text=True)
     is_ok(result.stdout, 'timer\nPyjo_Reactor_MyLoop SelectSelector\n', 'reactor of another distribution')
 
+with subtest('awaitable and coroutine'):
+    import Pyjo.Promise
+
+    reactor = Pyjo.Reactor.new()
+    promise = Pyjo.Promise.resolve('done')
+    awaitable = reactor.awaitable(promise)
+    ok(hasattr(awaitable, '__await__'), 'awaitable')
+
+    async def coro():
+        await reactor.awaitable(promise)
+        return 'done'
+
+    got = []
+    reactor.coroutine(coro(), got.append, got.append)
+    Pyjo.IOLoop.one_tick()
+    is_deeply_ok(got, ['done'], 'driven without asyncio')
+
 with subtest('Abstract methods'):
     reactor = Pyjo.Reactor.new()
     for call in (

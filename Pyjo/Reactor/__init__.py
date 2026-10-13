@@ -100,7 +100,7 @@ from Pyjo.Loader import load_class
 import builtins
 import os
 
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable, Coroutine, Generator
 from pkgutil import extend_path
 from typing import Any, Protocol, Self
 
@@ -144,6 +144,58 @@ class Pyjo_Reactor(Pyjo.EventEmitter.object):
         timer.
         """
         raise NotImplementedError('Method "again" not implemented by subclass')
+
+    # Not in Mojolicious: what awaiting a promise of Pyjoyment waits on
+    def awaitable(self, promise: Any) -> Awaitable[None]:
+        """::
+
+            awaitable = reactor.awaitable(promise)
+
+        Return what ``await promise`` waits on, which completes when the
+        promise is fulfilled or rejected. The base class gives one that
+        :meth:`coroutine` drives, without asyncio, and a reactor of an event
+        loop gives one of its loop, so that a promise can be awaited in the
+        tasks of that loop.
+        """
+        return _Awaitable(promise)
+
+    # Not in Mojolicious: how a coroutine runs as a promise, as Mojo's async sub
+    def coroutine(
+        self, coro: Coroutine[Any, Any, Any], resolve: Callable[[Any], Anything], reject: Callable[[Any], Anything]
+    ) -> None:
+        """::
+
+            reactor.coroutine(coro, resolve, reject)
+
+        Run a coroutine and call ``resolve`` with what it returns or
+        ``reject`` with the exception it raises. The base class runs it at
+        once, until it waits for a promise, as Mojo runs an ``async sub``,
+        and continues it when the promise is fulfilled or rejected, so that it
+        can await the promises of Pyjoyment without asyncio. A reactor of an
+        event loop runs it as a task of its loop, where it can await anything
+        of that loop.
+        """
+
+        def step() -> None:
+            try:
+                waiting = coro.send(None)
+            except StopIteration as e:
+                resolve(e.value)
+                return
+            except Exception as e:
+                reject(e)
+                return
+            then = getattr(waiting, 'then', None)
+            if not callable(then):
+                coro.close()
+                reject(TypeError(f'{_name(type(self))} cannot wait for {waiting!r}'))
+                return
+            then(resume, resume)
+
+        def resume(*values: Any) -> None:
+            step()
+
+        step()
 
     @classmethod
     def detect(cls) -> str:
@@ -303,6 +355,19 @@ class Pyjo_Reactor(Pyjo.EventEmitter.object):
             reactor.watch(handle, False, False)
         """
         raise NotImplementedError('Method "watch" not implemented by subclass')
+
+
+# What the base class gives to await: it waits for the promise itself
+class _Awaitable:
+    def __init__(self, promise: Any) -> None:
+        self.promise = promise
+
+    def __await__(self) -> Generator[Any, Any, None]:
+        yield self.promise
+
+
+def _name(cls: type) -> str:
+    return f'{cls.__module__}.{cls.__qualname__}'
 
 
 detect = Pyjo_Reactor.detect

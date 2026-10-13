@@ -35,11 +35,12 @@ Pyjo.Reactor.Asyncio - Low-level event reactor on asyncio
 :mod:`asyncio`. It watches handles and runs timers in an asyncio event loop,
 so coroutines, tasks and other users of the loop run along with it.
 
-A reactor uses the event loop it is given, the loop that is running when it
-is created, or a new event loop of its own. In a loop that runs already, as
-inside :func:`asyncio.run`, :meth:`start` and :meth:`one_tick` return right
-away, as asyncio does not nest event loops, and the handles and timers are
-watched by that loop.
+A reactor uses the event loop it is given, or else the loop that is running,
+as inside :func:`asyncio.run`, or a new event loop of its own, and moves its
+handles and timers to the loop that is running. In a loop that runs
+already, :meth:`start` and :meth:`one_tick` return right away, as asyncio
+does not nest event loops, and the handles and timers are watched by that
+loop.
 
 See also
 --------
@@ -60,6 +61,7 @@ import asyncio
 import random
 import time
 
+from collections.abc import Awaitable, Callable, Coroutine
 from typing import Any, Self, TypedDict
 
 
@@ -93,19 +95,9 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
         super().__init__()
 
         # Not in Mojolicious: the asyncio event loop
-        if loop is None:
-            try:
-                loop = asyncio.get_running_loop()
-            except RuntimeError:
-                loop = asyncio.new_event_loop()
-                self._own = True
-        self.loop = loop
-        """::
-
-            loop = reactor.loop
-
-        The :mod:`asyncio` event loop of the reactor.
-        """
+        self._fixed = loop is not None
+        self._loop = loop
+        self._own: asyncio.AbstractEventLoop | None = None
 
         self._error: BaseException | None = None
         self._io: dict[int, _IO] = {}
@@ -113,15 +105,67 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
         self._next_timer: str | None = None
         self._one = 0
         self._running = 0
+        self._tasks: set[asyncio.Task[Any]] = set()
         self._timers: dict[str, _Timer] = {}
-
-    _own = False
 
     def __del__(self) -> None:
         # Not in Mojolicious: the event loop of the reactor is closed with it
-        loop = getattr(self, 'loop', None)
-        if self._own and loop is not None and not loop.is_running() and not loop.is_closed():
+        loop = getattr(self, '_own', None)
+        if loop is not None and not loop.is_running() and not loop.is_closed():
             loop.close()
+
+    # Not in Mojolicious: the asyncio event loop
+    @property
+    def loop(self) -> asyncio.AbstractEventLoop:
+        """::
+
+            loop = reactor.loop
+
+        The :mod:`asyncio` event loop of the reactor: the one it is given, or
+        else the loop that is running, as inside :func:`asyncio.run`, or a
+        loop of its own. A reactor that is not given a loop follows the loop
+        that is running, and moves its handles and timers to it, unless it
+        has tasks in another loop, which cannot move.
+        """
+        loop = self._loop
+        if self._fixed and loop is not None:
+            return loop
+
+        try:
+            running = asyncio.get_running_loop()
+        except RuntimeError:
+            running = None
+
+        if running is not None:
+            if running is not loop and not len(self._tasks):
+                self._move(running)
+        elif loop is None or loop.is_closed() or (loop is not self._own and not loop.is_running()):
+            if self._own is None or self._own.is_closed():
+                self._own = asyncio.new_event_loop()
+            self._move(self._own)
+
+        assert self._loop is not None
+        return self._loop
+
+    # Move the handles and timers to another loop
+    def _move(self, new: asyncio.AbstractEventLoop) -> None:
+        old, self._loop = self._loop, new
+        alive = old is not None and not old.is_closed()
+        for id, timer in self._timers.items():
+            handle = timer['handle']
+            after = max(0.0, handle.when() - old.time()) if old is not None and alive else timer['after']
+            handle.cancel()
+            timer['handle'] = new.call_later(after, self._alarm, id)
+        for fd, io in self._io.items():
+            if old is not None and alive:
+                if io['read']:
+                    old.remove_reader(fd)
+                if io['write']:
+                    old.remove_writer(fd)
+            if io['read']:
+                new.add_reader(fd, self._ready, fd, False)
+            if io['write']:
+                new.add_writer(fd, self._ready, fd, True)
 
     def again(self, id: str, after: float | None = None) -> None:
         """::
@@ -138,6 +182,52 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
             timer['after'] = after
         timer['handle'].cancel()
         timer['handle'] = self.loop.call_later(timer['after'], self._alarm, id)
+
+    # Not in Mojolicious: a future of the loop
+    def awaitable(self, promise: Any) -> Awaitable[None]:
+        """::
+
+            future = reactor.awaitable(promise)
+
+        Return a future of :attr:`loop` that is done when the promise is
+        fulfilled or rejected, so that ``await promise`` works in any task of
+        the loop.
+        """
+        future: asyncio.Future[None] = self.loop.create_future()
+
+        def settle(*values: Any) -> None:
+            if not future.done():
+                future.set_result(None)
+
+        promise.then(settle, settle)
+        return future
+
+    # Not in Mojolicious: a task of the loop
+    def coroutine(
+        self, coro: Coroutine[Any, Any, Any], resolve: Callable[[Any], Any], reject: Callable[[Any], Any]
+    ) -> None:
+        """::
+
+            reactor.coroutine(coro, resolve, reject)
+
+        Run a coroutine as a task of :attr:`loop`, where it can await anything
+        of the loop, and call ``resolve`` with what it returns or ``reject``
+        with the exception it raises. A task that is not done is something to
+        watch, so that :meth:`start` does not stop before it.
+        """
+        task = self.loop.create_task(coro)
+        self._tasks.add(task)
+
+        def done(task: asyncio.Task[Any]) -> None:
+            self._tasks.discard(task)
+            if task.cancelled():
+                reject(asyncio.CancelledError())
+            elif (e := task.exception()) is not None:
+                reject(e)
+            else:
+                resolve(task.result())
+
+        task.add_done_callback(done)
 
     def io(self, handle: Handle, cb: IOCallback) -> Self:
         """::
@@ -197,7 +287,7 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
 
         try:
             # Stop automatically if there is nothing to watch
-            if not len(self._timers) and not len(self._io):
+            if not len(self._timers) and not len(self._io) and not len(self._tasks):
                 return self.stop()
 
             # Unlike Mojolicious: asyncio does not nest event loops, the one that runs already watches the events
@@ -265,6 +355,7 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
         self._next_tick = []
         self._next_timer = None
         self._running = 0
+        self._tasks = set()
         self._timers = {}
         self._stop()
 
