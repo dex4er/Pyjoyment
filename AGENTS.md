@@ -433,6 +433,10 @@ copy:
   `Method "x" not implemented by subclass`.
 - `local` on an attribute, as `local $self->{running}`, is the value saved
   before and set back in a `finally`.
+- A callback that an asyncio loop keeps, as a timer or an I/O watcher,
+  refers to the reactor weakly, so that the reactor and the loop it owns do
+  not make a cycle: in a cycle the garbage collector may close the sockets of
+  the loop before the loop itself, and closing the loop then fails.
 - asyncio does not nest event loops, and it logs an exception that a
   callback raises instead of passing it on. Where Mojo runs the reactor from
   a callback, the port returns at once, and an exception that Mojo lets die
@@ -553,10 +557,17 @@ Never read, display, reference, or include the contents of the following files:
 
 The same list is git-ignored in `.gitignore` and enforced for Claude Code by
 the `permissions.deny` rules in `.claude/settings.json`. Change all three
-together. The one exception is `Pyjo/IOLoop/certs/server.key`, the default
-self-signed certificate for TLS servers (as in Mojo): it is tracked, and
+together. The one exception is `Pyjo/IOLoop/certs/server.key`, the key of
+the default certificate for TLS servers (as in Mojo): it is tracked, and
 `.gitignore` whitelists it, because hatchling builds packages from the
 `.gitignore` patterns and would otherwise leave it out of the wheel.
+
+The certificate `server.crt` is for `localhost` and `127.0.0.1`, and a CA of
+its own, `ca.crt`, signs it, so that the tests can verify it. The key of the
+CA is not kept: new certificates come with a new CA, made with OpenSSL 3
+(RSA 2048, a hundred years, `basicConstraints`, `keyUsage`,
+`extendedKeyUsage=serverAuth` and `subjectAltName=DNS:localhost,IP:127.0.0.1`
+for the server), and the key of the CA is deleted afterwards.
 
 ## Documentation
 

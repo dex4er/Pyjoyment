@@ -151,6 +151,7 @@ strict = [
   "Pyjo/Headers.py",
   "Pyjo/Home.py",
   "Pyjo/IOLoop/__init__.py",
+  "Pyjo/IOLoop/Stream.py",
   "Pyjo/JSON/__init__.py",
   "Pyjo/JSON/Pointer.py",
   "Pyjo/Loader.py",

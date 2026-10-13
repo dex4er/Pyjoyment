@@ -6,44 +6,34 @@ Pyjo.IOLoop.Stream - Non-blocking I/O stream
     import Pyjo.IOLoop.Stream
 
     # Create stream
-    with Pyjo.IOLoop.Stream.new(handle) as stream:
+    stream = Pyjo.IOLoop.Stream.new(handle)
+    stream.on('read', lambda stream, chunk: ...)
+    stream.on('close', lambda stream: ...)
+    stream.on('error', lambda stream, err: ...)
 
-        @stream.on
-        def read(stream, chunk):
-            ...
+    # Start and stop watching for new data
+    stream.start()
+    stream.stop()
 
-        @stream.on
-        def close(stream):
-            ...
+    # Start reactor if necessary
+    if not stream.reactor.is_running:
+        stream.reactor.start()
 
-        @stream.on
-        def error(stream, err):
-            ...
-
-        # Start and stop watching for new data
-        stream.start()
-        stream.stop()
-
-        # Start reactor if necessary
-        if not stream.reactor.is_running:
-            stream.reactor.start()
-
-
-:mod:`Pyjo.IOLoop.Stream` is a container for I/O streams used by :mod:`Pyjo.IOLoop`.
+:mod:`Pyjo.IOLoop.Stream` is a container for I/O streams used by
+:mod:`Pyjo.IOLoop`. A handle is a socket, an :class:`ssl.SSLSocket` too, or
+anything else with a file descriptor, like a pipe.
 
 Events
 ------
 
-:mod:`Pyjo.IOLoop.Stream` inherits all events from :mod:`Pyjo.IOLoop.EventEmitter` and can
-emit the following new ones.
+:mod:`Pyjo.IOLoop.Stream` inherits all events from :mod:`Pyjo.EventEmitter`
+and can emit the following new ones.
 
 close
 ~~~~~
 ::
 
-    @stream.on
-    def close(stream):
-        ...
+    stream.on('close', lambda stream: ...)
 
 Emitted if the stream gets closed.
 
@@ -51,9 +41,7 @@ drain
 ~~~~~
 ::
 
-    @stream.on
-    def drain(stream):
-        ...
+    stream.on('drain', lambda stream: ...)
 
 Emitted once all data has been written.
 
@@ -61,19 +49,16 @@ error
 ~~~~~
 ::
 
-    @stream.on
-    def error(stream, err):
-        ...
+    stream.on('error', lambda stream, err: ...)
 
-Emitted if an error occurs on the stream, fatal if unhandled.
+Emitted if an error occurs on the stream, fatal if unhandled. The error is
+the :class:`OSError` of the handle.
 
 read
 ~~~~
 ::
 
-    @stream.on
-    def read(stream, chunk):
-        ...
+    stream.on('read', lambda stream, chunk: ...)
 
 Emitted if new data arrives on the stream.
 
@@ -81,9 +66,7 @@ timeout
 ~~~~~~~
 ::
 
-    @stream.on
-    def timeout(stream):
-        ...
+    stream.on('timeout', lambda stream: ...)
 
 Emitted if the stream has been inactive for too long and will get closed
 automatically.
@@ -92,113 +75,161 @@ write
 ~~~~~
 ::
 
-    @stream.on
-    def write(stream, chunk):
-        ...
+    stream.on('write', lambda stream, chunk: ...)
 
 Emitted if new data has been written to the stream.
 
-Classes
--------
+See also
+--------
+
+:mod:`Pyjoyment`, https://mojolicious.org.
+
+Ported from `Mojo::IOLoop::Stream <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/IOLoop/Stream.pm>`_
+of Mojolicious 9.49.
 """
 
 import Pyjo.EventEmitter
 import Pyjo.IOLoop
+import Pyjo.Reactor
 
-from Pyjo.Util import getenv, isalive, notnone, warn
-
-import errno
+import os
+import select
+import ssl
+import sys
 import weakref
 
+from collections.abc import Callable
+from typing import Any, Self
 
-DEBUG = getenv('PYJO_IOLOOP_DEBUG', False)
 
-
-NoneType = type(None)
-
-if getenv('PYJO_NO_TLS', False):
-    ssl = None
-else:
-    try:
-        import ssl
-    except ImportError:
-        ssl = None
+# A callback of a write gets the stream once all data has been written
+type DrainCallback = Callable[[Any], object]
 
 
 class Pyjo_IOLoop_Stream(Pyjo.EventEmitter.object):
     """
-    :mod:`Pyjo.IOLoop.Stream` inherits all attributes and methods from
+    :mod:`Pyjo.IOLoop.Stream` inherits all methods from
     :mod:`Pyjo.EventEmitter` and implements the following new ones.
     """
 
-    def __init__(self, handle, *args, **kwargs):
+    def __init__(self, handle: Any = None) -> None:
+        """::
+
+            stream = Pyjo.IOLoop.Stream.new(handle)
+
+        Construct a new :mod:`Pyjo.IOLoop.Stream` object.
+        """
         super().__init__()
 
-        self.reactor = notnone(kwargs.get('reactor'), lambda: Pyjo.IOLoop.singleton.reactor)
+        self.high_water_mark = 1048576
         """::
 
-            reactor = stream.reactor
-            stream.reactor = Pyjo.Reactor.Asyncio.new()
+            size = stream.high_water_mark
+            stream.high_water_mark = 1024
 
-        Low-level event reactor, defaults to the :attr:`reactor` attribute value of the
-        global :mod:`Pyjo.IOLoop` singleton.
-        """
-
-        self.handle = handle
-        """::
-
-            handle = stream.handle
-
-        Handle for stream.
+        Maximum size of :meth:`write` buffer in bytes before :attr:`can_write`
+        is false, defaults to ``1048576`` (1MiB).
         """
 
         self._buffer = b''
         self._graceful = False
+        self._handle: Any = handle
         self._paused = False
-        self._timeout = 15
-        self._timer = None
+        self._read = 0
+        self._reactor: weakref.ref[Pyjo.Reactor.object] | None = None
+        self._timeout: float = 15
+        self._timer: str | None = None
+        self._written = 0
 
-    def __del__(self):
-        if DEBUG:
-            warn(f'-- Method {self}.__del__')
+    def __del__(self) -> None:
+        if not sys.is_finalizing() and getattr(self, '_handle', None) is not None:
+            try:
+                self.close()
+            except Exception:
+                pass
 
-        try:
-            self.close()
-        except:
-            pass
+    @property
+    def reactor(self) -> Pyjo.Reactor.object:
+        """::
 
-    def __enter__(self):
-        return self
+            reactor = stream.reactor
+            stream.reactor = Pyjo.Reactor.Poll.new()
 
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.close()
+        Low-level event reactor, defaults to the ``reactor`` attribute value of
+        the global :mod:`Pyjo.IOLoop` singleton. Note that this attribute is
+        weakened.
+        """
+        if self._reactor is None:
+            self._reactor = weakref.ref(Pyjo.IOLoop.singleton.reactor)
+        if (reactor := self._reactor()) is None:
+            raise ReferenceError('weakly-referenced object no longer exists')
+        return reactor
 
-    def close(self):
+    @reactor.setter
+    def reactor(self, value: Pyjo.Reactor.object) -> None:
+        self._reactor = weakref.ref(value)
+
+    @property
+    def bytes_read(self) -> int:
+        """::
+
+            num = stream.bytes_read
+
+        Number of bytes received.
+        """
+        return self._read
+
+    @property
+    def bytes_waiting(self) -> int:
+        """::
+
+            num = stream.bytes_waiting
+
+        Number of bytes that have been enqueued with :meth:`write` and are
+        waiting to be written.
+        """
+        return len(self._buffer)
+
+    @property
+    def bytes_written(self) -> int:
+        """::
+
+            num = stream.bytes_written
+
+        Number of bytes written.
+        """
+        return self._written
+
+    @property
+    def can_write(self) -> bool:
+        """::
+
+            boolean = stream.can_write
+
+        True if calling :meth:`write` is safe.
+        """
+        return self._handle is not None and self.bytes_waiting < self.high_water_mark
+
+    def close(self) -> None:
         """::
 
             stream.close()
 
-        Close stream immediately. Used by context manager.
+        Close stream immediately.
         """
-        if not isalive(self):
+        reactor = self._reactor() if self._reactor is not None else Pyjo.IOLoop.singleton.reactor
+        if reactor is None:
             return
-
-        reactor = self.reactor
-        if not isalive(reactor):
-            return
-
         self.timeout = 0
-        handle = self.handle
-        self.handle = None
-        if not isalive(handle):
+        if (handle := self._handle) is None:
             return
+        self._handle = None
+        reactor.remove(handle)
+        # Perl closes the handle it frees at once, Python later, as PyPy does when its garbage collector runs
+        handle.close()
+        self.emit('close')
 
-        if handle:
-            reactor.remove(handle)
-            handle.close()
-            self.emit('close')
-
-    def close_gracefully(self):
+    def close_gracefully(self) -> None:
         """::
 
             stream.close_gracefully()
@@ -207,196 +238,196 @@ class Pyjo_IOLoop_Stream(Pyjo.EventEmitter.object):
         """
         if self.is_writing:
             self._graceful = True
-            return self
-        return self.close()
+        else:
+            self.close()
 
     @property
-    def fd(self):
+    def handle(self) -> Any:
         """::
 
-            fd = stream.fd
+            handle = stream.handle
 
-        Number of descriptor for handle
+        Get handle for stream, usually a :class:`socket.socket` or
+        :class:`ssl.SSLSocket` object.
         """
-        if self.handle:
-            return self.handle.fileno()
+        return self._handle
 
     @property
-    def is_readable(self):
+    def is_readable(self) -> bool:
         """::
 
             boolean = stream.is_readable
 
-        Quick non-blocking check if stream is readable, useful for identifying tainted
-        sockets.
+        Quick non-blocking check if stream is readable, useful for identifying
+        tainted sockets.
         """
         self._again()
-        if not self.handle:
-            return None
-        return self.handle and Pyjo.Util._readable(self.handle.fileno())
+        if (handle := self._handle) is None:
+            return False
+        return bool(select.select([handle], [], [], 0)[0])
 
     @property
-    def is_writing(self):
+    def is_writing(self) -> bool:
         """::
 
             boolean = stream.is_writing
 
         Check if stream is writing.
         """
-        if not self.handle:
-            return None
-        return len(self._buffer) or self.has_subscribers('drain')
+        if self._handle is None:
+            return False
+        return bool(len(self._buffer)) or self.has_subscribers('drain')
 
-    def start(self):
+    def start(self) -> None:
         """::
 
             stream.start()
 
-        Start watching for new data on the stream.
+        Start or resume watching for new data on the stream.
         """
         # Resume
+        if (handle := self._handle) is None:
+            return
         reactor = self.reactor
         if self._paused:
             self._paused = False
-            return reactor.watch(self.handle, True, self.is_writing)
+            reactor.watch(handle, True, self.is_writing)
+            return
 
-        stream = weakref.proxy(self)
+        ref = weakref.ref(self)
 
-        def read_write_cb(reactor, write):
-            if isalive(stream):
-                if write:
-                    stream._write()
-                else:
-                    stream._read()
+        def cb(reactor: Any, writable: bool) -> None:
+            if (stream := ref()) is not None:
+                stream._write() if writable else stream._read_handle()
 
-        reactor.io(self.set(timeout=self._timeout).handle, read_write_cb)
+        self.timeout = self._timeout
+        reactor.io(handle, cb)
 
-    def stop(self):
+    def steal_handle(self) -> Any:
+        """::
+
+            handle = stream.steal_handle()
+
+        Steal :attr:`handle` and prevent it from getting closed automatically.
+        """
+        handle, self._handle = self._handle, None
+        if handle is not None:
+            self.reactor.remove(handle)
+        return handle
+
+    def stop(self) -> None:
         """::
 
             stream.stop()
 
         Stop watching for new data on the stream.
         """
-        if not self._paused:
-            self.reactor.watch(self.handle, False, self.is_writing)
-        self._paused = True
-
-    def steal_handle(self):
-        """::
-
-            handle = stream.steal_handle()
-
-        Steal handle from stream and prevent it from getting closed automatically.
-        """
-        handle = self.handle
-        self.reactor.remove(handle)
-        self.handle = None
-        return handle
+        if self._handle is not None and not self._paused:
+            self._paused = True
+            self.reactor.watch(self._handle, False, self.is_writing)
 
     @property
-    def timeout(self):
+    def timeout(self) -> float:
         """::
 
             timeout = stream.timeout
             stream.timeout = 45
 
-        Maximum amount of time in seconds stream can be inactive before getting closed
-        automatically, defaults to ``15``. Setting the value to ``0`` will allow this
-        stream to be inactive indefinitely.
+        Maximum amount of time in seconds stream can be inactive before getting
+        closed automatically, defaults to ``15``. Setting the value to ``0``
+        will allow this stream to be inactive indefinitely.
         """
         return self._timeout
 
     @timeout.setter
-    def timeout(self, value):
-        reactor = self.reactor
-        if self._timer:
-            reactor.remove(self._timer)
-            self._timer = None
-
+    def timeout(self, value: float) -> None:
         self._timeout = value
 
-        if not value:
-            return
+        reactor = self.reactor
+        if self._timer is not None:
+            if not self._timeout:
+                timer, self._timer = self._timer, None
+                reactor.remove(timer)
+            else:
+                reactor.again(self._timer, self._timeout)
 
-        stream = weakref.proxy(self)
+        elif self._timeout:
+            ref = weakref.ref(self)
 
-        def timeout_cb(reactor):
-            if isalive(stream):
-                stream.emit('timeout').close()
+            def timeout(reactor: Any) -> None:
+                if (stream := ref()) is not None and stream._timer is not None:
+                    stream._timer = None
+                    stream.emit('timeout').close()
 
-        self._timer = reactor.timer(value, timeout_cb)
+            self._timer = reactor.timer(value, timeout)
 
-    def write(self, chunk, cb=None):
+    def write(self, chunk: bytes, cb: DrainCallback | None = None) -> Self:
         """::
 
-            stream = stream.write(bstring)
-            stream = stream.write(bstring, cb)
+            stream = stream.write(chunk)
+            stream = stream.write(chunk, lambda stream: ...)
 
-        Write data to stream, the optional drain callback will be invoked once all data
-        has been written.
+        Enqueue data to be written to the stream as soon as possible, the
+        optional drain callback will be executed once all data has been
+        written.
         """
+        # Left out from Mojolicious: utf8::downgrade, as the chunk is bytes already
         self._buffer += chunk
-        if cb:
+        if cb is not None:
             self.once('drain', cb)
         elif not len(self._buffer):
             return self
-        if self.handle:
-            self.reactor.watch(self.handle, not self._paused, 1)
+        if self._handle is not None:
+            self.reactor.watch(self._handle, not self._paused, True)
 
         return self
 
-    def _again(self):
-        if self._timer:
+    def _again(self) -> None:
+        if self._timer is not None:
             self.reactor.again(self._timer)
 
-    def _error(self, e):
-        # Retry
-        if e.errno == errno.EAGAIN or e.errno == errno.EINTR or e.errno == errno.EWOULDBLOCK:
-            return
-
-        if ssl and isinstance(e, (ssl.SSLWantReadError, ssl.SSLWantReadError)):
-            return
-
-        if ssl and isinstance(e, (ssl.SSLError,)) and e.strerror.startswith('The operation did not complete'):
-            return
-
-        # Closed
-        if e.errno == errno.ECONNRESET or e.errno == errno.EPIPE:
-            return self.close()
-
-        # Error
-        self.emit('error', e).close()
-
-    def _read(self):
-        readbuffer = b''
+    # Renamed from Mojolicious: _read, the attribute _read is the number of bytes read
+    def _read_handle(self) -> None:
+        handle = self._handle
         try:
-            readbuffer = self.handle.recv(131072)
+            chunk = handle.recv(131072) if hasattr(handle, 'recv') else os.read(handle.fileno(), 131072)
         except OSError as e:
-            return self._error(e)
-        if not readbuffer:
-            return self.close()
-        self.emit('read', readbuffer)._again()
+            # Retry
+            if isinstance(e, (BlockingIOError, InterruptedError, ssl.SSLWantReadError, ssl.SSLWantWriteError)):
+                return
 
-    def _write(self):
-        handle = self.handle
+            # Closed (maybe real error)
+            if isinstance(e, ConnectionResetError):
+                return self.close()
+            return self.emit('error', e).close()
+
+        self._read += len(chunk)
+        if not len(chunk):
+            return self.close()
+        self.emit('read', chunk)._again()
+
+    def _write(self) -> None:
+        # Handle errors only when reading (to avoid timing problems)
+        handle = self._handle
         if len(self._buffer):
             try:
-                written = handle.send(self._buffer)
-            except OSError as e:
-                self._error(e)
-            self.emit('write', self._buffer[:written])
-            self._buffer = self._buffer[written:]
-            if not len(self._buffer):
-                self.emit('drain')
-            self._again()
+                written = (
+                    handle.send(self._buffer) if hasattr(handle, 'send') else os.write(handle.fileno(), self._buffer)
+                )
+            except OSError:
+                return
+            self._written += written
+            chunk, self._buffer = self._buffer[:written], self._buffer[written:]
+            self.emit('write', chunk)._again()
 
+        if not len(self._buffer):
+            self.emit('drain')
         if self.is_writing:
             return
         if self._graceful:
             return self.close()
-        if self.handle:
-            self.reactor.watch(handle, not self._paused, 0)
+        if self._handle is not None:
+            self.reactor.watch(self._handle, not self._paused, False)
 
 
 new = Pyjo_IOLoop_Stream.new
