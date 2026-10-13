@@ -79,14 +79,16 @@ installs with `--locked` and fails on a tool that is not in the lock.
 
 The tests are scripts that print [TAP](https://testanything.org/), written
 with `Pyjo.Test`, which is inspired by Perl's `Test::More`. They run with
-`prove`:
+`Pyjo.Prove`, a TAP harness inspired by Perl's `prove`:
 
 ```sh
-PYTHONPATH=. mise exec -- prove t/Pyjo t/docs t/examples
+PYTHONPATH=. mise exec -- python -m Pyjo.Prove -j 4 t/Pyjo t/docs t/examples
 ```
 
-`.proverc` supplies `--ext=py --exec=python`. A single file runs on its own as
-well: `PYTHONPATH=. mise exec -- python t/Pyjo/URL.py`.
+A single file runs on its own as well:
+`PYTHONPATH=. mise exec -- python t/Pyjo/URL.py`. Perl's `prove` still works,
+because the output is standard TAP; `.proverc` supplies its
+`--ext=py --exec=python`.
 
 - `t/Pyjo/` holds the module tests, ported from Mojo's `t/mojo/*.t`.
 - `t/docs/` checks the examples from the module documentation.

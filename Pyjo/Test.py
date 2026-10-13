@@ -42,14 +42,13 @@ directory.
 Running tests
 -------------
 
-The test scripts run with ``prove``: ::
+The test scripts run with :mod:`Pyjo.Prove`: ::
 
-    $ PYTHONPATH=. prove --ext=py --exec=python t
+    $ python -m Pyjo.Prove -I . -r t
 
-The arguments can be kept in the ``.proverc`` file: ::
+or with Perl's ``prove``, as they print standard TAP: ::
 
-    --ext=py
-    --exec=python
+    $ PYTHONPATH=. prove --ext=py --exec=python -r t
 
 A single script runs on its own as well: ::
 
@@ -105,7 +104,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from types import TracebackType
 from typing import Any, NoReturn, Self, TextIO, cast, overload
-
 
 __all__ = [
     'bail_out',
@@ -551,7 +549,10 @@ class Subtest:
         return self
 
     def __exit__(
-        self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
     ) -> bool:
         state = _current()
 
@@ -623,7 +624,9 @@ def subtest(name: str, fn: Callable[[], object] | None = None) -> Subtest | bool
 
 
 def throws_ok(
-    cb: Callable[[], object], expected: type[BaseException] | str | re.Pattern[str], test_name: str | None = None
+    cb: Callable[[], object],
+    expected: type[BaseException] | str | re.Pattern[str],
+    test_name: str | None = None,
 ) -> bool:
     """::
 
@@ -657,7 +660,12 @@ def throws_ok(
 
     _ok(check, test_name)
     if not check:
-        _diag_lines([f'         got: {got if got is not None else "no exception"}', f'    expected: {expected}'])
+        _diag_lines(
+            [
+                f'         got: {got if got is not None else "no exception"}',
+                f'    expected: {expected}',
+            ]
+        )
     return check
 
 
@@ -710,7 +718,10 @@ def _at_exit() -> None:
         _diag_lines([f'Looks like your test exited with 255 just after {state.count}.'], depth=0)
         code = 255
     elif state.planned is None:
-        _diag_lines(['Tests were run but no plan was declared and done_testing() was not seen.'], depth=0)
+        _diag_lines(
+            ['Tests were run but no plan was declared and done_testing() was not seen.'],
+            depth=0,
+        )
         code = 254
     else:
         if not state.done:
@@ -759,7 +770,10 @@ def _deep_check(stack: list[_Step], e1: object, e2: object) -> bool:
 
     if isinstance(e1, set) and isinstance(e2, set):
         return _eq_sequence(
-            stack, 'set', sorted(cast(set[object], e1), key=repr), sorted(cast(set[object], e2), key=repr)
+            stack,
+            'set',
+            sorted(cast(set[object], e1), key=repr),
+            sorted(cast(set[object], e2), key=repr),
         )
 
     if isinstance(e1, dict) and isinstance(e2, dict):
@@ -773,7 +787,11 @@ def _deep_check(stack: list[_Step], e1: object, e2: object) -> bool:
 
 
 def _diag_lines(lines: list[str], stream: TextIO | None = None, depth: int | None = None) -> None:
-    _print(*[f'# {line}' if line else '#' for line in lines], stream=stream or sys.stderr, depth=depth)
+    _print(
+        *[f'# {line}' if line else '#' for line in lines],
+        stream=stream or sys.stderr,
+        depth=depth,
+    )
 
 
 def _eq_dict(stack: list[_Step], h1: dict[object, object], h2: dict[object, object]) -> bool:
@@ -788,7 +806,10 @@ def _eq_dict(stack: list[_Step], h1: dict[object, object], h2: dict[object, obje
 
 
 def _eq_sequence(
-    stack: list[_Step], kind: str, a1: list[object] | tuple[object, ...], a2: list[object] | tuple[object, ...]
+    stack: list[_Step],
+    kind: str,
+    a1: list[object] | tuple[object, ...],
+    a2: list[object] | tuple[object, ...],
 ) -> bool:
     for i in range(max(len(a1), len(a2))):
         e1 = a1[i] if i < len(a1) else _DOES_NOT_EXIST
@@ -800,7 +821,11 @@ def _eq_sequence(
     return True
 
 
-def _except_hook(exc_type: type[BaseException], exc_value: BaseException, traceback: TracebackType | None) -> None:
+def _except_hook(
+    exc_type: type[BaseException],
+    exc_value: BaseException,
+    traceback: TracebackType | None,
+) -> None:
     global _died
     _died = True
     _original_except_hook(exc_type, exc_value, traceback)

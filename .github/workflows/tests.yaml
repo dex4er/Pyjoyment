@@ -58,12 +58,10 @@ jobs:
           python-version: ${{ matrix.python }}
           allow-prereleases: true
 
-      # prove reads --ext and --exec from .proverc. Perl and prove come with
-      # the runner images.
       - name: Run tests
         run: |
           python --version
-          prove t/Pyjo t/docs t/examples
+          python -m Pyjo.Prove -j 4 t/Pyjo t/docs t/examples
 
   build:
     name: build
