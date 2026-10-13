@@ -1,0 +1,42 @@
+import Pyjo.Date
+
+from Pyjo.Test import *
+
+from datetime import UTC, datetime, timedelta, timezone
+from email.utils import format_datetime, parsedate_to_datetime
+
+
+with subtest('From datetime'):
+    is_ok(Pyjo.Date.new(datetime(1994, 11, 6, 8, 49, 37, tzinfo=UTC)).epoch, 784111777, 'aware, UTC')
+    dt = datetime(1994, 11, 6, 9, 49, 37, tzinfo=timezone(timedelta(hours=1)))
+    is_ok(Pyjo.Date.new(dt).epoch, 784111777, 'aware, other time zone')
+    dt = datetime(1994, 11, 6, 8, 49, 37)
+    is_ok(Pyjo.Date.new(dt).epoch, int(dt.timestamp()), 'naive is local time, as datetime.timestamp')
+    dt = datetime(1994, 11, 6, 8, 49, 37, 330000, tzinfo=UTC)
+    is_ok(Pyjo.Date.new(dt).epoch, 784111777.33, 'microseconds')
+    is_ok(Pyjo.Date.new().parse(dt).to_rfc3339(), '1994-11-06T08:49:37.33Z', 'parse')
+
+with subtest('To datetime'):
+    dt = Pyjo.Date.new(784111777).to_datetime()
+    isa_ok(dt, datetime, 'dt')
+    is_ok(dt, datetime(1994, 11, 6, 8, 49, 37, tzinfo=UTC), 'right value')
+    is_ok(dt.tzinfo, UTC, 'aware, UTC')
+    is_ok(Pyjo.Date.new(784111777.33).to_datetime().microsecond, 330000, 'microseconds')
+    is_ok(Pyjo.Date.new('garbage').to_datetime(), datetime(1970, 1, 1, tzinfo=UTC), 'no epoch is the epoch, as to_str')
+
+with subtest('Roundtrip'):
+    date = Pyjo.Date.new('Sun, 06 Nov 1994 08:49:37 GMT')
+    is_ok(Pyjo.Date.new(date.to_datetime()).epoch, date.epoch, 'Pyjo.Date -> datetime -> Pyjo.Date')
+
+with subtest('Numbers'):
+    date = Pyjo.Date.new(784111777.33)
+    is_ok(float(date), 784111777.33, 'float')
+    is_ok(int(date), 784111777, 'int')
+    is_ok(datetime.fromtimestamp(float(date), UTC).microsecond, 330000, 'datetime.fromtimestamp(float(date))')
+
+with subtest('email.utils'):
+    date = Pyjo.Date.new(784111777)
+    is_ok(parsedate_to_datetime(str(date)), date.to_datetime(), 'parsedate_to_datetime')
+    is_ok(format_datetime(date.to_datetime(), usegmt=True), str(date), 'format_datetime')
+
+done_testing()

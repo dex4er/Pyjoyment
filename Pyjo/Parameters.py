@@ -268,7 +268,7 @@ class Pyjo_Parameters(Pyjo.Base.object, Pyjo.String.Mixin.object):
             pairs: list[tuple[str, str]] = []
             self._pairs = pairs
 
-            # Bytes are a Perl byte string: the characters 0-255
+            # Not in Mojolicious: bytes, which are a Perl byte string, the characters 0-255
             if isinstance(string, (bytes, bytearray)):
                 string = string.decode('latin-1')
 
@@ -330,6 +330,7 @@ class Pyjo_Parameters(Pyjo.Base.object, Pyjo.String.Mixin.object):
             return self.append(*args, **kwargs)
 
         # String
+        # Not in Mojolicious: bytes, encoded with the charset
         string = args[0] if args else None
         self._string = (
             '' if string is None else bytes(string) if isinstance(string, (bytes, bytearray)) else str(string)
@@ -415,6 +416,8 @@ class Pyjo_Parameters(Pyjo.Base.object, Pyjo.String.Mixin.object):
 def _pairs(args: tuple[Anything, ...], kwargs: dict[str, Anything]) -> Iterator[tuple[str, Anything]]:
     # Parameters as pairs: from another object, as tuples, as names followed by
     # their values, and as keyword arguments
+    # Not in Mojolicious: tuples and keyword arguments, next to Mojo's names
+    # followed by their values
     items = iter(args)
     for item in items:
         if isinstance(item, Pyjo_Parameters):

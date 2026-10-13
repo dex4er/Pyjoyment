@@ -52,11 +52,15 @@ import builtins
 import re
 
 from typing import Self, cast
+from urllib.parse import ParseResult, ParseResultBytes, SplitResult, SplitResultBytes, urlsplit
 
 
 # The module ends with `object = Pyjo_URL`, which an annotation of `object`
 # would mean, as annotations are evaluated lazily
 type Anything = builtins.object
+
+# A result of urllib.parse.urlsplit or urllib.parse.urlparse
+type UrllibResult = SplitResult | ParseResult | SplitResultBytes | ParseResultBytes
 
 
 class Pyjo_URL(Pyjo.Base.object, Pyjo.String.Mixin.object):
@@ -65,11 +69,12 @@ class Pyjo_URL(Pyjo.Base.object, Pyjo.String.Mixin.object):
     :mod:`Pyjo.String.Mixin` and implements the following new ones.
     """
 
-    def __init__(self, url: str | bytes | None = None) -> None:
+    def __init__(self, url: 'str | bytes | UrllibResult | None' = None) -> None:
         """::
 
             url = Pyjo.URL.new()
             url = Pyjo.URL.new('http://127.0.0.1:3000/foo?f=b&baz=2#foo')
+            url = Pyjo.URL.new(urlsplit('http://127.0.0.1:3000/foo?f=b&baz=2#foo'))
 
         Construct a new :mod:`Pyjo.URL` object and :meth:`parse` URL if necessary.
         """
@@ -279,13 +284,15 @@ class Pyjo_URL(Pyjo.Base.object, Pyjo.String.Mixin.object):
         """
         return bool(self.scheme)
 
-    def parse(self, url: str | bytes) -> Self:
+    def parse(self, url: 'str | bytes | UrllibResult') -> Self:
         """::
 
             url = url.parse('http://127.0.0.1:3000/foo/bar?fo=o&baz=23#foo')
+            url = url.parse(urlsplit('http://127.0.0.1:3000/foo/bar?fo=o&baz=23#foo'))
 
         Parse relative or absolute URL. Bytes are characters 0-255, as a Perl
-        byte string. ::
+        byte string, and a result of :func:`urllib.parse.urlsplit` or
+        :func:`urllib.parse.urlparse` is taken as the URL it holds. ::
 
             # "/test/123"
             Pyjo.URL.new().parse('/test/123?foo=bar').path
@@ -296,6 +303,11 @@ class Pyjo_URL(Pyjo.Base.object, Pyjo.String.Mixin.object):
             # "sri@example.com"
             Pyjo.URL.new().parse('mailto:sri@example.com').path
         """
+        # Not in Mojolicious: urllib of the standard library
+        if isinstance(url, (SplitResult, ParseResult, SplitResultBytes, ParseResultBytes)):
+            url = url.geturl()
+
+        # Not in Mojolicious: bytes, which are characters 0-255, as a Perl byte string
         if isinstance(url, bytes):
             url = url.decode('latin-1')
 
@@ -557,6 +569,21 @@ class Pyjo_URL(Pyjo.Base.object, Pyjo.String.Mixin.object):
             Pyjo.URL.new('http://daniel:s3cret@pyjoyment.org').to_unsafe_str()
         """
         return self._string(True)
+
+    # Not in Mojolicious: urllib of the standard library
+    def to_urllib(self) -> SplitResult:
+        """::
+
+            split = url.to_urllib()
+
+        Turn URL into a :class:`urllib.parse.SplitResult`, for the standard library.
+        Unlike :meth:`to_str`, it includes :attr:`userinfo`, as the result holds all
+        parts of the URL. ::
+
+            # "isabel"
+            Pyjo.URL.new('http://isabel:s3cret@pyjoyment.org/foo').to_urllib().username
+        """
+        return urlsplit(self.to_unsafe_str())
 
     @property
     def username(self) -> str | None:

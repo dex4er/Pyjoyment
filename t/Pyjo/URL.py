@@ -676,28 +676,43 @@ with subtest('No charset'):
 
 with subtest('Resolve RFC 1808 examples'):
     base = Pyjo.URL.new('http://a/b/c/d?q#f')
-    for relative, absolute in [
-        ('g', 'http://a/b/c/g'),
-        ('./g', 'http://a/b/c/g'),
-        ('g/', 'http://a/b/c/g/'),
-        ('//g', 'http://g'),
-        ('?y', 'http://a/b/c/d?y'),
-        ('g?y', 'http://a/b/c/g?y'),
-        ('g?y/./x', 'http://a/b/c/g?y/./x'),
-        ('#s', 'http://a/b/c/d?q#s'),
-        ('g#s', 'http://a/b/c/g#s'),
-        ('g#s/./x', 'http://a/b/c/g#s/./x'),
-        ('g?y#s', 'http://a/b/c/g?y#s'),
-        ('.', 'http://a/b/c'),
-        ('./', 'http://a/b/c/'),
-        ('..', 'http://a/b'),
-        ('../', 'http://a/b/'),
-        ('../g', 'http://a/b/g'),
-        ('../..', 'http://a/'),
-        ('../../', 'http://a/'),
-        ('../../g', 'http://a/g'),
-    ]:
-        url = Pyjo.URL.new(relative)
-        is_ok(str(url.to_abs(base)), absolute, 'right absolute version')
+    url = Pyjo.URL.new('g')
+    is_ok(str(url.to_abs(base)), 'http://a/b/c/g', 'right absolute version')
+    url = Pyjo.URL.new('./g')
+    is_ok(str(url.to_abs(base)), 'http://a/b/c/g', 'right absolute version')
+    url = Pyjo.URL.new('g/')
+    is_ok(str(url.to_abs(base)), 'http://a/b/c/g/', 'right absolute version')
+    url = Pyjo.URL.new('//g')
+    is_ok(str(url.to_abs(base)), 'http://g', 'right absolute version')
+    url = Pyjo.URL.new('?y')
+    is_ok(str(url.to_abs(base)), 'http://a/b/c/d?y', 'right absolute version')
+    url = Pyjo.URL.new('g?y')
+    is_ok(str(url.to_abs(base)), 'http://a/b/c/g?y', 'right absolute version')
+    url = Pyjo.URL.new('g?y/./x')
+    is_ok(str(url.to_abs(base)), 'http://a/b/c/g?y/./x', 'right absolute version')
+    url = Pyjo.URL.new('#s')
+    is_ok(str(url.to_abs(base)), 'http://a/b/c/d?q#s', 'right absolute version')
+    url = Pyjo.URL.new('g#s')
+    is_ok(str(url.to_abs(base)), 'http://a/b/c/g#s', 'right absolute version')
+    url = Pyjo.URL.new('g#s/./x')
+    is_ok(str(url.to_abs(base)), 'http://a/b/c/g#s/./x', 'right absolute version')
+    url = Pyjo.URL.new('g?y#s')
+    is_ok(str(url.to_abs(base)), 'http://a/b/c/g?y#s', 'right absolute version')
+    url = Pyjo.URL.new('.')
+    is_ok(str(url.to_abs(base)), 'http://a/b/c', 'right absolute version')
+    url = Pyjo.URL.new('./')
+    is_ok(str(url.to_abs(base)), 'http://a/b/c/', 'right absolute version')
+    url = Pyjo.URL.new('..')
+    is_ok(str(url.to_abs(base)), 'http://a/b', 'right absolute version')
+    url = Pyjo.URL.new('../')
+    is_ok(str(url.to_abs(base)), 'http://a/b/', 'right absolute version')
+    url = Pyjo.URL.new('../g')
+    is_ok(str(url.to_abs(base)), 'http://a/b/g', 'right absolute version')
+    url = Pyjo.URL.new('../..')
+    is_ok(str(url.to_abs(base)), 'http://a/', 'right absolute version')
+    url = Pyjo.URL.new('../../')
+    is_ok(str(url.to_abs(base)), 'http://a/', 'right absolute version')
+    url = Pyjo.URL.new('../../g')
+    is_ok(str(url.to_abs(base)), 'http://a/g', 'right absolute version')
 
 done_testing()

@@ -4,6 +4,8 @@ from Pyjo.Test import *
 with subtest('Synopsis'):
     import Pyjo.URL
 
+    from urllib.parse import urlsplit
+
     # Parse
     url = Pyjo.URL.new('http://sri:foo@example.com:3000/foo?foo=bar#23')
     is_ok(url.scheme, 'http', 'url.scheme')
@@ -29,6 +31,8 @@ with subtest('new'):
     is_ok(str(url), '', 'url')
     url = Pyjo.URL.new('http://127.0.0.1:3000/foo?f=b&baz=2#foo')
     is_ok(str(url), 'http://127.0.0.1:3000/foo?f=b&baz=2#foo', 'url')
+    url = Pyjo.URL.new(urlsplit('http://127.0.0.1:3000/foo?f=b&baz=2#foo'))
+    is_ok(str(url), 'http://127.0.0.1:3000/foo?f=b&baz=2#foo', 'urlsplit')
 
 with subtest('fragment'):
     fragment = url.fragment
@@ -142,6 +146,8 @@ with subtest('parse'):
     url = Pyjo.URL.new()
     url = url.parse('http://127.0.0.1:3000/foo/bar?fo=o&baz=23#foo')
     is_ok(str(url), 'http://127.0.0.1:3000/foo/bar?fo=o&baz=23#foo', 'url')
+    url = Pyjo.URL.new().parse(urlsplit('http://127.0.0.1:3000/foo/bar?fo=o&baz=23#foo'))
+    is_ok(str(url), 'http://127.0.0.1:3000/foo/bar?fo=o&baz=23#foo', 'urlsplit')
 
     # "/test/123"
     is_ok(str(Pyjo.URL.new().parse('/test/123?foo=bar').path), '/test/123', 'path')
@@ -324,6 +330,14 @@ with subtest('to_unsafe_str'):
         'http://daniel:s3cret@pyjoyment.org',
         'with userinfo',
     )
+
+with subtest('to_urllib'):
+    url = Pyjo.URL.new('http://example.com/foo')
+    split = url.to_urllib()
+    is_ok(split, urlsplit('http://example.com/foo'), 'split')
+
+    # "isabel"
+    is_ok(Pyjo.URL.new('http://isabel:s3cret@pyjoyment.org/foo').to_urllib().username, 'isabel', 'username')
 
 with subtest('username'):
     url = Pyjo.URL.new('http://isabel:s3cret@pyjoyment.org')
