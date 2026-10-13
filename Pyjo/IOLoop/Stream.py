@@ -142,11 +142,12 @@ class Pyjo_IOLoop_Stream(Pyjo.EventEmitter.object):
         self._written = 0
 
     def __del__(self) -> None:
-        if not sys.is_finalizing() and getattr(self, '_handle', None) is not None:
-            try:
+        # Module globals may be gone at the end of the interpreter
+        try:
+            if not sys.is_finalizing() and getattr(self, '_handle', None) is not None:
                 self.close()
-            except Exception:
-                pass
+        except Exception:
+            pass
 
     @property
     def reactor(self) -> Pyjo.Reactor.object:

@@ -59,6 +59,7 @@ from Pyjo.Util import md5_sum
 
 import asyncio
 import random
+import sys
 import time
 import weakref
 
@@ -110,10 +111,14 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
         self._timers: dict[str, _Timer] = {}
 
     def __del__(self) -> None:
-        # Not in Mojolicious: the event loop of the reactor is closed with it
-        loop = getattr(self, '_own', None)
-        if loop is not None and not loop.is_running() and not loop.is_closed():
-            loop.close()
+        # Not in Mojolicious: the event loop of the reactor is closed with it, unless the interpreter is finishing
+        # Module globals may be gone at the end of the interpreter
+        try:
+            loop = getattr(self, '_own', None)
+            if loop is not None and not sys.is_finalizing() and not loop.is_running() and not loop.is_closed():
+                loop.close()
+        except Exception:
+            pass
 
     # Not in Mojolicious: the asyncio event loop
     @property
