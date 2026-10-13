@@ -1,6 +1,7 @@
 /build
 /dist
 .DS_Store
+.vscode
 .venv
 .ruff_cache
 __pycache__
