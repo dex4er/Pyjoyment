@@ -232,9 +232,9 @@ with subtest('to_abs'):
     absolute = path('test.txt').to_abs()
     is_ok(absolute, os.path.join(os.getcwd(), 'test.txt'), 'absolute')
 
-with subtest('to_array'):
+with subtest('to_list'):
     # "home:sri:.vimrc" (on UNIX)
-    is_ok(':'.join(path('/home/sri/.vimrc').to_array()), ':home:sri:.vimrc', 'parts')
+    is_ok(':'.join(path('/home/sri/.vimrc').to_list()), ':home:sri:.vimrc', 'parts')
 
 with subtest('to_path'):
     p = path('/home/sri/.vimrc').to_path()

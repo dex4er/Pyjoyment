@@ -44,7 +44,7 @@ with subtest('Siblings'):
     )
 
 with subtest('Array'):
-    is_deeply_ok(path('foo', 'bar').to_array(), catfile('foo', 'bar').split(os.sep), 'same structure')
+    is_deeply_ok(path('foo', 'bar').to_list(), catfile('foo', 'bar').split(os.sep), 'same structure')
     is_deeply_ok(list(path('foo', 'bar')), catfile('foo', 'bar').split(os.sep), 'same structure')
 
 with subtest('Absolute'):

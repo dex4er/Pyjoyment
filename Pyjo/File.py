@@ -127,9 +127,9 @@ class Pyjo_File(Pyjo.Base.object, Pyjo.String.Mixin.object):
 
             part = path[0]
 
-        A part of the path, as :meth:`to_array` gives it.
+        A part of the path, as :meth:`to_list` gives it.
         """
-        return self.to_array()[index]
+        return self.to_list()[index]
 
     def __iter__(self) -> Iterator[str]:
         """::
@@ -137,9 +137,9 @@ class Pyjo_File(Pyjo.Base.object, Pyjo.String.Mixin.object):
             for part in path:
                 ...
 
-        Iterate the parts of the path, as :meth:`to_array` gives them.
+        Iterate the parts of the path, as :meth:`to_list` gives them.
         """
-        return iter(self.to_array())
+        return iter(self.to_list())
 
     def __len__(self) -> int:
         """::
@@ -148,7 +148,7 @@ class Pyjo_File(Pyjo.Base.object, Pyjo.String.Mixin.object):
 
         Number of the parts of the path.
         """
-        return len(self.to_array())
+        return len(self.to_list())
 
     def basename(self, *suffixes: str) -> str:
         """::
@@ -553,15 +553,15 @@ class Pyjo_File(Pyjo.Base.object, Pyjo.String.Mixin.object):
             return self.new(_canonpath(self._path))
         return self.new(_catfile(os.getcwd(), self._path))
 
-    def to_array(self) -> 'builtins.list[str]':
+    def to_list(self) -> 'builtins.list[str]':
         """::
 
-            parts = path.to_array()
+            parts = path.to_list()
 
         Split the path on directory separators. ::
 
             # "home:sri:.vimrc" (on UNIX)
-            ':'.join(path('/home/sri/.vimrc').to_array())
+            ':'.join(path('/home/sri/.vimrc').to_list())
         """
         return self._path.split(os.sep)
 

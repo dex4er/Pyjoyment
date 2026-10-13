@@ -54,11 +54,11 @@ class Pyjo_Home(Pyjo.File.object):
         # Environment variable
         home: list[str] | None = None
         if os.environ.get('PYJO_HOME'):
-            home = Pyjo.File.new(os.environ['PYJO_HOME']).to_array()
+            home = Pyjo.File.new(os.environ['PYJO_HOME']).to_list()
 
         # Location of the application class
         elif cls is not None and (module := _module(cls)) is not None and (file := getattr(module, '__file__', None)):
-            home = Pyjo.File.new(file).to_array()
+            home = Pyjo.File.new(file).to_list()
             parts = len(module.__name__.split('.')) + (Pyjo.File.new(file).basename() == '__init__.py')
             del home[-parts:]
             for name in ('lib', 'blib'):
