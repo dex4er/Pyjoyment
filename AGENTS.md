@@ -286,6 +286,12 @@ copy:
   variable. Mojo's tests of the pure-Perl code set the variable, and those of
   the XS module run against the standard library.
 - `TO_JSON` is `__json__`.
+- `Mojo::ByteStream` is `Pyjo.String.Unicode` for characters and
+  `Pyjo.String.Bytes` for bytes. A Mojo test's `b(...)` is `u(...)` or
+  `b(...)`, by what the string holds.
+- Perl's `split` is `Pyjo.String.Unicode.split`, not `str.split` or
+  `re.split`: its pattern is a regular expression, a match of no length at
+  the beginning makes no field, and the empty fields at the end are left out.
 - `redo` in an `until` loop starts the body again without checking the
   condition. A `while` with `continue` checks it, so the port is a
   `while True:` inside an `if not ...:`.
@@ -388,6 +394,10 @@ Trunk reports only the issues that a change introduces, and counts an issue
 in a file that already exists upstream as existing, even when the file has
 just been put on the strict list. Check a newly strict module with
 `trunk check --show-existing` or with `.trunk/tools/pyright` directly.
+
+Python 3.12 evaluates the annotations of a function when it defines it, so
+a module in an import cycle, like `Pyjo.String.Unicode` and
+`Pyjo.String.Bytes`, quotes the annotations that name the other module.
 
 A module that ends with `object = Pyjo_X` cannot use `object` in its
 annotations: they are evaluated lazily (PEP 649, Python 3.14), when `object`

@@ -1,37 +1,60 @@
-"""
-Pyjo.String.Unicode - Unicode string
-====================================
+r"""
+Pyjo.String.Unicode - String of characters
+==========================================
 ::
 
     import Pyjo.String.Unicode
 
-    # Manipulate String.Unicode
+    # Manipulate string
     string = Pyjo.String.Unicode.new('foo_bar_baz')
     print(string.camelize())
 
     # Chain methods
-    string = Pyjo.String.Unicode.new('foo_bar_baz').quote()
-    string = string.unquote().encode('utf-8').b64_encode('')
-    print(string.decode('ascii'))
+    string = Pyjo.String.Unicode.new('foo bar baz').quote()
+    string = string.unquote().encode('UTF-8').b64_encode('')
+    print(string)
 
     # Use the alternative constructor
     from Pyjo.String.Unicode import u
-    string = u('foobarbaz').camelize('').say()
+    string = u('foobarbaz').b64_encode('').say()
 
-:mod:`Pyjo.String.Unicode` is a container for unicode strings that provides a
-more friendly API for many of the functions in :mod:`Pyjo.Util`.
+:mod:`Pyjo.String.Unicode` is a :class:`str` that provides a more friendly
+API for many of the functions in :mod:`Pyjo.Util`. Its counterpart for bytes
+is :mod:`Pyjo.String.Bytes`, and both have every method: a method that needs
+bytes encodes the string with ``UTF-8``. A method that turns a string into
+another one returns a :mod:`Pyjo.String.Unicode` object, and one that makes
+bytes, like :meth:`~Pyjo_String_Unicode.md5_bytes`, a
+:mod:`Pyjo.String.Bytes` object. ::
 
-It also inherits all methods from :class:`str`.
+    # Use it as a str
+    string = Pyjo.String.Unicode.new('foo')
+    print(string.upper())
 
-Classes
--------
+See also
+--------
+
+:mod:`Pyjoyment`, https://mojolicious.org.
+
+Ported from `Mojo::ByteStream <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/ByteStream.pm>`_
+of Mojolicious 9.49.
+
+Functions
+---------
 """
 
+import Pyjo.Collection
 import Pyjo.String.Bytes
 import Pyjo.Util
 
+import builtins
+import re
+import sys
 
-DEFAULT_CHARSET = 'utf-8'
+from collections.abc import Callable
+from typing import IO, Any, Self
+
+
+type Anything = builtins.object
 
 
 class Pyjo_String_Unicode(str):
@@ -40,113 +63,484 @@ class Pyjo_String_Unicode(str):
     implements the following new ones.
     """
 
-    def __new__(cls, value='', charset=DEFAULT_CHARSET):
-        return super().__new__(cls, Pyjo.Util.u(value, charset))
+    def __new__(cls, *parts: Anything) -> Self:
+        return super().__new__(cls, ''.join(map(_str, parts)))
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'{self.__module__}.new({super().__repr__()})'
 
-    def html_unescape(self):
+    # Left out from Mojolicious: the "bool" operator, that makes every
+    # bytestream true, as "0" is false in Perl; a str is false only when empty
+
+    def b64_decode(self) -> 'Pyjo.String.Bytes.object':
+        """::
+
+            data = string.b64_decode()
+
+        Base64 decode string with :func:`Pyjo.Util.b64_decode`.
+        """
+        return Pyjo.String.Bytes.new(Pyjo.Util.b64_decode(self.to_str()))
+
+    def b64_encode(self, eol: str = '\n') -> Self:
+        r"""::
+
+            string = string.b64_encode()
+            string = string.b64_encode("\n")
+
+        Base64 encode string with :func:`Pyjo.Util.b64_encode`. ::
+
+            # "Zm9vIGJhciBiYXo="
+            u('foo bar baz').b64_encode('')
+        """
+        return self.new(Pyjo.Util.b64_encode(self.to_bytes(), eol))
+
+    def camelize(self) -> Self:
+        """::
+
+            string = string.camelize()
+
+        Camelize string with :func:`Pyjo.Util.camelize`.
+        """
+        return self.new(Pyjo.Util.camelize(self.to_str()))
+
+    def clone(self) -> Self:
+        """::
+
+            string2 = string.clone()
+
+        Return a new :mod:`Pyjo.String.Unicode` object cloned from this string.
+        """
+        return self.new(self.to_str())
+
+    def decamelize(self) -> Self:
+        """::
+
+            string = string.decamelize()
+
+        Decamelize string with :func:`Pyjo.Util.decamelize`.
+        """
+        return self.new(Pyjo.Util.decamelize(self.to_str()))
+
+    def decode(self, encoding: str = 'UTF-8', errors: str = 'strict') -> Self:
+        """::
+
+            string = string.decode()
+            string = string.decode('iso-8859-1')
+
+        Decode string of the characters 0-255, as the bytes they are, defaults
+        to using ``UTF-8``. ::
+
+            # "♥"
+            u('%E2%99%A5').url_unescape().decode()
+        """
+        # Unlike Mojolicious: invalid input raises an exception, as bytes.decode()
+        # does, and Mojo::ByteStream becomes undef
+        return self.new(self.to_str().encode('latin-1').decode(encoding, errors))
+
+    def encode(self, encoding: str = 'UTF-8', errors: str = 'strict') -> 'Pyjo.String.Bytes.object':
+        """::
+
+            data = string.encode()
+            data = string.encode('iso-8859-1')
+
+        Encode string to a :mod:`Pyjo.String.Bytes` object, defaults to using
+        ``UTF-8``. ::
+
+            # b"%E2%99%A5"
+            u('♥').encode().url_escape()
+        """
+        # Unlike Mojolicious: a character that the encoding cannot represent raises
+        # an exception, as str.encode() does, and Mojo replaces it
+        return Pyjo.String.Bytes.new(self.to_str().encode(encoding, errors))
+
+    def gunzip(self) -> 'Pyjo.String.Bytes.object':
+        """::
+
+            data = string.gunzip()
+
+        Uncompress string with :func:`Pyjo.Util.gunzip`.
+        """
+        return Pyjo.String.Bytes.new(Pyjo.Util.gunzip(self.to_bytes()))
+
+    def gzip(self) -> 'Pyjo.String.Bytes.object':
+        """::
+
+            data = string.gzip()
+
+        Compress string with :func:`Pyjo.Util.gzip`.
+        """
+        return Pyjo.String.Bytes.new(Pyjo.Util.gzip(self.to_bytes()))
+
+    def hmac_sha1_sum(self, secret: str | bytes) -> Self:
+        """::
+
+            string = string.hmac_sha1_sum('passw0rd')
+
+        Generate HMAC-SHA1 checksum for string with
+        :func:`Pyjo.Util.hmac_sha1_sum`. ::
+
+            # "7fbdc89263974a89210ea71f171c77d3f8c21471"
+            u('foo bar baz').hmac_sha1_sum('secr3t')
+        """
+        return self.new(Pyjo.Util.hmac_sha1_sum(self.to_bytes(), _bytes(secret)))
+
+    def html_unescape(self) -> Self:
         """::
 
             string = string.html_unescape()
 
-        Unescape all HTML entities in unicode string with :func:`Pyjo.Util.html_unescape`. ::
+        Unescape all HTML entities in string with
+        :func:`Pyjo.Util.html_unescape`. ::
 
-            b('&lt;html&gt;').html_unescape().url_escape().say()
+            # "%3Chtml%3E"
+            u('&lt;html&gt;').html_unescape().url_escape()
         """
-        return self.new(Pyjo.Util.html_unescape(self))
+        return self.new(Pyjo.Util.html_unescape(self.to_str()))
 
-    def encode(self, charset=DEFAULT_CHARSET):
+    def humanize_bytes(self) -> Self:
         """::
 
-            string = string.encode()
-            string = string.encode('iso-8859-1')
+            string = string.humanize_bytes()
 
-        Encode unicode string, defaults to ``utf-8``, and return new :mod:`Pyjo.String.Bytes` object. ::
-
-            string.trim().quote().encode().say()
+        Turn number of bytes into a simplified human readable format for string
+        with :func:`Pyjo.Util.humanize_bytes`.
         """
-        return Pyjo.String.Bytes.new(super().encode(charset))
+        return self.new(Pyjo.Util.humanize_bytes(_number(self.to_str())))
+
+    def md5_bytes(self) -> 'Pyjo.String.Bytes.object':
+        """::
+
+            data = string.md5_bytes()
+
+        Generate binary MD5 checksum for string with :func:`Pyjo.Util.md5_bytes`.
+        """
+        return Pyjo.String.Bytes.new(Pyjo.Util.md5_bytes(self.to_bytes()))
+
+    def md5_sum(self) -> Self:
+        """::
+
+            string = string.md5_sum()
+
+        Generate MD5 checksum for string with :func:`Pyjo.Util.md5_sum`.
+        """
+        return self.new(Pyjo.Util.md5_sum(self.to_bytes()))
 
     @classmethod
-    def new(cls, value='', charset=DEFAULT_CHARSET):
+    def new(cls, *parts: Anything) -> Self:
         """::
 
             string = Pyjo.String.Unicode.new('test123')
 
         Construct a new :mod:`Pyjo.String.Unicode` object.
         """
-        return Pyjo_String_Unicode(value, charset)
+        return cls(*parts)
 
-    def say(self, **kwargs):
+    def punycode_decode(self) -> Self:
+        """::
+
+            string = string.punycode_decode()
+
+        Punycode decode string with :func:`Pyjo.Util.punycode_decode`.
+        """
+        return self.new(Pyjo.Util.punycode_decode(self.to_str()))
+
+    def punycode_encode(self) -> Self:
+        """::
+
+            string = string.punycode_encode()
+
+        Punycode encode string with :func:`Pyjo.Util.punycode_encode`.
+        """
+        return self.new(Pyjo.Util.punycode_encode(self.to_str()))
+
+    def quote(self) -> Self:
+        """::
+
+            string = string.quote()
+
+        Quote string with :func:`Pyjo.Util.quote`.
+        """
+        return self.new(Pyjo.Util.quote(self.to_str()))
+
+    def say(self, handle: IO[str] | None = None) -> Self:
         """::
 
             string = string.say()
-            string = string.say(file=sys.stderr, end='', flush=True)
+            string = string.say(sys.stderr)
 
-        Print unicode string to handle and append a newline, defaults to :attr:`sys.stdout`.
+        Print string to handle and append a newline, defaults to using
+        :data:`sys.stdout`.
         """
-        print(self.to_str(), **kwargs)
+        print(self.to_str(), file=handle if handle is not None else sys.stdout)
         return self
 
-    def to_bytes(self, charset=DEFAULT_CHARSET):
+    def secure_compare(self, string: str | bytes) -> bool:
         """::
 
-            bstring = string.to_bytes()
-            bstring = string.to_bytes(charset)
+            boolean = string.secure_compare(string2)
 
-        Turn unicode string into a bytes string.
+        Compare string with :func:`Pyjo.Util.secure_compare`.
         """
-        return Pyjo.Util.b(self, charset)
+        return Pyjo.Util.secure_compare(self.to_str(), string)
 
-    def to_str(self, charset=DEFAULT_CHARSET):
+    def sha1_bytes(self) -> 'Pyjo.String.Bytes.object':
+        """::
+
+            data = string.sha1_bytes()
+
+        Generate binary SHA1 checksum for string with
+        :func:`Pyjo.Util.sha1_bytes`.
+        """
+        return Pyjo.String.Bytes.new(Pyjo.Util.sha1_bytes(self.to_bytes()))
+
+    def sha1_sum(self) -> Self:
+        """::
+
+            string = string.sha1_sum()
+
+        Generate SHA1 checksum for string with :func:`Pyjo.Util.sha1_sum`.
+        """
+        return self.new(Pyjo.Util.sha1_sum(self.to_bytes()))
+
+    @property
+    def size(self) -> int:
+        """::
+
+            size = string.size
+
+        Size of string.
+        """
+        return len(self)
+
+    def slugify(self, allow_unicode: bool = False) -> Self:
+        """::
+
+            string = string.slugify()
+            string = string.slugify(boolean)
+
+        Generate URL slug for string with :func:`Pyjo.Util.slugify`.
+        """
+        return self.new(Pyjo.Util.slugify(self.to_str(), allow_unicode))
+
+    # Perl's split, which Mojo uses, is not str.split()
+    def split(  # pyright: ignore[reportIncompatibleMethodOverride]
+        self, pattern: str | re.Pattern[str], limit: int = 0
+    ) -> 'Pyjo.Collection.object':
+        """::
+
+            collection = string.split(',')
+            collection = string.split(',', -1)
+
+        Turn string into :mod:`Pyjo.Collection` object containing
+        :mod:`Pyjo.String.Unicode` objects. The pattern is a regular
+        expression, and the fields at the end that are empty are left out,
+        unless the limit is negative. ::
+
+            # "One,Two,Three"
+            u('one,two,three').split(',').map('camelize').join(',')
+
+            # "One,Two,Three,,,"
+            u('one,two,three,,,').split(',', -1).map('camelize').join(',')
+        """
+        return Pyjo.Collection.object(
+            [None if f is None else self.new(f) for f in split(pattern, self.to_str(), limit)]
+        )
+
+    def tap(self, cb: Callable[..., Any] | str, *args: Any, **kwargs: Any) -> Self:
+        """::
+
+            string = string.tap(lambda s: ...)
+
+        Alias for :meth:`Pyjo.Base.tap`.
+        """
+        if callable(cb):
+            cb(self, *args, **kwargs)
+        else:
+            getattr(self, cb)(*args, **kwargs)
+        return self
+
+    def term_escape(self) -> Self:
+        """::
+
+            string = string.term_escape()
+
+        Escape POSIX control characters in string with
+        :func:`Pyjo.Util.term_escape`. ::
+
+            # Print binary checksum to terminal
+            u('foo').sha1_bytes().term_escape().say()
+        """
+        return self.new(Pyjo.Util.term_escape(self.to_str()))
+
+    # Not in Mojolicious: the counterpart of to_str() in Pyjo.String.Mixin
+    def to_bytes(self) -> bytes:
+        """::
+
+            data = string.to_bytes()
+
+        Turn string into :class:`bytes`, encoded with ``UTF-8``.
+        """
+        return self.to_str().encode('UTF-8')
+
+    # Renamed from Mojolicious: to_string
+    def to_str(self) -> str:
         """::
 
             string = string.to_str()
 
-        Turn unicode string into a string, the same as :meth:`to_unicode`.
+        Turn string into :class:`str`.
         """
-        return self.to_unicode(charset)
+        return str.__str__(self)
 
-    def to_unicode(self, charset=DEFAULT_CHARSET):
-        """::
-
-            ustring = string.to_unicode()
-            ustring = string.to_unicode(charset)
-
-        Turn unicode string into an unicode string.
-        """
-        return Pyjo.Util.u(self, charset)
-
-    def trim(self):
+    def trim(self) -> Self:
         """::
 
             string = string.trim()
 
-        Trim whitespace characters from both ends of bytestring with :func:`Pyjo.Util.trim`.
+        Trim whitespace characters from both ends of string with
+        :func:`Pyjo.Util.trim`.
         """
-        return self.new(Pyjo.Util.trim(self))
+        return self.new(Pyjo.Util.trim(self.to_str()))
 
-    def xml_escape(self):
+    def unindent(self) -> Self:
+        """::
+
+            string = string.unindent()
+
+        Unindent string with :func:`Pyjo.Util.unindent`.
+        """
+        return self.new(Pyjo.Util.unindent(self.to_str()))
+
+    def unquote(self) -> Self:
+        """::
+
+            string = string.unquote()
+
+        Unquote string with :func:`Pyjo.Util.unquote`.
+        """
+        return self.new(Pyjo.Util.unquote(self.to_str()))
+
+    def url_escape(self, pattern: str | None = None) -> Self:
+        r"""::
+
+            string = string.url_escape()
+            string = string.url_escape(r'^A-Za-z0-9\-._~')
+
+        Percent encode all unsafe characters in string with
+        :func:`Pyjo.Util.url_escape`. ::
+
+            # b"%E2%98%83"
+            u('☃').encode().url_escape()
+        """
+        return self.new(Pyjo.Util.url_escape(self.to_str(), pattern))
+
+    def url_unescape(self) -> Self:
+        """::
+
+            string = string.url_unescape()
+
+        Decode percent encoded characters in string with
+        :func:`Pyjo.Util.url_unescape`. ::
+
+            # "&lt;html&gt;"
+            u('%3Chtml%3E').url_unescape().xml_escape()
+        """
+        return self.new(Pyjo.Util.url_unescape(self.to_str()))
+
+    # Left out from Mojolicious: with_roles, as Pyjoyment has no roles
+
+    def xml_escape(self) -> Self:
         """::
 
             string = string.xml_escape()
 
         Escape only the characters ``&``, ``<``, ``>``, ``"`` and ``'`` in
-        unicode string with :func:`Pyjo.Util.xml_escape`.
+        string with :func:`Pyjo.Util.xml_escape`.
         """
-        return self.new(Pyjo.Util.xml_escape(str(self)))
+        return self.new(Pyjo.Util.xml_escape(self.to_str()))
+
+    def xor_encode(self, key: str | bytes) -> 'Pyjo.String.Bytes.object':
+        """::
+
+            data = string.xor_encode(key)
+
+        XOR encode string with :func:`Pyjo.Util.xor_encode`. ::
+
+            # b"%04%0E%15B%03%1B%10"
+            u('foo bar').xor_encode('baz').url_escape()
+        """
+        return Pyjo.String.Bytes.new(Pyjo.Util.xor_encode(self.to_bytes(), _bytes(key)))
 
 
-def u(value='', charset=DEFAULT_CHARSET):
+def u(*parts: Anything) -> Pyjo_String_Unicode:
     """::
 
         string = u('test123')
 
     Construct a new :mod:`Pyjo.String.Unicode` object.
     """
-    return Pyjo_String_Unicode(value, charset)
+    return Pyjo_String_Unicode(*parts)
+
+
+# Not in Mojolicious: Perl's split, for Pyjo.String.Bytes too
+def split(pattern: str | re.Pattern[str], string: str, limit: int = 0) -> list[str | None]:
+    """::
+
+        fields = split(',', '1,2,3')
+
+    Split string as Perl's ``split`` does: the pattern is a regular
+    expression, a match of no length at the beginning of the string or right
+    after another match makes no field, the groups of the pattern are fields
+    too, and the fields at the end that are empty are left out, unless the
+    limit is negative. A positive limit is the largest number
+    of fields, the pattern ``' '`` splits on whitespace after leading
+    whitespace, and ``'^'`` matches at the beginning of every line.
+    """
+    if pattern == ' ':
+        string, pattern = re.sub(r'\A\s+', '', string), r'\s+'
+    regex = re.compile(pattern) if isinstance(pattern, str) else pattern
+    if regex.pattern == '^':
+        regex = re.compile('^', regex.flags | re.M)
+    if not len(string):
+        return []
+
+    fields: list[str | None] = []
+    pos = count = 0
+    for m in regex.finditer(string):
+        if limit > 0 and count >= limit - 1:
+            break
+        if m.start() == m.end() == pos:
+            continue
+        fields.append(string[pos : m.start()])
+        fields.extend(m.groups())
+        pos = m.end()
+        count += 1
+    fields.append(string[pos:])
+
+    if limit == 0:
+        while len(fields) and not fields[-1]:
+            fields.pop()
+    return fields
+
+
+def _bytes(value: str | bytes) -> bytes:
+    return value.encode('UTF-8') if isinstance(value, str) else value
+
+
+def _number(string: str) -> int | float:
+    try:
+        return int(string)
+    except ValueError:
+        return float(string)
+
+
+def _str(part: Anything) -> str:
+    if isinstance(part, (bytes, bytearray)):
+        try:
+            return bytes(part).decode('UTF-8')
+        except UnicodeDecodeError:
+            return bytes(part).decode('latin-1')
+    return str(part)
 
 
 new = Pyjo_String_Unicode.new
