@@ -111,8 +111,14 @@ class Pyjo_Collection[T](list[T]):
             cb(e, i)
         return self
 
+    @overload
+    def first(self, cb: Callable[[T], object] | None = None, /) -> T | None: ...
+
+    @overload
+    def first(self, cb: Callable[..., Any] | str | re.Pattern[str], /, *args: Any, **kwargs: Any) -> T | None: ...
+
     def first(
-        self, cb: Callable[..., Any] | str | re.Pattern[str] | None = None, *args: Any, **kwargs: Any
+        self, cb: Callable[..., Any] | str | re.Pattern[str] | None = None, /, *args: Any, **kwargs: Any
     ) -> T | None:
         """::
 
@@ -180,7 +186,13 @@ class Pyjo_Collection[T](list[T]):
         """
         return self[index] if -len(self) <= index < len(self) else default
 
-    def grep(self, cb: Callable[..., Any] | str | re.Pattern[str], *args: Any, **kwargs: Any) -> Self:
+    @overload
+    def grep(self, cb: Callable[[T], object], /) -> Self: ...
+
+    @overload
+    def grep(self, cb: Callable[..., Any] | str | re.Pattern[str], /, *args: Any, **kwargs: Any) -> Self: ...
+
+    def grep(self, cb: Callable[..., Any] | str | re.Pattern[str], /, *args: Any, **kwargs: Any) -> Self:
         """::
 
             new = collection.grep(re.compile(r'foo'))
@@ -247,7 +259,13 @@ class Pyjo_Collection[T](list[T]):
         """
         return self[-1] if len(self) else None
 
-    def map(self, cb: Callable[..., Any] | str, *args: Any, **kwargs: Any) -> 'Pyjo_Collection[Any]':
+    @overload
+    def map[U](self, cb: Callable[[T], U], /) -> 'Pyjo_Collection[U]': ...
+
+    @overload
+    def map(self, cb: Callable[..., Any] | str, /, *args: Any, **kwargs: Any) -> 'Pyjo_Collection[Any]': ...
+
+    def map(self, cb: Callable[..., Any] | str, /, *args: Any, **kwargs: Any) -> 'Pyjo_Collection[Any]':
         """::
 
             new = collection.map(lambda e: ...)
