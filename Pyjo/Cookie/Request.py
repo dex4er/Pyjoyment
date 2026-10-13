@@ -31,6 +31,8 @@ from Pyjo.Util import quote, split_header
 
 import re
 
+from http.cookies import BaseCookie
+
 
 class Pyjo_Cookie_Request(Pyjo.Cookie.object):
     """
@@ -39,13 +41,19 @@ class Pyjo_Cookie_Request(Pyjo.Cookie.object):
     """
 
     @classmethod
-    def parse[C: Pyjo_Cookie_Request](cls: type[C], string: str | None = None) -> list[C]:
+    def parse[C: Pyjo_Cookie_Request](cls: type[C], string: str | BaseCookie[str] | None = None) -> list[C]:
         """::
 
             cookies = Pyjo.Cookie.Request.parse('f=b; g=a')
+            cookies = Pyjo.Cookie.Request.parse(SimpleCookie('f=b; g=a'))
 
-        Parse cookies.
+        Parse cookies, also from a :class:`http.cookies.SimpleCookie` of the standard
+        library.
         """
+        # Not in Mojolicious: http.cookies of the standard library
+        if isinstance(string, BaseCookie):
+            return [cls.new(morsel) for morsel in string.values()]
+
         cookies: list[C] = []
         tree: list[list[list[str | None]]] = split_header(string or '')
         for name, value in (pair for pairs in tree for pair in pairs):

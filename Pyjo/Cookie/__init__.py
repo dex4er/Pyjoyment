@@ -29,6 +29,12 @@ Classes
 import Pyjo.Base
 import Pyjo.String.Mixin
 
+from Pyjo.Util import quote
+
+import re
+
+from http.cookies import BaseCookie, Morsel
+
 
 class Pyjo_Cookie(Pyjo.Base.object, Pyjo.String.Mixin.object):
     """
@@ -36,7 +42,16 @@ class Pyjo_Cookie(Pyjo.Base.object, Pyjo.String.Mixin.object):
     :mod:`Pyjo.String.Mixin` and implements the following new ones.
     """
 
-    def __init__(self, *, name: str | None = None, value: str | None = None) -> None:
+    def __init__(self, morsel: Morsel[str] | None = None, *, name: str | None = None, value: str | None = None) -> None:
+        """::
+
+            cookie = Pyjo.Cookie.Request.new()
+            cookie = Pyjo.Cookie.Request.new(name='foo', value='bar')
+            cookie = Pyjo.Cookie.Request.new(SimpleCookie('foo=bar')['foo'])
+
+        Construct a new cookie, from a :class:`http.cookies.Morsel` of the standard
+        library if one is given.
+        """
         self.name = name
         """::
 
@@ -54,6 +69,10 @@ class Pyjo_Cookie(Pyjo.Base.object, Pyjo.String.Mixin.object):
 
         Cookie value.
         """
+
+        # Not in Mojolicious: a Morsel of http.cookies of the standard library
+        if morsel is not None:
+            self.name, self.value = morsel.key, morsel.value
 
     def __bool__(self) -> bool:
         """::
@@ -74,7 +93,7 @@ class Pyjo_Cookie(Pyjo.Base.object, Pyjo.String.Mixin.object):
         return self.to_str()
 
     @classmethod
-    def parse[C: Pyjo_Cookie](cls: type[C], string: str | None = None) -> list[C]:
+    def parse[C: Pyjo_Cookie](cls: type[C], string: str | BaseCookie[str] | None = None) -> list[C]:
         """::
 
             cookies = cookie.parse(string)
@@ -91,6 +110,22 @@ class Pyjo_Cookie(Pyjo.Base.object, Pyjo.String.Mixin.object):
         Render cookie. Meant to be overloaded in a subclass.
         """
         raise NotImplementedError('Method "to_str" not implemented by subclass')
+
+    # Not in Mojolicious: http.cookies of the standard library
+    def to_morsel(self) -> Morsel[str]:
+        """::
+
+            morsel = cookie.to_morsel()
+
+        Turn cookie into a :class:`http.cookies.Morsel`, for the standard library. ::
+
+            # "foo=\"b r\""
+            Pyjo.Cookie.Request.new(name='foo', value='b r').to_morsel().OutputString()
+        """
+        morsel: Morsel[str] = Morsel()
+        value = self.value or ''
+        morsel.set(self.name or '', value, quote(value) if re.search(r'[,;" ]', value) else value)
+        return morsel
 
 
 new = Pyjo_Cookie.new

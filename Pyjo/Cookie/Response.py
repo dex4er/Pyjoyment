@@ -30,7 +30,10 @@ import Pyjo.Date
 
 from Pyjo.Util import quote, split_cookie_header
 
+import contextlib
 import re
+
+from http.cookies import BaseCookie, CookieError, Morsel
 
 
 ATTRS = {'domain', 'expires', 'httponly', 'max-age', 'partitioned', 'path', 'samesite', 'secure'}
@@ -44,6 +47,7 @@ class Pyjo_Cookie_Response(Pyjo.Cookie.object):
 
     def __init__(
         self,
+        morsel: Morsel[str] | None = None,
         *,
         name: str | None = None,
         value: str | None = None,
@@ -57,7 +61,7 @@ class Pyjo_Cookie_Response(Pyjo.Cookie.object):
         samesite: str | None = None,
         secure: bool | None = None,
     ) -> None:
-        super().__init__(name=name, value=value)
+        super().__init__(morsel, name=name, value=value)
 
         self.domain = domain
         """::
@@ -147,14 +151,25 @@ class Pyjo_Cookie_Response(Pyjo.Cookie.object):
         connections.
         """
 
+        # Not in Mojolicious: the attributes of a Morsel of http.cookies, as a
+        # "Set-Cookie" header gives them
+        if morsel is not None:
+            vars(self).update(vars(self.parse(morsel.OutputString())[0]))
+
     @classmethod
-    def parse[C: Pyjo_Cookie_Response](cls: type[C], string: str | None = None) -> list[C]:
+    def parse[C: Pyjo_Cookie_Response](cls: type[C], string: str | BaseCookie[str] | None = None) -> list[C]:
         """::
 
             cookies = Pyjo.Cookie.Response.parse('f=b; path=/')
+            cookies = Pyjo.Cookie.Response.parse(SimpleCookie('f=b; path=/'))
 
-        Parse cookies.
+        Parse cookies, also from a :class:`http.cookies.SimpleCookie` of the standard
+        library.
         """
+        # Not in Mojolicious: http.cookies of the standard library
+        if isinstance(string, BaseCookie):
+            return [cls.new(morsel) for morsel in string.values()]
+
         cookies: list[C] = []
         tree: list[list[list[str | None]]] = split_cookie_header(string or '')
         for pairs in tree:
@@ -182,6 +197,39 @@ class Pyjo_Cookie_Response(Pyjo.Cookie.object):
                     setattr(cookie, attr, True)
 
         return cookies
+
+    # Not in Mojolicious: http.cookies of the standard library
+    def to_morsel(self) -> Morsel[str]:
+        """::
+
+            morsel = cookie.to_morsel()
+
+        Turn cookie into a :class:`http.cookies.Morsel`, for the standard library.
+        The partitioned flag is left out before Python 3.14, as ``Morsel`` has no
+        such attribute there. ::
+
+            # "foo=bar; Path=/; Secure"
+            Pyjo.Cookie.Response.new(name='foo', value='bar', path='/', secure=True).to_morsel().OutputString()
+        """
+        morsel = super().to_morsel()
+        if (expires := self.expires) is not None:
+            morsel['expires'] = Pyjo.Date.new(expires).to_str()
+        if domain := self.domain:
+            morsel['domain'] = domain
+        if path := self.path:
+            morsel['path'] = path
+        if self.partitioned:
+            with contextlib.suppress(CookieError):
+                morsel['partitioned'] = True
+        if self.secure:
+            morsel['secure'] = True
+        if self.httponly:
+            morsel['httponly'] = True
+        if samesite := self.samesite:
+            morsel['samesite'] = samesite
+        if (max_age := self.max_age) is not None:
+            morsel['max-age'] = str(max_age)
+        return morsel
 
     def to_str(self) -> str:
         """::
