@@ -127,6 +127,8 @@ strict = [
   "Pyjo/Cookie/Response.py",
   "Pyjo/Date.py",
   "Pyjo/Headers.py",
+  "Pyjo/JSON/__init__.py",
+  "Pyjo/JSON/Pointer.py",
   "Pyjo/Parameters.py",
   "Pyjo/Path.py",
   "Pyjo/Prove.py",

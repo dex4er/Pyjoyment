@@ -1,25 +1,49 @@
-class JSONTest:
-    def __init__(self, something=None):
-        self.something = {} if something is None else something
+import os
 
-    def to_json(self):
+
+os.environ['PYJO_NO_JSON_STDLIB'] = '1'
+
+# E402 "Module level import not at top of file": the environment variable has to
+# be set before Pyjo.JSON is imported
+import Pyjo.Base  # noqa: E402
+import Pyjo.JSON  # noqa: E402
+
+from Pyjo.JSON import decode_json, encode_json, false, from_json, j, to_json, true  # noqa: E402
+from Pyjo.String.Bytes import b  # noqa: E402
+from Pyjo.Test import *  # noqa: E402
+from Pyjo.Util import encode  # noqa: E402
+
+import re  # noqa: E402
+
+
+class JSONTest(Pyjo.Base.object):
+    def __init__(self, **kwargs):
+        self.something = {}
+        self.set(**kwargs)
+
+    def __json__(self):
         return self.something
 
 
-if __name__ == '__main__':
-    from Pyjo.Test import *  # noqa
+class JSONTest2(Pyjo.Base.object):
+    def __and__(self, other):
+        raise RuntimeError
 
-    from Pyjo.JSON import decode_json, encode_json, from_json, j, to_json
-    from Pyjo.String.Bytes import b
-    from Pyjo.String.Unicode import u
+    def __str__(self):
+        return 'works!'
 
-    # Decode array
+
+class JSONTest3(Pyjo.Base.object):
+    pass
+
+
+with subtest('Decode array'):
     array = decode_json('[]')
     is_deeply_ok(array, [], 'decode []')
     array = decode_json('[ [ ]]')
     is_deeply_ok(array, [[]], 'decode [ [ ]]')
 
-    # Decode number
+with subtest('Decode number'):
     array = decode_json('[0]')
     is_deeply_ok(array, [0], 'decode [0]')
     array = decode_json('[1]')
@@ -47,21 +71,21 @@ if __name__ == '__main__':
     value = decode_json('23.3')
     cmp_ok(value, '==', 23.3, 'decode 23.3')
 
-    # Decode name
+with subtest('Decode name'):
     array = decode_json('[true]')
-    is_deeply_ok(array, [True], 'decode [true]')
+    is_deeply_ok(array, [Pyjo.JSON.true], 'decode [true]')
     array = decode_json('[null]')
     is_deeply_ok(array, [None], 'decode [null]')
     array = decode_json('[true, false]')
-    is_deeply_ok(array, [True, False], 'decode [true, false]')
+    is_deeply_ok(array, [true, false], 'decode [true, false]')
     value = decode_json('true')
-    is_ok(value, True, 'decode true')
+    is_ok(value, Pyjo.JSON.true, 'decode true')
     value = decode_json('false')
-    is_ok(value, False, 'decode false')
+    is_ok(value, Pyjo.JSON.false, 'decode false')
     value = decode_json('null')
     is_ok(value, None, 'decode null')
 
-    # Decode string
+with subtest('Decode string'):
     array = decode_json('[" "]')
     is_deeply_ok(array, [' '], 'decode [" "]')
     array = decode_json('["hello world!"]')
@@ -85,198 +109,343 @@ if __name__ == '__main__':
     value = decode_json(r'"hell\no"')
     is_ok(value, 'hell\no', r'decode "hell\no"')
 
-    # Decode object
-    dictionary = decode_json('{}')
-    is_deeply_ok(dictionary, {}, 'decode {}')
-    dictionary = decode_json('{"foo": "bar"}')
-    is_deeply_ok(dictionary, {'foo': 'bar'}, 'decode {"foo": "bar"}')
-    dictionary = decode_json('{"foo": [23, "bar"]}')
-    is_deeply_ok(dictionary, {'foo': [23, 'bar']}, 'decode {"foo": [23, "bar"]}')
+with subtest('Decode object'):
+    hash = decode_json('{}')
+    is_deeply_ok(hash, {}, 'decode {}')
+    hash = decode_json('{"foo": "bar"}')
+    is_deeply_ok(hash, {'foo': 'bar'}, 'decode {"foo": "bar"}')
+    hash = decode_json('{"foo": [23, "bar"]}')
+    is_deeply_ok(hash, {'foo': [23, 'bar']}, 'decode {"foo": [23, "bar"]}')
 
-    # Decode full spec example
-    dictionary = decode_json("""
-    {
-       "Image": {
-           "Width":  800,
-           "Height": 600,
-           "Title":  "View from 15th Floor",
-           "Thumbnail": {
-               "Url":    "http://www.example.com/image/481989943",
-               "Height": 125,
-               "Width":  "100"
-           },
-           "IDs": [116, 943, 234, 38793]
-        }
+with subtest('Decode full spec example'):
+    hash = decode_json("""{
+   "Image": {
+       "Width":  800,
+       "Height": 600,
+       "Title":  "View from 15th Floor",
+       "Thumbnail": {
+           "Url":    "http://www.example.com/image/481989943",
+           "Height": 125,
+           "Width":  "100"
+       },
+       "IDs": [116, 943, 234, 38793]
     }
-    """)
-    is_ok(dictionary['Image']['Width'], 800, 'right value')
-    is_ok(dictionary['Image']['Height'], 600, 'right value')
-    is_ok(dictionary['Image']['Title'], 'View from 15th Floor', 'right value')
-    is_ok(dictionary['Image']['Thumbnail']['Url'], 'http://www.example.com/image/481989943', 'right value')
-    is_ok(dictionary['Image']['Thumbnail']['Height'], 125, 'right value')
-    is_ok(dictionary['Image']['Thumbnail']['Width'], '100', 'right value')
-    is_ok(dictionary['Image']['IDs'][0], 116, 'right value')
-    is_ok(dictionary['Image']['IDs'][1], 943, 'right value')
-    is_ok(dictionary['Image']['IDs'][2], 234, 'right value')
-    is_ok(dictionary['Image']['IDs'][3], 38793, 'right value')
+}
+""")
+    is_ok(hash['Image']['Width'], 800, 'right value')
+    is_ok(hash['Image']['Height'], 600, 'right value')
+    is_ok(hash['Image']['Title'], 'View from 15th Floor', 'right value')
+    is_ok(hash['Image']['Thumbnail']['Url'], 'http://www.example.com/image/481989943', 'right value')
+    is_ok(hash['Image']['Thumbnail']['Height'], 125, 'right value')
+    is_ok(hash['Image']['Thumbnail']['Width'], '100', 'right value')
+    is_ok(hash['Image']['IDs'][0], 116, 'right value')
+    is_ok(hash['Image']['IDs'][1], 943, 'right value')
+    is_ok(hash['Image']['IDs'][2], 234, 'right value')
+    is_ok(hash['Image']['IDs'][3], 38793, 'right value')
 
-    # Encode array
-    bstring = encode_json([])
-    is_ok(bstring, b'[]', 'encode []')
-    bstring = encode_json([[]])
-    is_ok(bstring, b'[[]]', 'encode [[]]')
-    bstring = encode_json([[], []])
-    is_ok(bstring, b'[[],[]]', 'encode [[], []]')
-    bstring = encode_json([[], [[]], []])
-    is_ok(bstring, b'[[],[[]],[]]', 'encode [[], [[]], []]')
+with subtest('Encode array'):
+    data = encode_json([])
+    is_ok(data, b'[]', 'encode []')
+    data = encode_json([[]])
+    is_ok(data, b'[[]]', 'encode [[]]')
+    data = encode_json([[], []])
+    is_ok(data, b'[[],[]]', 'encode [[], []]')
+    data = encode_json([[], [[]], []])
+    is_ok(data, b'[[],[[]],[]]', 'encode [[], [[]], []]')
 
-    # Encode string
-    bstring = encode_json(['foo'])
-    is_ok(bstring, b'["foo"]', "encode ['foo']")
-    bstring = encode_json(['hello\nworld!'])
-    is_ok(bstring, rb'["hello\nworld!"]', r'encode ["hello\nworld!"]')
-    bstring = encode_json(['hello\t"world!'])
-    is_ok(bstring, rb'["hello\t\"world!"]', r'encode ["hello\t\"world!"]')
-    bstring = encode_json(['hello\x03\u0152world\u0152!'])
-    is_ok(b(bstring).decode('utf-8'), '["hello\\u0003\u0152world\u0152!"]', r'encode ["hello\x03\u0152world\u0152!"]')
-    bstring = encode_json(['123abc'])
-    is_ok(bstring, b'["123abc"]', 'encode ["123abc"]')
-    bstring = encode_json(['\x00\x1f \a\b/\f\r'])
-    is_ok(bstring, b'["\\u0000\\u001f \\u0007\\b\\/\\f\\r"]', r'encode ["\x00\x1f \a\b/\f\r"]')
-    bstring = encode_json('')
-    is_ok(bstring, b'""', 'encode ""')
-    bstring = encode_json('hell\no')
-    is_ok(bstring, b'"hell\\no"', r'encode "hell\no"')
+with subtest('Encode string'):
+    data = encode_json(['foo'])
+    is_ok(data, b'["foo"]', "encode ['foo']")
+    data = encode_json(['hello\nworld!'])
+    is_ok(data, rb'["hello\nworld!"]', r"encode ['hello\nworld!']")
+    data = encode_json(['hello\t"world!'])
+    is_ok(data, rb'["hello\t\"world!"]', r"""encode ['hello\t"world!']""")
+    data = encode_json(['hello\x03\u0152world\u0152!'])
+    is_ok(
+        data.decode('UTF-8'),
+        '["hello\\u0003\u0152world\u0152!"]',
+        r"encode ['hello\x03\u0152world\u0152!']",
+    )
+    data = encode_json(['123abc'])
+    is_ok(data, b'["123abc"]', "encode ['123abc']")
+    data = encode_json(['\x00\x1f \a\b/\f\r'])
+    is_ok(data, rb'["\u0000\u001F \u0007\b\/\f\r"]', r"encode ['\x00\x1f \a\b/\f\r']")
+    data = encode_json('')
+    is_ok(data, b'""', "encode ''")
+    data = encode_json('hell\no')
+    is_ok(data, rb'"hell\no"', r"encode 'hell\no'")
 
-    # Encode object
-    bstring = encode_json({})
-    is_ok(bstring, b'{}', 'encode {}')
-    bstring = encode_json({'foo': {}})
-    is_ok(bstring, b'{"foo":{}}', 'encode {foo: {}}')
-    bstring = encode_json({'foo': 'bar'})
-    is_ok(bstring, b'{"foo":"bar"}', "encode {foo: 'bar'}")
-    bstring = encode_json({'foo': []})
-    is_ok(bstring, b'{"foo":[]}', 'encode {foo: []}')
-    bstring = encode_json({'foo': ['bar']})
-    is_ok(bstring, b'{"foo":["bar"]}', "encode {foo: ['bar']}")
+with subtest('Encode object'):
+    data = encode_json({})
+    is_ok(data, b'{}', 'encode {}')
+    data = encode_json({'foo': {}})
+    is_ok(data, b'{"foo":{}}', "encode {'foo': {}}")
+    data = encode_json({'foo': 'bar'})
+    is_ok(data, b'{"foo":"bar"}', "encode {'foo': 'bar'}")
+    data = encode_json({'foo': []})
+    is_ok(data, b'{"foo":[]}', "encode {'foo': []}")
+    data = encode_json({'foo': ['bar']})
+    is_ok(data, b'{"foo":["bar"]}', "encode {'foo': ['bar']}")
+    data = encode_json({'foo': 'bar', 'baz': 'yada'})
+    is_ok(data, b'{"baz":"yada","foo":"bar"}', "encode {'foo': 'bar', 'baz': 'yada'}")
 
-    # Encode name
-    bstring = encode_json([True])
-    is_ok(bstring, b'[true]', 'encode [True]')
-    bstring = encode_json([None])
-    is_ok(bstring, b'[null]', 'encode [None]')
-    bstring = encode_json([True, False])
-    is_ok(bstring, b'[true,false]', 'encode [True, False]')
-    bstring = encode_json(True)
-    is_ok(bstring, b'true', 'encode True')
-    bstring = encode_json(False)
-    is_ok(bstring, b'false', 'encode False')
-    bstring = encode_json(None)
-    is_ok(bstring, b'null', 'encode None')
+with subtest('Encode name'):
+    data = encode_json([Pyjo.JSON.true])
+    is_ok(data, b'[true]', 'encode [Pyjo.JSON.true]')
+    data = encode_json([None])
+    is_ok(data, b'[null]', 'encode [None]')
+    data = encode_json([Pyjo.JSON.true, Pyjo.JSON.false])
+    is_ok(data, b'[true,false]', 'encode [Pyjo.JSON.true, Pyjo.JSON.false]')
+    data = encode_json(Pyjo.JSON.true)
+    is_ok(data, b'true', 'encode Pyjo.JSON.true')
+    data = encode_json(Pyjo.JSON.false)
+    is_ok(data, b'false', 'encode Pyjo.JSON.false')
+    data = encode_json(None)
+    is_ok(data, b'null', 'encode None')
 
-    # Encode number
-    bstring = encode_json([1])
-    is_ok(bstring, b'[1]', 'encode [1]')
-    bstring = encode_json(['1'])
-    is_ok(bstring, b'["1"]', 'encode ["1"]')
-    bstring = encode_json(['-122.026020'])
-    is_ok(bstring, b'["-122.026020"]', "encode ['-122.026020']")
-    bstring = encode_json([-122.026020])
-    is_ok(bstring, b'[-122.02602]', 'encode [-122.026020]')
-    bstring = encode_json([1, -2])
-    is_ok(bstring, b'[1,-2]', 'encode [1, -2]')
-    bstring = encode_json(['10e12', [2]])
-    is_ok(bstring, b'["10e12",[2]]', "encode ['10e12', [2]]")
-    bstring = encode_json([int(10e12), [2]])
-    is_ok(bstring, b'[10000000000000,[2]]', 'encode [10e12, [2]]')
-    bstring = encode_json([37.7668, [20]])
-    is_ok(bstring, b'[37.7668,[20]]', 'encode [37.7668, [20]]')
-    bstring = encode_json(0)
-    is_ok(bstring, b'0', 'encode 0')
-    bstring = encode_json(23.3)
-    is_ok(bstring, b'23.3', 'encode 23.3')
+with subtest('Encode number'):
+    data = encode_json([1])
+    is_ok(data, b'[1]', 'encode [1]')
+    data = encode_json(['1'])
+    is_ok(data, b'["1"]', "encode ['1']")
+    data = encode_json(['-122.026020'])
+    is_ok(data, b'["-122.026020"]', "encode ['-122.026020']")
+    data = encode_json([-122.026020])
+    is_ok(data, b'[-122.02602]', 'encode [-122.026020]')
+    data = encode_json([1, -2])
+    is_ok(data, b'[1,-2]', 'encode [1, -2]')
+    data = encode_json(['10e12', [2]])
+    is_ok(data, b'["10e12",[2]]', "encode ['10e12', [2]]")
+    data = encode_json([10e12, [2]])
+    is_ok(data, b'[10000000000000,[2]]', 'encode [10e12, [2]]')
+    data = encode_json([37.7668, [20]])
+    is_ok(data, b'[37.7668,[20]]', 'encode [37.7668, [20]]')
+    data = encode_json(0)
+    is_ok(data, b'0', 'encode 0')
+    data = encode_json(23.3)
+    is_ok(data, b'23.3', 'encode 23.3')
 
-    # Faihu roundtrip
-    bstring = j(['\U00010346'])
-    is_ok(b(bstring).decode('utf-8'), '["\U00010346"]', r'encode ["\U00010346"]')
-    array = j(bstring)
+with subtest('Encode boolean'):
+    data = encode_json([not not 1])
+    is_ok(data, b'[true]', 'encode [not not 1]')
+    data = encode_json([not not 0])
+    is_ok(data, b'[false]', 'encode [not not 0]')
+
+with subtest('Faihu roundtrip'):
+    data = j(['\U00010346'])
+    is_ok(data.decode('UTF-8'), '["\U00010346"]', r"encode ['\U00010346']")
+    array = j(data)
     is_deeply_ok(array, ['\U00010346'], 'successful roundtrip')
 
-    # Decode faihu surrogate pair
-    array = decode_json(b'["\\ud800\\udf46"]')
-    is_deeply_ok(array, ['\U00010346'], 'decode ["\\ud800\\udf46"]')
+with subtest('Decode faihu surrogate pair'):
+    array = decode_json(r'["\ud800\udf46"]')
+    is_deeply_ok(array, ['\U00010346'], r'decode ["\ud800\udf46"]')
 
-    # Decode object with duplicate keys
-    dictionary = decode_json(b'{"foo": 1, "foo": 2}')
-    is_deeply_ok(dictionary, {'foo': 2}, 'decode {"foo": 1, "foo": 2}')
+with subtest('Complicated roundtrips'):
+    data = b'{"":""}'
+    hash = decode_json(data)
+    is_deeply_ok(hash, {'': ''}, 'decode {"":""}')
+    is_ok(encode_json(hash), data, 're-encode')
+    data = b'[null,false,true,"",0,1]'
+    array = decode_json(data)
+    is_deeply_ok(array, [None, Pyjo.JSON.false, Pyjo.JSON.true, '', 0, 1], 'decode [null,false,true,"",0,1]')
+    is_ok(encode_json(array), data, 're-encode')
+    array = [None, 0, 1, '', Pyjo.JSON.true, Pyjo.JSON.false]
+    data = encode_json(array)
+    ok(data, 'defined value')
+    is_deeply_ok(decode_json(data), array, 'successful roundtrip')
 
-    # Complicated roudtrips
-    bstring = b'{"":""}'
-    dictionary = decode_json(bstring)
-    is_deeply_ok(dictionary, {'': ''}, 'decode {"":""}')
-    is_ok(encode_json(dictionary), bstring, 're-encode')
-    bstring = b'[null,false,true,"",0,1]'
-    array = decode_json(bstring)
-    is_deeply_ok(array, [None, False, True, '', 0, 1], 'decode [null,false,true,"",0,1]')
-    is_ok(encode_json(array), bstring, 're-encode')
-    array = [None, 0, 1, '', True, False]
-    bstring = encode_json(array)
-    ok(bstring, 'defined value')
-    is_deeply_ok(decode_json(bstring), array, 'successful roundtrip')
-
-    # Real world roundtrip
-    bstring = encode_json({'foo': r'c:\progra~1\mozill~1\firefox.exe'})
+with subtest('Real world roundtrip'):
+    data = encode_json({'foo': r'c:\progra~1\mozill~1\firefox.exe'})
     is_ok(
-        bstring,
-        b'{"foo":"c:\\\\progra~1\\\\mozill~1\\\\firefox.exe"}',
-        r'encode {foo: \'c:\progra~1\mozill~1\firefox.exe\'}',
+        data,
+        rb'{"foo":"c:\\progra~1\\mozill~1\\firefox.exe"}',
+        r"encode {'foo': 'c:\progra~1\mozill~1\firefox.exe'}",
     )
-    dictionary = decode_json(bstring)
-    is_deeply_ok(dictionary, {'foo': r'c:\progra~1\mozill~1\firefox.exe'}, 'successful roundtrip')
+    hash = decode_json(data)
+    is_deeply_ok(hash, {'foo': r'c:\progra~1\mozill~1\firefox.exe'}, 'successful roundtrip')
 
-    # Huge string
-    bstring = encode_json(['a' * 32768])
-    is_deeply_ok(decode_json(bstring), ['a' * 32768], 'successful roundtrip')
+with subtest('Huge string'):
+    data = encode_json(['a' * 32768])
+    is_deeply_ok(decode_json(data), ['a' * 32768], 'successful roundtrip')
 
-    # u2028, u2029 and slash
-    bstring = encode_json(['\u2028test\u2029123</script>'])
-    is_ok(bstring, rb'["\u2028test\u2029123<\/script>"]', 'escaped u2028, u2029 and slash')
-    is_deeply_ok(decode_json(bstring), ['\u2028test\u2029123</script>'], 'successful roundtrip')
+with subtest('Slash'):
+    data = encode_json(['123</script>'])
+    is_ok(data, rb'["123<\/script>"]', 'escaped slash')
+    is_deeply_ok(decode_json(data), ['123</script>'], 'successful roundtrip')
 
-    # JSON without utf-8 encoding
+with subtest('JSON without UTF-8 encoding'):
     is_deeply_ok(from_json('["♥"]'), ['♥'], 'characters decoded')
     is_ok(to_json(['♥']), '["♥"]', 'characters encoded')
     is_deeply_ok(from_json(to_json(['\xe9'])), ['\xe9'], 'successful roundtrip')
 
-    # Object
-    bstring = encode_json([b('test')])
-    is_deeply_ok(decode_json(bstring), ['test'], 'successful roundtrip')
-    bstring = encode_json([u('test')])
-    is_deeply_ok(decode_json(bstring), ['test'], 'successful roundtrip')
+with subtest('Blessed reference'):
+    data = encode_json([b('test')])
+    is_deeply_ok(decode_json(data), ['test'], 'successful roundtrip')
 
-    # Object with to_json method
-    bstring = encode_json(JSONTest())
-    is_deeply_ok(decode_json(bstring), {}, 'successful roundtrip')
-    bstring = encode_json(JSONTest({'just': 'works'}))
-    is_deeply_ok(decode_json(bstring), {'just': 'works'}, 'successful roundtrip')
+with subtest('Blessed reference with __json__ method'):
+    data = encode_json(JSONTest.new())
+    is_deeply_ok(decode_json(data), {}, 'successful roundtrip')
+    data = encode_json(JSONTest.new(something={'just': 'works'}, **{'else': {'not': 'working'}}))
+    is_deeply_ok(decode_json(data), {'just': 'works'}, 'successful roundtrip')
 
-    # Converted numbers
+with subtest('Unknown reference'):
+    is_deeply_ok(encode_json(lambda: None), b'null', 'unknown reference')
+
+# Left out from Mojolicious: the "Boolean shortcut" subtest, as Python has no
+# scalar references, which Mojo encodes as booleans
+
+with subtest('Booleans in different contexts'):
+    ok(true, 'true')
+    is_ok(true, 1, 'right string value')
+    is_ok(true + 0, 1, 'right numeric value')
+    ok(not false, 'false')
+    is_ok(false, 0, 'right string value')
+    is_ok(false + 0, 0, 'right numeric value')
+
+with subtest('Upgraded numbers'):
     num = 3
     string = str(num)
     is_ok(encode_json({'test': [num, string]}), b'{"test":[3,"3"]}', 'upgraded number detected')
     num = 3.21
     string = str(num)
     is_ok(encode_json({'test': [num, string]}), b'{"test":[3.21,"3.21"]}', 'upgraded number detected')
+    # Left out from Mojolicious: "0 but true", a Perl string that is a number
+    # without a warning, as a Python string is never a number
 
-    # "inf" and "nan"
-    throws_ok(lambda: encode_json({'test': float('Inf')}), ValueError, 'encode "Inf"')
-    throws_ok(lambda: encode_json({'test': float('NaN')}), ValueError, 'encode "NaN"')
+# Left out from Mojolicious: the "Upgraded string" and "dualvar" subtests, as a
+# Python value is either a number or a string, never both
 
-    # "null"
+with subtest('Other reference types'):
+    is_ok(encode_json([JSONTest2.new()]), b'["works!"]', 'object stringified')
+    is_ok(encode_json([JSONTest3.new()]), b'[null]', 'object with no stringification overload')
+
+with subtest('Ensure numbers and strings are not upgraded'):
+    mixed = [3, 'three', '3', 0, '0']
+    is_ok(encode_json(mixed), b'[3,"three","3",0,"0"]', 'all have been detected correctly')
+    is_ok(encode_json(mixed), b'[3,"three","3",0,"0"]', 'all have been detected correctly again')
+
+with subtest('"inf" and "nan"'):
+    like_ok(encode_json({'test': float('inf')}), re.compile(rb'^{"test":".*"}$'), 'encode "inf" as string')
+    like_ok(encode_json({'test': float('nan')}), re.compile(rb'^{"test":".*"}$'), 'encode "nan" as string')
+
+with subtest('"null"'):
     is_ok(j('null'), None, 'decode null')
 
-    # Errors
-    throws_ok(lambda: decode_json('test'), ValueError, 'right error')
-    throws_ok(lambda: decode_json('{'), ValueError, 'right error')
+with subtest('Errors'):
+    throws_ok(lambda: decode_json('test'), re.compile(r'Malformed JSON: Expected string, array, object'), 'right error')
+    throws_ok(
+        lambda: decode_json('test'), re.compile(r'object, number, boolean or null at line 0, offset 0'), 'right error'
+    )
+    throws_ok(
+        lambda: decode_json(rb'["\ud800"]'),
+        re.compile(r'Malformed JSON: Missing low-surrogate at line 1, offset 8'),
+        'right error',
+    )
+    throws_ok(
+        lambda: decode_json(rb'["\udf46"]'),
+        re.compile(r'Malformed JSON: Missing high-surrogate at line 1, offset 8'),
+        'right error',
+    )
+    throws_ok(
+        lambda: decode_json('[[]'), re.compile(r'Malformed JSON: Expected comma or right square bracket'), 'right error'
+    )
+    throws_ok(lambda: decode_json('[[]'), re.compile(r'bracket while parsing array at line 1, offset 3'), 'right error')
+    throws_ok(
+        lambda: decode_json('{{}'),
+        re.compile(r'Malformed JSON: Expected string while parsing object at line 1, offset 1'),
+        'right error',
+    )
+    throws_ok(
+        lambda: decode_json('["foo\x00]'),
+        re.compile(r'Malformed JSON: Unexpected character or invalid escape'),
+        'right error',
+    )
+    throws_ok(
+        lambda: decode_json('["foo\x00]'), re.compile(r'escape while parsing string at line 1, offset 5'), 'right error'
+    )
+    throws_ok(
+        lambda: decode_json('{"foo":"bar"{'),
+        re.compile(r'Malformed JSON: Expected comma or right curly bracket'),
+        'right error',
+    )
+    throws_ok(
+        lambda: decode_json('{"foo":"bar"{'),
+        re.compile(r'bracket while parsing object at line 1, offset 12'),
+        'right error',
+    )
+    throws_ok(
+        lambda: decode_json('{"foo""bar"}'),
+        re.compile(r'Malformed JSON: Expected colon while parsing object at line 1, offset 6'),
+        'right error',
+    )
+    throws_ok(
+        lambda: decode_json('[[]...'),
+        re.compile(r'Malformed JSON: Expected comma or right square bracket'),
+        'right error',
+    )
+    throws_ok(
+        lambda: decode_json('[[]...'), re.compile(r'bracket while parsing array at line 1, offset 3'), 'right error'
+    )
+    throws_ok(
+        lambda: decode_json('{{}...'),
+        re.compile(r'Malformed JSON: Expected string while parsing object at line 1, offset 1'),
+        'right error',
+    )
+    throws_ok(
+        lambda: decode_json('[nan]'),
+        re.compile(r'Malformed JSON: Expected string, array, object, number'),
+        'right error',
+    )
+    throws_ok(lambda: decode_json('[nan]'), re.compile(r'number, boolean or null at line 1, offset 1'), 'right error')
+    throws_ok(
+        lambda: decode_json('["foo]'),
+        re.compile(r'Malformed JSON: Unterminated string at line 1, offset 6'),
+        'right error',
+    )
+    throws_ok(
+        lambda: decode_json('{"foo":"bar"}lala'),
+        re.compile(r'Malformed JSON: Unexpected data at line 1, offset 13'),
+        'right error',
+    )
+    throws_ok(lambda: decode_json(''), re.compile(r'Missing or empty input at offset 0'), 'right error')
+    throws_ok(
+        lambda: decode_json('["foo",\n"bar"]lala'),
+        re.compile(r'Malformed JSON: Unexpected data at line 2, offset 6'),
+        'right error',
+    )
+    throws_ok(
+        lambda: decode_json('["foo",\n"bar",\n"bazra"]lalala'),
+        re.compile(r'Malformed JSON: Unexpected data at line 3, offset 8'),
+        'right error',
+    )
+    throws_ok(lambda: decode_json('["♥"]'), re.compile(r'Input is not UTF-8 encoded'), 'right error')
+    throws_ok(
+        lambda: decode_json(encode('Shift_JIS', 'やった')), re.compile(r'Input is not UTF-8 encoded'), 'right error'
+    )
+    is_ok(j('{'), None, 'syntax error')
+    # Left out from Mojolicious: the two errors that name the file of the
+    # caller, as croak adds it to the message and Python keeps it in the
+    # traceback
 
-    done_testing()
+with subtest('Maximum nesting level'):
+    ok(decode_json('[' * 512 + ']' * 512), 'decode deeply nested array')
+    throws_ok(
+        lambda: decode_json('[' * 513 + ']' * 513),
+        re.compile(r'Malformed JSON: Nesting too deep at line 1, offset 513'),
+        'right error',
+    )
+    ok(decode_json('{"a":' * 512 + '1' + '}' * 512), 'decode deeply nested object')
+    throws_ok(
+        lambda: decode_json('{"a":' * 513 + '1' + '}' * 513),
+        re.compile(r'Malformed JSON: Nesting too deep at line 1, offset 2561'),
+        'right error',
+    )
+    throws_ok(
+        lambda: decode_json('[{"a":' * 257 + '1' + '}]' * 257),
+        re.compile(r'Malformed JSON: Nesting too deep'),
+        'right error',
+    )
+    ok(decode_json('[' * 512 + ']' * 512), 'decode deeply nested array again')
+
+done_testing()
