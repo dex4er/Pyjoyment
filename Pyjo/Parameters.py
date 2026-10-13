@@ -10,12 +10,29 @@ Pyjo.Parameters - Parameters
     print(params.param('baz'))
 
     # Build
-    params = Pyjo.Parameters.new(foo='bar', baz=23)
-    params.append(i=u'♥ pyjo')
+    params = Pyjo.Parameters.new('foo', 'bar', 'baz', 23)
+    params.pairs.append(('i', '♥ pyjoyment'))
     print(params)
 
-:mod:`Pyjo.Parameters` is a container for form parameters used by :mod:`Pyjo.URL`
-and based on :rfc:`3986` as well as `the HTML Living Standard <https://html.spec.whatwg.org>`_.
+:mod:`Pyjo.Parameters` is a container for form parameters used by
+:mod:`Pyjo.URL`, based on :rfc:`3986` and the
+`HTML Living Standard <https://html.spec.whatwg.org>`_.
+
+The parameters are pairs of a name and a value, as tuples. Methods that take
+parameters take them as tuples, as names followed by their values, or as
+keyword arguments: ::
+
+    params.append(('foo', 'bar'), ('baz', 23))
+    params.append('foo', 'bar', 'baz', 23)
+    params.append(foo='bar', baz=23)
+
+See also
+--------
+
+:mod:`Pyjoyment`, https://mojolicious.org.
+
+Ported from `Mojo::Parameters <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/Parameters.pm>`_
+of Mojolicious 9.49.
 
 Classes
 -------
@@ -24,50 +41,58 @@ Classes
 import Pyjo.Base
 import Pyjo.String.Mixin
 
-from Pyjo.Regexp import r
-from Pyjo.Util import b, isiterable, notnone, u, url_escape, url_unescape
+from Pyjo.Util import url_escape, url_unescape
+
+import builtins
+import re
+
+from collections.abc import Iterator
+from typing import Self, cast, overload
 
 
-re_pair = r(rb'^([^=]+)(?:=(.*))?$')
+# The module ends with `object = Pyjo_Parameters`, which an annotation of
+# `object` would mean, as annotations are evaluated lazily
+type Anything = builtins.object
 
 
 class Pyjo_Parameters(Pyjo.Base.object, Pyjo.String.Mixin.object):
     """
-    :mod:`Pyjo.Parameters` inherits all attributes and methods from
-    :mod:`Pyjo.Base` and :mod:`Pyjo.String.Mixin` and implements the following new ones.
+    :mod:`Pyjo.Parameters` inherits all methods from :mod:`Pyjo.Base` and
+    :mod:`Pyjo.String.Mixin` and implements the following new ones.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Anything, **kwargs: Anything) -> None:
         """::
 
             params = Pyjo.Parameters.new()
             params = Pyjo.Parameters.new('foo=b%3Bar&baz=23')
-            params = Pyjo.Parameters.new(foo='b&ar')
-            params = Pyjo.Parameters.new(foo=['ba&r', 'baz'])
+            params = Pyjo.Parameters.new('foo', 'b&ar')
+            params = Pyjo.Parameters.new('foo', ['ba&r', 'baz'])
+            params = Pyjo.Parameters.new('foo', ['bar', 'baz'], 'bar', 23)
             params = Pyjo.Parameters.new(foo=['bar', 'baz'], bar=23)
 
-        Construct a new :mod:`Pyjo.Parameters` object and :meth:`parse` parameters if
-        necessary.
+        Construct a new :mod:`Pyjo.Parameters` object and :meth:`parse` parameters
+        if necessary.
         """
-
-        self.charset = 'utf-8'
+        self.charset: str | None = 'UTF-8'
         """::
 
             charset = params.charset
-            params.charset = 'utf-8'
+            params.charset = 'UTF-8'
 
-        Charset used for encoding and decoding parameters, defaults to ``utf-8``. ::
+        Charset used for encoding and decoding parameters, defaults to ``UTF-8``. ::
 
             # Disable encoding and decoding
             params.charset = None
         """
 
-        self._pairs = []
-        self._string = None
+        self._pairs: list[tuple[str, str]] | None = None
+        self._string: str | bytes | None = None
 
-        self.parse(*args, **kwargs)
+        if args or kwargs:
+            self.parse(*args, **kwargs)
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
         """::
 
             boolean = bool(params)
@@ -76,72 +101,97 @@ class Pyjo_Parameters(Pyjo.Base.object, Pyjo.String.Mixin.object):
         """
         return True
 
-    def __iter__(self):
+    def __getitem__(self, index: int) -> tuple[str, str]:
+        """::
+
+            pair = params[0]
+
+        Alias for :attr:`pairs`. Note that this will normalize the parameters. ::
+
+            print(params[0])
+        """
+        return self.pairs[index]
+
+    def __iter__(self) -> Iterator[tuple[str, str]]:
         """::
 
             pairs = list(params)
 
-        Iterator based on :attr:`params`. Note that this will normalize the parameters.
+        Alias for :attr:`pairs`. Note that this will normalize the parameters. ::
+
+            for name, value in params:
+                print(name, value)
         """
         return iter(self.pairs)
 
-    def append(self, *args, **kwargs):
+    def __len__(self) -> int:
         """::
 
-            params = params.append(foo='ba&r')
-            params = params.append(foo=['ba&r', 'baz'])
-            params = params.append(('foo', ['bar', 'baz']), ('bar', 23))
-            params = params.append(Pyjo.Params.new())
+            size = len(params)
 
-        Append parameters. Note that this method will normalize the parameters.
+        Alias for :attr:`pairs`. Note that this will normalize the parameters.
+        """
+        return len(self.pairs)
 
-        ::
+    def __str__(self) -> str:
+        """::
+
+            string = str(params)
+
+        Alias for :meth:`to_str`.
+        """
+        return self.to_str()
+
+    def append(self, *args: Anything, **kwargs: Anything) -> Self:
+        """::
+
+            params = params.append('foo', 'ba&r')
+            params = params.append('foo', ['ba&r', 'baz'])
+            params = params.append('foo', ['bar', 'baz'], 'bar', 23)
+            params = params.append(Pyjo.Parameters.new())
+
+        Append parameters. Note that this method will normalize the parameters. ::
 
             # "foo=bar&foo=baz"
             Pyjo.Parameters.new('foo=bar').append(Pyjo.Parameters.new('foo=baz'))
 
             # "foo=bar&foo=baz"
-            Pyjo.Parameters.new('foo=bar').append(foo='baz')
+            Pyjo.Parameters.new('foo=bar').append('foo', 'baz')
 
             # "foo=bar&foo=baz&foo=yada"
-            Pyjo.Parameters.new('foo=bar').append(foo=['baz', 'yada'])
+            Pyjo.Parameters.new('foo=bar').append('foo', ['baz', 'yada'])
 
             # "foo=bar&foo=baz&foo=yada&bar=23"
-            Pyjo.Parameters.new('foo=bar').append(('foo', ['baz', 'yada']), ('bar', 23))
+            Pyjo.Parameters.new('foo=bar').append('foo', ['baz', 'yada'], 'bar', 23)
         """
-        pairs = self.pairs
+        old = self.pairs
+        for name, value in _pairs(args, kwargs):
+            # Multiple values
+            if isinstance(value, (list, tuple)):
+                old.extend((name, '' if v is None else str(v)) for v in cast(list[Anything], value))
 
-        if args and len(args) == 1 and isinstance(args[0], Pyjo_Parameters):
-            args = args[0].pairs
+            # Single value
+            elif value is not None:
+                old.append((name, str(value)))
 
-        for k, v in list(args) + sorted(kwargs.items()):
-            if isiterable(v):
-                for vv in v:
-                    pairs.append(
-                        (k, vv),
-                    )
-            else:
-                pairs.append(
-                    (k, v),
-                )
         return self
 
-    def clone(self):
+    def clone(self) -> Self:
         """::
 
             params2 = params.clone()
 
-        Clone parameters.
+        Return a new :mod:`Pyjo.Parameters` object cloned from these parameters.
         """
-        new_obj = type(self)()
-        new_obj.charset = self.charset
+        clone = self.new()
+        clone.charset = self.charset
         if self._string is not None:
-            new_obj._string = self._string
+            clone._string = self._string
         else:
-            new_obj._pairs = list(self._pairs)
-        return new_obj
+            clone._pairs = list(self.pairs)
+        return clone
 
-    def every_param(self, name):
+    def every_param(self, name: Anything) -> list[str]:
         """::
 
             values = params.every_param('foo')
@@ -152,21 +202,15 @@ class Pyjo_Parameters(Pyjo.Base.object, Pyjo.String.Mixin.object):
             # Get first value
             print(params.every_param('foo')[0])
         """
-        values = []
-        pairs = self.pairs
-        for k, v in pairs:
-            if k == name:
-                values.append(v)
+        name = str(name)
+        return [v for n, v in self.pairs if n == name]
 
-        return values
-
-    def merge(self, *args, **kwargs):
+    def merge(self, *args: Anything, **kwargs: Anything) -> Self:
         """::
 
-            params = params.merge(('foo', 'ba&r'),)
-            params = params.merge(foo='baz')
-            params = params.merge(foo=['ba&r', 'baz'])
-            params = params.merge(('foo', ['bar', 'baz']), ('bar', 23))
+            params = params.merge('foo', 'ba&r')
+            params = params.merge('foo', ['ba&r', 'baz'])
+            params = params.merge('foo', ['bar', 'baz'], 'bar', 23)
             params = params.merge(Pyjo.Parameters.new())
 
         Merge parameters. Note that this method will normalize the parameters. ::
@@ -175,138 +219,125 @@ class Pyjo_Parameters(Pyjo.Base.object, Pyjo.String.Mixin.object):
             Pyjo.Parameters.new('foo=bar').merge(Pyjo.Parameters.new('foo=baz'))
 
             # "yada=yada&foo=baz"
-            Pyjo.Parameters.new('foo=bar&yada=yada').merge(foo='baz')
+            Pyjo.Parameters.new('foo=bar&yada=yada').merge('foo', 'baz')
 
             # "yada=yada"
-            Pyjo.Parameters.new('foo=bar&yada=yada').merge(foo=None)
+            Pyjo.Parameters.new('foo=bar&yada=yada').merge('foo', None)
         """
-        if len(args) == 1 and hasattr(args[0], 'pairs'):
-            pairs = args[0].pairs
+        if len(args) == 1 and not kwargs and isinstance(args[0], Pyjo_Parameters):
+            merge: dict[str, Anything] = {**args[0].to_dict()}
         else:
-            pairs = list(args) + sorted(kwargs.items())
-        for k, v in pairs:
-            if v is None:
-                self.remove(k)
+            merge = dict(_pairs(args, kwargs))
+
+        for name in sorted(merge):
+            if (value := merge[name]) is not None:
+                self.param(name, value)
             else:
-                self.param(k, v)
+                self.remove(name)
+
         return self
 
-    @property
-    def names(self):
+    def names(self) -> list[str]:
         """::
 
-            names = params.names
+            names = params.names()
 
-        Return a list of all parameter names. ::
+        Return a list with all parameter names. ::
 
-          # Names of all parameters
-          for n in params.names:
-              print(n)
+            # Names of all parameters
+            for name in params.names():
+                print(name)
         """
-        return sorted(self.to_dict().keys())
+        return sorted(self.to_dict())
 
     @property
-    def pairs(self):
+    def pairs(self) -> list[tuple[str, str]]:
         """::
 
-            array = params.pairs
-            params.pairs = [('foo', 'b&ar'), ('baz', 23)]
+            pairs = params.pairs
+            params.pairs = [('foo', 'b&ar'), ('baz', '23')]
 
-        Parsed parameters. Note that setting this property will normalize the parameters.
+        Parsed parameter pairs. Note that this method will normalize the parameters. ::
+
+            # Remove all parameters
+            params.pairs = []
         """
         # Parse string
-        if self._string is not None:
-            string = self._string
+        if (string := self._string) is not None:
             self._string = None
-            self._pairs = []
+            pairs: list[tuple[str, str]] = []
+            self._pairs = pairs
 
-            if not len(string):
-                return self._pairs
+            # Bytes are a Perl byte string: the characters 0-255
+            if isinstance(string, (bytes, bytearray)):
+                string = string.decode('latin-1')
 
-            charset = self.charset
-
-            for pair in string.split(b'&'):
-                m = re_pair.search(pair)
-
-                if not m:
+            for pair in string.split('&'):
+                if not (m := re.match(r'^([^=]+)(?:=(.*))?$', pair)):
                     continue
-
-                name = m.group(1)
-                value = notnone(m.group(2), b'')
+                name, value = m[1], m[2] or ''
 
                 # Replace "+" with whitespace, unescape and decode
-                name = name.replace(b'+', b' ')
-                value = value.replace(b'+', b' ')
+                name = self._decode(url_unescape(name.replace('+', ' ')))
+                value = self._decode(url_unescape(value.replace('+', ' ')))
 
-                name = url_unescape(name)
-                value = url_unescape(value)
+                pairs.append((name, value))
 
-                if charset:
-                    name = u(name, charset)
-                    value = u(value, charset)
-
-                self._pairs.append(
-                    (name, value),
-                )
-
+        if self._pairs is None:
+            self._pairs = []
         return self._pairs
 
     @pairs.setter
-    def pairs(self, value=None):
-        # Replace parameters
+    def pairs(self, value: list[tuple[str, str]]) -> None:
         self._pairs = value
         self._string = None
-        return self
 
-    def param(self, name, value=None):
+    @overload
+    def param(self, name: Anything, /) -> str | None: ...
+
+    @overload
+    def param(self, name: Anything, value: Anything, /, *values: Anything) -> Self: ...
+
+    def param(self, name: Anything, /, *values: Anything) -> str | None | Self:
         """::
 
             value = params.param('foo')
-            foo, baz = params.param(['foo', 'baz'])
             params = params.param('foo', 'ba&r')
+            params = params.param('foo', 'ba&r', 'baz')
             params = params.param('foo', ['ba;r', 'baz'])
 
         Access parameter values. If there are multiple values sharing the same name,
         and you want to access more than just the last one, you can use
         :meth:`every_param`. Note that this method will normalize the parameters.
         """
-        # Multiple names
-        if name is not None and isinstance(
-            name,
-            (
-                list,
-                tuple,
-            ),
-        ):
-            return [self.param(n) for n in name]
+        if not values:
+            every = self.every_param(name)
+            return every[-1] if every else None
+        self.remove(name)
+        value = cast(list[Anything], values[0]) if len(values) == 1 and isinstance(values[0], list) else list(values)
+        return self.append(name, value)
 
-        # Last value
-        if value is None:
-            param = self.every_param(name)
-            if param:
-                return self.every_param(name)[-1]
-            else:
-                return
-
-        # Replace values
-        return self._replace(name, value)
-
-    def parse(self, *args, **kwargs):
+    def parse(self, *args: Anything, **kwargs: Anything) -> Self:
         """::
 
             params = params.parse('foo=b%3Bar&baz=23')
 
-        Parse parameters.
+        Parse parameters, given as characters or as bytes encoded with
+        :attr:`charset`.
         """
-        if len(args) == 1 and not isinstance(args[0], tuple):
-            # String
-            self._string = b(args[0], self.charset)
-            return self
-        else:
-            # Pairs
+        # Pairs
+        if len(args) > 1 or kwargs or (args and isinstance(args[0], (tuple, Pyjo_Parameters))):
             return self.append(*args, **kwargs)
 
-    def remove(self, name):
+        # String
+        string = args[0] if args else None
+        self._string = (
+            '' if string is None else bytes(string) if isinstance(string, (bytes, bytearray)) else str(string)
+        )
+        self._pairs = None
+        return self
+
+    def remove(self, name: Anything) -> Self:
         """::
 
             params = params.remove('foo')
@@ -316,116 +347,93 @@ class Pyjo_Parameters(Pyjo.Base.object, Pyjo.String.Mixin.object):
             # "bar=yada"
             Pyjo.Parameters.new('foo=bar&foo=baz&bar=yada').remove('foo')
         """
+        name = str(name)
         pairs = self.pairs
-        i = 0
-        while i < len(pairs):
-            if pairs[i][0] == name:
-                pairs.pop(i)
-            else:
-                i += 1
+        pairs[:] = [(n, v) for n, v in pairs if n != name]
         return self
 
-    def to_bytes(self):
-        """::
-
-            bstring = params.to_bytes()
-
-        Turn parameters into a bytes string.
-        """
-        # String
-        charset = self.charset
-
-        if self._string is not None:
-            return url_escape(self._string, rb'^A-Za-z0-9\-._~!$&\'()*+,;=%:@/?')
-
-        # Build pairs
-        pairs = self.pairs
-        if not pairs:
-            return b''
-
-        strpairs = []
-        for name, value in pairs:
-            if charset:
-                name = b(name, charset)
-                value = b(value, charset)
-
-            name = url_escape(name, rb'^A-Za-z0-9\-._~!$\'()*,:@/?')
-            value = url_escape(value, rb'^A-Za-z0-9\-._~!$\'()*,:@/?')
-
-            name = name.replace(b'%20', b'+')
-            value = value.replace(b'%20', b'+')
-
-            strpairs.append(name + b'=' + value)
-
-        return b'&'.join(strpairs)
-
-    def to_dict(self):
+    def to_dict(self) -> dict[str, str | list[str]]:
         """::
 
             d = params.to_dict()
 
-        Turn parameters into a :class:`dict`. Note that this method will normalize
-        the parameters. ::
+        Turn parameters into a dict. Note that this method will normalize the
+        parameters. ::
 
             # "baz"
             Pyjo.Parameters.new('foo=bar&foo=baz').to_dict()['foo'][1]
         """
-        d = {}
-        pairs = self.pairs
-        for k, v in pairs:
-            if k in d:
-                if not isinstance(d[k], list):
-                    d[k] = [d[k]]
-                d[k].append(v)
+        d: dict[str, str | list[str]] = {}
+        for name, value in self.pairs:
+            # List
+            if (old := d.get(name)) is not None:
+                if isinstance(old, list):
+                    old.append(value)
+                else:
+                    d[name] = [old, value]
+
+            # String
             else:
-                d[k] = v
+                d[name] = value
+
         return d
 
-    def to_str(self):
+    def to_str(self) -> str:
         """::
 
             string = params.to_str()
 
-        Turn parameters into a string.
+        Turn parameters into a string. ::
+
+            # "foo=bar&baz=23"
+            Pyjo.Parameters.new().set(pairs=[('foo', 'bar'), ('baz', '23')]).to_str()
         """
-        return self.to_bytes().decode('ascii')
+        # String (RFC 3986)
+        if (string := self._string) is not None:
+            return url_escape(self._encode(string), rb"^A-Za-z0-9\-._~%!$&'()*+,;=:@/?").decode('ascii')
 
-    def _replace(self, name, value):
-        pairs = self.pairs
+        # Build pairs (HTML Living Standard)
+        pairs: list[str] = []
+        for name, value in self.pairs:
+            # Escape and replace whitespace with "+"
+            name = url_escape(self._encode(name), rb'^*\-.0-9A-Z_a-z').decode('ascii').replace('%20', '+')
+            value = url_escape(self._encode(value), rb'^*\-.0-9A-Z_a-z').decode('ascii').replace('%20', '+')
+            pairs.append(f'{name}={value}')
 
-        if isinstance(
-            value,
-            (
-                list,
-                tuple,
-            ),
-        ):
-            values = value
+        return '&'.join(pairs)
+
+    def _decode(self, string: str) -> str:
+        # Characters 0-255 are bytes, as a Perl byte string; a string with other
+        # characters stays as it is, as Perl fails to decode it
+        try:
+            data = string.encode('latin-1')
+        except UnicodeEncodeError:
+            return string
+
+        # Bytes that do not decode stay characters 0-255, as in a Perl byte string
+        try:
+            return data.decode(self.charset or 'latin-1')
+        except UnicodeDecodeError:
+            return string
+
+    def _encode(self, string: str | bytes) -> bytes:
+        # Without a charset, a character is a byte, as in a Perl byte string
+        return string if isinstance(string, bytes) else string.encode(self.charset or 'latin-1')
+
+
+def _pairs(args: tuple[Anything, ...], kwargs: dict[str, Anything]) -> Iterator[tuple[str, Anything]]:
+    # Parameters as pairs: from another object, as tuples, as names followed by
+    # their values, and as keyword arguments
+    items = iter(args)
+    for item in items:
+        if isinstance(item, Pyjo_Parameters):
+            yield from item.pairs
+        elif isinstance(item, tuple):
+            name, value = cast(tuple[Anything, Anything], item)
+            yield str(name), value
         else:
-            values = [value]
-
-        i = 0
-
-        while i < len(pairs) and len(values):
-            if pairs[i][0] == name:
-                pairs[i] = (
-                    name,
-                    values.pop(0),
-                )
-            i += 1
-
-        while i < len(pairs):
-            if pairs[i] == name:
-                pairs.pop(i)
-            else:
-                i += 1
-
-        while len(values):
-            self.append(
-                (name, values.pop(0)),
-            )
-
-        return self
+            yield str(item), next(items, None)
+    yield from kwargs.items()
 
 
 new = Pyjo_Parameters.new
