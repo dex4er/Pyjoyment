@@ -303,11 +303,21 @@ self-signed certificate for TLS servers (as in Mojo): it is tracked, and
 
 ## Documentation
 
-`README.rst` is for a user: what Pyjoyment is, how to install it, short
-examples. This file is for whoever changes the code: how it works and why.
-Module documentation lives in the module docstrings, ported from Mojo's POD
-in the same layout (synopsis, events, attributes, methods), and Sphinx builds
-the API reference in `docs/` from them.
+`README.rst` is for a user: what Pyjoyment is, its status, how to install
+it, examples, and where the documentation is. This file is for whoever
+changes the code: how it works and why. Module documentation lives in the
+module docstrings, ported from Mojo's POD in the same layout (synopsis,
+events, attributes, methods), and Sphinx builds the API reference in `docs/`
+from them.
+
+The intro, status, installation and license pages in `docs/` include their
+text from `README.rst`, between `.. begin-<name>` and `.. end-<name>`
+comments, so the text is edited in `README.rst` only. The examples are
+included from `examples/` the same way, never copied: a copy is not tested
+and goes stale. `README.rst` is the exception, as it has to render on GitHub,
+which does not support `include`: its examples are copies of `examples/`.
+`docs/conf.py` takes the name, the authors and the version from
+`pyproject.toml`.
 
 Documentation describes how things are and has to stay true without anyone
 maintaining it. Keep out of it whatever goes stale on its own: issue and pull
