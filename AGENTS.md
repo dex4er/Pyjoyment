@@ -197,6 +197,36 @@ For each module:
 5. Check the module off in the porting inventory issue, which lists every
    module of the target Mojolicious with its Pyjoyment counterpart.
 
+Code that has no counterpart in the Mojolicious module, such as a method, a
+branch or a form of an argument for Python only, has a comment that starts
+with `# Not in Mojolicious:` and says what it is for, so that the diff of a
+newer Mojolicious can be applied around it. This lists them:
+
+```sh
+grep -rn "Not in Mojolicious" Pyjo
+```
+
+It is a comment, not a part of the docstring: the documentation describes
+the API as it is. Translations of Perl idioms, as listed below, are Mojo's
+code and are not marked.
+
+A method of Mojolicious that has another name in Pyjoyment than the
+translations below give it, as `to_rfc3339` for Mojo's `to_datetime`, has a
+comment that starts with `# Renamed from Mojolicious:` and names the Mojo
+method, in the module and in its ported tests, where the diff of a newer
+Mojolicious uses the old name.
+
+A method of Mojolicious that is left out on purpose has a comment where it
+would be, in the order of the Mojo module, that starts with
+`# Left out from Mojolicious:`, names the method and says why, so that its
+absence is not taken for an omission.
+
+Behaviour that differs from Mojolicious on purpose has a comment that starts
+with `# Unlike Mojolicious:`, says what Mojo does, and why the port does
+otherwise, so that a newer Mojolicious does not bring the old behaviour back.
+Where the difference comes from a bug of Mojolicious, the bug also goes to
+the issue that collects them.
+
 Mojo's tests and the behaviour of its code at the tag are the reference, not
 its POD: the examples in the POD are not tested and can be wrong. Where they
 disagree, run the Perl code from the clone (`perl -Imojo/lib -MMojo::URL -e ...`)
