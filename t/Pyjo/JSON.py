@@ -1,15 +1,3 @@
-import Pyjo.Test
-
-
-class NoseTest(Pyjo.Test.NoseTest):
-    script = __file__
-    srcdir = '../..'
-
-
-class UnitTest(Pyjo.Test.UnitTest):
-    script = __file__
-
-
 class JSONTest:
     def __init__(self, something={}):
         self.something = something

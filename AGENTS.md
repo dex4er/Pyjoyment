@@ -78,7 +78,8 @@ installs with `--locked` and fails on a tool that is not in the lock.
 ## Tests
 
 The tests are scripts that print [TAP](https://testanything.org/), written
-with `Pyjo.Test`, a port of Perl's `Test::More`. They run with `prove`:
+with `Pyjo.Test`, which is inspired by Perl's `Test::More`. They run with
+`prove`:
 
 ```sh
 PYTHONPATH=. mise exec -- prove t/Pyjo t/docs t/examples
@@ -90,6 +91,28 @@ well: `PYTHONPATH=. mise exec -- python t/Pyjo/URL.py`.
 - `t/Pyjo/` holds the module tests, ported from Mojo's `t/mojo/*.t`.
 - `t/docs/` checks the examples from the module documentation.
 - `t/examples/` runs the scripts from `examples/`.
+- `t/lib/` holds helpers shared by the tests.
+
+A test script imports the test functions and groups its tests in subtests,
+like Mojo's tests do; Python keywords give some functions an `_ok` suffix
+(`is_ok`, `isnt_ok`, `like_ok`, `is_deeply_ok`):
+
+```python
+from Pyjo.Test import *
+
+import Pyjo.URL
+
+with subtest('Simple'):
+    url = Pyjo.URL.new('HtTp://Example.Com')
+    is_ok(url.host, 'Example.Com', 'right host')
+
+done_testing()
+```
+
+The exit status comes from an `atexit` handler that `Pyjo.Test` registers,
+and only once a test function has been called, so importing the module (as
+Sphinx does) has no effect. Older test files still wrap their body in
+`if __name__ == '__main__':`, which is no longer needed.
 
 CI sets `PYTHONWARNINGS=error::SyntaxWarning`, so an invalid escape sequence
 fails the build. Python keeps an unknown escape such as `"\:"` as a backslash
@@ -108,6 +131,12 @@ before the interpreter exits.
 The target is **Mojolicious 9.49**: every module is ported from the `v9.49`
 tag, so the ported modules match each other. Moving to a newer Mojolicious is a
 step of its own, which changes this version and updates every ported module.
+
+Some modules have no counterpart in Mojolicious: `Pyjo.Test` (inspired by
+Perl's `Test::More`), `Pyjo.String.*`, `Pyjo.Regexp` and the helpers in
+`Pyjo.Util` that turn statements into expressions. These extras follow their
+Perl inspiration where it helps, without porting it, and their tests are
+written for them rather than ported.
 
 A module is ported anew from the target Mojolicious, not migrated from the
 existing Python code. The existing Python module is a reference for how
@@ -163,6 +192,10 @@ trunk fmt          # format changed files
 trunk check        # lint changed files
 trunk check --all  # lint everything, as CI does
 ```
+
+Without `--fix` or `--no-fix`, `trunk check` asks whether to apply each
+autofix and waits for an answer, which hangs a non-interactive shell such as
+an agent's. Pass one of them there.
 
 `trunk-fmt-pre-commit` formats staged files on commit and
 `trunk-check-pre-push` checks before a push, once Trunk has installed its git
