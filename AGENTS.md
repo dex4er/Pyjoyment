@@ -433,6 +433,13 @@ copy:
   `Method "x" not implemented by subclass`.
 - `local` on an attribute, as `local $self->{running}`, is the value saved
   before and set back in a `finally`.
+- `__del__`, the counterpart of `DESTROY`, does nothing when
+  `sys.is_finalizing()`, as Mojo checks `${^GLOBAL_PHASE}`, and keeps its
+  whole body in a `try`: at the end of the interpreter the globals of the
+  module may already be `None`, even `sys`.
+- `tls_options` of IO::Socket::SSL is an `ssl.SSLContext`, `tls_context`, as
+  asyncio takes `ssl=context`. OpenSSL chooses an ALPN protocol by the order
+  of the server, IO::Socket::SSL by the order of the client.
 - A callback that an asyncio loop keeps, as a timer or an I/O watcher,
   refers to the reactor weakly, so that the reactor and the loop it owns do
   not make a cycle: in a cycle the garbage collector may close the sockets of
