@@ -20,7 +20,7 @@ if __name__ == '__main__':
     finished = Value(None)
     req.max_message_size = req.headers.max_line_size
     huge = b'a=b; ' * req.max_message_size
-    req.on(lambda req: finished.set(req.is_finished), 'finish')
+    req.on('finish', lambda req: finished.set(req.is_finished))
     ok(not req.is_limit_exceeded, 'limit is not exceeded')
     req.parse(b'PUT /upload HTTP/1.1\x0d\x0aCookie: ' + huge + b'\x0d\x0a')
     ok(req.is_limit_exceeded, 'limit is exceeded')
@@ -344,7 +344,7 @@ if __name__ == '__main__':
     setenv('PYJO_MAX_LINE_SIZE', '5')
     req = Pyjo.Message.Request.new()
     limit = Value(None)
-    req.on(lambda req: limit.set(req.is_limit_exceeded), 'finish')
+    req.on('finish', lambda req: limit.set(req.is_limit_exceeded))
     ok(not req.is_limit_exceeded, 'limit is not exceeded')
     is_ok(req.headers.max_line_size, 5, 'right size')
     req.parse(b'GET /foo/bar/baz.html HTTP/1')
@@ -372,7 +372,7 @@ if __name__ == '__main__':
     setenv('PYJO_MAX_MESSAGE_SIZE', '5')
     req = Pyjo.Message.Request.new()
     limit = Value(None)
-    req.on(lambda req: limit.set(req.is_limit_exceeded), 'finish')
+    req.on('finish', lambda req: limit.set(req.is_limit_exceeded))
     is_ok(req.max_message_size, 5, 'right size')
     req.parse(b'GET /foo/bar/baz.html HTTP/1')
     ok(req.is_finished, 'request is finished')
@@ -422,7 +422,7 @@ if __name__ == '__main__':
     # Parse full HTTP 1.0 request (solitary LF)
     req = Pyjo.Message.Request.new()
     body = Value(b'')
-    req.content.on(lambda req, chunk: body.set(body.get() + chunk), 'read')
+    req.content.on('read', lambda req, chunk: body.set(body.get() + chunk))
     req.parse(b'GET /foo/bar/baz.html?fo')
     req.parse(b'o=13#23 HTTP/1.0\x0aContent')
     req.parse(b'-Type: text/')
@@ -473,7 +473,7 @@ if __name__ == '__main__':
     # Parse full HTTP 1.0 request with zero chunk
     req = Pyjo.Message.Request.new()
     finished = Value(None)
-    req.on(lambda req: finished.set(req.is_finished), 'finish')
+    req.on('finish', lambda req: finished.set(req.is_finished))
     req.parse(b'GET /foo/bar/baz.html?fo')
     req.parse(b'o=13#23 HTTP/1.0\x0d\x0aContent')
     req.parse(b'-Type: text/')
@@ -564,10 +564,10 @@ if __name__ == '__main__':
             if not bufprogress.get():
                 bufprogress.set(bytes(req.url.path))
 
-    req.on(on_progress_cb1, 'progress')
+    req.on('progress', on_progress_cb1)
 
-    req.content.unsubscribe('read').on(lambda req, chunk: buf.set(buf.get() + chunk), 'read')
-    req.on(lambda req: buffinish.set(buffinish.get() + b(req.url.fragment)), 'finish')
+    req.content.unsubscribe('read').on('read', lambda req, chunk: buf.set(buf.get() + chunk))
+    req.on('finish', lambda req: buffinish.set(buffinish.get() + b(req.url.fragment)))
     req.parse(b'POST /foo/bar/baz.html?foo=13#23 HTTP/1.1\x0d\x0a')
     is_ok(bufprogress.get(), b'', 'no progress')
     req.parse(b'Content-Type: text/plain\x0d\x0a')
@@ -1065,7 +1065,7 @@ if __name__ == '__main__':
     # Build full HTTP 1.1 request
     req = Pyjo.Message.Request.new()
     finished = Value(None)
-    req.on(lambda req: finished.set(req.is_finished), 'finish')
+    req.on('finish', lambda req: finished.set(req.is_finished))
     req.method = 'get'
     req.url.parse(b'http://127.0.0.1/foo/bar')
     req.headers.expect = '100-continue'
@@ -1088,13 +1088,13 @@ if __name__ == '__main__':
     state = Value(None)
     finished = Value(None)
     offprogress = Value(0)
-    req.on(lambda req: finished.set(req.is_finished), 'finish')
+    req.on('finish', lambda req: finished.set(req.is_finished))
 
     def on_progress_cb2(req, part, offset):
         state.set(part)
         offprogress.set(offprogress.get() + offset)
 
-    req.on(on_progress_cb2, 'progress')
+    req.on('progress', on_progress_cb2)
 
     req.method = 'get'
     req.url.parse(b'http://127.0.0.1/foo/bar')
@@ -1123,7 +1123,7 @@ if __name__ == '__main__':
     # Build full HTTP 1.1 request (with clone)
     req = Pyjo.Message.Request.new()
     finished = Value(None)
-    req.on(lambda req: finished.set(req.is_finished), 'finish')
+    req.on('finish', lambda req: finished.set(req.is_finished))
     req.method = 'get'
     req.url.parse(b'http://127.0.0.1/foo/bar')
     req.headers.expect = '100-continue'
@@ -1189,7 +1189,7 @@ if __name__ == '__main__':
     # Build HTTP 1.1 request body
     req = Pyjo.Message.Request.new()
     finished = Value(None)
-    req.on(lambda req: finished.set(req.is_finished), 'finish')
+    req.on('finish', lambda req: finished.set(req.is_finished))
     req.method = 'get'
     req.url.parse(b'http://127.0.0.1/foo/bar')
     req.headers.expect = '100-continue'
@@ -1474,7 +1474,7 @@ if __name__ == '__main__':
     req.url.parse(b'http://127.0.0.1:8080/foo/bar')
     req.headers.transfer_encoding = 'chunked'
     counter = Value(0)
-    req.on(lambda req, state, offset: counter.inc(), 'progress')
+    req.on('progress', lambda req, state, offset: counter.inc())
 
     def write_cb(req, offset):
         req.write_chunk(b'hello world2!\n\n', lambda req, offset: req.write_chunk(b''))
@@ -1564,7 +1564,7 @@ if __name__ == '__main__':
     # Parse full HTTP 1.0 request with cookies and progress callback
     req = Pyjo.Message.Request.new()
     counter = Value(0)
-    req.on(lambda req, state, offset: counter.inc(), 'progress')
+    req.on('progress', lambda req, state, offset: counter.inc())
     is_ok(counter.get(), 0, 'right count')
     ok(not req.content.is_parsing_body, 'is not parsing body')
     ok(not req.is_finished, 'request is not finished')

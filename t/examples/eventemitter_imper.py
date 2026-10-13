@@ -21,8 +21,8 @@ if __name__ == '__main__':
 
     tiger = Cat()
 
-    tiger.on(roar_cb, 'roar')
-    tiger.once(dead_cb, 'dead')
+    tiger.on('roar', roar_cb)
+    tiger.once('dead', dead_cb)
 
     tiger.poke(2)
     tiger.poke(2)

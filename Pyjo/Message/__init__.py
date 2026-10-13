@@ -96,7 +96,7 @@ class Pyjo_Message(Pyjo.EventEmitter.object):
     """
 
     def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+        super().__init__()
 
         self.content = notnone(kwargs.get('content'), lambda: Pyjo.Content.Single.new())
         """::

@@ -288,9 +288,9 @@ if __name__ == '__main__':
 
     # Parse full HTTP 1.1 response (100 Continue)
     res = Pyjo.Message.Response.new()
-    res.content.on(lambda content: content.headers.header('X-Body', 'one'), 'body')
-    res.on(lambda res, state, offset: res.headers.header('X-Progress', 'two'), 'progress')
-    res.on(lambda res: res.headers.header('X-Finish', 'three'), 'finish')
+    res.content.on('body', lambda content: content.headers.header('X-Body', 'one'))
+    res.on('progress', lambda res, state, offset: res.headers.header('X-Progress', 'two'))
+    res.on('finish', lambda res: res.headers.header('X-Finish', 'three'))
     res.parse(b'HTTP/1.1 100 Continue\x0d\x0a\x0d\x0a')
     ok(res.is_finished, 'response is finished')
     ok(res.is_empty, 'response is empty')
@@ -323,8 +323,8 @@ if __name__ == '__main__':
 
     # Parse full HTTP 1.1 response (204 No Content)
     res = Pyjo.Message.Response.new()
-    res.content.on(lambda content: content.headers.header('X-Body', 'one'), 'body')
-    res.on(lambda req: req.headers.header('X-Finish', 'two'), 'finish')
+    res.content.on('body', lambda content: content.headers.header('X-Body', 'one'))
+    res.on('finish', lambda req: req.headers.header('X-Finish', 'two'))
     res.parse(b'HTTP/1.1 204 No Content\x0d\x0a')
     res.parse(b'Content-Type: text/html\x0d\x0a')
     res.parse(b'Content-Length: 9001\x0d\x0a')
@@ -714,7 +714,7 @@ if __name__ == '__main__':
     finished = Value(None)
     state = Value(None)
     progressed = Value(0)
-    res.on(lambda res: finished.set(res.is_finished), 'finish')
+    res.on('finish', lambda res: finished.set(res.is_finished))
 
     @res.on
     def progress(res, part, offset):

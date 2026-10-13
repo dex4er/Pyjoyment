@@ -132,7 +132,7 @@ class Pyjo_IOLoop_Stream(Pyjo.EventEmitter.object):
     """
 
     def __init__(self, handle, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__()
 
         self.reactor = notnone(kwargs.get('reactor'), lambda: Pyjo.IOLoop.singleton.reactor)
         """::
@@ -338,7 +338,7 @@ class Pyjo_IOLoop_Stream(Pyjo.EventEmitter.object):
         """
         self._buffer += chunk
         if cb:
-            self.once(cb, 'drain')
+            self.once('drain', cb)
         elif not len(self._buffer):
             return self
         if self.handle:

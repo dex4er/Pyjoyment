@@ -102,7 +102,7 @@ if __name__ == '__main__':
         Pyjo.IOLoop.stop()
 
     port = Pyjo.IOLoop.acceptor(cid).port
-    Pyjo.IOLoop.acceptor(cid).on(lambda server, handle: handle2.set(handle), 'accept')
+    Pyjo.IOLoop.acceptor(cid).on('accept', lambda server, handle: handle2.set(handle))
     cid2 = Pyjo.IOLoop.client(address='127.0.0.1', port=port, cb=lambda loop, err, stream: True)
     Pyjo.IOLoop.start()
     count.set(0)
@@ -151,16 +151,16 @@ if __name__ == '__main__':
     def cid2(loop, err, stream):
         handle.set(stream.steal_handle())
         end()
-        stream.on(lambda stream: buf.set(buf.get() + b'should not happen'), 'close')
-        stream.on(lambda stream, err: buf.set(buf.get() + b'should not happen either'), 'error')
+        stream.on('close', lambda stream: buf.set(buf.get() + b'should not happen'))
+        stream.on('error', lambda stream, err: buf.set(buf.get() + b'should not happen either'))
 
     delay.wait()
     stream = Pyjo.IOLoop.Stream.new(handle.get())
     is_ok(stream.timeout, 15, 'right default')
     is_ok(stream.set(timeout=16).timeout, 16, 'right timeout')
     cid = Pyjo.IOLoop.stream(stream)
-    stream.on(lambda stream: Pyjo.IOLoop.stop(), 'close')
-    stream.on(lambda stream, chunk: buf.set(buf.get() + chunk), 'read')
+    stream.on('close', lambda stream: Pyjo.IOLoop.stop())
+    stream.on('read', lambda stream, chunk: buf.set(buf.get() + chunk))
     stream.write(b'hello')
     ok(Pyjo.IOLoop.stream(cid), 'stream exists')
     is_ok(stream.timeout, 16, 'right timeout')
@@ -192,13 +192,13 @@ if __name__ == '__main__':
     removed = Value(0)
     delay = Pyjo.IOLoop.delay(lambda delay: removed.inc())
     end = delay.begin()
-    cid = Pyjo.IOLoop.server(address='127.0.0.1', cb=lambda loop, stream, cid: stream.on(lambda stream: end(), 'close'))
+    cid = Pyjo.IOLoop.server(address='127.0.0.1', cb=lambda loop, stream, cid: stream.on('close', lambda stream: end()))
     port = Pyjo.IOLoop.acceptor(cid).port
     end2 = delay.begin()
 
     @Pyjo.IOLoop.client(port=port)
     def cid2(loop, err, stream):
-        stream.on(end2, 'close')
+        stream.on('close', end2)
         loop.remove(cid2)
 
     delay.wait()
@@ -243,7 +243,7 @@ if __name__ == '__main__':
             return stream.write(b'1', drain)
 
         drain(stream)
-        stream.on(lambda stream, chunk: client.set(client.get() + chunk), 'read')
+        stream.on('read', lambda stream, chunk: client.set(client.get() + chunk))
 
     Pyjo.IOLoop.start()
     is_ok(server_before.get(), server_after.get(), 'stream has been paused')
@@ -256,7 +256,7 @@ if __name__ == '__main__':
         err = Value('')
         loop = Pyjo.IOLoop.new()
         finish = Value(0)
-        loop.on(lambda loop: finish.inc(), 'finish')
+        loop.on('finish', lambda loop: finish.inc())
         loop.stop_gracefully()
         loop.remove(loop.client(port=Pyjo.IOLoop.Server.generate_port(), cb=lambda *args: True))
 

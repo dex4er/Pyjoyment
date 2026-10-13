@@ -71,7 +71,7 @@ class Pyjo_Server_Base(Pyjo.EventEmitter.object):
         Construct a new ``Pyjo.Server`` object and subscribe to ``request`` event
         with default request handling.
         """
-        super().__init__(**kwargs)
+        super().__init__()
 
         self.app = notnone(kwargs.get('app'), lambda: self.build_app('Pyjo.HelloWorld'))
         """::
@@ -95,7 +95,7 @@ class Pyjo_Server_Base(Pyjo.EventEmitter.object):
         def request_cb(server, tx):
             server.app.handler(tx)
 
-        self.on(request_cb, 'request')
+        self.on('request', request_cb)
 
     def build_app(self, app):
         """::

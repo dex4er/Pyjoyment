@@ -47,7 +47,7 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
     """
 
     def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+        super().__init__()
 
         self.ca = notnone(kwargs.get('ca'), lambda: getenv('PYJO_CA_FILE'))
         self.cert = notnone(kwargs.get('cert'), lambda: getenv('PYJO_CERT_FILE'))
@@ -190,24 +190,24 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
             def timeout_cb(ua):
                 self._error(cid, 'Inactivity timeout')
 
-            stream.on(timeout_cb, 'timeout')
+            stream.on('timeout', timeout_cb)
 
             def close_cb(ua):
                 if ua:
                     self._finish(cid, True)
 
-            stream.on(close_cb, 'close')
+            stream.on('close', close_cb)
 
             def error_cb(ua, err):
                 if ua:
                     self._error(cid, err)
 
-            stream.on(error_cb, 'error')
+            stream.on('error', error_cb)
 
             def read_cb(ua, chunk):
                 self._read(cid, chunk)
 
-            stream.on(read_cb, 'read')
+            stream.on('read', read_cb)
             cb(cid)
 
         cid = self._loop(nb).client(client_cb, **options)
@@ -236,7 +236,7 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
         def resume_cb(ua):
             ua._write(cid)
 
-        tx.on(resume_cb, 'resume')
+        tx.on('resume', resume_cb)
         self._write(cid)
 
     def _connection(self, nb, tx, cb):

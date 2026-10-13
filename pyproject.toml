@@ -131,6 +131,7 @@ strict = [
   "Pyjo/DOM/CSS.py",
   "Pyjo/DOM/HTML.py",
   "Pyjo/Date.py",
+  "Pyjo/EventEmitter.py",
   "Pyjo/Exception.py",
   "Pyjo/File.py",
   "Pyjo/Headers.py",

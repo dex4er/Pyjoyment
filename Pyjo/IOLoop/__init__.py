@@ -108,7 +108,7 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
     """
 
     def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+        super().__init__()
 
         self.max_accepts = kwargs.get('max_accepts', 0)
         """::
@@ -251,14 +251,14 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
                 loop._stream(stream, cid)
                 cb(loop, None, stream)
 
-        client.on(connect_cb, 'connect')
+        client.on('connect', connect_cb)
 
         def error_cb(client, err):
             if isalive(loop):
                 loop._remove(cid)
                 cb(loop, err, None)
 
-        client.on(error_cb, 'error')
+        client.on('error', error_cb)
 
         client.connect(**kwargs)
         return cid
@@ -505,7 +505,7 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
             if self._limit():
                 self._not_accepting()
 
-        server.on(accept_cb, 'accept')
+        server.on('accept', accept_cb)
         server.listen(**kwargs)
 
         return self.acceptor(server)
@@ -677,7 +677,7 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
             if isalive(loop):
                 loop._remove(cid)
 
-        stream.on(close_cb, 'close')
+        stream.on('close', close_cb)
         stream.start()
 
         return cid

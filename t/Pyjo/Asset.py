@@ -184,7 +184,7 @@ if __name__ == '__main__':
     # Upgrade
     asset = Pyjo.Asset.Memory.new(max_memory_size=5, auto_upgrade=True)
     upgrade = Value(0)
-    asset.on(lambda asset_mem, asset_file: upgrade.inc(), 'upgrade')
+    asset.on('upgrade', lambda asset_mem, asset_file: upgrade.inc())
     asset = asset.add_chunk(b'lala')
     ok(not upgrade.get(), 'upgrade event has not been emitted')
     ok(not asset.is_file, 'stored in memory')
