@@ -1,0 +1,336 @@
+r"""
+Pyjo.Prove - Run test scripts
+=============================
+::
+
+    $ python -m Pyjo.Prove t/Pyjo t/docs
+    $ python -m Pyjo.Prove -r -j 4 t
+    $ pyjo-prove -v t/Pyjo/URL.py
+
+:mod:`Pyjo.Prove` runs test scripts which print the
+`Test Anything Protocol <https://testanything.org/>`_ (TAP), such as the ones
+written with :mod:`Pyjo.Test`, and reports their results. It is inspired by
+Perl's ``prove`` and accepts the options of it that make sense for Python.
+
+A directory runs every script with the extension ``.py`` in it, and with
+``-r`` in its subdirectories too. Without arguments it runs ``t``.
+
+A test script passes when it exits with status ``0``, declares a plan, runs as
+many tests as planned and none of them fails, except the ``TODO`` tests. A
+plan of ``1..0 # SKIP reason`` skips the whole script. ``Bail out!`` stops the
+whole run. Indented lines belong to subtests and are not parsed: the parent
+test point stands for the whole subtest.
+
+The exit status is ``0`` when every test script passed and ``1`` otherwise.
+
+Options
+-------
+
+``-r``, ``--recurse``
+    Run the test scripts in subdirectories too.
+
+``-j N``, ``--jobs N``
+    Run up to N test scripts at the same time.
+
+``-v``, ``--verbose``
+    Print the TAP output of each test script.
+
+``-I DIR``, ``--include DIR``
+    Add the directory to ``PYTHONPATH`` of the test scripts. Can be repeated.
+
+``--ext EXT``
+    Extension of the test scripts in a directory, ``.py`` by default.
+
+``--exec CMD``
+    Command that runs a test script, the current Python interpreter by default.
+
+Functions
+---------
+"""
+
+import argparse
+import asyncio
+import os
+import re
+import shlex
+import sys
+import time
+
+from collections.abc import Sequence
+from dataclasses import dataclass, field
+
+
+__all__ = ['Result', 'find_scripts', 'finish', 'main', 'parse', 'run', 'run_script']
+
+
+RE_VERSION = re.compile(r'TAP version (\d+)\s*$')
+RE_PLAN = re.compile(r'1\.\.(\d+)\s*(?:#\s*(.*?))?\s*$')
+RE_TEST = re.compile(
+    r'(not )?ok\b\s*(\d+)?\s*(?:-\s*)?((?:\\.|[^#\\])*?)\s*(?:#\s*(skip|todo)\b\s*(.*?))?\s*$',
+    re.IGNORECASE,
+)
+RE_BAIL_OUT = re.compile(r'Bail out!\s*(.*?)\s*$')
+RE_SKIP = re.compile(r'skip\b\s*(.*)', re.IGNORECASE)
+
+
+@dataclass
+class Result:
+    """
+    Result of a test script: what its TAP output says and how it exited.
+    """
+
+    path: str
+    planned: int | None = None
+    skip_all: str | None = None
+    tests: int = 0
+    failed: list[int] = field(default_factory=lambda: [])
+    todo_passed: list[int] = field(default_factory=lambda: [])
+    skipped: int = 0
+    bail_out: str | None = None
+    exit_status: int = 0
+    errors: list[str] = field(default_factory=lambda: [])
+    output: list[str] = field(default_factory=lambda: [])
+
+    @property
+    def passed(self) -> bool:
+        """::
+
+            ok = result.passed
+
+        True if the test script passed.
+        """
+        return not self.failed and not self.errors and self.bail_out is None
+
+
+def parse(result: Result, line: str) -> None:
+    """::
+
+        result = Result('t/test.py')
+        for line in output.splitlines():
+            parse(result, line)
+
+    Parse a line of TAP output into the result.
+    """
+    result.output.append(line)
+
+    if not line or line[0].isspace():
+        return
+
+    if m := RE_TEST.match(line):
+        not_ok, number, _, directive, _ = m.groups()
+        result.tests += 1
+        if number is not None and int(number) != result.tests:
+            result.errors.append(f'Tests out of sequence.  Found ({number}) but expected ({result.tests})')
+        directive = (directive or '').lower()
+        if directive == 'skip':
+            result.skipped += 1
+        if not_ok and directive != 'todo':
+            result.failed.append(result.tests)
+        if not not_ok and directive == 'todo':
+            result.todo_passed.append(result.tests)
+        return
+
+    if m := RE_PLAN.match(line):
+        if result.planned is not None:
+            result.errors.append('More than one plan found in TAP output')
+            return
+        result.planned = int(m.group(1))
+        if result.planned == 0 and (skip := RE_SKIP.match(m.group(2) or '')):
+            result.skip_all = skip.group(1)
+        return
+
+    if m := RE_BAIL_OUT.match(line):
+        result.bail_out = m.group(1)
+        return
+
+    if RE_VERSION.match(line) and len(result.output) > 1:
+        result.errors.append('TAP version must be the first line of the output')
+
+
+def finish(result: Result) -> None:
+    """::
+
+        finish(result)
+
+    Check the result once the test script has exited: the plan, the number of
+    tests and the exit status.
+    """
+    if result.bail_out is not None:
+        return
+    if result.planned is None:
+        result.errors.append('No plan found in TAP output')
+    elif result.planned != result.tests:
+        result.errors.append(f'Bad plan.  You planned {result.planned} tests but ran {result.tests}.')
+    if result.exit_status:
+        result.errors.append(f'Non-zero exit status: {result.exit_status}')
+
+
+async def run_script(
+    path: str, command: Sequence[str], env: dict[str, str], *, verbose: bool = False, stream: bool = False
+) -> Result:
+    """::
+
+        result = await run_script('t/test.py', [sys.executable], dict(os.environ))
+
+    Run a test script and parse its TAP output. The standard error of the
+    script goes to the standard error of this process.
+    """
+    result = Result(path)
+    process = await asyncio.create_subprocess_exec(*command, path, stdout=asyncio.subprocess.PIPE, env=env)
+    assert process.stdout is not None
+    while raw := await process.stdout.readline():
+        line = raw.decode('utf-8', 'replace').rstrip('\r\n')
+        parse(result, line)
+        if verbose and stream:
+            print(line, flush=True)
+    result.exit_status = await process.wait()
+    finish(result)
+    return result
+
+
+def find_scripts(paths: Sequence[str], ext: str, recurse: bool) -> list[str]:
+    """::
+
+        scripts = find_scripts(['t'], '.py', recurse=True)
+
+    Expand directories into the test scripts in them, sorted by name.
+    """
+    scripts: list[str] = []
+    for path in paths:
+        if not os.path.isdir(path):
+            scripts.append(path)
+            continue
+        found: list[str] = []
+        for root, dirs, files in os.walk(path):
+            dirs.sort()
+            found.extend(os.path.join(root, f) for f in files if f.endswith(ext))
+            if not recurse:
+                break
+        scripts.extend(sorted(found))
+    return scripts
+
+
+async def run(
+    scripts: Sequence[str],
+    command: Sequence[str] | None = None,
+    env: dict[str, str] | None = None,
+    *,
+    jobs: int = 1,
+    verbose: bool = False,
+) -> list[Result]:
+    """::
+
+        results = asyncio.run(run(['t/a.py', 't/b.py'], jobs=2))
+
+    Run the test scripts, print a line for each of them and a summary, and
+    return the results in the order of the scripts.
+    """
+    command = list(command or [sys.executable])
+    env = dict(os.environ if env is None else env)
+    width = max((len(s) for s in scripts), default=0) + 3
+    semaphore = asyncio.Semaphore(max(jobs, 1))
+    bailed_out = asyncio.Event()
+    started = time.monotonic()
+
+    async def one(path: str) -> Result | None:
+        async with semaphore:
+            if bailed_out.is_set():
+                return None
+            stream = jobs <= 1
+            if stream and verbose:
+                print(f'{path} ..', flush=True)
+            result = await run_script(path, command, env, verbose=verbose, stream=stream)
+            if verbose and not stream:
+                print(f'{path} ..', *result.output, sep='\n', flush=True)
+            print(_status_line(result, width), flush=True)
+            if result.bail_out is not None:
+                bailed_out.set()
+            return result
+
+    if jobs <= 1:
+        results: list[Result | None] = []
+        for path in scripts:
+            results.append(await one(path))
+    else:
+        results = await asyncio.gather(*(one(path) for path in scripts))
+
+    done = [r for r in results if r is not None]
+    _summary(done, time.monotonic() - started)
+    return done
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """::
+
+        sys.exit(main(['-r', 't']))
+
+    Command line interface: parse the options, run the test scripts and return
+    the exit status.
+    """
+    parser = argparse.ArgumentParser(prog='pyjo-prove', description='Run test scripts which print TAP.')
+    parser.add_argument('-r', '--recurse', action='store_true', help='run the test scripts in subdirectories too')
+    parser.add_argument('-j', '--jobs', type=int, default=1, metavar='N', help='run up to N test scripts at once')
+    parser.add_argument('-v', '--verbose', action='store_true', help='print the TAP output of each test script')
+    parser.add_argument(
+        '-I', '--include', action='append', default=[], metavar='DIR', help='add the directory to PYTHONPATH'
+    )
+    parser.add_argument('--ext', default='.py', help='extension of the test scripts, .py by default')
+    parser.add_argument('--exec', dest='command', metavar='CMD', help='command that runs a test script')
+    parser.add_argument('paths', nargs='*', default=['t'], help='test scripts and directories, t by default')
+    args = parser.parse_args(argv)
+
+    ext = args.ext if args.ext.startswith('.') else f'.{args.ext}'
+    scripts = find_scripts(args.paths, ext, args.recurse)
+    if not scripts:
+        print('No tests found.', file=sys.stderr)
+        return 1
+
+    env = dict(os.environ)
+    if args.include:
+        env['PYTHONPATH'] = os.pathsep.join([*args.include, *filter(None, [env.get('PYTHONPATH')])])
+
+    command = shlex.split(args.command) if args.command else [sys.executable]
+    results = asyncio.run(run(scripts, command, env, jobs=args.jobs, verbose=args.verbose))
+    return 0 if len(results) == len(scripts) and all(r.passed for r in results) else 1
+
+
+def _status_line(result: Result, width: int) -> str:
+    name = f'{result.path} {"." * (width - len(result.path))}'
+    if result.bail_out is not None:
+        return f'{name} Bailout called.  Further testing stopped:  {result.bail_out}'
+    if result.passed and result.skip_all is not None:
+        return f'{name} skipped: {result.skip_all}'
+    if result.passed:
+        return f'{name} ok'
+    if result.failed:
+        return f'{name} Failed {len(result.failed)}/{result.tests} subtests'
+    return f'{name} Dubious'
+
+
+def _summary(results: list[Result], elapsed: float) -> None:
+    failed = [r for r in results if not r.passed]
+    tests = sum(r.tests for r in results)
+
+    if failed:
+        print('\nTest Summary Report\n-------------------')
+        for r in failed:
+            print(f'{r.path} (Tests: {r.tests} Failed: {len(r.failed)})')
+            if r.failed:
+                print(f'  Failed {"tests" if len(r.failed) > 1 else "test"}:  {", ".join(map(str, r.failed))}')
+            if r.bail_out is not None:
+                print(f'  Bail out:  {r.bail_out}')
+            for error in r.errors:
+                print(f'  {error}')
+    else:
+        print('All tests successful.')
+
+    todo_passed = [r for r in results if r.todo_passed]
+    for r in todo_passed:
+        print(f'{r.path}: TODO passed:  {", ".join(map(str, r.todo_passed))}')
+
+    print(f'Files={len(results)}, Tests={tests}, {elapsed:.0f} wallclock secs')
+    print(f'Result: {"FAIL" if failed else "PASS"}', flush=True)
+
+
+if __name__ == '__main__':
+    sys.exit(main())
