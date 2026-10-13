@@ -297,6 +297,12 @@ copy:
 - Python's recursion limit is 1000 calls. A recursive parser that must reach
   a nesting depth like `Mojo::JSON`'s 512 makes one call for each level,
   not two.
+- A function that works on bytes in Mojo, such as a checksum, Base64
+  encoding, compression or `xor_encode`, takes `bytes`, and a Mojo test that
+  passes it a literal like `'foo bar baz'` passes `b'foo bar baz'`.
+- Perl's `\w` matches the combining marks of scripts such as Devanagari,
+  Python's does not, so a regular expression that keeps word characters of
+  any script tests the Unicode category of the character as well.
 - Methods that Mojo makes in a loop with `monkey_patch`, such as the
   shortcuts of `Mojo::Headers`, are class attributes, one for each, made
   with a descriptor class.
