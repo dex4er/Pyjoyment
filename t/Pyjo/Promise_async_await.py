@@ -24,17 +24,17 @@ def collect():
         gc.collect()
 
 
-@Pyjo.Promise.async_
+@Pyjo.Promise.coroutine
 async def await_then_return_promise(method):
     return Pyjo.Promise.resolve(await getattr(Pyjo.Promise, method)(0.01, method))
 
 
-@Pyjo.Promise.async_
+@Pyjo.Promise.coroutine
 async def reject_p():
     await Pyjo.Promise.reject('Rejected promise')
 
 
-@Pyjo.Promise.async_
+@Pyjo.Promise.coroutine
 async def test_three(ok):
     def cb(resolve, reject):
         Pyjo.IOLoop.next_tick(lambda loop: (resolve if ok else reject)('value'))
@@ -104,7 +104,7 @@ with subtest('Async nested function returning a promise'):
 
 # Top-level await
 # Not in Mojolicious: Python awaits in a coroutine only, which runs as a promise
-@Pyjo.Promise.async_
+@Pyjo.Promise.coroutine
 async def top_level():
     is_ok(await Pyjo.Promise.resolve('works'), 'works', 'top-level await resolved')
     is_deeply_ok(list(await Pyjo.Promise.resolve('just', 'works')), ['just', 'works'], 'top-level await resolved')

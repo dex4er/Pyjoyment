@@ -203,12 +203,12 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
         return future
 
     # Not in Mojolicious: a task of the loop
-    def coroutine(
+    def run_coroutine(
         self, coro: Coroutine[Any, Any, Any], resolve: Callable[[Any], Any], reject: Callable[[Any], Any]
     ) -> None:
         """::
 
-            reactor.coroutine(coro, resolve, reject)
+            reactor.run_coroutine(coro, resolve, reject)
 
         Run a coroutine as a task of :attr:`loop`, where it can await anything
         of the loop, and call ``resolve`` with what it returns or ``reject``

@@ -77,7 +77,7 @@ with subtest('Synopsis'):
         ).wait()
 
         # Await a promise in a coroutine
-        @Pyjo.Promise.async_
+        @Pyjo.Promise.coroutine
         async def code(url):
             tx = await get_p(url)
             return tx.res.code
@@ -278,13 +278,13 @@ with subtest('wait'):
     promise.then(got.append).wait()
     is_deeply_ok(got, ['waited'], 'waited')
 
-with subtest('async_'):
+with subtest('coroutine'):
     output = io.StringIO()
     with contextlib.redirect_stdout(output):
         ua = FakeUA()
         ua.get_p = get_p
 
-        @Pyjo.Promise.async_
+        @Pyjo.Promise.coroutine
         async def title(url):
             tx = await ua.get_p(url)
             return tx.res.dom.at('title').text

@@ -98,7 +98,7 @@ with subtest('awaitable and coroutine'):
         return 'done'
 
     got = []
-    reactor.coroutine(coro(), got.append, got.append)
+    reactor.run_coroutine(coro(), got.append, got.append)
     Pyjo.IOLoop.one_tick()
     is_deeply_ok(got, ['done'], 'driven without asyncio')
 

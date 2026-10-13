@@ -50,7 +50,7 @@ with subtest('asyncio.gather'):
 
 with subtest('A coroutine with asyncio in a promise'):
 
-    @Pyjo.Promise.async_
+    @Pyjo.Promise.coroutine
     async def slow(value):
         await asyncio.sleep(0.01)
         return await Pyjo.Promise.timer(0.01, value)
@@ -59,7 +59,7 @@ with subtest('A coroutine with asyncio in a promise'):
     slow('done').then(got.append).wait()
     is_deeply_ok(got, ['done'], 'wait runs the loop until the task is done')
 
-    @Pyjo.Promise.async_
+    @Pyjo.Promise.coroutine
     async def nothing():
         await asyncio.sleep(0)
 
@@ -67,7 +67,7 @@ with subtest('A coroutine with asyncio in a promise'):
     nothing().then(lambda *values: got.append(values)).wait()
     is_deeply_ok(got, [()], 'None is no value')
 
-    @Pyjo.Promise.async_
+    @Pyjo.Promise.coroutine
     async def fails():
         await asyncio.sleep(0)
         raise ValueError('Oops')
@@ -80,12 +80,12 @@ with subtest('A coroutine without asyncio'):
     code = """
 import asyncio, Pyjo.Promise
 
-@Pyjo.Promise.async_
+@Pyjo.Promise.coroutine
 async def twice(value):
     first = await Pyjo.Promise.timer(0.01, value)
     return first * 2
 
-@Pyjo.Promise.async_
+@Pyjo.Promise.coroutine
 async def foreign():
     await asyncio.sleep(0)
 

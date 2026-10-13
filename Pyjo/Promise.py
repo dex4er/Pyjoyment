@@ -46,7 +46,7 @@ Pyjo.Promise - Promises/A+
     ).catch(lambda err: warn(f'Something went wrong: {err}')).wait()
 
     # Await a promise in a coroutine
-    @Pyjo.Promise.async_
+    @Pyjo.Promise.coroutine
     async def code(url):
         tx = await get_p(url)
         return tx.res.code
@@ -98,7 +98,7 @@ Coroutines
 a tuple of several values, or ``None`` for none. A rejection raises the
 exception the promise was rejected with, or a :mod:`Pyjo.Exception` of the
 first reason. A coroutine is a promise with :meth:`~Pyjo_Promise.new` or
-:func:`async_`. The reactor of the event loop runs it: a coroutine awaits the
+:func:`coroutine`. The reactor of the event loop runs it: a coroutine awaits the
 promises of Pyjoyment with any reactor, and with :mod:`Pyjo.Reactor.Asyncio`
 anything of asyncio too, and a promise can be awaited in any asyncio task. ::
 
@@ -213,7 +213,7 @@ class Pyjo_Promise(Pyjo.Base.object):
             def resolve(value: Any) -> None:
                 self.resolve() if value is None else self.resolve(value)
 
-            self.ioloop.reactor.coroutine(cast(Coroutine[Any, Any, Any], cb), resolve, lambda e: self.reject(e))
+            self.ioloop.reactor.run_coroutine(cast(Coroutine[Any, Any, Any], cb), resolve, lambda e: self.reject(e))
 
         elif cb is not None:
             cb(lambda *values: self.resolve(*values), lambda *values: self.reject(*values))
@@ -601,10 +601,10 @@ class Pyjo_Promise(Pyjo.Base.object):
 
 
 # Not in Mojolicious: a decorator of a coroutine function, as Mojo's async sub
-def async_[**P](func: Callable[P, Coroutine[Any, Any, Any]]) -> Callable[P, Pyjo_Promise]:
+def coroutine[**P](func: Callable[P, Coroutine[Any, Any, Any]]) -> Callable[P, Pyjo_Promise]:
     """::
 
-        @Pyjo.Promise.async_
+        @Pyjo.Promise.coroutine
         async def title(url):
             tx = await ua.get_p(url)
             return tx.res.dom.at('title').text

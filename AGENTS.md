@@ -425,7 +425,7 @@ copy:
   the return value is one value, `None` is none, as Perl's `return;`, and a
   promise of several values passes them on.
 - `async sub` of Mojo is an `async def` that the reactor runs as a promise,
-  `Pyjo.Promise.async_`, and Mojo's `AWAIT_*` methods are `__await__`. A
+  `Pyjo.Promise.coroutine`, and Mojo's `AWAIT_*` methods are `__await__`. A
   reactor without asyncio drives a coroutine that awaits promises of
   Pyjoyment; the asyncio reactor runs it as a task.
 - A method that the base class of Mojo leaves to a subclass raises

@@ -153,19 +153,19 @@ class Pyjo_Reactor(Pyjo.EventEmitter.object):
 
         Return what ``await promise`` waits on, which completes when the
         promise is fulfilled or rejected. The base class gives one that
-        :meth:`coroutine` drives, without asyncio, and a reactor of an event
+        :meth:`run_coroutine` drives, without asyncio, and a reactor of an event
         loop gives one of its loop, so that a promise can be awaited in the
         tasks of that loop.
         """
         return _Awaitable(promise)
 
     # Not in Mojolicious: how a coroutine runs as a promise, as Mojo's async sub
-    def coroutine(
+    def run_coroutine(
         self, coro: Coroutine[Any, Any, Any], resolve: Callable[[Any], Anything], reject: Callable[[Any], Anything]
     ) -> None:
         """::
 
-            reactor.coroutine(coro, resolve, reject)
+            reactor.run_coroutine(coro, resolve, reject)
 
         Run a coroutine and call ``resolve`` with what it returns or
         ``reject`` with the exception it raises. The base class runs it at

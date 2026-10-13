@@ -119,7 +119,7 @@ with subtest('awaitable and coroutine'):
         return await promise
 
     got = []
-    reactor.coroutine(coro(), got.append, got.append)
+    reactor.run_coroutine(coro(), got.append, got.append)
     Pyjo.Promise.new().set(ioloop=loop).timer(0.05).wait()
     is_deeply_ok(got, ['done'], 'task of the loop')
 
