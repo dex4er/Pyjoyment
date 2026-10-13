@@ -365,6 +365,10 @@ copy:
 - A method that Mojo calls on the class or on an object, like
   `Mojo::DOM->new_tag` and `$dom->new_tag`, is a descriptor that passes either
   of them.
+- A method of Mojolicious with the name of a method of `Pyjo.Base`, like `set`
+  of `Mojo::Cache`, replaces it in the class. Mojo's chain of an attribute and
+  the method, `$cache->max_keys(1)->set(one => 1)`, is then an assignment
+  followed by the call.
 - A module that is not ported yet but uses a ported one follows its API: the
   lines that use it are taken from the target Mojolicious, and so is the
   expectation of a test of them that the target changed.
