@@ -615,7 +615,7 @@ if __name__ == '__main__':
     ok(url.path.leading_slash, 'has leading slash')
     ok(url.path.trailing_slash, 'has trailing slash')
     is_ok(str(url.query), '%E5=%E4', 'right query')
-    is_ok(url.query.param(b'\xe5'), b'\xe4', 'right value')
+    is_ok(url.query.param('\xe5'), '\xe4', 'right value')
     is_ok(str(url), 'http://foo.bar/%E4/?%E5=%E4', 'right format')
 
     # Resolve RFC 1808 examples

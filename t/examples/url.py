@@ -13,7 +13,7 @@ if __name__ == '__main__':
 
     is_ok(
         str(Pyjo.URL.new('http://metacpan.org/search').set(query={'q': 'Mojo::URL', 'size': 20})),
-        'http://metacpan.org/search?q=Mojo::URL&size=20',
+        'http://metacpan.org/search?q=Mojo%3A%3AURL&size=20',
         'new metacpan.org url',
     )
 

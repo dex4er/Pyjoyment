@@ -7,7 +7,9 @@ if __name__ == '__main__':
         path='/w/index.php', query=[('title', 'Wikipedia:Strona_główna'), ('action', 'history')]
     )
     is_ok(
-        str(url1), 'http://pl.wikipedia.org/w/index.php?title=Wikipedia:Strona_g%C5%82%C3%B3wna&action=history', 'url1'
+        str(url1),
+        'http://pl.wikipedia.org/w/index.php?title=Wikipedia%3AStrona_g%C5%82%C3%B3wna&action=history',
+        'url1',
     )
 
     url2 = Pyjo.URL.new('http://pl.wikipedia.org').set(path='/wiki/Wikipedia:Strona_główna')
