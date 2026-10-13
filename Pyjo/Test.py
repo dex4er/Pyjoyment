@@ -42,14 +42,13 @@ directory.
 Running tests
 -------------
 
-The test scripts run with ``prove``: ::
+The test scripts run with :mod:`Pyjo.Prove`: ::
 
-    $ PYTHONPATH=. prove --ext=py --exec=python t
+    $ python -m Pyjo.Prove -I . -r t
 
-The arguments can be kept in the ``.proverc`` file: ::
+or with Perl's ``prove``, as they print standard TAP: ::
 
-    --ext=py
-    --exec=python
+    $ PYTHONPATH=. prove --ext=py --exec=python -r t
 
 A single script runs on its own as well: ::
 

@@ -47,6 +47,9 @@ classifiers = [
   "Topic :: Text Processing :: Markup :: HTML",
 ]
 
+[project.scripts]
+pyjo-prove = "Pyjo.Prove:main"
+
 [project.urls]
 Homepage = "https://github.com/dex4er/Pyjoyment"
 Documentation = "https://pyjoyment.readthedocs.io/"
@@ -118,4 +121,4 @@ lines-after-imports = 2
 [tool.pyright]
 pythonVersion = "3.12"
 typeCheckingMode = "off"
-strict = ["Pyjo/Test.py"]
+strict = ["Pyjo/Prove.py", "Pyjo/Test.py"]

@@ -71,6 +71,10 @@ Python the project does not use. Run tools through mise:
 mise exec -- python --version
 ```
 
+`uv.lock` locks the Python dependencies; there are none at run time yet. After
+a change to `pyproject.toml`, run `mise exec -- uv lock`; CI checks that the
+lock matches with `uv lock --check`.
+
 `mise install` re-locks only the platform it runs on. After changing a tool
 version, run `mise lock` so every platform in `mise.lock` is refreshed; CI
 installs with `--locked` and fails on a tool that is not in the lock.
@@ -79,19 +83,22 @@ installs with `--locked` and fails on a tool that is not in the lock.
 
 The tests are scripts that print [TAP](https://testanything.org/), written
 with `Pyjo.Test`, which is inspired by Perl's `Test::More`. They run with
-`prove`:
+`Pyjo.Prove`, a TAP harness inspired by Perl's `prove`:
 
 ```sh
-PYTHONPATH=. mise exec -- prove t/Pyjo t/docs t/examples
+PYTHONPATH=. mise exec -- python -m Pyjo.Prove -j 4 -r t
 ```
 
-`.proverc` supplies `--ext=py --exec=python`. A single file runs on its own as
-well: `PYTHONPATH=. mise exec -- python t/Pyjo/URL.py`.
+A single file runs on its own as well:
+`PYTHONPATH=. mise exec -- python t/Pyjo/URL.py`. Perl's `prove` still works,
+because the output is standard TAP; `.proverc` supplies its
+`--ext=py --exec=python`.
 
 - `t/Pyjo/` holds the module tests, ported from Mojo's `t/mojo/*.t`.
 - `t/docs/` checks the examples from the module documentation.
 - `t/examples/` runs the scripts from `examples/`.
-- `t/lib/` holds helpers shared by the tests.
+- `t/lib/` holds helpers shared by the tests. Run on their own, they skip with
+  `plan(skip_all=...)`, so `-r t` reports them as skipped instead of failing.
 
 A test script imports the test functions and groups its tests in subtests,
 like Mojo's tests do; Python keywords give some functions an `_ok` suffix
@@ -114,8 +121,10 @@ and only once a test function has been called, so importing the module (as
 Sphinx does) has no effect. Older test files still wrap their body in
 `if __name__ == '__main__':`, which is no longer needed.
 
-CI sets `PYTHONWARNINGS=error::SyntaxWarning`, so an invalid escape sequence
-fails the build. Python keeps an unknown escape such as `"\:"` as a backslash
+CI sets `PYTHONWARNINGS=error::SyntaxWarning,error::DeprecationWarning`, so an
+invalid escape sequence or a deprecated API fails the build, before a new
+Python removes it; the weekly run catches the deprecations of a new Python
+release. Python keeps an unknown escape such as `"\:"` as a backslash
 followed by the character, which is often exactly what a CSS selector or a
 regular expression ported from Perl needs; write it as `"\\:"` or as a raw
 string so it survives the Python release that turns the warning into an error.

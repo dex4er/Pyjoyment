@@ -1,13 +1,12 @@
 if __name__ == '__main__':
     from Pyjo.Test import *  # noqa
 
-    import codecs
     import os
     import time
 
     from Pyjo.Util import slurp, u
 
-    from t.lib.TemporaryDirectory import TemporaryDirectory
+    from tempfile import TemporaryDirectory
 
     import Pyjo.Log
 
@@ -26,7 +25,7 @@ if __name__ == '__main__':
     with TemporaryDirectory() as tmpdir:
         # Logging to handle
         path = os.path.join(tmpdir, 'test_handle.log')
-        handle = codecs.open(path, 'w', 'utf-8')
+        handle = open(path, 'w', encoding='utf-8')
         with Pyjo.Log.new(handle=handle) as log:
             log.error('Just works')
             log.fatal('I ♥ Mojolicious')

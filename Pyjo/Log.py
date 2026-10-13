@@ -305,7 +305,7 @@ class Pyjo_Log(Pyjo.EventEmitter.object):
 
     def _build_handle(self):
         if self.path:
-            return codecs.open(self.path, mode='a', encoding='utf-8', errors='replace')
+            return open(self.path, mode='a', encoding='utf-8', errors='replace', newline='')
         elif (getattr(sys.stderr, 'encoding', '') or '').lower() == 'utf-8':
             return sys.stderr
         elif not hasattr(sys.stderr, 'encoding'):

@@ -30,6 +30,7 @@ jobs:
           - mise
           - "3.12"
           - "3.13"
+          - "3.14"
           - "3.15"
           - pypy3.12
 
@@ -38,8 +39,9 @@ jobs:
 
     env:
       PYTHONPATH: .
-      # Invalid escape sequences become errors in a future Python.
-      PYTHONWARNINGS: error::SyntaxWarning
+      # Invalid escape sequences and deprecated APIs become errors in a future
+      # Python; fail now instead.
+      PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
 
     steps:
       - name: Checkout
@@ -58,12 +60,10 @@ jobs:
           python-version: ${{ matrix.python }}
           allow-prereleases: true
 
-      # prove reads --ext and --exec from .proverc. Perl and prove come with
-      # the runner images.
       - name: Run tests
         run: |
           python --version
-          prove t/Pyjo t/docs t/examples
+          python -m Pyjo.Prove -j 4 -r t
 
   build:
     name: build
@@ -80,12 +80,16 @@ jobs:
         with:
           version: 2026.10.4 # datasource=github-releases depName=jdx/mise
 
+      # uv.lock has to match pyproject.toml.
+      - name: Check uv.lock
+        run: uv lock --check
+
       - name: Build sdist and wheel
         run: uv build
 
       # Package data is the easiest part of a package to lose silently.
       - name: Check wheel contents
-        run: |
+        run: |-
           python -m zipfile -l dist/*.whl | tee wheel.txt
           grep -q 'Pyjo/IOLoop/certs/server.crt' wheel.txt
           grep -q 'Pyjo/IOLoop/certs/server.key' wheel.txt
