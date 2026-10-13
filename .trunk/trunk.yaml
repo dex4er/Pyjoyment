@@ -28,6 +28,7 @@ lint:
           - lint
           - format
     - taplo@0.10.0
+    - yamlfmt@0.21.0
     - yamllint@1.38.0
   disabled:
     # bandit: security checks for Python code; not used here
@@ -51,6 +52,11 @@ lint:
     # default self-signed TLS key in Pyjo/IOLoop/certs, tracked on purpose
     - trufflehog
   ignore:
+    # Rewritten by trunk upgrade
+    - linters:
+        - yamlfmt
+      paths:
+        - .trunk/trunk.yaml
     # Examples that compare Pyjoyment with other libraries, which are not
     # installed for the project
     - linters:
