@@ -95,7 +95,9 @@ because the output is standard TAP; `.proverc` supplies its
 `--ext=py --exec=python`.
 
 - `t/Pyjo/` holds the module tests, ported from Mojo's `t/mojo/*.t`.
-- `t/docs/` checks the examples from the module documentation.
+- `t/docs/` checks that the code in the module documentation is correct: it
+  is the same code as in the docstrings, in the same order, with `print` and
+  the comments that show a result turned into assertions.
 - `t/examples/` runs the scripts from `examples/`.
 - `t/lib/` holds helpers shared by the tests. Run on their own, they skip with
   `plan(skip_all=...)`, so `-r t` reports them as skipped instead of failing.
@@ -166,8 +168,8 @@ For each module:
    (synopsis, description, events, attributes, methods, operators, see also)
    and Mojo's wording, with Python names and examples. The POD is the source of
    the Python documentation. Sphinx lists the classes after the module
-   docstring, so "See also" ends the module docstring, before them. The
-   examples are checked in `t/docs/`.
+   docstring, so "See also" ends the module docstring, before them. A test in
+   `t/docs/` runs the examples.
 4. Name the source at the end of "See also", as a link to the file at the
    tag (`https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/Date.pm`),
    annotate the module and put it on pyright's strict list.

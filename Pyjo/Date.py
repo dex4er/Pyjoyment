@@ -5,6 +5,8 @@ Pyjo.Date - HTTP date
 
     import Pyjo.Date
 
+    import time
+
     # Parse
     date = Pyjo.Date.new('Sun, 06 Nov 1994 08:49:37 GMT')
     print(date.epoch)
