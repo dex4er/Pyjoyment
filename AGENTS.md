@@ -214,9 +214,19 @@ copy:
 - Overloaded operators become special methods: `""` is `__str__`, `bool` is
   `__bool__`, and `@{}` is `__getitem__`, `__iter__` and `__len__`.
   `to_string` is `to_str`, the counterpart of `to_bytes` in
-  `Pyjo.String.Mixin`. `to_hash` is `to_dict`, and a flat list of
-  names and values, like the pairs of `Mojo::Parameters`, is a list of
-  `(name, value)` tuples.
+  `Pyjo.String.Mixin`, and `to_unsafe_string` is `to_unsafe_str`.
+  `to_hash` is `to_dict`, and a flat list of names and values, like the
+  pairs of `Mojo::Parameters`, is a list of `(name, value)` tuples.
+- Mojo's attributes and getter/setter methods are attributes and properties
+  (`url.host`, `url.path`). A method without arguments that describes the
+  object, like `is_abs` or `protocol`, is a property too: as a method,
+  `if url.is_abs:` would always be true. A method that builds something,
+  like `to_str`, `clone` or `names`, stays a method.
+- Mojo's forms of an accessor with a list of arguments, an array reference
+  and a hash reference are a `tuple`, a `list` and a `dict`:
+  `url.query = ('a', 1)` replaces the parameters, `['a', 1]` appends
+  them, and `{'a': 1}` merges them, as `query(a => 1)`, `query([a => 1])`
+  and `query({a => 1})` do.
 - A Perl string of characters is a `str`, and bytes in Python are `bytes`,
   encoded with the charset of the module. Perl keeps bytes that do not decode
   as a byte string, which is a `str` of the characters 0-255 in Python:
