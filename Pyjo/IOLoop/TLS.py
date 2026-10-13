@@ -199,11 +199,9 @@ class Pyjo_IOLoop_TLS(Pyjo.EventEmitter.object):
             return self._error(e)
         self._handle = handle
 
-        ref = weakref.ref(self)
-
+        # The reactor keeps the negotiation alive until it is done, as Mojo's callback refers to it
         def cb(reactor: Any, writable: bool) -> None:
-            if (tls := ref()) is not None:
-                tls._tls(handle)
+            self._tls(handle)
 
         self.reactor.io(handle, cb)
 

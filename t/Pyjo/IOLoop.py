@@ -422,7 +422,27 @@ with subtest('Graceful shutdown (max_accepts)'):
     is_ok(loop.max_accepts, 1, 'right value')
 
 with subtest('Connection limit'):
-    skip('single_accept and is_accepting of Mojo::IOLoop::Server 9.49 are not ported yet', 3)
+    err = id = None
+    loop = Pyjo.IOLoop.new(max_connections=2)
+    accepting = []
+
+    def accepting_cb(loop, stream, cid):
+        def tick(loop):
+            accepting.append(loop.acceptor(id).is_accepting)
+            if len(accepting) == 2:
+                loop.stop()
+
+        loop.next_tick(tick)
+
+    id = loop.server(accepting_cb, address='127.0.0.1', single_accept=True)
+    port = loop.acceptor(id).port
+    for _ in range(2):
+        loop.client(lambda loop, err, stream: None, port=port)
+    loop.timer(30, failed_cb)
+    loop.start()
+    ok(not err, 'no error')
+    ok(accepting[0], 'accepting connections')
+    ok(not accepting[1], 'connection limit reached')
 
 with subtest('Exception in timer'):
     with contextlib.redirect_stderr(io.StringIO()) as stderr:

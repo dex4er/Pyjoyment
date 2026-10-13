@@ -1,6 +1,6 @@
 import Pyjo.IOLoop
-import Pyjo.IOLoop.Server
 import Pyjo.IOLoop.Stream
+import Pyjo.IOLoop.TLS
 
 from Pyjo.Test import *
 
@@ -52,9 +52,9 @@ with subtest('An error'):
     ok(all(isinstance(e, OSError) for e in errors), 'errors are OSError')
 
 with subtest('TLS'):
-    certs = os.path.dirname(Pyjo.IOLoop.Server.CERT)
+    certs = os.path.dirname(Pyjo.IOLoop.TLS.CERT)
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-    context.load_cert_chain(Pyjo.IOLoop.Server.CERT, Pyjo.IOLoop.Server.KEY)
+    context.load_cert_chain(Pyjo.IOLoop.TLS.CERT, Pyjo.IOLoop.TLS.KEY)
     client_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     client_context.load_verify_locations(os.path.join(certs, 'ca.crt'))
     a, b = socket.socketpair()

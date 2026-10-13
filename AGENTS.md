@@ -440,6 +440,10 @@ copy:
 - `tls_options` of IO::Socket::SSL is an `ssl.SSLContext`, `tls_context`, as
   asyncio takes `ssl=context`. OpenSSL chooses an ALPN protocol by the order
   of the server, IO::Socket::SSL by the order of the client.
+- A timer of no time, as `next_tick` makes, runs in Mojo's reactor in the
+  same tick as the I/O before it, so before the next I/O; asyncio runs a
+  `call_later(0)` after the I/O of its next iteration, and a `call_soon`
+  before it, so the asyncio reactor schedules such a timer with `call_soon`.
 - A callback that an asyncio loop keeps, as a timer or an I/O watcher,
   refers to the reactor weakly, so that the reactor and the loop it owns do
   not make a cycle: in a cycle the garbage collector may close the sockets of
