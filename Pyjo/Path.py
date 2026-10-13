@@ -10,12 +10,20 @@ Pyjo.Path - Path
     print(path[0])
 
     # Build
-    path = Pyjo.Path.new(u'/i/♥')
-    path.append('pyjo')
+    path = Pyjo.Path.new('/i/♥')
+    path.parts.append('pyjoyment')
     print(path)
 
-:mod:`Pyjo.Path` is a container for paths used by :mod:`Pyjo.URL` and based on
+:mod:`Pyjo.Path` is a container for paths used by :mod:`Pyjo.URL`, based on
 :rfc:`3986`.
+
+See also
+--------
+
+:mod:`Pyjoyment`, https://mojolicious.org.
+
+Ported from `Mojo::Path <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/Path.pm>`_
+of Mojolicious 9.49.
 
 Classes
 -------
@@ -24,45 +32,49 @@ Classes
 import Pyjo.Base
 import Pyjo.String.Mixin
 
-from Pyjo.Util import b, u, url_escape, url_unescape
+from Pyjo.Util import url_escape, url_unescape
+
+import re
+
+from collections.abc import Iterator
+from typing import Self
 
 
 class Pyjo_Path(Pyjo.Base.object, Pyjo.String.Mixin.object):
     """
-    :mod:`Pyjo.Path` inherits all attributes and methods from
-    :mod:`Pyjo.Base` and :mod:`Pyjo.String.Mixin` and implements the following new ones.
+    :mod:`Pyjo.Path` inherits all methods from :mod:`Pyjo.Base` and
+    :mod:`Pyjo.String.Mixin` and implements the following new ones.
     """
 
-    def __init__(self, path=None, **kwargs):
+    def __init__(self, path: 'str | bytes | Pyjo_Path | None' = None) -> None:
         """::
 
             path = Pyjo.Path.new()
             path = Pyjo.Path.new('/foo%2Fbar%3B/baz.html')
 
-        Construct a new :mod`Pyjo.Path` object and :meth:`parse` path if necessary.
+        Construct a new :mod:`Pyjo.Path` object and :meth:`parse` path if necessary.
         """
-
-        self.charset = kwargs.get('charset', 'utf-8')
+        self.charset: str | None = 'UTF-8'
         """::
 
             charset = path.charset
-            path.charset = 'utf-8'
+            path.charset = 'UTF-8'
 
-        Charset used for encoding and decoding, defaults to ``utf-8``. ::
+        Charset used for encoding and decoding, defaults to ``UTF-8``. ::
 
             # Disable encoding and decoding
             path.charset = None
         """
 
+        self._path: str | bytes | None = None
+        self._parts: list[str] | None = None
         self._leading_slash = False
-        self._path = None
-        self._parts = None
         self._trailing_slash = False
 
         if path is not None:
             self.parse(path)
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
         """::
 
             boolean = bool(path)
@@ -71,17 +83,51 @@ class Pyjo_Path(Pyjo.Base.object, Pyjo.String.Mixin.object):
         """
         return True
 
-    def __iter__(self):
+    def __getitem__(self, index: int) -> str:
+        """::
+
+            part = path[0]
+
+        Alias for :attr:`parts`. Note that this will normalize the path and that
+        ``%2F`` will be treated as ``/`` for security reasons. ::
+
+            print(path[0])
+        """
+        return self.parts[index]
+
+    def __iter__(self) -> Iterator[str]:
         """::
 
             parts = list(path)
 
-        Iterator based on :attr:`parts`. Note that this will normalize the path and that ``%2F``
-        will be treated as ``/`` for security reasons.
+        Alias for :attr:`parts`. Note that this will normalize the path and that
+        ``%2F`` will be treated as ``/`` for security reasons. ::
+
+            for part in path:
+                print(part)
         """
         return iter(self.parts)
 
-    def canonicalize(self):
+    def __len__(self) -> int:
+        """::
+
+            size = len(path)
+
+        Alias for :attr:`parts`. Note that this will normalize the path and that
+        ``%2F`` will be treated as ``/`` for security reasons.
+        """
+        return len(self.parts)
+
+    def __str__(self) -> str:
+        """::
+
+            string = str(path)
+
+        Alias for :meth:`to_str`.
+        """
+        return self.to_str()
+
+    def canonicalize(self) -> Self:
         """::
 
             path = path.canonicalize()
@@ -101,41 +147,39 @@ class Pyjo_Path(Pyjo.Base.object, Pyjo.String.Mixin.object):
         parts = self.parts
         i = 0
         while i < len(parts):
-            if parts[i] == '' or parts[i] == '.' or parts[i] == '...':
-                parts.pop(i)
+            if parts[i] in ('', '.', '...'):
+                del parts[i]
             elif i < 1 or parts[i] != '..' or parts[i - 1] == '..':
                 i += 1
             else:
                 i -= 1
-                parts.pop(i)
-                parts.pop(i)
+                del parts[i : i + 2]
 
         if not parts:
             self.trailing_slash = False
-
         return self
 
-    def clone(self):
+    def clone(self) -> Self:
         """::
 
             clone = path.clone()
 
-        Clone path.
+        Return a new :mod:`Pyjo.Path` object cloned from this path.
         """
-        new_obj = type(self)()
-        new_obj.charset = self.charset
-        if self._parts:
-            new_obj._parts = list(self._parts)
-            new_obj._leading_slash = self._leading_slash
-            new_obj._trailing_slash = self._trailing_slash
+        clone = self.new()
+        clone.charset = self.charset
+        if self._parts is not None:
+            clone._leading_slash = self._leading_slash
+            clone._trailing_slash = self._trailing_slash
+            clone._parts = list(self._parts)
         else:
-            new_obj._path = self._path
-        return new_obj
+            clone._path = self._path
+        return clone
 
-    def contains(self, prefix):
+    def contains(self, prefix: str) -> bool:
         """::
 
-            boolean = path.contains(u'/i/♥/pyjo')
+            boolean = path.contains('/i/♥/pyjoyment')
 
         Check if path contains given prefix. ::
 
@@ -149,38 +193,38 @@ class Pyjo_Path(Pyjo.Base.object, Pyjo.String.Mixin.object):
             Pyjo.Path.new('/foo/bar').contains('/bar')
             Pyjo.Path.new('/foo/bar').contains('/whatever')
         """
-        if prefix == '/':
-            return True
-        else:
-            path = self.to_route()
-            return (
-                len(path) >= len(prefix)
-                and path.startswith(prefix)
-                and (len(path) == len(prefix) or path[len(prefix)] == '/')
-            )
+        return prefix == '/' or re.match(re.escape(prefix) + r'(?:/|$)', self.to_route()) is not None
 
     @property
-    def leading_slash(self):
+    def leading_slash(self) -> bool:
         """::
 
             boolean = path.leading_slash
             path.leading_slash = boolean
 
         Path has a leading slash. Note that this method will normalize the path and
-        that ``%2F`` will be treated as ``/`` for security reasons.
+        that ``%2F`` will be treated as ``/`` for security reasons. ::
+
+            # "/foo/bar"
+            Pyjo.Path.new('foo/bar').set(leading_slash=True)
+
+            # "foo/bar"
+            Pyjo.Path.new('/foo/bar').set(leading_slash=False)
         """
-        return self._parse('leading_slash')
+        self._parse()
+        return self._leading_slash
 
     @leading_slash.setter
-    def leading_slash(self, value):
-        self._parse('leading_slash', value)
+    def leading_slash(self, value: bool) -> None:
+        self._parse()
+        self._leading_slash = value
 
-    def merge(self, path):
+    def merge(self, path: 'str | bytes | Pyjo_Path') -> Self:
         """::
 
             path = path.merge('/foo/bar')
             path = path.merge('foo/bar')
-            path = path.merge(Pyjo.Path.new('foo/bar'))
+            path = path.merge(Pyjo.Path.new())
 
         Merge paths. Note that this method will normalize both paths if necessary and
         that ``%2F`` will be treated as ``/`` for security reasons. ::
@@ -195,106 +239,64 @@ class Pyjo_Path(Pyjo.Base.object, Pyjo.String.Mixin.object):
             Pyjo.Path.new('/foo/bar/').merge('baz/yada')
         """
         # Replace
-        if u(path).startswith('/'):
+        if path.startswith(b'/') if isinstance(path, bytes) else str(path).startswith('/'):
             return self.parse(path)
 
         # Merge
         if not self.trailing_slash and self.parts:
             self.parts.pop()
-
-        path = self.new(path)
-        self.parts += path.parts
-
-        self._trailing_slash = path._trailing_slash
-
+        other = self.new(path)
+        self.parts.extend(other.parts)
+        self.trailing_slash = other.trailing_slash
         return self
 
-    def parse(self, path):
+    def parse(self, path: 'str | bytes | Pyjo_Path') -> Self:
         """::
 
             path = path.parse('/foo%2Fbar%3B/baz.html')
 
-        Parse path.
+        Parse path, given as characters or as bytes encoded with :attr:`charset`.
         """
-        self._path = b(path, self.charset)
-
+        self._path = path if isinstance(path, bytes) else str(path)
         self._parts = None
-        self._leading_slash = False
-        self._trailing_slash = False
-
+        self._leading_slash = self._trailing_slash = False
         return self
 
     @property
-    def parts(self):
+    def parts(self) -> list[str]:
         """::
 
             parts = path.parts
             path.parts = ['foo', 'bar', 'baz']
 
-        The path parts. Note that this method will normalize the path and that ``%2F``
-        will be treated as ``/`` for security reasons. ::
+        The path parts. Note that this method will normalize the path and that
+        ``%2F`` will be treated as ``/`` for security reasons. ::
 
             # Part with slash
             path.parts.append('foo/bar')
         """
-        return self._parse('parts')
+        return self._parse()
 
     @parts.setter
-    def parts(self, value):
-        self._parse('parts', value)
+    def parts(self, value: list[str]) -> None:
+        self._parse()
+        self._parts = value
 
-    def to_abs_str(self):
+    def to_abs_str(self) -> str:
         """::
 
-            str = path.to_abs_str()
+            string = path.to_abs_str()
 
         Turn path into an absolute string. ::
 
-            # "/i/%E2%99%A5/pyjo"
-            Pyjo.Path.new('/i/%E2%99%A5/pyjo').to_abs_str()
-            Pyjo.Path.new('i/%E2%99%A5/pyjo').to_abs_str()
+            # "/i/%E2%99%A5/pyjoyment"
+            Pyjo.Path.new('/i/%E2%99%A5/pyjoyment').to_abs_str()
+            Pyjo.Path.new('i/%E2%99%A5/pyjoyment').to_abs_str()
         """
         path = self.to_str()
-        if not path.startswith('/'):
-            path = '/' + path
-        return path
+        return path if path.startswith('/') else f'/{path}'
 
-    def to_bytes(self):
-        """::
-
-            bstring = path.to_bytes()
-
-        Turn path into a bytes string. ::
-
-            # b"/i/%E2%99%A5/pyjo"
-            Pyjo.Path.new('/i/%E2%99%A5/pyjo').to_bytes()
-
-            # b"i/%E2%99%A5/pyjo"
-            Pyjo.Path.new('i/%E2%99%A5/pyjo').to_bytes()
-        """
-        # Path
-        charset = self.charset
-
-        if self._path is not None:
-            return url_escape(self._path, rb'^A-Za-z0-9\-._~!$&\'()*+,;=%:@/')
-
-        if self._parts:
-            parts = self._parts
-            if charset:
-                parts = map(lambda p: p.encode(charset), parts)
-            path = b'/'.join(map(lambda p: url_escape(p, rb'^A-Za-z0-9\-._~!$&\'()*+,;=:@'), parts))
-        else:
-            path = b''
-
-        if self._leading_slash:
-            path = b'/' + path
-
-        if self._trailing_slash:
-            path = path + b'/'
-
-        return path
-
-    def to_dir(self):
+    def to_dir(self) -> Self:
         """::
 
             dir = route.to_dir()
@@ -302,117 +304,113 @@ class Pyjo_Path(Pyjo.Base.object, Pyjo.String.Mixin.object):
         Clone path and remove everything after the right-most slash. ::
 
             # "/i/%E2%99%A5/"
-            Pyjo.Path.new('/i/%E2%99%A5/pyjo').to_dir()
+            Pyjo.Path.new('/i/%E2%99%A5/pyjoyment').to_dir().to_abs_str()
 
             # "i/%E2%99%A5/"
-            Pyjo.Path.new('i/%E2%99%A5/pyjo').to_dir()
+            Pyjo.Path.new('i/%E2%99%A5/pyjoyment').to_dir().to_abs_str()
         """
         clone = self.clone()
-        parts = clone.parts
-        if not clone.trailing_slash and parts:
-            parts.pop()
+        if not clone.trailing_slash and clone.parts:
+            clone.parts.pop()
         clone.trailing_slash = bool(clone.parts)
         return clone
 
-    def to_json(self):
-        """::
-
-            string = path.to_json()
-
-        Turn path into a JSON representation. The same as :meth:`to_str`. ::
-
-            # "/i/%E2%99%A5/pyjo"
-            Pyjo.Path.new('/i/%E2%99%A5/pyjo').to_json()
-        """
-        return self.to_str()
-
-    def to_route(self):
+    def to_route(self) -> str:
         """::
 
             route = path.to_route()
 
         Turn path into a route. ::
 
-            # "/i/♥/pyjo"
-            Pyjo.Path.new('/i/%E2%99%A5/pyjo').to_route()
-            Pyjo.Path.new('i/%E2%99%A5/pyjo').to_route()
+            # "/i/♥/pyjoyment"
+            Pyjo.Path.new('/i/%E2%99%A5/pyjoyment').to_route()
+            Pyjo.Path.new('i/%E2%99%A5/pyjoyment').to_route()
         """
         clone = self.clone()
-        if clone.charset is None:
-            slash = b'/'
-        else:
-            slash = '/'
-        route = slash + slash.join(clone.parts)
-        if clone._trailing_slash:
-            route += slash
-        return route
+        return '/' + '/'.join([*clone.parts, ''] if clone.trailing_slash else clone.parts)
 
-    def to_str(self):
+    def to_str(self) -> str:
         """::
 
             string = path.to_str()
 
         Turn path into a string. ::
 
-            # "/i/%E2%99%A5/pyjo"
-            Pyjo.Path.new('/i/%E2%99%A5/pyjo').to_str()
+            # "/i/%E2%99%A5/pyjoyment"
+            Pyjo.Path.new('/i/%E2%99%A5/pyjoyment').to_str()
 
-            # "i/%E2%99%A5/pyjo"
-            Pyjo.Path.new('i/%E2%99%A5/pyjo').to_str()
+            # "i/%E2%99%A5/pyjoyment"
+            Pyjo.Path.new('i/%E2%99%A5/pyjoyment').to_str()
         """
-        return self.to_bytes().decode('ascii')
+        # Path
+        if self._path is not None:
+            return url_escape(self._encode(self._path), rb"^A-Za-z0-9\-._~!$&'()*+,;=%:@/").decode('ascii')
+
+        # Build path
+        path = '/'.join(
+            url_escape(self._encode(p), rb"^A-Za-z0-9\-._~!$&'()*+,;=:@").decode('ascii') for p in self.parts
+        )
+        if self.leading_slash:
+            path = f'/{path}'
+        if self.trailing_slash:
+            path = f'{path}/'
+        return path
 
     @property
-    def trailing_slash(self):
+    def trailing_slash(self) -> bool:
         """::
 
             boolean = path.trailing_slash
             path.trailing_slash = boolean
 
         Path has a trailing slash. Note that this method will normalize the path and
-        that ``%2F`` will be treated as ``/`` for security reasons.
+        that ``%2F`` will be treated as ``/`` for security reasons. ::
+
+            # "/foo/bar/"
+            Pyjo.Path.new('/foo/bar').set(trailing_slash=True)
+
+            # "/foo/bar"
+            Pyjo.Path.new('/foo/bar/').set(trailing_slash=False)
         """
-        return self._parse('trailing_slash')
+        self._parse()
+        return self._trailing_slash
 
     @trailing_slash.setter
-    def trailing_slash(self, value):
-        self._parse('trailing_slash', value)
+    def trailing_slash(self, value: bool) -> None:
+        self._parse()
+        self._trailing_slash = value
 
-    def _parse(self, name, *args):
+    def _encode(self, string: str | bytes) -> bytes:
+        # Without a charset, a character is a byte, as in a Perl byte string
+        return string if isinstance(string, bytes) else string.encode(self.charset or 'latin-1')
+
+    def _decode(self, path: str | bytes) -> str:
+        # Characters 0-255 are bytes, as a Perl byte string; a string with other
+        # characters stays as it is, as Perl fails to decode it
+        if isinstance(path, str):
+            try:
+                path = path.encode('latin-1')
+            except UnicodeEncodeError:
+                return path
+
+        # Bytes that do not decode stay characters 0-255, as in a Perl byte string
+        try:
+            return path.decode(self.charset or 'latin-1')
+        except UnicodeDecodeError:
+            return path.decode('latin-1')
+
+    def _parse(self) -> list[str]:
         if self._parts is None:
-            charset = self.charset
-
-            if self._path is not None:
-                path = self._path
-            else:
-                path = '' if charset else b''
-
-            if charset:
-                path = url_unescape(b(path, charset)).decode(charset)
-                slash = '/'
-            else:
-                path = url_unescape(path)
-                slash = b'/'
-
+            path = self._decode(url_unescape(self._path or ''))
             self._path = None
 
-            if path.startswith(slash):
-                path = path[1:]
-                self._leading_slash = True
+            self._leading_slash = path.startswith('/')
+            path = path.removeprefix('/')
+            self._trailing_slash = path.endswith('/')
+            path = path.removesuffix('/')
+            self._parts = path.split('/') if path else []
 
-            if path.endswith(slash):
-                path = path[:-1]
-                self._trailing_slash = True
-
-            if path == '':
-                self._parts = []
-            else:
-                self._parts = path.split(slash)
-
-        if not args:
-            return getattr(self, '_' + name)
-
-        setattr(self, '_' + name, args[0])
+        return self._parts
 
 
 new = Pyjo_Path.new

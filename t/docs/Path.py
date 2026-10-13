@@ -1,134 +1,179 @@
-if __name__ == '__main__':
-    from Pyjo.Test import *  # noqa
+from Pyjo.Test import *
 
+
+with subtest('Synopsis'):
     import Pyjo.Path
-    from Pyjo.String.Unicode import u
 
-    # __init __
+    # Parse
+    path = Pyjo.Path.new('/foo%2Fbar%3B/baz.html')
+    is_ok(path[0], 'foo', 'path[0]')
+
+    # Build
+    path = Pyjo.Path.new('/i/♥')
+    path.parts.append('pyjoyment')
+    is_ok(str(path), '/i/%E2%99%A5/pyjoyment', 'path')
+
+with subtest('new'):
     path = Pyjo.Path.new()
     is_ok(str(path), '', 'path')
     path = Pyjo.Path.new('/foo%2Fbar%3B/baz.html')
     is_ok(str(path), '/foo%2Fbar%3B/baz.html', 'path')
 
-    # charset
-    path = Pyjo.Path.new('/foo%2Fbar%3B/baz.html')
+with subtest('charset'):
     charset = path.charset
-    is_ok(charset, 'utf-8', 'charset')
-    path.charset = 'utf-8'
-    charset = path.charset
-    is_ok(charset, 'utf-8', 'charset')
+    is_ok(charset, 'UTF-8', 'charset')
+    path.charset = 'UTF-8'
+    is_ok(path.charset, 'UTF-8', 'path.charset')
 
-    # __iter__
-    path = Pyjo.Path.new('/foo%2Fbar%3B/baz.html')
-    l = [v for v in path]
-    is_deeply_ok(l, ['foo', 'bar;', 'baz.html'], '[v for v in path]')
+    # Disable encoding and decoding
+    path.charset = None
+    is_ok(path.charset, None, 'path.charset')
 
-    # __bool__
-    ok(Pyjo.Path.new(), 'Pyjo.Path.new()')
-
-    # canonicalize
-    path = Pyjo.Path.new('/foo/./bar/../baz').canonicalize()
-    is_ok(str(path), '/foo/baz', 'path')
-
-    path = Pyjo.Path.new('/foo/../bar/../../baz').canonicalize()
-    is_ok(str(path), '/../baz', 'path')
-
-    path = Pyjo.Path.new('/foo/.../bar').canonicalize()
-    is_ok(str(path), '/foo/bar', 'path')
-
-    # clone
-    path = Pyjo.Path.new('/foo%2Fbar%3B/baz.html')
-    path2 = path.clone()
-    is_ok(str(path2), '/foo%2Fbar%3B/baz.html', 'path2')
-    isnt_ok(id(path), id(path2), 'path')
-
-    # contains
-    boolean = Pyjo.Path.new('/foo/bar').contains('/')
-    is_ok(boolean, True, 'boolean')
-    boolean = Pyjo.Path.new('/foo/bar').contains('/foo')
-    is_ok(boolean, True, 'boolean')
-    boolean = Pyjo.Path.new('/foo/bar').contains('/foo/bar')
+with subtest('__bool__'):
+    boolean = bool(path)
     is_ok(boolean, True, 'boolean')
 
-    boolean = Pyjo.Path.new('/foo/bar').contains('/f')
-    is_ok(boolean, False, 'boolean')
-    boolean = Pyjo.Path.new('/foo/bar').contains('/bar')
-    is_ok(boolean, False, 'boolean')
-    boolean = Pyjo.Path.new('/foo/bar').contains('/whatever')
-    is_ok(boolean, False, 'boolean')
-
-    # leading_slash
+with subtest('__getitem__'):
     path = Pyjo.Path.new('/foo%2Fbar%3B/baz.html')
-    leading_slash = path.leading_slash
-    is_ok(leading_slash, True, 'leading_slash')
-    path.leading_slash = False
-    leading_slash = path.leading_slash
-    is_ok(leading_slash, False, 'leading_slash')
+    part = path[0]
+    is_ok(part, 'foo', 'part')
 
-    # merge
-    path = Pyjo.Path.new('/foo/bar').merge('/baz/yada')
-    is_ok(str(path), '/baz/yada', 'path')
+with subtest('__iter__'):
+    parts = list(path)
+    is_deeply_ok(parts, ['foo', 'bar;', 'baz.html'], 'parts')
+    is_deeply_ok([part for part in path], ['foo', 'bar;', 'baz.html'], 'for part in path')
 
-    path = Pyjo.Path.new('/foo/bar').merge('baz/yada')
-    is_ok(str(path), '/foo/baz/yada', 'path')
+with subtest('__len__'):
+    size = len(path)
+    is_ok(size, 3, 'size')
 
-    path = Pyjo.Path.new('/foo/bar/').merge('baz/yada')
-    is_ok(str(path), '/foo/bar/baz/yada', 'path')
+with subtest('__str__'):
+    string = str(path)
+    is_ok(string, '/foo/bar;/baz.html', 'string')
 
-    # parse
-    path = Pyjo.Path.new()
+with subtest('canonicalize'):
+    path = Pyjo.Path.new('/foo/../bar').canonicalize()
+    is_ok(str(path), '/bar', 'path')
+
+    # "/foo/baz"
+    is_ok(str(Pyjo.Path.new('/foo/./bar/../baz').canonicalize()), '/foo/baz', "'/foo/./bar/../baz'")
+
+    # "/../baz"
+    is_ok(str(Pyjo.Path.new('/foo/../bar/../../baz').canonicalize()), '/../baz', "'/foo/../bar/../../baz'")
+
+    # "/foo/bar"
+    is_ok(str(Pyjo.Path.new('/foo/.../bar').canonicalize()), '/foo/bar', "'/foo/.../bar'")
+
+with subtest('clone'):
+    clone = path.clone()
+    is_ok(str(clone), '/bar', 'clone')
+    isnt_ok(id(clone), id(path), 'another object')
+
+with subtest('contains'):
+    boolean = Pyjo.Path.new('/i/♥/pyjoyment').contains('/i/♥/pyjoyment')
+    is_ok(boolean, True, 'boolean')
+
+    # True
+    is_ok(Pyjo.Path.new('/foo/bar').contains('/'), True, "contains('/')")
+    is_ok(Pyjo.Path.new('/foo/bar').contains('/foo'), True, "contains('/foo')")
+    is_ok(Pyjo.Path.new('/foo/bar').contains('/foo/bar'), True, "contains('/foo/bar')")
+
+    # False
+    is_ok(Pyjo.Path.new('/foo/bar').contains('/f'), False, "contains('/f')")
+    is_ok(Pyjo.Path.new('/foo/bar').contains('/bar'), False, "contains('/bar')")
+    is_ok(Pyjo.Path.new('/foo/bar').contains('/whatever'), False, "contains('/whatever')")
+
+with subtest('leading_slash'):
+    boolean = path.leading_slash
+    is_ok(boolean, True, 'boolean')
+    path.leading_slash = boolean
+    is_ok(path.leading_slash, True, 'path.leading_slash')
+
+    # "/foo/bar"
+    is_ok(str(Pyjo.Path.new('foo/bar').set(leading_slash=True)), '/foo/bar', 'leading_slash=True')
+
+    # "foo/bar"
+    is_ok(str(Pyjo.Path.new('/foo/bar').set(leading_slash=False)), 'foo/bar', 'leading_slash=False')
+
+with subtest('merge'):
+    path = Pyjo.Path.new('/baz/')
+    path = path.merge('/foo/bar')
+    is_ok(str(path), '/foo/bar', "merge('/foo/bar')")
+    path = path.merge('foo/bar')
+    is_ok(str(path), '/foo/foo/bar', "merge('foo/bar')")
+    path = path.merge(Pyjo.Path.new())
+    is_ok(str(path), '/foo/foo', 'merge(Pyjo.Path.new())')
+
+    # "/baz/yada"
+    is_ok(str(Pyjo.Path.new('/foo/bar').merge('/baz/yada')), '/baz/yada', "merge('/baz/yada')")
+
+    # "/foo/baz/yada"
+    is_ok(str(Pyjo.Path.new('/foo/bar').merge('baz/yada')), '/foo/baz/yada', "merge('baz/yada')")
+
+    # "/foo/bar/baz/yada"
+    is_ok(str(Pyjo.Path.new('/foo/bar/').merge('baz/yada')), '/foo/bar/baz/yada', "'/foo/bar/' merge('baz/yada')")
+
+with subtest('parse'):
     path = path.parse('/foo%2Fbar%3B/baz.html')
     is_deeply_ok(path.parts, ['foo', 'bar;', 'baz.html'], 'path.parts')
 
-    # paths
-    path = Pyjo.Path.new()
+with subtest('parts'):
+    parts = path.parts
+    is_deeply_ok(parts, ['foo', 'bar;', 'baz.html'], 'parts')
     path.parts = ['foo', 'bar', 'baz']
-    is_ok(str(path), 'foo/bar/baz', 'path')
+    is_ok(str(path), '/foo/bar/baz', 'path')
 
+    # Part with slash
     path.parts.append('foo/bar')
-    is_ok(str(path), 'foo/bar/baz/foo%2Fbar', 'path')
+    is_ok(str(path), '/foo/bar/baz/foo%2Fbar', 'path')
 
-    # to_abs_str
-    path = Pyjo.Path.new('/i/%E2%99%A5/pyjo').to_abs_str()
-    is_ok(str(path), '/i/%E2%99%A5/pyjo', 'path')
+with subtest('to_abs_str'):
+    string = path.to_abs_str()
+    is_ok(string, '/foo/bar/baz/foo%2Fbar', 'string')
 
-    path = Pyjo.Path.new('i/%E2%99%A5/pyjo').to_abs_str()
-    is_ok(str(path), '/i/%E2%99%A5/pyjo', 'path')
+    # "/i/%E2%99%A5/pyjoyment"
+    is_ok(Pyjo.Path.new('/i/%E2%99%A5/pyjoyment').to_abs_str(), '/i/%E2%99%A5/pyjoyment', 'absolute')
+    is_ok(Pyjo.Path.new('i/%E2%99%A5/pyjoyment').to_abs_str(), '/i/%E2%99%A5/pyjoyment', 'relative')
 
-    # to_bytes
-    path = Pyjo.Path.new('/i/%E2%99%A5/pyjo')
-    is_ok(bytes(path), b'/i/%E2%99%A5/pyjo', 'path')
+with subtest('to_dir'):
+    route = Pyjo.Path.new('/foo/bar')
+    dir = route.to_dir()
+    is_ok(str(dir), '/foo/', 'dir')
 
-    path = Pyjo.Path.new('i/%E2%99%A5/pyjo')
-    is_ok(bytes(path), b'i/%E2%99%A5/pyjo', 'path')
+    # "/i/%E2%99%A5/"
+    is_ok(Pyjo.Path.new('/i/%E2%99%A5/pyjoyment').to_dir().to_abs_str(), '/i/%E2%99%A5/', 'absolute')
 
-    # to_dir
-    path = Pyjo.Path.new('/i/%E2%99%A5/pyjo').to_dir()
-    is_ok(str(path), '/i/%E2%99%A5/', 'path')
+    # "i/%E2%99%A5/"
+    is_ok(Pyjo.Path.new('i/%E2%99%A5/pyjoyment').to_dir().to_abs_str(), '/i/%E2%99%A5/', 'relative')
 
-    path = Pyjo.Path.new('i/%E2%99%A5/pyjo').to_dir()
-    is_ok(str(path), 'i/%E2%99%A5/', 'path')
+with subtest('to_route'):
+    route = path.to_route()
+    is_ok(route, '/foo/bar/baz/foo/bar', 'route')
 
-    # to_route
-    path = Pyjo.Path.new('/i/%E2%99%A5/pyjo').to_route()
-    is_ok(u(path), '/i/♥/pyjo', 'path')
+    # "/i/♥/pyjoyment"
+    is_ok(Pyjo.Path.new('/i/%E2%99%A5/pyjoyment').to_route(), '/i/♥/pyjoyment', 'absolute')
+    is_ok(Pyjo.Path.new('i/%E2%99%A5/pyjoyment').to_route(), '/i/♥/pyjoyment', 'relative')
 
-    path = Pyjo.Path.new('i/%E2%99%A5/pyjo').to_route()
-    is_ok(u(path), '/i/♥/pyjo', 'path')
+with subtest('to_str'):
+    string = path.to_str()
+    is_ok(string, '/foo/bar/baz/foo%2Fbar', 'string')
 
-    # to_str
-    path = Pyjo.Path.new('/i/%E2%99%A5/pyjo')
-    is_ok(str(path), '/i/%E2%99%A5/pyjo', 'path')
+    # "/i/%E2%99%A5/pyjoyment"
+    is_ok(Pyjo.Path.new('/i/%E2%99%A5/pyjoyment').to_str(), '/i/%E2%99%A5/pyjoyment', 'absolute')
 
-    path = Pyjo.Path.new('i/%E2%99%A5/pyjo')
-    is_ok(str(path), 'i/%E2%99%A5/pyjo', 'path')
+    # "i/%E2%99%A5/pyjoyment"
+    is_ok(Pyjo.Path.new('i/%E2%99%A5/pyjoyment').to_str(), 'i/%E2%99%A5/pyjoyment', 'relative')
 
-    # trailing_slash
-    path = Pyjo.Path.new('/foo%2Fbar%3B/baz.html')
-    trailing_slash = path.trailing_slash
-    is_ok(trailing_slash, False, 'trailing_slash')
-    path.trailing_slash = True
-    trailing_slash = path.trailing_slash
-    is_ok(trailing_slash, True, 'trailing_slash')
+with subtest('trailing_slash'):
+    boolean = path.trailing_slash
+    is_ok(boolean, False, 'boolean')
+    path.trailing_slash = boolean
+    is_ok(path.trailing_slash, False, 'path.trailing_slash')
 
-    done_testing()
+    # "/foo/bar/"
+    is_ok(str(Pyjo.Path.new('/foo/bar').set(trailing_slash=True)), '/foo/bar/', 'trailing_slash=True')
+
+    # "/foo/bar"
+    is_ok(str(Pyjo.Path.new('/foo/bar/').set(trailing_slash=False)), '/foo/bar', 'trailing_slash=False')
+
+done_testing()
