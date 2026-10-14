@@ -22,6 +22,9 @@ whole run. Indented lines belong to subtests and are not parsed: the parent
 test point stands for the whole subtest.
 
 The exit status is ``0`` when every test script passed and ``1`` otherwise.
+Ctrl-C (``SIGINT``) stops the run: the test scripts that are running are
+killed, with the processes they started, and the harness dies of the signal,
+or with ``--trap`` prints the summary of the test scripts that have finished.
 
 Options
 -------
@@ -44,6 +47,14 @@ Options
 ``--exec CMD``
     Command that runs a test script, the current Python interpreter by default.
 
+``--timeout SECONDS``
+    The most time a test script may run, no limit by default. A test script
+    that runs longer is killed, with the processes it started, and fails.
+
+``--trap``
+    Print the summary of the test scripts that have finished when Ctrl-C
+    interrupts the run.
+
 Functions
 ---------
 """
@@ -53,6 +64,7 @@ import asyncio
 import os
 import re
 import shlex
+import signal
 import sys
 import time
 
@@ -88,6 +100,7 @@ class Result:
     skipped: int = 0
     bail_out: str | None = None
     exit_status: int = 0
+    timed_out: float | None = None
     errors: list[str] = field(default_factory=lambda: [])
     output: list[str] = field(default_factory=lambda: [])
 
@@ -157,6 +170,9 @@ def finish(result: Result) -> None:
     """
     if result.bail_out is not None:
         return
+    if result.timed_out is not None:
+        result.errors.append(f'Timed out after {result.timed_out:g} seconds')
+        return
     if result.planned is None:
         result.errors.append('No plan found in TAP output')
     elif result.planned != result.tests:
@@ -166,24 +182,51 @@ def finish(result: Result) -> None:
 
 
 async def run_script(
-    path: str, command: Sequence[str], env: dict[str, str], *, verbose: bool = False, stream: bool = False
+    path: str,
+    command: Sequence[str],
+    env: dict[str, str],
+    *,
+    verbose: bool = False,
+    stream: bool = False,
+    timeout: float | None = None,
 ) -> Result:
     """::
 
         result = await run_script('t/test.py', [sys.executable], dict(os.environ))
+        result = await run_script('t/test.py', [sys.executable], dict(os.environ), timeout=60)
 
     Run a test script and parse its TAP output. The standard error of the
-    script goes to the standard error of this process.
+    script goes to the standard error of this process. A script that runs
+    longer than ``timeout`` seconds is killed, with the processes it started.
     """
     result = Result(path)
-    process = await asyncio.create_subprocess_exec(*command, path, stdout=asyncio.subprocess.PIPE, env=env)
+    # The script leads a process group of its own, so that the processes it starts are killed with it
+    process = await asyncio.create_subprocess_exec(
+        *command,
+        path,
+        stdout=asyncio.subprocess.PIPE,
+        env=env,
+        process_group=0 if hasattr(os, 'killpg') else None,
+    )
     assert process.stdout is not None
-    while raw := await process.stdout.readline():
-        line = raw.decode('utf-8', 'replace').rstrip('\r\n')
-        parse(result, line)
-        if verbose and stream:
-            print(line, flush=True)
-    result.exit_status = await process.wait()
+    try:
+        async with asyncio.timeout(timeout):
+            while raw := await process.stdout.readline():
+                line = raw.decode('utf-8', 'replace').rstrip('\r\n')
+                parse(result, line)
+                if verbose and stream:
+                    print(line, flush=True)
+            result.exit_status = await process.wait()
+    except TimeoutError:
+        result.timed_out = timeout
+        _kill(process)
+        result.exit_status = await process.wait()
+    finally:
+        # Ctrl-C reaches the foreground process group only, not the one of the script, which the harness waits for,
+        # so that it does not outlive the harness
+        if process.returncode is None:
+            _kill(process)
+            await process.wait()
     finish(result)
     return result
 
@@ -217,13 +260,18 @@ async def run(
     *,
     jobs: int = 1,
     verbose: bool = False,
+    timeout: float | None = None,
+    trap: bool = False,
 ) -> list[Result]:
     """::
 
         results = asyncio.run(run(['t/a.py', 't/b.py'], jobs=2))
+        results = asyncio.run(run(['t/a.py', 't/b.py'], timeout=60, trap=True))
 
     Run the test scripts, print a line for each of them and a summary, and
-    return the results in the order of the scripts.
+    return the results in the order of the scripts. With ``trap``, a run that
+    Ctrl-C interrupts prints the summary and returns the results of the test
+    scripts that have finished.
     """
     command = list(command or [sys.executable])
     env = dict(os.environ if env is None else env)
@@ -232,30 +280,39 @@ async def run(
     bailed_out = asyncio.Event()
     started = time.monotonic()
 
-    async def one(path: str) -> Result | None:
+    finished: dict[int, Result] = {}
+    interrupted = False
+
+    async def one(i: int, path: str) -> None:
         async with semaphore:
             if bailed_out.is_set():
-                return None
+                return
             stream = jobs <= 1
             if stream and verbose:
                 print(f'{path} ..', flush=True)
-            result = await run_script(path, command, env, verbose=verbose, stream=stream)
+            result = await run_script(path, command, env, verbose=verbose, stream=stream, timeout=timeout)
             if verbose and not stream:
                 print(f'{path} ..', *result.output, sep='\n', flush=True)
             print(_status_line(result, width), flush=True)
             if result.bail_out is not None:
                 bailed_out.set()
-            return result
+            finished[i] = result
 
-    if jobs <= 1:
-        results: list[Result | None] = []
-        for path in scripts:
-            results.append(await one(path))
-    else:
-        results = await asyncio.gather(*(one(path) for path in scripts))
+    try:
+        if jobs <= 1:
+            for i, path in enumerate(scripts):
+                await one(i, path)
+        else:
+            await asyncio.gather(*(one(i, path) for i, path in enumerate(scripts)))
+    except asyncio.CancelledError:
+        # Ctrl-C, which asyncio.run() turns into the cancellation of the run
+        if not trap:
+            raise
+        interrupted = True
+        print(flush=True)
 
-    done = [r for r in results if r is not None]
-    _summary(done, time.monotonic() - started)
+    done = [finished[i] for i in sorted(finished)]
+    _summary(done, time.monotonic() - started, interrupted)
     return done
 
 
@@ -276,6 +333,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument('--ext', default='.py', help='extension of the test scripts, .py by default')
     parser.add_argument('--exec', dest='command', metavar='CMD', help='command that runs a test script')
+    parser.add_argument(
+        '--timeout', type=float, metavar='SECONDS', help='the most time a test script may run, no limit by default'
+    )
+    parser.add_argument('--trap', action='store_true', help='print the summary when Ctrl-C interrupts the run')
     parser.add_argument('paths', nargs='*', default=['t'], help='test scripts and directories, t by default')
     args = parser.parse_args(argv)
 
@@ -290,7 +351,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         env['PYTHONPATH'] = os.pathsep.join([*args.include, *filter(None, [env.get('PYTHONPATH')])])
 
     command = shlex.split(args.command) if args.command else [sys.executable]
-    results = asyncio.run(run(scripts, command, env, jobs=args.jobs, verbose=args.verbose))
+    try:
+        results = asyncio.run(
+            run(scripts, command, env, jobs=args.jobs, verbose=args.verbose, timeout=args.timeout, trap=args.trap)
+        )
+    except KeyboardInterrupt:
+        # Die of the signal, as a process that does not handle it does, without a traceback
+        signal.signal(signal.SIGINT, signal.SIG_DFL)
+        os.kill(os.getpid(), signal.SIGINT)
+        raise
     return 0 if len(results) == len(scripts) and all(r.passed for r in results) else 1
 
 
@@ -298,6 +367,8 @@ def _status_line(result: Result, width: int) -> str:
     name = f'{result.path} {"." * (width - len(result.path))}'
     if result.bail_out is not None:
         return f'{name} Bailout called.  Further testing stopped:  {result.bail_out}'
+    if result.timed_out is not None:
+        return f'{name} Timed out'
     if result.passed and result.skip_all is not None:
         return f'{name} skipped: {result.skip_all}'
     if result.passed:
@@ -307,9 +378,22 @@ def _status_line(result: Result, width: int) -> str:
     return f'{name} Dubious'
 
 
-def _summary(results: list[Result], elapsed: float) -> None:
+def _kill(process: asyncio.subprocess.Process) -> None:
+    try:
+        if hasattr(os, 'killpg'):
+            os.killpg(process.pid, signal.SIGKILL)
+        else:
+            process.kill()
+    except ProcessLookupError:
+        pass
+
+
+def _summary(results: list[Result], elapsed: float, interrupted: bool = False) -> None:
     failed = [r for r in results if not r.passed]
     tests = sum(r.tests for r in results)
+
+    if interrupted:
+        print('Test run interrupted!', file=sys.stderr, flush=True)
 
     if failed:
         print('\nTest Summary Report\n-------------------')
@@ -321,7 +405,7 @@ def _summary(results: list[Result], elapsed: float) -> None:
                 print(f'  Bail out:  {r.bail_out}')
             for error in r.errors:
                 print(f'  {error}')
-    else:
+    elif not interrupted:
         print('All tests successful.')
 
     todo_passed = [r for r in results if r.todo_passed]
@@ -329,7 +413,7 @@ def _summary(results: list[Result], elapsed: float) -> None:
         print(f'{r.path}: TODO passed:  {", ".join(map(str, r.todo_passed))}')
 
     print(f'Files={len(results)}, Tests={tests}, {elapsed:.0f} wallclock secs')
-    print(f'Result: {"FAIL" if failed else "PASS"}', flush=True)
+    print(f'Result: {"FAIL" if failed or interrupted else "PASS"}', flush=True)
 
 
 if __name__ == '__main__':

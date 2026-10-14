@@ -129,6 +129,12 @@ with tempfile.TemporaryDirectory() as tmp:
             is_ok(names['result'].passed, True, 'result.passed')
             is_ok(names['result'].exit_status, 0, 'result.exit_status')
 
+            names, _ = run("""
+                result = await run_script('t/test.py', [sys.executable], dict(os.environ), timeout=60)
+            """)
+            is_ok(names['result'].passed, True, 'result.passed with a timeout')
+            is_ok(names['result'].timed_out, None, 'result.timed_out')
+
         with subtest('find_scripts'):
             names, _ = run("""
                 scripts = find_scripts(['t'], '.py', recurse=True)
@@ -146,6 +152,12 @@ with tempfile.TemporaryDirectory() as tmp:
             is_ok([r.path for r in names['results']], ['t/a.py', 't/b.py'], 'results')
             like_ok(out, r'(?m)^t/a\.py \.+ ok$', 'line for t/a.py')
             like_ok(out, r'(?m)^Result: PASS$', 'summary')
+
+            names, out = run("""
+                results = asyncio.run(run(['t/a.py', 't/b.py'], timeout=60, trap=True))
+            """)
+            is_ok([r.path for r in names['results']], ['t/a.py', 't/b.py'], 'results with a timeout and trap')
+            like_ok(out, r'(?m)^Result: PASS$', 'summary with a timeout and trap')
 
         with subtest('main'):
             names, out = run("""
