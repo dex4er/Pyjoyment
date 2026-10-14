@@ -31,7 +31,9 @@ with subtest('build_frame'):
     data = build_frame(masked, fin, rsv1, rsv2, rsv3, op, payload)
     is_ok(data, b'\x81\x0cHello World!', 'frame')
 
-    like_ok(output(lambda: print(build_frame(1, 1, 0, 0, 0, WS_BINARY, b'Hello World!'))), r"^b'\\x82\\x8c", 'masked')
+    like_ok(
+        output(lambda: print(build_frame(1, 1, 0, 0, 0, WS_BINARY, b'Hello World!'))), r"^b['\"]\\x82\\x8c", 'masked'
+    )
     is_ok(output(lambda: print(build_frame(0, 0, 0, 0, 0, WS_TEXT, b'Hello '))), "b'\\x01\\x06Hello '\n", 'no FIN')
     is_ok(
         output(lambda: print(build_frame(0, 1, 0, 0, 0, WS_CONTINUATION, b'World!'))), "b'\\x80\\x06World!'\n", 'cont'
