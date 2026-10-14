@@ -1,4 +1,4 @@
-"""
+r"""
 Pyjo.Content - HTTP content base class
 ======================================
 ::
@@ -6,100 +6,127 @@ Pyjo.Content - HTTP content base class
     import Pyjo.Content
 
     class MyContent(Pyjo.Content.object):
+        def body_contains(self, chunk): ...
         @property
-        def body_contains(self, chunk):
-            ...
+        def body_size(self): ...
+        def get_body_chunk(self, offset): ...
 
-        @property
-        def body_size(self):
-            ...
-
-        def get_body_chunk(self, offset):
-            ...
-
-:mod:`Pyjo.Content` is an abstract base class for HTTP content based on
-:rfc:`7230` and
-:rfc:`7231`.
+:mod:`Pyjo.Content` is an abstract base class for HTTP content containers,
+based on `RFC 7230 <https://tools.ietf.org/html/rfc7230>`_ and
+`RFC 7231 <https://tools.ietf.org/html/rfc7231>`_, like
+:mod:`Pyjo.Content.MultiPart` and :mod:`Pyjo.Content.Single`.
 
 Events
 ------
 
-:mod:`Pyjo.Content` inherits all events from :mod:`Pyjo.EventEmitter` and can emit
-the following new ones.
+:mod:`Pyjo.Content` inherits all events from :mod:`Pyjo.EventEmitter` and can
+emit the following new ones.
 
 body
-^^^^
+~~~~
 ::
 
-    @content.on
-    def body(content):
-        ...
+    content.on('body', lambda content: ...)
 
 Emitted once all headers have been parsed and the body starts. ::
 
-    @content.on
+    @content.on('body')
     def body(content):
         if content.headers.header('X-No-MultiPart'):
             content.auto_upgrade = False
 
 drain
-^^^^^
+~~~~~
 ::
 
-    @content.on
-    def drain(content, offset):
-        ...
+    content.on('drain', lambda content, offset: ...)
 
 Emitted once all data has been written. ::
 
-    @content.on
-    def drain(content, offset):
-        content.write_chunk(time.time())
+    content.on('drain', lambda content, offset: content.write_chunk(str(time.time()).encode()))
 
 read
-^^^^
+~~~~
 ::
 
-    @content.on
-    def read(content, chunk):
-        ...
+    content.on('read', lambda content, chunk: ...)
 
 Emitted when a new chunk of content arrives. ::
 
-    content.unsubscribe('read')
+    content.on('read', lambda content, chunk: print(f'Streaming: {chunk}'))
 
-    @content.on
-    def read(content, chunk):
-        print("Streaming: {0}".format(chunk))
+sse
+~~~
+::
 
-Classess
+    content.on('sse', lambda content, event: ...)
+
+Emitted when a new Server-Sent Event (SSE) connection has been established,
+with ``None`` for the event, and for each new event that arrives. Note that
+this event is **EXPERIMENTAL** and may change without warning! ::
+
+    @content.on('sse')
+    def sse(content, event):
+        if event:
+            print(f'Type: {event["type"]}, Data: {event["text"]}')
+        else:
+            print('SSE connection established')
+
+See also
 --------
+
+:mod:`Pyjoyment`, https://mojolicious.org.
+
+Ported from `Mojo::Content <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/Content.pm>`_
+of Mojolicious 9.49.
 """
 
 import Pyjo.EventEmitter
 import Pyjo.Headers
 
-from Pyjo.Regexp import r
-from Pyjo.Util import b, convert, getenv, not_implemented, notnone
+from Pyjo.SSE import build_event, parse_event
 
+import os
+import re
 import zlib
 
+from collections.abc import Callable, Mapping
+from typing import Any, Self
 
-re_boundary = r(r"""multipart.*boundary\s*=\s*(?:"([^"]+)"|([\w'(),.:?\-+/]+))""", 'i')
-re_charset = r(r'charset\s*=\s*"?([^"\s;]+)"?', 'i')
-re_chunk = r(rb'^(?:\x0d?\x0a)?([0-9a-fA-F]+).*\x0a')
+
+# A callback of a write gets the content once all data has been written
+type DrainCallback = Callable[..., object]
+
+BOUNDARY_RE = re.compile(r'multipart.*boundary\s*=\s*(?:"([^"]+)"|([\w\'(),.:?\-+/]+))', re.I)
 
 
 class Pyjo_Content(Pyjo.EventEmitter.object):
     """
-    :mod:`Pyjo.Content` inherits all methods from :mod:`Pyjo.EventEmitter` and implements
-    the following new ones.
+    :mod:`Pyjo.Content` inherits all methods from :mod:`Pyjo.EventEmitter` and
+    implements the following new ones.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(
+        self,
+        *,
+        auto_decompress: bool | None = None,
+        auto_relax: bool | None = None,
+        headers: Pyjo.Headers.object | None = None,
+        max_buffer_size: int | None = None,
+        max_leftover_size: int | None = None,
+        relaxed: bool | None = None,
+        skip_body: bool | None = None,
+    ) -> None:
+        """::
+
+            content = Pyjo.Content.Single.new()
+            content = Pyjo.Content.Single.new(headers=Pyjo.Headers.new())
+
+        Construct a new content object.
+        """
         super().__init__()
 
-        self.auto_decompress = kwargs.get('auto_decompress')
+        self.auto_decompress = auto_decompress
         """::
 
             boolean = content.auto_decompress
@@ -108,7 +135,7 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
         Decompress content automatically if :attr:`is_compressed` is true.
         """
 
-        self.auto_relax = kwargs.get('auto_relax')
+        self.auto_relax = auto_relax
         """::
 
             boolean = content.auto_relax
@@ -117,60 +144,45 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
         Try to detect when relaxed parsing is necessary.
         """
 
-        self.expect_close = kwargs.get('expect_close', False)
-        """::
-
-            boolean = content.expect_close
-            content.expect_close = boolean
-
-        Expect a response that is terminated with a connection close.
-        """
-
-        self.headers = notnone(kwargs.get('headers'), lambda: Pyjo.Headers.new())
-        """::
-
-            headers = content.headers
-            content.headers = Pyjo.Headers.new()
-
-        Content headers, defaults to a :mod:`Pyjo.Headers` object.
-        """
-
-        self.max_buffer_size = notnone(
-            kwargs.get('max_buffer_size'), lambda: convert(getenv('PYJO_MAX_BUFFER_SIZE', '0'), int, 0) or 262144
+        self.max_buffer_size = (
+            max_buffer_size if max_buffer_size is not None else int(os.environ.get('PYJO_MAX_BUFFER_SIZE') or 262144)
         )
         """::
 
             size = content.max_buffer_size
             content.max_buffer_size = 1024
 
-        Maximum size in bytes of buffer for content parser, defaults to the value of
-        the ``PYJO_MAX_BUFFER_SIZE` environment variable or ``262144`` (256KB).
+        Maximum size in bytes of buffer for content parser, defaults to the
+        value of the ``PYJO_MAX_BUFFER_SIZE`` environment variable or
+        ``262144`` (256KiB).
         """
 
-        self.max_leftover_size = notnone(
-            kwargs.get('max_leftover_size'), lambda: convert(getenv('PYJO_MAX_LEFTOVER_SIZE', '0'), int, 0) or 262144
+        self.max_leftover_size = (
+            max_leftover_size
+            if max_leftover_size is not None
+            else int(os.environ.get('PYJO_MAX_LEFTOVER_SIZE') or 262144)
         )
         """::
 
             size = content.max_leftover_size
             content.max_leftover_size = 1024
 
-        Maximum size in bytes of buffer for pipelined HTTP requests, defaults to the
-        value of the ``PYJO_MAX_LEFTOVER_SIZE` environment variable or ``262144``
-        (256KB).
+        Maximum size in bytes of buffer for pipelined HTTP requests, defaults
+        to the value of the ``PYJO_MAX_LEFTOVER_SIZE`` environment variable or
+        ``262144`` (256KiB).
         """
 
-        self.relaxed = kwargs.get('relaxed', False)
+        self.relaxed = relaxed
         """::
 
             boolean = content.relaxed
             content.relaxed = boolean
 
-        Activate relaxed parsing for responses that are terminated with a connection
-        close.
+        Activate relaxed parsing for responses that are terminated with a
+        connection close.
         """
 
-        self.skip_body = kwargs.get('skip_body', False)
+        self.skip_body = skip_body
         """::
 
             boolean = content.skip_body
@@ -179,133 +191,125 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
         Skip body parsing and finish after headers.
         """
 
-        self._body = kwargs.get('_body', False)
-        self._body_buffer = kwargs.get('_body_buffer', bytearray())
-        self._buffer = kwargs.get('_buffer', bytearray())
-        self._chunk_len = kwargs.get('_chunk_len', 0)
-        self._chunk_state = kwargs.get('_chunk_state', None)
-        self._chunks = kwargs.get('_chunks', 0)
-        self._delay = kwargs.get('_delay', False)
-        self._dynamic = kwargs.get('_dynamic', False)
-        self._eof = kwargs.get('_eof', False)
-        self._gz = kwargs.get('_gz', None)
-        self._gz_size = kwargs.get('_gz_size', 0)
-        self._header_buffer = kwargs.get('_header_buffer', None)
-        self._header_size = kwargs.get('_header_size', 0)
-        self._limit = kwargs.get('_limit', False)
-        self._pre_buffer = kwargs.get('_pre_buffer', bytearray())
-        self._raw_size = kwargs.get('_raw_size', 0)
-        self._real_size = kwargs.get('_real_size', 0)
-        self._size = kwargs.get('_size', 0)
-        self._state = kwargs.get('_state', None)
+        self._headers = headers
 
-    @not_implemented
-    def body_contains(self, chunk):
+        # The state of the parser and of the generator, as the keys of Mojo's hash
+        self._body = False
+        self._body_buffer: bytes | None = None
+        self._buffer = b''
+        self._chunk_len = 0
+        self._chunk_state: str | None = None
+        self._chunked = False
+        self._chunks = 0
+        self._dynamic = False
+        self._eof = False
+        self._gz: Any = None
+        self._gz_total = 0
+        self._header_buffer: bytes | None = None
+        self._header_size: int | None = None
+        self._limit = False
+        self._post_buffer = b''
+        self._pre_buffer = b''
+        self._raw_size = 0
+        self._real_size: int | None = None
+        self._size = 0
+        self._sse = False
+        self._state: str | None = None
+
+    @property
+    def headers(self) -> Pyjo.Headers.object:
+        """::
+
+            headers = content.headers
+            content.headers = Pyjo.Headers.new()
+
+        Content headers, defaults to a :mod:`Pyjo.Headers` object.
+        """
+        if self._headers is None:
+            self._headers = Pyjo.Headers.new()
+        return self._headers
+
+    @headers.setter
+    def headers(self, value: Pyjo.Headers.object) -> None:
+        self._headers = value
+
+    def body_contains(self, chunk: bytes) -> bool:
         """::
 
             boolean = content.body_contains(b'foo bar baz')
 
-        Check if content contains a specific string. Meant to be overloaded in a
-        subclass.
+        Check if content contains a specific string. Meant to be overloaded in
+        a subclass.
         """
-        pass
+        raise NotImplementedError('Method "body_contains" not implemented by subclass')
 
     @property
-    @not_implemented
-    def body_size(self):
+    def body_size(self) -> int:
         """::
 
             size = content.body_size
 
         Content size in bytes. Meant to be overloaded in a subclass.
         """
-        pass
+        raise NotImplementedError('Method "body_size" not implemented by subclass')
 
     @property
-    def boundary(self):
+    def boundary(self) -> str | None:
         """::
 
             boundary = content.boundary
 
         Extract multipart boundary from ``Content-Type`` header.
         """
-        content_type = notnone(self.headers.content_type, '')
-        m = re_boundary.search(content_type)
-        if m:
-            return notnone(m.group(1), m.group(2))
-        else:
-            return
-
-    def build_body(self):
-        """::
-
-            bstring = content.build_body()
-
-        Render whole body.
-        """
-        return self._build('get_body_chunk')
-
-    def build_headers(self):
-        """::
-
-            bstring = content.build_headers()
-
-        Render all headers.
-        """
-        return self._build('get_header_chunk')
+        if m := BOUNDARY_RE.search(self.headers.content_type or ''):
+            return m[1] if m[1] is not None else m[2]
+        return None
 
     @property
-    def charset(self):
+    def charset(self) -> str | None:
         """::
 
             charset = content.charset
 
         Extract charset from ``Content-Type`` header.
         """
-        content_type = self.headers.content_type
-        if content_type is None:
-            content_type = ''
-        m = re_charset.search(content_type)
-        if m:
-            return m.group(1)
-        else:
-            return
+        if m := re.search(r'charset\s*=\s*"?([^"\s;]+)"?', self.headers.content_type or '', re.I):
+            return m[1]
+        return None
 
-    def clone(self):
+    def clone(self) -> Self | None:
         """::
 
             clone = content.clone()
 
-        Clone content if possible, otherwise return ``None``.
+        Return a new content object cloned from this content if possible,
+        otherwise return ``None``.
         """
         if self.is_dynamic:
-            return
-        else:
-            return self.new(headers=self.headers.clone())
+            return None
+        return type(self).new(headers=self.headers.clone())
 
-    def generate_body_chunk(self, offset):
+    def generate_body_chunk(self, offset: int) -> bytes | None:
         """::
 
             chunk = content.generate_body_chunk(0)
 
         Generate dynamic content.
         """
-        if not self._delay and not len(self._body_buffer):
+        if self._body_buffer is None:
+            self._body_buffer = b''
+        if not len(self._body_buffer):
             self.emit('drain', offset)
-        else:
-            self._delay = False
-        chunk = self._body_buffer
-        self._body_buffer = bytearray()
-        if not len(chunk):
-            if self._eof:
-                return bytearray()
-            else:
-                return
-        else:
+        if len(self._body_buffer):
+            chunk, self._body_buffer = self._body_buffer, None
             return chunk
+        if self._eof:
+            return b''
 
-    @not_implemented
-    def get_body_chunk(self, offset):
+        length = self._number(self.headers.content_length)
+        return b'' if length is not None and length == offset else None
+
+    def get_body_chunk(self, offset: int) -> bytes | None:
         """::
 
             chunk = content.get_body_chunk(0)
@@ -313,70 +317,72 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
         Get a chunk of content starting from a specific position. Meant to be
         overloaded in a subclass.
         """
-        pass
+        raise NotImplementedError('Method "get_body_chunk" not implemented by subclass')
 
-    def get_header_chunk(self, offset):
+    def get_header_chunk(self, offset: int) -> bytes:
         """::
 
             chunk = content.get_header_chunk(13)
 
-        Get a chunk of the headers starting from a specific position.
+        Get a chunk of the headers starting from a specific position. Note that
+        this method finalizes the content.
         """
-        if self._header_buffer is None:
-            headers = bytearray(self.headers.to_bytes())
-            if headers:
-                self._header_buffer = headers + b'\x0d\x0a\x0d\x0a'
-            else:
-                self._header_buffer = bytearray(b'\x0d\x0a')
-
-        return self._header_buffer[offset:131072]
+        return self._headers_buffer()[offset : offset + 131072]
 
     @property
-    def header_size(self):
+    def header_size(self) -> int:
         """::
 
             size = content.header_size
 
-        Size of headers in bytes.
+        Size of headers in bytes. Note that this method finalizes the content.
         """
-        return len(self.build_headers())
+        return len(self._headers_buffer())
+
+    def headers_contain(self, chunk: bytes) -> bool:
+        """::
+
+            boolean = content.headers_contain(b'foo bar baz')
+
+        Check if headers contain a specific string. Note that this method
+        finalizes the content.
+        """
+        return self._headers_buffer().find(chunk) >= 0
 
     @property
-    def is_chunked(self):
+    def is_chunked(self) -> bool:
         """::
 
             boolean = content.is_chunked
 
-        Check if content is chunked.
+        Check if ``Transfer-Encoding`` header indicates chunked transfer
+        encoding.
         """
         return bool(self.headers.transfer_encoding)
 
     @property
-    def is_compressed(self):
+    def is_compressed(self) -> bool:
         """::
 
             boolean = content.is_compressed
 
-        Check if content is gzip compressed.
+        Check ``Content-Encoding`` header for ``gzip`` value.
         """
-        if self.headers.content_encoding is None:
-            return False
-        else:
-            return self.headers.content_encoding.lower() == 'gzip'
+        return (self.headers.content_encoding or '').lower() == 'gzip'
 
     @property
-    def is_dynamic(self):
+    def is_dynamic(self) -> bool:
         """::
 
             boolean = content.is_dynamic
 
-        Check if content will be dynamically generated, which prevents :meth:`clone` from
-        working.
+        Check if content will be dynamically generated, which prevents
+        :meth:`clone` from working.
         """
-        return self._dynamic and self.headers.content_length is None
+        return self._dynamic
 
     @property
-    def is_finished(self):
+    def is_finished(self) -> bool:
         """::
 
             boolean = content.is_finished
@@ -386,7 +392,7 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
         return self._state == 'finished'
 
     @property
-    def is_limit_exceeded(self):
+    def is_limit_exceeded(self) -> bool:
         """::
 
             boolean = content.is_limit_exceeded
@@ -396,17 +402,17 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
         return self._limit
 
     @property
-    def is_multipart(self):
+    def is_multipart(self) -> bool:
         """::
 
-            false = content.is_multipart
+            boolean = content.is_multipart
 
-        False.
+        False, this is not a :mod:`Pyjo.Content.MultiPart` object.
         """
         return False
 
     @property
-    def is_parsing_body(self):
+    def is_parsing_body(self) -> bool:
         """::
 
             boolean = content.is_parsing_body
@@ -416,41 +422,57 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
         return self._state == 'body'
 
     @property
-    def leftovers(self):
+    def is_sse(self) -> bool:
         """::
 
-            chunk = content.leftovers
+            boolean = content.is_sse
+
+        Check if ``Content-Type`` header indicates Server-Sent Events (SSE).
+        Note that this method is **EXPERIMENTAL** and may change without
+        warning!
+        """
+        return (self.headers.content_type or '') == 'text/event-stream'
+
+    def leftovers(self) -> bytes:
+        """::
+
+            data = content.leftovers()
 
         Get leftover data from content parser.
         """
         return self._buffer
 
-    def parse(self, chunk=None):
+    def parse(self, chunk: bytes | None = None) -> 'Pyjo_Content':
         r"""::
 
-            content = content.parse(b"Content-Length: 12\x0d\x0a\x0d\x0aHello World!")
+            content = content.parse(b'Content-Length: 12\x0d\x0a\x0d\x0aHello World!')
 
         Parse content chunk.
         """
         # Headers
-        if chunk is not None:
-            self._parse_until_body(b(chunk, 'ascii'))
-
+        self._parse_until_body(chunk)
         if self._state == 'headers':
             return self
 
         # Chunked content
-        if self.is_chunked and self._state != 'headers':
+        if self._real_size is None:
+            self._real_size = 0
+        if self.is_chunked:
             self._parse_chunked()
             if self._chunk_state == 'finished':
                 self._state = 'finished'
 
+        # SSE
+        elif self.is_sse:
+            self._parse_sse()
+
         # Not chunked, pass through to second buffer
         else:
             self._real_size += len(self._pre_buffer)
-            if not (self.is_finished and len(self._buffer) > self.max_leftover_size):
-                self._buffer.extend(self._pre_buffer)
-            self._pre_buffer = bytearray()
+            limit = self.is_finished and len(self._buffer) > self.max_leftover_size
+            if not limit:
+                self._buffer += self._pre_buffer
+            self._pre_buffer = b''
 
         # No content
         if self.skip_body:
@@ -459,42 +481,33 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
 
         # Relaxed parsing
         headers = self.headers
-        length = headers.content_length
-        if self.auto_relax and length is None or length == '':
-            connection = headers.connection.lower() if headers.connection is not None else ''
-            if connection == 'close' or (not connection and self.expect_close):
+        length = headers.content_length if headers.content_length is not None else ''
+        if self.auto_relax and not len(length):
+            connection = (headers.connection or '').lower()
+            if connection == 'close' or not connection:
                 self.relaxed = True
 
         # Chunked or relaxed content
         if self.is_chunked or self.relaxed:
             self._decompress(self._buffer)
             self._size += len(self._buffer)
-            self._buffer = bytearray()
+            self._buffer = b''
             return self
 
         # Normal content
-        if length is not None and length.isdigit():
-            length = int(length)
-        else:
-            length = 0
-        need = length - self._size
-        if need > 0:
-            chunk = self._buffer[:need]
-            del self._buffer[:need]
+        size = self._number(length) or 0
+        if (need := size - self._size) > 0:
+            have = len(self._buffer)
+            take = int(need) if need < have else have
+            chunk, self._buffer = self._buffer[:take], self._buffer[take:]
             self._decompress(chunk)
             self._size += len(chunk)
-
-        if length <= self.progress:
+        if size <= self.progress:
             self._state = 'finished'
-
-            # Replace Content-Encoding with Content-Length
-            if self.auto_decompress and self.is_compressed:
-                self.headers.content_length = self._gz_size
-                self.headers.remove('Content-Encoding')
 
         return self
 
-    def parse_body(self, body):
+    def parse_body(self, chunk: bytes | None = None) -> 'Pyjo_Content':
         """::
 
             content = content.parse_body(b'Hi!')
@@ -502,171 +515,161 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
         Parse body chunk and skip headers.
         """
         self._state = 'body'
-        return self.parse(body)
+        return self.parse(chunk)
 
     @property
-    def progress(self):
+    def progress(self) -> int:
         """::
 
             size = content.progress
 
         Size of content already received from message in bytes.
         """
-        state = self._state
-        if not state:
+        if self._state not in ('body', 'finished'):
             return 0
-        if state == 'body' or state == 'finished':
-            return self._raw_size - self._header_size
-        else:
-            return 0
+        return self._raw_size - (self._header_size or 0)
 
-    def to_bytes(self):
+    def write(self, chunk: bytes | None = None, cb: DrainCallback | None = None) -> Self:
         """::
 
-            bstring = content.to_bytes()
-
-        Turn content into a bytes string, suitable for HTTP messages.
-        """
-        buf = b''
-        offset = 0
-        while True:
-            chunk = self.get_header_chunk(offset)
-            if not chunk:
-                break
-            buf += chunk
-            offset += len(chunk)
-        offset = 0
-        while True:
-            chunk = self.get_body_chunk(offset)
-            if not chunk:
-                break
-            buf += chunk
-            offset += len(chunk)
-        return buf
-
-    def write(self, chunk=None, cb=None):
-        """::
-
+            content = content.write()
+            content = content.write(b'')
             content = content.write(chunk)
-            content = content.write(chunk, cb)
+            content = content.write(chunk, lambda content, offset: ...)
 
-        Write dynamic content non-blocking, the optional drain callback will be invoked
-        once all data has been written.
+        Write dynamic content non-blocking, the optional drain callback will
+        be executed once all data has been written. Calling this method
+        without a chunk of data will finalize the :attr:`headers` and allow
+        for dynamic content to be written later. You can write an empty chunk
+        of data at any time to end the stream. ::
+
+            # Make sure previous chunk of data has been written before continuing
+            content.write(
+                b'He',
+                lambda content, offset: content.write(b'llo!', lambda content, offset: content.write(b'')),
+            )
         """
         self._dynamic = True
-
         if chunk is not None:
-            self._body_buffer.extend(chunk)
-        else:
-            self._delay = True
-
-        if cb:
+            self._body_buffer = (self._body_buffer or b'') + chunk
+        if cb is not None:
             self.once('drain', cb)
-
-        if chunk == b'':
+        if chunk is not None and not len(chunk):
             self._eof = True
 
         return self
 
-    def write_chunk(self, chunk=None, cb=None):
+    def write_chunk(self, chunk: bytes | None = None, cb: DrainCallback | None = None) -> Self:
         """::
 
+            content = content.write_chunk()
+            content = content.write_chunk(b'')
             content = content.write_chunk(chunk)
-            content = content.write_chunk(chunk, cb)
+            content = content.write_chunk(chunk, lambda content, offset: ...)
 
-        Write dynamic content non-blocking with ``chunked`` transfer encoding, the
-        optional drain callback will be invoked once all data has been written.
+        Write dynamic content non-blocking with chunked transfer encoding, the
+        optional drain callback will be executed once all data has been
+        written. Calling this method without a chunk of data will finalize the
+        :attr:`headers` and allow for dynamic content to be written later. You
+        can write an empty chunk of data at any time to end the stream. ::
+
+            # Make sure previous chunk of data has been written before continuing
+            content.write_chunk(
+                b'He',
+                lambda content, offset: content.write_chunk(b'llo!', lambda content, offset: content.write_chunk(b'')),
+            )
         """
-        if not self.is_chunked:
+        if not self._chunked:
             self.headers.transfer_encoding = 'chunked'
+        self._chunked = self._dynamic = True
 
-        self.write(self._build_chunk(chunk) if chunk is not None else chunk, cb)
-        if chunk == b'':
+        if chunk is not None:
+            self._body_buffer = (self._body_buffer or b'') + self._build_chunk(chunk)
+        if cb is not None:
+            self.once('drain', cb)
+        if chunk is not None and not len(chunk):
             self._eof = True
 
         return self
 
-    def _build(self, method):
-        buf, offset = b'', 0
-        while True:
-            # No chunk yet, try again
-            chunk = getattr(self, method)(offset)
-            if chunk is None:
-                continue
+    def write_sse(self, event: Mapping[str, Any] | None = None, cb: DrainCallback | None = None) -> Self:
+        """::
 
-            l = len(chunk)
-            if not l:
-                break
+            content = content.write_sse()
+            content = content.write_sse(event)
+            content = content.write_sse(event, lambda content, offset: ...)
 
-            offset += l
-            buf += chunk
+        Write Server-Sent Event (SSE) non-blocking, the optional drain callback
+        will be executed once all data has been written. Calling this method
+        without an event will finalize the response headers and allow for
+        events to be written later. Note that this method is **EXPERIMENTAL**
+        and may change without warning!
+        """
+        if not self._sse:
+            self.headers.content_type = 'text/event-stream'
+        self._sse = True
 
-        return buf
+        if event is None:
+            return self.write()
+        return self.write(build_event(event), cb)
 
-    def _build_chunk(self, chunk):
+    def _build_chunk(self, chunk: bytes) -> bytes:
         # End
         if not len(chunk):
             return b'\x0d\x0a0\x0d\x0a\x0d\x0a'
 
         # First chunk has no leading CRLF
-        if self._chunks:
-            crlf = b'\x0d\x0a'
-        else:
-            crlf = b''
+        crlf = b'\x0d\x0a' if self._chunks else b''
         self._chunks += 1
+        return crlf + f'{len(chunk):x}'.encode() + b'\x0d\x0a' + chunk
 
-        return crlf + b(f'{len(chunk):x}', 'ascii') + b'\x0d\x0a' + chunk
-
-    def _decompress(self, chunk):
+    def _decompress(self, chunk: bytes) -> None:
         # No compression
-        if not self.auto_decompress or not self.is_compressed:
-            return self.emit('read', chunk)
+        if not (self.auto_decompress and self.is_compressed):
+            self.emit('read', chunk)
+            return
 
-        # Decompress
+        # Decompress, as Compress::Raw::Zlib does with WANT_GZIP
+        self._post_buffer += chunk
         if self._gz is None:
-            self._gz = zlib.decompressobj(zlib.MAX_WBITS | 16)
+            self._gz = zlib.decompressobj(wbits=16 + zlib.MAX_WBITS)
         gz = self._gz
-
         try:
-            out = gz.decompress(bytes(chunk))
-
-            l = len(out)
-
-            if l > 0:
-                self.emit('read', out)
-
-            self._gz_size += l
-
+            out = gz.decompress(self._post_buffer)
+            self._post_buffer = gz.unused_data
         except zlib.error:
             out = b''
+        self._gz_total += len(out)
+        self.emit('read', out)
+
+        # Replace Content-Encoding with Content-Length
+        if gz.eof:
+            self.headers.content_length = self._gz_total
+            self.headers.remove('Content-Encoding')
 
         # Check buffer size
-        # TODO workaround for pypy bug and always empty unconsumed tail
-        if len(gz.unconsumed_tail) > self.max_buffer_size:
-            self._state = 'finished'
-            self._limit = True
+        if len(self._post_buffer) > self.max_buffer_size:
+            self._state, self._limit = 'finished', True
 
-    def _parse_chunked(self):
+    # Renamed from Mojolicious: _headers, the attribute _headers is the headers
+    def _headers_buffer(self) -> bytes:
+        if self._header_buffer is None:
+            headers = self.headers.to_bytes()
+            self._header_buffer = headers + b'\x0d\x0a\x0d\x0a' if headers else b'\x0d\x0a'
+        return self._header_buffer
+
+    def _parse_chunked(self) -> None:
         # Trailing headers
         if self._chunk_state == 'trailing_headers':
             return self._parse_chunked_trailing_headers()
 
-        while True:
-            l = len(self._pre_buffer)
-            if not l:
-                break
-
+        while length := len(self._pre_buffer):
             # Start new chunk (ignore the chunk extension)
             if not self._chunk_len:
-                m = re_chunk.search(self._pre_buffer)
-                if m:
-                    self._pre_buffer = bytearray(re_chunk.sub(b'', bytes(self._pre_buffer), 1))
-                else:
+                if not (m := re.match(rb'(?:\x0d?\x0a)?([0-9a-fA-F]+).*\x0a', self._pre_buffer)):
                     break
-                try:
-                    self._chunk_len = int(bytes(m.group(1)), 16)
-                except:
-                    self._chunk_len = None
+                self._pre_buffer = self._pre_buffer[m.end() :]
+                self._chunk_len = int(m[1], 16)
                 if self._chunk_len:
                     continue
 
@@ -675,12 +678,12 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
                 break
 
             # Remove as much as possible from payload
-            if self._chunk_len < l:
-                l = self._chunk_len
-            self._buffer.extend(self._pre_buffer[:l])
-            del self._pre_buffer[:l]
-            self._real_size += l
-            self._chunk_len -= l
+            if self._chunk_len < length:
+                length = self._chunk_len
+            self._buffer += self._pre_buffer[:length]
+            self._pre_buffer = self._pre_buffer[length:]
+            self._real_size = (self._real_size or 0) + length
+            self._chunk_len -= length
 
         # Trailing headers
         if self._chunk_state == 'trailing_headers':
@@ -688,38 +691,68 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
 
         # Check buffer size
         if len(self._pre_buffer) > self.max_buffer_size:
-            self._state = 'finished'
-            self._limit = True
+            self._state, self._limit = 'finished', True
 
-    def _parse_headers(self):
-        pre_buffer = self._pre_buffer
-        self._pre_buffer = bytearray()
-        headers = self.headers.parse(pre_buffer)
-        if not headers.is_finished:
-            return
-        self._state = 'body'
-
-        # Take care of leftovers
-        leftovers = self._pre_buffer = bytearray(headers.leftovers())
-        self._header_size = self._raw_size - len(leftovers)
-
-    def _parse_chunked_trailing_headers(self):
+    def _parse_chunked_trailing_headers(self) -> None:
         headers = self.headers.parse(self._pre_buffer)
-        self._pre_buffer = bytearray()
+        self._pre_buffer = b''
         if not headers.is_finished:
             return
         self._chunk_state = 'finished'
 
         # Take care of leftover and replace Transfer-Encoding with Content-Length
-        self._buffer.extend(headers.leftovers())
+        self._buffer += headers.leftovers()
         headers.remove('Transfer-Encoding')
         if not headers.content_length:
             headers.content_length = self._real_size
 
-    def _parse_until_body(self, chunk):
+    def _parse_headers(self) -> None:
+        headers = self.headers.parse(self._pre_buffer)
+        self._pre_buffer = b''
+        if not headers.is_finished:
+            return
+        self._state = 'body'
+
+        # Take care of leftovers
+        leftovers = self._pre_buffer = headers.leftovers()
+        self._header_size = self._raw_size - len(leftovers)
+
+    def _parse_sse(self) -> None:
+        # Connection established, with None for the event that Mojo leaves out
+        if not self._sse:
+            self.emit('sse', None)
+        self._sse = True
+
+        # Parse SSE
+        buffer = bytearray(self._pre_buffer)
+        while event := parse_event(buffer):
+            self.emit('sse', event)
+        self._pre_buffer = bytes(buffer)
+
+        # Check buffer size
+        if len(self._pre_buffer) > self.max_buffer_size:
+            self._state, self._limit = 'finished', True
+
+    # Perl's looks_like_number and the number of a string
+    @staticmethod
+    def _number(value: str | int | float | None) -> int | float | None:
+        if value is None:
+            return None
+        if isinstance(value, int | float):
+            return value
+        try:
+            return int(value.strip())
+        except ValueError:
+            try:
+                return float(value)
+            except ValueError:
+                return None
+
+    def _parse_until_body(self, chunk: bytes | None) -> None:
+        chunk = chunk if chunk is not None else b''
         self._raw_size += len(chunk)
-        self._pre_buffer.extend(chunk)
-        if self._state is None:
+        self._pre_buffer += chunk
+        if not self._state:
             self._state = 'headers'
         if self._state == 'headers':
             self._parse_headers()

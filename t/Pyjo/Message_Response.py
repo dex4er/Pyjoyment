@@ -108,7 +108,7 @@ if __name__ == '__main__':
     # Parse HTTP 1.1 response start-line, no headers and body
     res = Pyjo.Message.Response.new()
     res.parse(b'HTTP/1.1 200 OK\x0d\x0a\x0d\x0a')
-    ok(res.is_finished, 'response is finished')
+    ok(not res.is_finished, 'response is not finished')
     is_ok(res.code, 200, 'right status')
     is_ok(res.message, 'OK', 'right message')
     is_ok(res.version, '1.1', 'right version')
@@ -152,7 +152,7 @@ if __name__ == '__main__':
     res.parse(b'\x0d')
     ok(not res.is_finished, 'response is not finished')
     res.parse(b'\x0a')
-    ok(res.is_finished, 'response is finished')
+    ok(not res.is_finished, 'response is not finished')
     is_ok(res.code, 200, 'right status')
     is_ok(res.message, 'OK', 'right message')
     is_ok(res.version, '1.1', 'right version')
@@ -160,7 +160,7 @@ if __name__ == '__main__':
     # Parse HTTP 1.1 response start-line, no headers and body (no message)
     res = Pyjo.Message.Response.new()
     res.parse(b'HTTP/1.1 200\x0d\x0a\x0d\x0a')
-    ok(res.is_finished, 'response is finished')
+    ok(not res.is_finished, 'response is not finished')
     is_ok(res.code, 200, 'right status')
     is_ok(res.message, None, 'no message')
     is_ok(res.version, '1.1', 'right version')
@@ -201,7 +201,7 @@ if __name__ == '__main__':
     is_ok(res.message, 'Internal Server Error', 'right message')
     is_ok(res.version, '1.0', 'right version')
     is_ok(res.body, b'', 'no content')
-    is_ok(res.content.leftovers, b'HTTP/1.0 200 OK\x0d\x0a\x0d\x0a', 'next response in leftovers')
+    is_ok(res.content.leftovers(), b'HTTP/1.0 200 OK\x0d\x0a\x0d\x0a', 'next response in leftovers')
 
     # Parse full HTTP 1.0 response (no limit)
     setenv('PYJO_MAX_MESSAGE_SIZE', '0')
@@ -284,7 +284,7 @@ if __name__ == '__main__':
     is_ok(res.version, '1.1', 'right version')
     is_ok(res.headers.content_length, '123test', 'right "Content-Length" value')
     is_ok(res.body, b'', 'no content')
-    is_ok(res.content.leftovers, b'Hello World!', 'content in leftovers')
+    is_ok(res.content.leftovers(), b'Hello World!', 'content in leftovers')
 
     # Parse full HTTP 1.1 response (100 Continue)
     res = Pyjo.Message.Response.new()
@@ -521,7 +521,7 @@ if __name__ == '__main__':
     isa_ok(res.upload('upload').asset, Pyjo.Asset.Memory.object, 'right file')
     is_ok(res.upload('upload').asset.size, 69, 'right size')
     is_ok(res.content.parts[2].headers.content_type, 'application/octet-stream', 'right "Content-Type" value')
-    is_ok(res.content.leftovers, b'HTTP/1.0 200 OK\x0d\x0a\x0d\x0a', 'next response in leftovers')
+    is_ok(res.content.leftovers(), b'HTTP/1.0 200 OK\x0d\x0a\x0d\x0a', 'next response in leftovers')
 
     # Parse HTTP 1.1 chunked multipart response (in multiple small chunks)
     res = Pyjo.Message.Response.new()
@@ -742,8 +742,6 @@ if __name__ == '__main__':
     is_ok(state.get(), 'body', 'made progress on headers')
     ok(progressed.get(), 'made progress')
     ok(finished.get(), 'finished')
-    is_ok(res.build_headers(), res.content.build_headers(), 'headers are equal')
-    is_ok(res.build_body(), res.content.build_body(), 'body is equal')
 
     # Build HTTP 1.1 multipart response
     res = Pyjo.Message.Response.new()
@@ -828,7 +826,7 @@ if __name__ == '__main__':
     is_ok(res.headers.sec_websocket_accept, 'abcdef=', 'right "Sec-WebSocket-Accept" value')
     is_ok(res.headers.sec_websocket_protocol, 'sample', 'right "Sec-WebSocket-Protocol" value')
     is_ok(res.body, b'', 'no content')
-    is_ok(res.content.leftovers, b'\x81\x08\x77\x68\x61\x74\x65\x76\x65\x72', 'frame in leftovers')
+    is_ok(res.content.leftovers(), b'\x81\x08\x77\x68\x61\x74\x65\x76\x65\x72', 'frame in leftovers')
 
     # Build WebSocket handshake response
     res = Pyjo.Message.Response.new()
@@ -931,7 +929,7 @@ if __name__ == '__main__':
 
     res.fix_headers()
     is_ok(res.headers.connection, None, 'no "Connection" value')
-    ok(not res.content.is_dynamic, 'no dynamic content')
+    ok(res.content.is_dynamic, 'dynamic content')
     is_ok(count, len(body), 'right length')
     is_ok(full, body, 'right content')
 

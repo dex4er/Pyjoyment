@@ -7,39 +7,63 @@ Pyjo.Upload - Upload
 
     upload = Pyjo.Upload.new()
     print(upload.filename)
-    upload.move_to('/home/pyjo/foo.txt')
+    upload.move_to('/home/sri/foo.txt')
 
 :mod:`Pyjo.Upload` is a container for uploaded files.
 
-Classes
--------
+See also
+--------
+
+:mod:`Pyjoyment`, https://mojolicious.org.
+
+Ported from `Mojo::Upload <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/Upload.pm>`_
+of Mojolicious 9.49.
 """
 
-import Pyjo.Asset.File
+import Pyjo.Asset
 import Pyjo.Base
 import Pyjo.Headers
 
-from Pyjo.Util import notnone
+import builtins
+
+from typing import Self
+
+
+type Anything = builtins.object
 
 
 class Pyjo_Upload(Pyjo.Base.object):
     """
-    :mod:`Pyjo.Upload` inherits all attributes and methods from
-    :mod:`Pyjo.Base` and implements the following new ones.
+    :mod:`Pyjo.Upload` inherits all methods from :mod:`Pyjo.Base` and
+    implements the following new ones.
     """
 
-    def __init__(self, **kwargs):
-        self.asset = notnone(kwargs.get('asset'), lambda: Pyjo.Asset.File.new())
+    def __init__(
+        self,
+        *,
+        asset: Pyjo.Asset.object | None = None,
+        filename: str | None = None,
+        headers: Pyjo.Headers.object | None = None,
+        name: str | None = None,
+    ) -> None:
+        """::
+
+            upload = Pyjo.Upload.new()
+            upload = Pyjo.Upload.new(name='foo', filename='foo.txt', asset=Pyjo.Asset.Memory.new())
+
+        Construct a new :mod:`Pyjo.Upload` object.
+        """
+        self.asset = asset
         """::
 
             asset = upload.asset
             upload.asset = Pyjo.Asset.File.new()
 
-        Asset containing the uploaded data, usually a :mod:`Pyjo.Asset.File` or
-        :mod:`Pyjo.Asset.Memory` object.
+        Asset containing the uploaded data, usually a :mod:`Pyjo.Asset.File`
+        or :mod:`Pyjo.Asset.Memory` object.
         """
 
-        self.filename = kwargs.get('filename')
+        self.filename = filename
         """::
 
             filename = upload.filename
@@ -48,7 +72,16 @@ class Pyjo_Upload(Pyjo.Base.object):
         Name of the uploaded file.
         """
 
-        self.name = kwargs.get('name')
+        self.headers = headers
+        """::
+
+            headers = upload.headers
+            upload.headers = Pyjo.Headers.new()
+
+        Headers for upload, usually a :mod:`Pyjo.Headers` object.
+        """
+
+        self.name = name
         """::
 
             name = upload.name
@@ -57,43 +90,40 @@ class Pyjo_Upload(Pyjo.Base.object):
         Name of the upload.
         """
 
-        self.headers = notnone(kwargs.get('headers'), lambda: Pyjo.Headers.new())
+    def move_to(self, to: Anything) -> Self:
         """::
 
-            headers = upload.headers
-            upload.headers = Pyjo.Headers.new()
-
-        Headers for upload, defaults to a :mod:`Pyjo.Headers` object.
-        """
-
-    def move_to(self, path):
-        """::
-
-            upload = upload.move_to('/home/pyjo/foo.txt')
+            upload = upload.move_to('/home/sri/foo.txt')
 
         Move uploaded data into a specific file.
         """
-        self.asset.move_to(path)
+        self._asset().move_to(to)
         return self
 
     @property
-    def size(self):
+    def size(self) -> int:
         """::
 
             size = upload.size
 
         Size of uploaded data in bytes.
         """
-        return self.asset.size
+        return self._asset().size
 
-    def slurp(self):
+    def slurp(self) -> bytes:
         """::
 
-            bstring = upload.slurp()
+            content = upload.slurp()
 
         Read all uploaded data at once.
         """
-        return self.asset.slurp()
+        return self._asset().slurp()
+
+    # The asset, which an upload without one does not have, as in Mojo
+    def _asset(self) -> Pyjo.Asset.object:
+        if (asset := self.asset) is None:
+            raise AttributeError("'NoneType' object has no attribute 'slurp'")
+        return asset
 
 
 new = Pyjo_Upload.new

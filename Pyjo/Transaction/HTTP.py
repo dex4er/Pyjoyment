@@ -129,7 +129,7 @@ class Pyjo_Transaction_HTTP(Pyjo.Transaction.object):
             return
 
         self.res(res.new()).emit('unexpected', res)
-        leftovers = res.content.leftovers
+        leftovers = res.content.leftovers()
         if not len(leftovers):
             return
         self.client_read(leftovers)
