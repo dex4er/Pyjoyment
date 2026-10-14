@@ -46,7 +46,10 @@ import Pyjo.Date
 import Pyjo.Message
 
 import builtins
+import http.client
+import io
 import re
+import urllib.response
 
 from collections.abc import Mapping
 from typing import Any, Self, cast, overload
@@ -131,13 +134,29 @@ class Pyjo_Message_Response(Pyjo.Message.object):
     # The default of max_message_size, which a response raises
     _MAX_MESSAGE_SIZE = 2147483648
 
-    def __init__(self, *, code: int | None = None, message: str | None = None, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        response: http.client.HTTPResponse | urllib.response.addinfourl | None = None,
+        /,
+        *,
+        code: int | None = None,
+        message: str | None = None,
+        **kwargs: Any,
+    ) -> None:
         """::
 
             res = Pyjo.Message.Response.new()
             res = Pyjo.Message.Response.new(code=200, message='OK')
+            res = Pyjo.Message.Response.new(urllib.request.urlopen('http://127.0.0.1/'))
 
-        Construct a new :mod:`Pyjo.Message.Response` object.
+        Construct a new :mod:`Pyjo.Message.Response` object, from a response
+        of urllib if it is given: an :class:`http.client.HTTPResponse`, as
+        :func:`urllib.request.urlopen` returns for HTTP, or a
+        :class:`urllib.response.addinfourl`, as it returns for other URLs and
+        :class:`urllib.error.HTTPError` is: its status, ``200`` for a response
+        without one, as of a ``file:`` or ``data:`` URL, its headers, and the
+        body without the transfer encoding, as :mod:`http.client` decodes it.
+        It reads the response and closes it.
         """
         super().__init__(**kwargs)
 
@@ -160,6 +179,10 @@ class Pyjo_Message_Response(Pyjo.Message.object):
         """
 
         self._start_buffer: bytes | None = None
+
+        # Not in Mojolicious: a response of urllib
+        if response is not None:
+            self._from_urllib(response)
 
     @overload
     def cookies(self) -> list[Pyjo.Cookie.Response.object]: ...
@@ -368,6 +391,49 @@ class Pyjo_Message_Response(Pyjo.Message.object):
         """
         return len(self._start_line())
 
+    # Not in Mojolicious: a response of urllib
+    def to_urllib(self, *, method: str | None = None, url: str | None = None) -> http.client.HTTPResponse:
+        """::
+
+            response = res.to_urllib()
+            response = res.to_urllib(method='HEAD', url='http://127.0.0.1/')
+
+        Turn response into an :class:`http.client.HTTPResponse`, as
+        :func:`urllib.request.urlopen` returns for HTTP, parsed by
+        :mod:`http.client` from :meth:`~Pyjo.Message.Pyjo_Message.to_bytes`.
+        The method of the request tells whether the response has a body, and
+        the URL is what :meth:`~http.client.HTTPResponse.geturl` returns. ::
+
+            # A response for the code that uses urllib
+            response = Pyjo.Message.Response.new(code=200).set(body=b'Hi!').to_urllib()
+            print(response.read())
+        """
+        response = http.client.HTTPResponse(cast(Any, _Socket(self.to_bytes())), method=method)
+        response.begin()
+
+        # The URL, as urlopen sets it
+        if url is not None:
+            response.url = url
+        return response
+
+    # Not in Mojolicious: a response of urllib
+    def _from_urllib(self, response: http.client.HTTPResponse | urllib.response.addinfourl) -> None:
+        # A response without a status, as of a file: or data: URL, is a success
+        self.code = response.status or 200
+        self.message = getattr(response, 'reason', None) or None
+        self.version = {9: '0.9', 10: '1.0'}.get(getattr(response, 'version', 11), '1.1')
+        headers = self.headers
+        for name, value in response.headers.items():
+            headers.add(name, value)
+        body = response.read()
+        response.close()
+
+        # The body without the transfer encoding
+        if headers.transfer_encoding:
+            headers.remove('Transfer-Encoding')
+            headers.content_length = len(body)
+        self.body = body
+
     def _start_line(self) -> bytes:
         if self._start_buffer is not None:
             return self._start_buffer
@@ -380,6 +446,15 @@ class Pyjo_Message_Response(Pyjo.Message.object):
         if not (code := self.code):
             return False
         return any(code >= c and code < c + 100 for c in classes)
+
+
+# Not in Mojolicious: a socket that http.client reads a response from
+class _Socket:
+    def __init__(self, data: bytes) -> None:
+        self._data = data
+
+    def makefile(self, mode: str, *args: Any, **kwargs: Any) -> io.BytesIO:
+        return io.BytesIO(self._data)
 
 
 new = Pyjo_Message_Response.new

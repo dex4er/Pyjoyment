@@ -55,8 +55,9 @@ import os
 import random
 import re
 import time
+import urllib.request
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import Any, Self, cast, overload
 
 
@@ -71,6 +72,8 @@ class Pyjo_Message_Request(Pyjo.Message.object):
 
     def __init__(
         self,
+        request: urllib.request.Request | None = None,
+        /,
         *,
         env: Mapping[str, Any] | None = None,
         method: str = 'GET',
@@ -86,8 +89,11 @@ class Pyjo_Message_Request(Pyjo.Message.object):
 
             req = Pyjo.Message.Request.new()
             req = Pyjo.Message.Request.new(method='POST', url=Pyjo.URL.new('http://127.0.0.1/'))
+            req = Pyjo.Message.Request.new(urllib.request.Request('http://127.0.0.1/', data=b'Hi!'))
 
-        Construct a new :mod:`Pyjo.Message.Request` object.
+        Construct a new :mod:`Pyjo.Message.Request` object, from a
+        :class:`urllib.request.Request` if it is given: its method, URL,
+        headers and data.
         """
         super().__init__(**kwargs)
 
@@ -156,6 +162,10 @@ class Pyjo_Message_Request(Pyjo.Message.object):
         self._request_id = request_id
         self._start_buffer: bytes | None = None
         self._url = url
+
+        # Not in Mojolicious: a request of urllib
+        if request is not None:
+            self._from_urllib(request)
 
     @property
     def request_id(self) -> str:
@@ -488,6 +498,65 @@ class Pyjo_Message_Request(Pyjo.Message.object):
         request.
         """
         return len(self._start_line())
+
+    # Not in Mojolicious: a request of urllib
+    def to_urllib(self) -> urllib.request.Request:
+        """::
+
+            request = req.to_urllib()
+
+        Turn request into a :class:`urllib.request.Request`, with the absolute
+        :attr:`url`, the headers, the body and the :attr:`proxy`. urllib takes
+        no userinfo in a URL, so the userinfo of :attr:`url` and :attr:`proxy`
+        becomes the ``Authorization`` and ``Proxy-Authorization`` headers, as
+        :meth:`fix_headers` does. ::
+
+            # Send the request with urllib
+            with urllib.request.urlopen(req.to_urllib()) as response:
+                res = Pyjo.Message.Response.new(response)
+        """
+        url = self.url.to_abs()
+        headers = self.headers
+        body = self.build_body() if self.content.is_multipart else self.body
+        request = urllib.request.Request(
+            str(url),
+            data=body or None,
+            headers={name: value for name in headers.names() if (value := headers.header(name)) is not None},
+            method=self.method,
+        )
+
+        # Basic authentication
+        if (info := url.userinfo) and not headers.authorization:
+            request.add_header('Authorization', 'Basic ' + _basic_encode(info))
+
+        # Proxy with basic authentication
+        if (proxy := self.proxy) and self.via_proxy:
+            request.set_proxy(proxy.host_port or '', proxy.scheme or 'http')
+            if (info := proxy.userinfo) and not headers.proxy_authorization:
+                request.add_header('Proxy-Authorization', 'Basic ' + _basic_encode(info))
+
+        return request
+
+    # Not in Mojolicious: a request of urllib
+    def _from_urllib(self, request: urllib.request.Request) -> None:
+        self.method = request.get_method()
+        self.url = Pyjo.URL.new(request.full_url)
+        headers = self.headers
+        for name, value in request.header_items():
+            headers.add(name, value)
+
+        # Data as bytes, a file or an iterable of bytes
+        data = request.data
+        if data is None:
+            return
+        if isinstance(data, bytes | bytearray):
+            self.body = bytes(data)
+        elif isinstance(data, memoryview):
+            self.body = data.tobytes()
+        elif (read := getattr(data, 'read', None)) is not None:
+            self.body = bytes(read())
+        else:
+            self.body = b''.join(bytes(chunk) for chunk in cast(Iterable[bytes], data))
 
     def _parse_env(self, env: Mapping[str, Any]) -> None:
         # Bypass normal message parser
