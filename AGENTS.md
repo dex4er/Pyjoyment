@@ -131,6 +131,8 @@ takes a few seconds.
   names it: `reactor_detect.t` is `Reactor_detect.py`, `ioloop_tls.t` is
   `IOLoop_TLS.py`, and `tls.t` is `TLS.py`.
 - `t/certs/` holds the certificates of the tests, as `t/mojo/certs` in Mojo.
+- `t/cookies/` holds the cookie files of the tests, as `t/mojo/cookies` in
+  Mojo.
 - `t/docs/` checks that the code in the module documentation is correct: it
   is the same code as in the docstrings, in the same order, with `print` and
   the comments that show a result turned into assertions. Documented code
@@ -340,6 +342,11 @@ copy:
   `url.query = ('a', 1)` replaces the parameters, `['a', 1]` appends
   them, and `{'a': 1}` merges them, as `query(a => 1)`, `query([a => 1])`
   and `query({a => 1})` do.
+- A name followed by its data in Mojo's list of arguments, as a generator of
+  `tx` in `Mojo::UserAgent::Transactor` with its options
+  (`form => {a => 'b'}, charset => 'UTF-8'`), is a keyword argument
+  (`form={'a': 'b'}, charset='UTF-8'`), and a hash reference of headers or
+  the content before it are positional arguments.
 - A Perl string of characters is a `str`, and bytes in Python are `bytes`,
   encoded with the charset of the module. Perl keeps bytes that do not decode
   as a byte string, which is a `str` of the characters 0-255 in Python:

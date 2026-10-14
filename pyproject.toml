@@ -204,5 +204,8 @@ strict = [
   "Pyjo/Transaction/WebSocket.py",
   "Pyjo/URL.py",
   "Pyjo/Upload.py",
+  "Pyjo/UserAgent/CookieJar.py",
+  "Pyjo/UserAgent/Proxy.py",
+  "Pyjo/UserAgent/Transactor.py",
   "Pyjo/WebSocket.py",
 ]
