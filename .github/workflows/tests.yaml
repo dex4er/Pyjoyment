@@ -82,7 +82,7 @@ jobs:
           PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
         run: |
           python -m Pyjo.Prove -j 4 --timeout 60 \
-            t/Pyjo/IOLoop*.py t/Pyjo/TLS.py t/Pyjo/Promise*.py t/stdlib/IOLoop*.py \
+            t/Pyjo/IOLoop*.py t/Pyjo/TLS.py t/Pyjo/Promise*.py t/Pyjo/Subprocess.py t/stdlib/IOLoop*.py \
             t/Pyjo/UserAgent*.py t/stdlib/UserAgent*.py t/Pyjo/Server_Daemon.py t/stdlib/Server_Daemon.py \
             t/Pyjo/File_download.py 2>&1 | tee prove.log
           if grep -n 'ResourceWarning:' prove.log; then exit 1; fi

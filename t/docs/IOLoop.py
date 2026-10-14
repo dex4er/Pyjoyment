@@ -277,4 +277,36 @@ with subtest('stream'):
     loop.reset()
     peer.close()
 
+with subtest('subprocess'):
+    import Pyjo.IOLoop.Subprocess
+
+    import time
+
+    # PyPy with its JIT on macOS: the child of a fork crashes now and then with a bus error, under load
+    if sys.platform == 'darwin' and getattr(sys, 'pypy_translation_info', {}).get('translation.jit'):
+        skip('PyPy with its JIT on macOS: the child of a fork crashes now and then with SIGBUS', 4)
+    else:
+        subprocess = Pyjo.IOLoop.subprocess()
+        isa_ok(subprocess, Pyjo.IOLoop.Subprocess.object, 'subprocess')
+        subprocess = Pyjo.IOLoop.new().subprocess()
+        isa_ok(subprocess, Pyjo.IOLoop.Subprocess.object, 'subprocess of a loop')
+        got = []
+        loop = Pyjo.IOLoop.new()
+        subprocess = loop.subprocess(lambda subprocess: 1, lambda subprocess, err, *results: got.extend(results))
+        loop.start()
+        is_deeply_ok(got, [1], 'run')
+
+        def blocking(subprocess):
+            time.sleep(0.05)
+            return '♥', 'Pyjoyment'
+
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            # Operation that would block the event loop for 5 seconds
+            Pyjo.IOLoop.subprocess().run_p(blocking).then(
+                lambda *results: print(f'I {results[0]} {results[1]}!')
+            ).catch(lambda err: print(f'Subprocess error: {err}'))
+            Pyjo.IOLoop.start()
+        is_ok(output.getvalue(), 'I ♥ Pyjoyment!\n', 'promise')
+
 done_testing()

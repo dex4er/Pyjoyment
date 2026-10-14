@@ -89,6 +89,19 @@ _SOCKS_REPLIES = {
 type AddrInfo = list[tuple[Any, Any, Any, Any, Any]]
 
 
+# The threads of the pool are stopped before a fork, as a process with threads may deadlock in its child, which Python
+# warns about, and the child would have a pool without its threads; the next resolution starts the pool again
+def _before_fork() -> None:
+    global _executor
+    if (executor := _executor) is not None:
+        _executor = None
+        executor.shutdown(wait=True)
+
+
+if hasattr(os, 'register_at_fork'):
+    os.register_at_fork(before=_before_fork)
+
+
 class _Resolver:
     """A name resolution in a thread, which makes a socket readable once it is done."""
 
