@@ -59,31 +59,42 @@ jobs:
 
       # Invalid escape sequences and deprecated APIs become errors in a future
       # Python; fail now instead. Only the tests: setup-python runs pip, whose
-      # warnings are not ours.
+      # warnings are not ours. The development mode of Python shows the
+      # ResourceWarning of a socket or a file that is not closed, which only
+      # goes to the standard error, so the output is checked for it.
       - name: Run tests
+        shell: bash
         env:
+          PYTHONDEVMODE: "1"
           PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
         run: |
           python --version
-          python -m Pyjo.Prove -j 4 --timeout 60 -r t
+          python -m Pyjo.Prove -j 4 --timeout 60 -r t 2>&1 | tee prove.log
+          if grep -n 'ResourceWarning:' prove.log; then exit 1; fi
 
       # The tests of the event loop run on the reactor without asyncio too.
       - name: Run tests on Pyjo.Reactor.Poll
+        shell: bash
         env:
           PYJO_REACTOR: Pyjo.Reactor.Poll
+          PYTHONDEVMODE: "1"
           PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
         run: |
-          python -m Pyjo.Prove -j 4 --timeout 60 t/Pyjo/IOLoop*.py t/Pyjo/TLS.py t/Pyjo/Promise*.py t/stdlib/IOLoop*.py
+          python -m Pyjo.Prove -j 4 --timeout 60 t/Pyjo/IOLoop*.py t/Pyjo/TLS.py t/Pyjo/Promise*.py t/stdlib/IOLoop*.py 2>&1 | tee prove.log
+          if grep -n 'ResourceWarning:' prove.log; then exit 1; fi
 
       # The tests of Pyjo.Server.ASGI, Pyjo.Server.WSGI and Pyjo.Server.CGI with
       # real servers, from the dependency group "servers", on the Python of
       # mise.toml only.
       - name: Run tests on ASGI, WSGI and CGI servers
         if: matrix.python == 'mise'
+        shell: bash
         env:
+          PYTHONDEVMODE: "1"
           PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
         run: |
-          uv run --python "$(command -v python)" --only-group servers python -m Pyjo.Prove --timeout 120 -r t/servers
+          uv run --python "$(command -v python)" --only-group servers python -m Pyjo.Prove --timeout 120 -r t/servers 2>&1 | tee prove.log
+          if grep -n 'ResourceWarning:' prove.log; then exit 1; fi
 
   build:
     name: build
