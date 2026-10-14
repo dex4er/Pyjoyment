@@ -172,4 +172,27 @@ with subtest('One worker and immediate shutdown'):
     is_ok(tx.res.code, 200, 'right status')
     is_ok(tx.res.body, b'works too!', 'right content')
 
+# Not in Mojolicious: a worker that gets QUIT before it has its handler stops, where Mojo's serves on
+with subtest('QUIT right after the fork'):
+    port = Pyjo.IOLoop.Server.object.generate_port()
+    prefork = Pyjo.Server.Prefork.new(heartbeat_interval=0.5, listen=[f'http://127.0.0.1:{port}'], workers=1)
+    spawn, reap, heartbeats = [], [], []
+
+    @prefork.on('spawn')
+    def quit(prefork, pid):
+        if not len(spawn):
+            os.kill(pid, signal.SIGQUIT)
+        spawn.append(pid)
+
+    @prefork.on('heartbeat')
+    def count(prefork, pid):
+        heartbeats.append(pid)
+        if len(heartbeats) > 4:
+            os.kill(os.getpid(), signal.SIGINT)
+
+    prefork.on('reap', lambda prefork, pid: reap.append(pid))
+    prefork.run()
+    ok(heartbeats.count(spawn[0]) < 5, 'first worker has stopped')
+    is_ok(reap[0], spawn[0], 'first worker reaped')
+
 done_testing()

@@ -33,7 +33,7 @@ import Pyjo.Transaction.HTTP
 import builtins
 import os
 
-from typing import Any, Self
+from typing import Any, Self, overload
 
 
 type Anything = builtins.object
@@ -79,6 +79,8 @@ class Pyjo_HelloWorld(Pyjo.Base.object):
         Moniker of this application, defaults to ``pyjo-hello_world``.
         """
 
+        self._config: dict[str, Any] = {}
+
     def build_tx(self) -> Pyjo.Transaction.HTTP.object:
         """::
 
@@ -87,6 +89,48 @@ class Pyjo_HelloWorld(Pyjo.Base.object):
         Build :mod:`Pyjo.Transaction.HTTP` object.
         """
         return Pyjo.Transaction.HTTP.new()
+
+    # config(**values) with no values is config(), which the first overload types
+    @overload
+    def config(self) -> dict[str, Any]: ...  # pyright: ignore[reportOverlappingOverload]
+
+    @overload
+    def config(self, name: str, /) -> Any: ...
+
+    @overload
+    def config(self, values: dict[str, Any], /) -> Self: ...
+
+    @overload
+    def config(self, **values: Any) -> Self: ...
+
+    def config(self, *args: Any, **values: Any) -> Any:
+        """::
+
+            config = hello.config()
+            foo = hello.config('foo')
+            hello = hello.config({'foo': 'bar', 'baz': 23})
+            hello = hello.config(foo='bar', baz=23)
+
+        Application configuration, as servers like :mod:`Pyjo.Server.Hot` read
+        their settings from it. ::
+
+            # Remove value
+            foo = hello.config().pop('foo')
+
+            # Assign multiple values at once
+            hello.config(foo='test', bar=23)
+        """
+        # Dict
+        if not len(args) and not len(values):
+            return self._config
+
+        # Get
+        if len(args) == 1 and isinstance(args[0], str):
+            return self._config.get(args[0])
+
+        # Set
+        self._config.update(*args, **values)
+        return self
 
     def handler(self, tx: Pyjo.Transaction.HTTP.object) -> None:
         """::

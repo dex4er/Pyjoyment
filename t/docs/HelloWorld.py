@@ -37,6 +37,19 @@ with subtest('build_tx'):
     tx = hello.build_tx()
     ok(isinstance(tx, Pyjo.Transaction.HTTP.object), 'tx')
 
+with subtest('config'):
+    config = hello.config()
+    is_deeply_ok(config, {}, 'empty')
+    is_ok(hello.config({'foo': 'bar', 'baz': 23}), hello, 'hello.config({...})')
+    is_ok(hello.config(foo='bar', baz=23), hello, 'hello.config(...)')
+    foo = hello.config('foo')
+    is_ok(foo, 'bar', 'foo')
+    foo = hello.config().pop('foo')
+    is_ok(foo, 'bar', 'removed')
+    is_ok(hello.config('foo'), None, 'no foo')
+    hello.config(foo='test', bar=23)
+    is_deeply_ok(hello.config(), {'baz': 23, 'foo': 'test', 'bar': 23}, 'multiple values')
+
 with subtest('handler'):
     tx = Pyjo.Transaction.HTTP.new()
     hello.handler(tx)
