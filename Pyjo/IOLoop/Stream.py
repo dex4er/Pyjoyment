@@ -398,7 +398,9 @@ class Pyjo_IOLoop_Stream(Pyjo.EventEmitter.object):
                 return
 
             # Closed (maybe real error)
-            if isinstance(e, ConnectionResetError):
+            # Unlike Mojolicious: EPIPE is a close too, as ECONNRESET is, as a read of TLS writes the session tickets
+            # of TLS 1.3 with OpenSSL 3.5, which fails when the peer is gone
+            if isinstance(e, (ConnectionResetError, BrokenPipeError)):
                 return self.close()
             return self.emit('error', e).close()
 
