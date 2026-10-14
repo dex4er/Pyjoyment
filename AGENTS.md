@@ -184,7 +184,8 @@ without asyncio has to pass them too:
 PYJO_REACTOR=Pyjo.Reactor.Poll PYTHONPATH=. mise exec -- python -m Pyjo.Prove -j 4 \
   t/Pyjo/IOLoop*.py t/Pyjo/TLS.py t/Pyjo/Promise*.py t/Pyjo/Subprocess.py t/stdlib/IOLoop*.py \
   t/Pyjo/UserAgent*.py t/stdlib/UserAgent*.py t/Pyjo/Server_Daemon.py t/stdlib/Server_Daemon.py \
-  t/Pyjo/Server_Prefork.py t/stdlib/Server_Prefork.py t/Pyjo/File_download.py
+  t/Pyjo/Server_Prefork.py t/stdlib/Server_Prefork.py t/Pyjo/Server_Reload.py t/stdlib/Server_Reload.py \
+  t/Pyjo/File_download.py
 ```
 
 CI runs the tests in `t/servers` on the Python of `mise.toml` only, with the
@@ -385,6 +386,14 @@ copy:
   HTTP headers are such characters too, as `http.client` has them: bytes
   from the wire are decoded as ISO-8859-1.
 - An environment variable `MOJO_*` is `PYJO_*`.
+- A name that Mojolicious takes from somewhere else, as `Mojo::Server::Hypnotoad`
+  and `Mojo::Server::Morbo` are named after characters of Futurama, is a name
+  that says what the module does, `Pyjo.Server.Hot` and `Pyjo.Server.Reload`,
+  with a `# Renamed from Mojolicious:` comment; so are its environment
+  variables (`PYJO_RELOAD_BACKEND`) and the jokes of its documentation. A
+  script of Mojolicious, as `script/morbo`, is a `main` function of the module
+  with `argparse`, a `pyjo-` command in `[project.scripts]` of
+  `pyproject.toml` (`pyjo-reload`) and `python -m` of the module.
 - Where Mojo uses an optional XS module for speed, as `Mojo::JSON` uses
   `Cpanel::JSON::XS`, the port uses the module of the standard library in its
   place and keeps the port of the pure-Perl code behind a `PYJO_NO_*`
