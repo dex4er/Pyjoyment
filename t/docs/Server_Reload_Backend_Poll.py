@@ -18,10 +18,10 @@ with subtest('Synopsis'):
         backend = Pyjo.Server.Reload.Backend.Poll.new()
         backend.watch_timeout = 0
         backend.modified_files()
-        file = dir.child('lib').make_path().child('MyApp.py').spew(b'pass\n')
-        # The clock of a file system can be behind time.time() by some milliseconds, so the file gets a time surely
+        # The clock of a file system can be behind time.time() by some milliseconds, so the file is written a second
         # after the start
-        os.utime(file, (time.time() + 1, time.time() + 1))
+        time.sleep(1)
+        file = dir.child('lib').make_path().child('MyApp.py').spew(b'pass\n')
         if files := backend.modified_files():
             print('Files have been changed')
     is_ok(output.getvalue(), 'Files have been changed\n', 'changed')

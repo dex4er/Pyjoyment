@@ -30,6 +30,9 @@ with subtest('Paths of pathlib and times of os.utime'), tempfile.TemporaryDirect
     root = pathlib.Path(dir)
     (root / 'lib').mkdir()
     file = root / 'lib' / 'MyApp.py'
+    # The clock of a file system can be behind time.time() by some milliseconds, so the file is written a second
+    # after the start
+    time.sleep(1)
     file.write_text('pass\n')
     backend = Pyjo.Server.Reload.Backend.Poll.new(watch=[root / 'lib'], watch_timeout=0)
     is_deeply_ok(backend.modified_files(), [str(file)], 'a directory of pathlib')
