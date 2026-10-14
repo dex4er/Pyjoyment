@@ -67,8 +67,9 @@ from Pyjo.Util import md5_sum
 
 import builtins
 import importlib
+import importlib.machinery
+import importlib.util
 import os
-import runpy
 import sys
 
 from pkgutil import extend_path
@@ -285,7 +286,7 @@ class Pyjo_Server(Pyjo.EventEmitter.object):
 
             # Try to load application from script into sandbox
             try:
-                runpy.run_path(path, run_name=f'Pyjo.Server.Sandbox.{md5_sum(path.encode())}')
+                _run(path, f'Pyjo.Server.Sandbox.{md5_sum(path.encode())}')
             except Exception as e:
                 raise Pyjo.Exception.new(f'Can\'t load application from file "{path}": {e}') from e
             if (app := loaded_app) is None or not callable(getattr(app, 'handler', None)):
@@ -311,6 +312,16 @@ class Pyjo_Server(Pyjo.EventEmitter.object):
         Run server. Meant to be overloaded in a subclass.
         """
         raise NotImplementedError('Method "run" not implemented by subclass')
+
+
+# Not in Mojolicious: the script as a module of its own with a loader, where runpy.run_path gives it none, so that
+# linecache finds its source for a stack trace, as asyncio in debug mode makes them, without the DeprecationWarning of
+# Python 3.15; a script without the suffix .py runs too, and no bytecode is written next to it
+def _run(path: str, name: str) -> None:
+    loader = importlib.machinery.SourceFileLoader(name, path)
+    module = importlib.util.module_from_spec(importlib.machinery.ModuleSpec(name, loader, origin=path))
+    module.__file__ = path
+    exec(compile(loader.get_source(name) or '', path, 'exec'), module.__dict__)
 
 
 def _request(server: Pyjo_Server, tx: Pyjo.Transaction.HTTP.object) -> None:

@@ -49,6 +49,7 @@ classifiers = [
 
 [project.scripts]
 pyjo-prove = "Pyjo.Prove:main"
+pyjo-reload = "Pyjo.Server.Reload:main"
 
 [project.urls]
 Homepage = "https://github.com/dex4er/Pyjoyment"
@@ -203,6 +204,10 @@ strict = [
   "Pyjo/Server/CGI.py",
   "Pyjo/Server/Daemon.py",
   "Pyjo/Server/Prefork.py",
+  "Pyjo/Server/Reload/__init__.py",
+  "Pyjo/Server/Reload/__main__.py",
+  "Pyjo/Server/Reload/Backend/__init__.py",
+  "Pyjo/Server/Reload/Backend/Poll.py",
   "Pyjo/Server/WSGI.py",
   "Pyjo/String/Bytes.py",
   "Pyjo/String/Mixin.py",
