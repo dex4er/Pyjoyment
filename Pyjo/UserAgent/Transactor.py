@@ -147,7 +147,7 @@ class Pyjo_UserAgent_Transactor(Pyjo.Base.object):
         # CONNECT request (expect a bad response)
         new = self.tx('CONNECT', url.clone().set(userinfo=None))
         new.req.proxy = proxy
-        new.res.connect.set(auto_relax=False).headers.connection = 'keep-alive'
+        new.res.content.set(auto_relax=False).headers.connection = 'keep-alive'
 
         return new
 
@@ -200,19 +200,17 @@ class Pyjo_UserAgent_Transactor(Pyjo.Base.object):
         tx = Pyjo.Transaction.HTTP.new()
         req = tx.req
         req.method = method
-        if not re_no_proto.search(str(url)):
-            url = 'http://' + str(url)
         if isinstance(url, Pyjo.URL.object):
-            req.url(url)
+            req.url = url
         else:
-            req.url.parse(url)
+            req.url.parse(url if re_no_proto.search(url) else 'http://' + url)
 
         # Headers (we identify ourselves and accept gzip compression)
         h = req.headers
         if headers:
             h.from_dict(headers)
         if not h.user_agent:
-            h.useragent = self.name
+            h.user_agent = self.name
         if not h.accept_encoding:
             h.accept_encoding = 'gzip'
 
