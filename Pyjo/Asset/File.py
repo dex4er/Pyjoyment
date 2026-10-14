@@ -37,10 +37,12 @@ import Pyjo.Asset
 import Pyjo.Exception
 import Pyjo.File
 
+import atexit
 import builtins
 import os
 import sys
 import tempfile
+import weakref
 
 from types import TracebackType
 from typing import IO, Self
@@ -95,6 +97,7 @@ class Pyjo_Asset_File(Pyjo.Asset.object):
         self._handle = handle
         self._pid = os.getpid()
         self._tmpdir = None if tmpdir is None else os.fspath(tmpdir)
+        _FILES.add(self)
 
     def __del__(self) -> None:
         # Module globals may be gone at the end of the interpreter
@@ -339,6 +342,20 @@ class Pyjo_Asset_File(Pyjo.Asset.object):
         :mod:`Pyjo.Asset.File` object.
         """
         return self
+
+
+# Not in Mojolicious: the files that exist, which are closed, and deleted with cleanup, at the end of the interpreter, as
+# Perl does it then, while __del__ does nothing
+_FILES: 'weakref.WeakSet[Pyjo_Asset_File]' = weakref.WeakSet()
+
+
+@atexit.register
+def _close() -> None:
+    for file in list(_FILES):
+        try:
+            file.close()
+        except Exception:
+            pass
 
 
 new = Pyjo_Asset_File.new
