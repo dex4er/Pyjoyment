@@ -35,7 +35,11 @@ The application runs in the event loop of the ASGI server: the reactor of
 :mod:`Pyjo.IOLoop` follows the loop that is running, so timers, promises and
 the I/O of :mod:`Pyjoyment` share it, and the response can be given later
 than the ``request`` event, once the transaction is resumed. This needs the
-reactor on :mod:`asyncio`, :mod:`Pyjo.Reactor.Asyncio`, which is the default.
+reactor on :mod:`asyncio`, :mod:`Pyjo.Reactor.Asyncio` or a subclass of it,
+which is the default, and an ASGI server on :mod:`asyncio`, as uvicorn is, or
+hypercorn without Trio: with another reactor, as :mod:`Pyjo.Reactor.Poll`,
+:meth:`Pyjo_Server_ASGI.to_asgi_app` and :meth:`Pyjo_Server_ASGI.run` raise an exception, as nothing would run
+it in the loop of the server.
 
 An HTTP request is read from the connection scope as the ``CGI`` environment
 that :meth:`Pyjo.Message.Request.Pyjo_Message_Request.parse` takes, as
@@ -63,7 +67,10 @@ counterpart of
 """
 
 import Pyjo.Content.Single
+import Pyjo.Exception
+import Pyjo.IOLoop
 import Pyjo.Promise
+import Pyjo.Reactor.Asyncio
 import Pyjo.Server.Base
 import Pyjo.Transaction
 import Pyjo.Transaction.HTTP
@@ -101,6 +108,7 @@ class Pyjo_Server_ASGI(Pyjo.Server.Base.object):
 
         Run ``ASGI`` for one connection.
         """
+        _check_reactor()
         type = scope['type']
         if type == 'http':
             await self._http(scope, receive, send)
@@ -118,6 +126,8 @@ class Pyjo_Server_ASGI(Pyjo.Server.Base.object):
 
         Turn the application into an ``ASGI`` application.
         """
+        _check_reactor()
+
         # Preload application and wrap it, the attribute of Pyjo.Server.Base, which is not typed yet
         cast(object, self.app)  # pyright: ignore[reportUnknownMemberType]
 
@@ -347,6 +357,14 @@ class _Writer:
             await self._send({'type': 'websocket.send', 'text': payload.decode('utf-8', 'replace')})
         else:
             await self._send({'type': 'websocket.send', 'bytes': payload})
+
+
+# A reactor without asyncio can neither run in the loop of the ASGI server nor give an awaitable that asyncio takes
+def _check_reactor() -> None:
+    reactor = Pyjo.IOLoop.object.singleton().reactor
+    if not isinstance(reactor, Pyjo.Reactor.Asyncio.object):
+        name = f'{type(reactor).__module__}.{type(reactor).__qualname__}'
+        raise Pyjo.Exception.new(f'Pyjo.Server.ASGI needs Pyjo.Reactor.Asyncio, not {name}')
 
 
 # The body of a request, from http.request messages
