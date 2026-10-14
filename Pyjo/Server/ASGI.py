@@ -93,6 +93,7 @@ import Pyjo.Transaction
 import Pyjo.Transaction.HTTP
 import Pyjo.Transaction.WebSocket
 
+from Pyjo.Util import url_escape
 from Pyjo.WebSocket import WS_BINARY, WS_CLOSE, WS_CONTINUATION, WS_TEXT, Frame, parse_frame, server_handshake
 
 import struct
@@ -387,8 +388,10 @@ async def _body(receive: Receive):
 
 # The CGI environment of a connection scope
 def _environ(scope: Scope) -> dict[str, str]:
+    # The raw path is bytes, which a path of Pyjoyment takes as characters, so the bytes beyond ASCII are percent-encoded,
+    # as the path is escaped
     raw = scope.get('raw_path')
-    path = raw.split(b'?', 1)[0].decode('latin-1') if raw else scope.get('path', '')
+    path = url_escape(raw.split(b'?', 1)[0], rb'\x80-\xff').decode('ascii') if raw else scope.get('path', '')
     env = {
         'PATH_INFO': path,
         'QUERY_STRING': scope.get('query_string', b'').decode('latin-1'),
