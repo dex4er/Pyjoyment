@@ -121,7 +121,11 @@ A single file runs on its own as well:
 because the output is standard TAP; `.proverc` supplies its
 `--ext=py --exec=python`.
 
-- `t/Pyjo/` holds the module tests, ported from Mojo's `t/mojo/*.t`.
+- `t/Pyjo/` holds the module tests, ported from Mojo's `t/mojo/*.t`. A
+  file has the name of Mojo's test with the part of the module as Pyjoyment
+  names it: `reactor_detect.t` is `Reactor_detect.py`, `ioloop_tls.t` is
+  `IOLoop_TLS.py`, and `tls.t` is `TLS.py`.
+- `t/certs/` holds the certificates of the tests, as `t/mojo/certs` in Mojo.
 - `t/docs/` checks that the code in the module documentation is correct: it
   is the same code as in the docstrings, in the same order, with `print` and
   the comments that show a result turned into assertions. Documented code
@@ -437,6 +441,14 @@ copy:
   `sys.is_finalizing()`, as Mojo checks `${^GLOBAL_PHASE}`, and keeps its
   whole body in a `try`: at the end of the interpreter the globals of the
   module may already be `None`, even `sys`.
+- An optional module of Perl that Mojo uses when it is installed has a
+  counterpart in the standard library, or is left out until something needs
+  it: Net::DNS::Native is `getaddrinfo` in a thread that tells the reactor
+  through a socket pair, IO::Socket::Socks is left out, and `socket_options`
+  of IO::Socket::IP is `source_address`, as `socket.create_connection` has
+  it. `SSL_hostname` and `SSL_verifycn_name` of IO::Socket::SSL are one
+  `tls_hostname`, as Python has one `server_hostname` for SNI and for the
+  verification.
 - `tls_options` of IO::Socket::SSL is an `ssl.SSLContext`, `tls_context`, as
   asyncio takes `ssl=context`. OpenSSL chooses an ALPN protocol by the order
   of the server, IO::Socket::SSL by the order of the client.
@@ -579,6 +591,16 @@ CA is not kept: new certificates come with a new CA, made with OpenSSL 3
 (RSA 2048, a hundred years, `basicConstraints`, `keyUsage`,
 `extendedKeyUsage=serverAuth` and `subjectAltName=DNS:localhost,IP:127.0.0.1`
 for the server), and the key of the CA is deleted afterwards.
+
+The certificates of the tests in `t/certs` are the other exception: their
+keys are tracked, and `.gitignore` lets `t/certs/*.key` in, as the tests of
+TLS need them. Another CA of its own, `t/certs/ca.crt`, whose key is not kept
+either, signs `server` (`localhost`, `127.0.0.1`, `::1`, `serverAuth`),
+`mojo_server` (`mojolicious.org`) and `client` (`clientAuth`), and `bad` is
+self-signed. They are made as the default certificate is, all of them
+together with a new CA. Claude Code does not read these keys either: the
+rules of `.claude/settings.json` stay as they are, and the tests read the
+keys.
 
 ## Documentation
 

@@ -175,6 +175,16 @@ class Pyjo_IOLoop_TLS(Pyjo.EventEmitter.object):
             The :class:`ssl.SSLContext` to use instead of the one that the
             other options make.
 
+        tls_hostname
+            ::
+
+                tls_hostname='mojolicious.org'
+                tls_hostname=''
+
+            Name of the server for SNI and the verification of its
+            certificate on the client-side instead of ``address``, an empty
+            one for no SNI.
+
         tls_key
             ::
 
@@ -191,7 +201,8 @@ class Pyjo_IOLoop_TLS(Pyjo.EventEmitter.object):
         server = bool(options.get('server'))
         try:
             context = self._expand(options)
-            hostname = None if server else options.get('address') or None
+            # Not in Mojolicious: tls_hostname for the SSL_hostname and SSL_verifycn_name of IO::Socket::SSL
+            hostname = None if server else options.get('tls_hostname', options.get('address')) or None
             handle = context.wrap_socket(
                 handle, server_side=server, do_handshake_on_connect=False, server_hostname=hostname
             )
@@ -247,7 +258,7 @@ class Pyjo_IOLoop_TLS(Pyjo.EventEmitter.object):
             context.load_default_certs()
         if cert:
             context.load_cert_chain(cert, key)
-        if not options.get('address'):
+        if not options.get('tls_hostname', options.get('address')):
             context.check_hostname = False
         return context
 
