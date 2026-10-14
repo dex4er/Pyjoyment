@@ -3,6 +3,7 @@ from Pyjo.Test import *
 import contextlib
 import io
 import os
+import time
 
 
 with subtest('Synopsis'):
@@ -17,7 +18,10 @@ with subtest('Synopsis'):
         backend = Pyjo.Server.Reload.Backend.Poll.new()
         backend.watch_timeout = 0
         backend.modified_files()
-        dir.child('lib').make_path().child('MyApp.py').spew(b'pass\n')
+        file = dir.child('lib').make_path().child('MyApp.py').spew(b'pass\n')
+        # The clock of a file system can be behind time.time() by some milliseconds, so the file gets a time surely
+        # after the start
+        os.utime(file, (time.time() + 1, time.time() + 1))
         if files := backend.modified_files():
             print('Files have been changed')
     is_ok(output.getvalue(), 'Files have been changed\n', 'changed')

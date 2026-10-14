@@ -263,11 +263,15 @@ with subtest('SO_REUSEPORT'):
         skip('SO_REUSEPORT support required!', 2)
     else:
         port = Pyjo.IOLoop.Server.object.generate_port()
-        daemon = Pyjo.Server.Daemon.new(listen=[f'http://127.0.0.1:{port}'], silent=True).start()
-        ok(
-            not daemon.ioloop.acceptor(daemon.acceptors[0]).handle.getsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT),
-            'no SO_REUSEPORT socket option',
-        )
+        # Not in Mojolicious: the daemon is closed where the test is done with it, as Perl frees it, as PyPy frees it
+        # later, and the next daemon would reuse its listen socket of PYJO_REUSE
+        with Pyjo.Server.Daemon.new(listen=[f'http://127.0.0.1:{port}'], silent=True).start() as daemon:
+            ok(
+                not daemon.ioloop.acceptor(daemon.acceptors[0]).handle.getsockopt(
+                    socket.SOL_SOCKET, socket.SO_REUSEPORT
+                ),
+                'no SO_REUSEPORT socket option',
+            )
         daemon = Pyjo.Server.Daemon.new(listen=[f'http://127.0.0.1:{port}?reuse=1'], silent=True)
         daemon.start()
         ok(
