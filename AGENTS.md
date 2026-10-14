@@ -182,7 +182,7 @@ without asyncio has to pass them too:
 
 ```sh
 PYJO_REACTOR=Pyjo.Reactor.Poll PYTHONPATH=. mise exec -- python -m Pyjo.Prove -j 4 \
-  t/Pyjo/IOLoop*.py t/Pyjo/TLS.py t/Pyjo/Promise*.py t/stdlib/IOLoop*.py \
+  t/Pyjo/IOLoop*.py t/Pyjo/TLS.py t/Pyjo/Promise*.py t/Pyjo/Subprocess.py t/stdlib/IOLoop*.py \
   t/Pyjo/UserAgent*.py t/stdlib/UserAgent*.py t/Pyjo/Server_Daemon.py t/stdlib/Server_Daemon.py \
   t/Pyjo/File_download.py
 ```
@@ -529,7 +529,15 @@ copy:
 - A callback returns a list in Perl and one value in Python. Where Mojo
   makes values of what a callback returns, as `then` of `Mojo::Promise` does,
   the return value is one value, `None` is none, as Perl's `return;`, and a
-  promise of several values passes them on.
+  promise of several values passes them on. Where the values are passed on as
+  they are, as the first callback of `run` of `Pyjo.IOLoop.Subprocess` gives
+  them to the second one, a tuple is several values.
+- Perl's `fork` is `os.fork`, where it exists, and `POSIX::_exit` is
+  `os._exit`, which leaves the buffers of `sys.stdout` and `sys.stderr`, so
+  they are written before both. A process with threads may deadlock in the
+  child of a fork, which Python warns about, so a pool of threads of the port,
+  as the one of name resolution in `Pyjo.IOLoop.Client`, is stopped before a
+  fork with `os.register_at_fork` and started again when it is needed.
 - `async sub` of Mojo is an `async def` that the reactor runs as a promise,
   `Pyjo.Promise.coroutine`, and Mojo's `AWAIT_*` methods are `__await__`. A
   reactor without asyncio drives a coroutine that awaits promises of

@@ -181,6 +181,7 @@ strict = [
   "Pyjo/IOLoop/Client.py",
   "Pyjo/IOLoop/Server.py",
   "Pyjo/IOLoop/Stream.py",
+  "Pyjo/IOLoop/Subprocess.py",
   "Pyjo/IOLoop/TLS.py",
   "Pyjo/JSON/__init__.py",
   "Pyjo/JSON/Pointer.py",

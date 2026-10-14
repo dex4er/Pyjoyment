@@ -115,7 +115,13 @@ import time
 import weakref
 
 from collections.abc import Callable
-from typing import Any, Self, overload
+from typing import TYPE_CHECKING, Any, Self, overload
+
+
+if TYPE_CHECKING:
+    import Pyjo.IOLoop.Subprocess
+
+    from Pyjo.IOLoop.Subprocess import Child, Parent
 
 
 type Anything = builtins.object
@@ -607,7 +613,32 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
         c = self._in.get(stream) or self._out.get(stream) or {}
         return c.get('stream')
 
-    # TODO: subprocess, when Mojo::IOLoop::Subprocess is ported
+    def subprocess(
+        self, child: 'Child | None' = None, parent: 'Parent | None' = None
+    ) -> 'Pyjo.IOLoop.Subprocess.object':
+        """::
+
+            subprocess = Pyjo.IOLoop.subprocess()
+            subprocess = loop.subprocess()
+            subprocess = loop.subprocess(lambda subprocess: ..., lambda subprocess, err, *results: ...)
+
+        Build :mod:`Pyjo.IOLoop.Subprocess` object to perform computationally
+        expensive operations in subprocesses, without blocking the event loop.
+        Callbacks will be passed along to
+        :meth:`Pyjo.IOLoop.Subprocess.Pyjo_IOLoop_Subprocess.run`. ::
+
+            # Operation that would block the event loop for 5 seconds
+            Pyjo.IOLoop.subprocess().run_p(blocking).then(lambda *results: print(f'I {results[0]} {results[1]}!')).catch(
+                lambda err: print(f'Subprocess error: {err}')
+            )
+        """
+        # Not in Mojolicious: imported here, as Pyjo.IOLoop.Subprocess uses Pyjo.Promise, which uses Pyjo.IOLoop
+        import Pyjo.IOLoop.Subprocess
+
+        subprocess = Pyjo.IOLoop.Subprocess.new(ioloop=self)
+        if child is not None and parent is not None:
+            return subprocess.run(child, parent)
+        return subprocess
 
     @overload
     def timer(self, after: float, cb: TimerCallback) -> str: ...
@@ -779,6 +810,7 @@ start = singleton.start
 stop = singleton.stop
 stop_gracefully = singleton.stop_gracefully
 stream = singleton.stream
+subprocess = singleton.subprocess
 timer = singleton.timer
 
 
