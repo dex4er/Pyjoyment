@@ -13,8 +13,8 @@ import weakref
 
 
 # A minimal Mojolicious::Lite for the tests that Mojo writes on it: an application with routes for HTTP and WebSocket,
-# hooks, a user agent and a controller that renders text, data and JSON, writes and finishes, with what the servers need
-# from an application
+# under, hooks, a user agent and a controller that renders text, data and JSON, writes and finishes and sets cookies,
+# with what the servers need from an application
 # TODO: Pyjoyment.Lite in its place, when it is ported
 
 
@@ -32,6 +32,13 @@ class Controller:
     @property
     def res(self):
         return self.tx.res
+
+    def cookie(self, name, value=None):
+        if value is None:
+            cookie = self.req.cookie(name)
+            return cookie.value if cookie is not None else None
+        self.res.cookies({'name': name, 'value': str(value)})
+        return self
 
     def finish(self, *args):
         tx = self.tx
@@ -115,6 +122,7 @@ class Controller:
 class Routes:
     def __init__(self):
         self.routes = []
+        self.unders = []
 
     def any(self, pattern, *args):
         return self._route(None, pattern, args)
@@ -136,6 +144,13 @@ class Routes:
 
     def put(self, pattern, *args):
         return self._route(['PUT'], pattern, args)
+
+    def under(self, cb=None):
+        # The callbacks that run before the action of every route, which stops unless they return a true value
+        if cb is None:
+            return lambda cb: self.under(cb) and cb
+        self.unders.append(cb)
+        return self
 
     def websocket(self, pattern, *args):
         return self._route(['WEBSOCKET'], pattern, args)
@@ -205,6 +220,9 @@ class Mojolicious:
                 return c.render(text='Page not found', status=404)
             stash, cb = match
             c.stash.update(stash)
+            for under in self.routes.unders:
+                if not under(c):
+                    return
             if cb is None:
                 return c.render(**{k: v for k, v in stash.items() if k in ('data', 'json', 'status', 'text')})
             # An action that renders nothing leaves the response for later, as the route was found
@@ -277,6 +295,10 @@ def post(pattern, *args):
 
 def put(pattern, *args):
     return app.routes.put(pattern, *args)
+
+
+def under(cb=None):
+    return app.routes.under(cb)
 
 
 def websocket(pattern, *args):
