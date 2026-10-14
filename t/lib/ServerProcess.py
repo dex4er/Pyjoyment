@@ -19,9 +19,10 @@ def free_port():
 
 
 class Server:
-    def __init__(self, dir, command):
-        # The command is a list of the program and its arguments, which name the port as {port}
-        self.port = free_port()
+    def __init__(self, dir, command, port=None):
+        # The command is a list of the program and its arguments, which name the port as {port}, a free one unless it
+        # is given
+        self.port = port or free_port()
         args = [arg.format(port=self.port) for arg in command]
         # The warnings of the servers and their libraries are not ours, so they are not errors there as in CI
         env = {k: v for k, v in os.environ.items() if k != 'PYTHONWARNINGS'} | {

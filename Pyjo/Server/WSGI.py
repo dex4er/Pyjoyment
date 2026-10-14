@@ -46,11 +46,13 @@ WSGI servers
 * Gunicorn and Waitress: also chunked requests.
 * uWSGI with ``--http-socket``: a chunked request reaches the application
   without its body.
+* Werkzeug: also chunked requests, with a ``Date`` header of its own next to
+  the one of the response.
 
 Events
 ------
 
-:mod:`Pyjo.Server.WSGI` inherits all events from :mod:`Pyjo.Server.Base`.
+:mod:`Pyjo.Server.WSGI` inherits all events from :mod:`Pyjo.Server`.
 
 Classes
 -------
@@ -58,17 +60,17 @@ Classes
 
 import Pyjo.Content.Single
 import Pyjo.IOLoop
-import Pyjo.Server.Base
+import Pyjo.Server
 
 from Pyjo.Util import url_escape
 
 import wsgiref.util
 
 
-class Pyjo_Server_WSGI(Pyjo.Server.Base.object):
+class Pyjo_Server_WSGI(Pyjo.Server.object):
     """
     :mod:`Pyjo.Server.WSGI` inherits all attributes and methods from
-    :mod:`Pyjo.Server.Base` and implements the following new ones.
+    :mod:`Pyjo.Server` and implements the following new ones.
     """
 
     def run(self, environ):

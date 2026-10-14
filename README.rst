@@ -68,6 +68,55 @@ or, in a project managed with `uv <https://docs.astral.sh/uv/>`_: ::
 
 .. end-installation
 
+Quick start
+===========
+
+``Pyjo.HelloWorld`` is the application that a server runs when it is given
+none, and it answers every request with ``Your Pyjo is working!``. It runs
+natively on the web server of Pyjoyment:
+
+.. code-block:: python
+
+   import Pyjo.HelloWorld
+   import Pyjo.Server.Daemon
+
+
+   Pyjo.Server.Daemon.new(app=Pyjo.HelloWorld.new(), listen=['http://*:3000']).run()
+
+on `uvicorn <https://www.uvicorn.org/>`_, an ASGI server
+(``pip install uvicorn``):
+
+.. code-block:: python
+
+   import Pyjo.HelloWorld
+   import Pyjo.Server.ASGI
+
+   import uvicorn
+
+
+   app = Pyjo.Server.ASGI.new(app=Pyjo.HelloWorld.new()).to_asgi_app()
+
+   uvicorn.run(app, port=3000)
+
+or on `Werkzeug <https://werkzeug.palletsprojects.com/>`_, a WSGI server
+(``pip install werkzeug``):
+
+.. code-block:: python
+
+   import Pyjo.HelloWorld
+   import Pyjo.Server.WSGI
+
+   from werkzeug.serving import run_simple
+
+
+   app = Pyjo.Server.WSGI.new(app=Pyjo.HelloWorld.new()).to_wsgi_app()
+
+   run_simple('localhost', 3000, app)
+
+and answers on port 3000: ::
+
+    curl http://localhost:3000/
+
 Documentation
 =============
 

@@ -43,7 +43,7 @@ Shut down server immediately.
 Events
 ------
 
-:mod:`Pyjo.Server.Daemon` inherits all events from :mod:`Pyjo.Server.Base`.
+:mod:`Pyjo.Server.Daemon` inherits all events from :mod:`Pyjo.Server`.
 
 Debugging
 ---------
@@ -58,7 +58,7 @@ Classes
 """
 
 import Pyjo.IOLoop
-import Pyjo.Server.Base
+import Pyjo.Server
 import Pyjo.Transaction.WebSocket
 import Pyjo.URL
 
@@ -74,14 +74,15 @@ import weakref
 DEBUG = getenv('PYJO_DAEMON_DEBUG', False)
 
 
-class Pyjo_Server_Daemon(Pyjo.Server.Base.object):
+class Pyjo_Server_Daemon(Pyjo.Server.object):
     """
     :mod:`Pyjo.Server.Daemon` inherits all attributes and methods from
-    :mod:`Pyjo.Server.Base` and implements the following new ones.
+    :mod:`Pyjo.Server` and implements the following new ones.
     """
 
     def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+        # TODO: the arguments of Pyjo.Server, which takes no others, until this module is ported
+        super().__init__(**{k: kwargs[k] for k in ('app', 'reverse_proxy', 'trusted_proxies') if k in kwargs})
 
         self.acceptors = kwargs.get('acceptors', [])
         """::

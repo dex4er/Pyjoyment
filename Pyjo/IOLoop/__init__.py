@@ -591,6 +591,8 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
             # Increase inactivity timeout for connection to 300 seconds
             Pyjo.IOLoop.stream(id).timeout = 300
         """
+        if stream is None:
+            return None
         if not isinstance(stream, str):
             return self._stream(stream, self._id())
         c = self._in.get(stream) or self._out.get(stream) or {}

@@ -62,6 +62,6 @@ with subtest('to_asgi_app'):
     app = asgi.to_asgi_app()
     ok(inspect.iscoroutinefunction(app), 'ASGI application')
     status, headers, body = ASGIClient.response(ASGIClient.run(app, *ASGIClient.http('GET', '/')))
-    is_ok(body, b'Hello, world!\n', 'default application')
+    is_ok(body, b'Your Pyjo is working!', 'default application')
 
 done_testing()
