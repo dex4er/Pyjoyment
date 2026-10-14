@@ -7,7 +7,7 @@ Pyjo.UserAgent - Non-blocking I/O HTTP and WebSocket user agent
 
     # Say hello to the Unicode snowman with "Do Not Track" header
     ua = Pyjo.UserAgent.new()
-    print(ua.get(u'www.☃.net?hello=there', headers={'DNT': 1}).res.body
+    print(ua.get('www.☃.net?hello=there', {'DNT': 1}).res.body)
 
     # Form POST with exception handling
     tx = ua.post('https://metacpan.org/search', form={'q': 'pyjo'})
@@ -69,18 +69,16 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
         self._nb_queue = []
         self._queue = []
 
-    def build_tx(self, method, url, **kwargs):
-        return self.transactor.tx(method, url, **kwargs)
+    def build_tx(self, method, url, *args, **kwargs):
+        return self.transactor.tx(method, url, *args, **kwargs)
 
-    def get(self, url, **kwargs):
+    def get(self, url, *args, cb=None, **kwargs):
         """::
 
             tx = ua.get('example.com')
-            tx = ua.get('http://example.com', headers={'Accept': '*/*'}, data='Hi!')
-            tx = ua.get('http://example.com', headers={'Accept': '*/*'},
-                        form={'a': 'b'})
-            tx = ua.get('http://example.com', headers={'Accept': '*/*'},
-                        json={'a': 'b'})
+            tx = ua.get('http://example.com', {'Accept': '*/*'}, b'Hi!')
+            tx = ua.get('http://example.com', {'Accept': '*/*'}, form={'a': 'b'})
+            tx = ua.get('http://example.com', {'Accept': '*/*'}, json={'a': 'b'})
 
         Perform blocking ``GET`` request and return resulting
         :mod:`Pyjo.Transaction.HTTP` object, takes the same arguments as
@@ -95,17 +93,15 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
             if not Pyjo.IOLoop.is_running
                 Pyjo.IOLoop.start()
         """
-        return self.start(self.build_tx('GET', url, **kwargs), kwargs.get('cb'))
+        return self.start(self.build_tx('GET', url, *args, **kwargs), cb)
 
-    def post(self, url, **kwargs):
+    def post(self, url, *args, cb=None, **kwargs):
         """::
 
             tx = ua.post('example.com')
-            tx = ua.post('http://example.com', headers={'Accept': '*/*'}, data='Hi!')
-            tx = ua.post('http://example.com', headers={'Accept': '*/*'},
-                        form={'a': 'b'})
-            tx = ua.post('http://example.com', headers={'Accept': '*/*'},
-                        json={'a': 'b'})
+            tx = ua.post('http://example.com', {'Accept': '*/*'}, b'Hi!')
+            tx = ua.post('http://example.com', {'Accept': '*/*'}, form={'a': 'b'})
+            tx = ua.post('http://example.com', {'Accept': '*/*'}, json={'a': 'b'})
 
         Perform blocking ``POST`` request and return resulting
         :mod:`Pyjo.Transaction.HTTP` object, takes the same arguments as
@@ -120,7 +116,7 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
             if not Pyjo.IOLoop.is_running
                 Pyjo.IOLoop.start()
         """
-        return self.start(self.build_tx('POST', url, **kwargs), kwargs.get('cb'))
+        return self.start(self.build_tx('POST', url, *args, **kwargs), cb)
 
     def start(self, tx, cb=None):
         # TODO Pyjo.UserAgent.Server and fork safety
