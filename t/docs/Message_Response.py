@@ -4,9 +4,12 @@ import Pyjo.Message.Response
 from Pyjo.Test import *
 
 import contextlib
+import http.server
 import io
 import os
 import re
+import threading
+import urllib.request
 
 
 def output(cb):
@@ -14,6 +17,23 @@ def output(cb):
     with contextlib.redirect_stdout(out):
         cb()
     return out.getvalue()
+
+
+# A server of http.server for the examples with urllib.request.urlopen
+class Handler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-Length', '3')
+        self.end_headers()
+        self.wfile.write(b'Hi!')
+
+    def log_message(self, *args):
+        pass
+
+
+server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+threading.Thread(target=server.serve_forever, daemon=True).start()
+port = server.server_address[1]
 
 
 with subtest('Synopsis'):
@@ -58,6 +78,9 @@ with subtest('new'):
     res = Pyjo.Message.Response.new(code=200, message='OK')
     is_ok(res.code, 200, 'code')
     is_ok(res.message, 'OK', 'message')
+    res = Pyjo.Message.Response.new(urllib.request.urlopen(f'http://127.0.0.1:{port}/'))
+    is_ok(res.code, 200, 'code of urllib')
+    is_ok(res.body, b'Hi!', 'body of urllib')
 
 with subtest('code'):
     res = Pyjo.Message.Response.new()
@@ -158,5 +181,21 @@ with subtest('start_line_size'):
     res = Pyjo.Message.Response.new()
     size = res.start_line_size
     is_ok(size, 24, 'size')
+
+with subtest('to_urllib'):
+    import http.client
+
+    res = Pyjo.Message.Response.new(code=200)
+    response = res.to_urllib()
+    isa_ok(response, http.client.HTTPResponse, 'response')
+    response = res.to_urllib(method='HEAD', url='http://127.0.0.1/')
+    is_ok(response.geturl(), 'http://127.0.0.1/', 'response.geturl()')
+
+    # A response for the code that uses urllib
+    response = Pyjo.Message.Response.new(code=200).set(body=b'Hi!').to_urllib()
+    is_ok(response.read(), b'Hi!', 'response.read()')
+
+server.shutdown()
+server.server_close()
 
 done_testing()

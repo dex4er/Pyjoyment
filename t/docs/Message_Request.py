@@ -6,7 +6,10 @@ import Pyjo.URL
 from Pyjo.Test import *
 
 import contextlib
+import http.server
 import io
+import threading
+import urllib.request
 
 
 def output(cb):
@@ -14,6 +17,23 @@ def output(cb):
     with contextlib.redirect_stdout(out):
         cb()
     return out.getvalue()
+
+
+# A server of http.server for the examples with urllib.request.urlopen
+class Handler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-Length', '3')
+        self.end_headers()
+        self.wfile.write(b'Hi!')
+
+    def log_message(self, *args):
+        pass
+
+
+server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+threading.Thread(target=server.serve_forever, daemon=True).start()
+port = server.server_address[1]
 
 
 with subtest('Synopsis'):
@@ -50,6 +70,10 @@ with subtest('new'):
     req = Pyjo.Message.Request.new(method='POST', url=Pyjo.URL.new('http://127.0.0.1/'))
     is_ok(req.method, 'POST', 'method')
     is_ok(req.url, 'http://127.0.0.1/', 'URL')
+    req = Pyjo.Message.Request.new(urllib.request.Request('http://127.0.0.1/', data=b'Hi!'))
+    is_ok(req.method, 'POST', 'method of urllib')
+    is_ok(req.url, 'http://127.0.0.1/', 'URL of urllib')
+    is_ok(req.body, b'Hi!', 'data of urllib')
 
 with subtest('env'):
     req = Pyjo.Message.Request.new()
@@ -220,5 +244,21 @@ with subtest('start_line_size'):
     req = Pyjo.Message.Request.new()
     size = req.start_line_size
     is_ok(size, 16, 'size')
+
+with subtest('to_urllib'):
+    import Pyjo.Message.Response
+
+    req = Pyjo.Message.Request.new()
+    req.url.parse(f'http://127.0.0.1:{port}/')
+    request = req.to_urllib()
+    isa_ok(request, urllib.request.Request, 'request')
+
+    # Send the request with urllib
+    with urllib.request.urlopen(req.to_urllib()) as response:
+        res = Pyjo.Message.Response.new(response)
+    is_ok(res.body, b'Hi!', 'res.body')
+
+server.shutdown()
+server.server_close()
 
 done_testing()
