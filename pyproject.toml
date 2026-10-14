@@ -49,6 +49,7 @@ classifiers = [
 
 [project.scripts]
 pyjo-prove = "Pyjo.Prove:main"
+pyjo-hot = "Pyjo.Server.Hot:main"
 pyjo-reload = "Pyjo.Server.Reload:main"
 
 [project.urls]
@@ -203,6 +204,8 @@ strict = [
   "Pyjo/Server/ASGI.py",
   "Pyjo/Server/CGI.py",
   "Pyjo/Server/Daemon.py",
+  "Pyjo/Server/Hot/__init__.py",
+  "Pyjo/Server/Hot/__main__.py",
   "Pyjo/Server/Prefork.py",
   "Pyjo/Server/Reload/__init__.py",
   "Pyjo/Server/Reload/__main__.py",

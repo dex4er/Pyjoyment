@@ -184,8 +184,8 @@ without asyncio has to pass them too:
 PYJO_REACTOR=Pyjo.Reactor.Poll PYTHONPATH=. mise exec -- python -m Pyjo.Prove -j 4 \
   t/Pyjo/IOLoop*.py t/Pyjo/TLS.py t/Pyjo/Promise*.py t/Pyjo/Subprocess.py t/stdlib/IOLoop*.py \
   t/Pyjo/UserAgent*.py t/stdlib/UserAgent*.py t/Pyjo/Server_Daemon.py t/stdlib/Server_Daemon.py \
-  t/Pyjo/Server_Prefork.py t/stdlib/Server_Prefork.py t/Pyjo/Server_Reload.py t/stdlib/Server_Reload.py \
-  t/Pyjo/File_download.py
+  t/Pyjo/Server_Hot.py t/stdlib/Server_Hot.py t/Pyjo/Server_Prefork.py t/stdlib/Server_Prefork.py \
+  t/Pyjo/Server_Reload.py t/stdlib/Server_Reload.py t/Pyjo/File_download.py
 ```
 
 CI runs the tests in `t/servers` on the Python of `mise.toml` only, with the
@@ -563,7 +563,11 @@ copy:
   and `signal.set_wakeup_fd` with a socket pair that the loop watches wakes it
   up. In the child of a fork, a reactor of asyncio that is not given a loop
   moves to a new one, as the selector of the loop of the parent, epoll or
-  kqueue, is not the child's.
+  kqueue, is not the child's. Python clears in the child a signal that comes
+  during the fork, and the child has the handlers of the parent until it sets
+  its own, so a signal that the child must not miss, as QUIT of a worker of
+  `Pyjo.Server.Prefork`, is blocked with `signal.pthread_sigmask` across the
+  fork and unblocked once the child has its handler.
 - `local` on an attribute, as `local $self->{running}`, is the value saved
   before and set back in a `finally`.
 - `__del__`, the counterpart of `DESTROY`, does nothing when
