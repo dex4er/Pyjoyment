@@ -56,20 +56,24 @@ Documentation = "https://pyjoyment.readthedocs.io/"
 Source = "https://github.com/dex4er/Pyjoyment"
 Issues = "https://github.com/dex4er/Pyjoyment/issues"
 
-# Not dependencies of the package: the ASGI and WSGI servers that the tests in t/servers run Pyjo.Server.ASGI and
-# Pyjo.Server.WSGI on, and a client of WebSocket for them
+# Not dependencies of the package: the ASGI, WSGI and CGI servers that the tests in t/servers run Pyjo.Server.ASGI,
+# Pyjo.Server.WSGI and Pyjo.Server.CGI on, and a client of WebSocket for them
 [dependency-groups]
 servers = [
   "daphne>=4.2.3",
   "granian>=2.8.4",
   "gunicorn>=26.2.0; sys_platform != 'win32'",
   "hypercorn>=0.18.0",
-  "pyuwsgi>=2.0.30.post1; sys_platform != 'win32'",
+  "uwsgi>=2.0.30; sys_platform != 'win32'",
   "uvicorn>=0.54.0",
   "uvloop>=0.23.0; sys_platform != 'win32'",
   "waitress>=3.0.2",
   "websockets>=17.2",
 ]
+
+# uWSGI runs CGI scripts with its plugin "cgi", which the package builds into the binary only on request
+[tool.uv.extra-build-variables]
+uwsgi = { UWSGI_EMBED_PLUGINS = "cgi" }
 
 [tool.hatch.build.targets.wheel]
 packages = ["Pyjo", "Pyjoyment"]

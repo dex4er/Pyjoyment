@@ -2,7 +2,6 @@ import http.client
 import os
 import socket
 import subprocess
-import sys
 import time
 
 
@@ -21,7 +20,7 @@ def free_port():
 
 class Server:
     def __init__(self, dir, command):
-        # The arguments of the command name the port as {port}
+        # The command is a list of the program and its arguments, which name the port as {port}
         self.port = free_port()
         args = [arg.format(port=self.port) for arg in command]
         # The warnings of the servers and their libraries are not ours, so they are not errors there as in CI
@@ -29,9 +28,7 @@ class Server:
             'PYTHONPATH': os.pathsep.join([dir, ROOT])
         }
         self.log = open(os.path.join(dir, 'server.log'), 'w+')
-        self.process = subprocess.Popen(
-            [sys.executable, *args], cwd=dir, env=env, stdout=self.log, stderr=subprocess.STDOUT
-        )
+        self.process = subprocess.Popen(args, cwd=dir, env=env, stdout=self.log, stderr=subprocess.STDOUT)
         deadline = time.monotonic() + 20
         while time.monotonic() < deadline:
             try:
@@ -54,8 +51,8 @@ class Server:
         self.log.seek(0)
         return self.log.read()
 
-    def request(self, method, path, body=None, headers=None, chunked=False):
-        conn = http.client.HTTPConnection('127.0.0.1', self.port, timeout=10)
+    def request(self, method, path, body=None, headers=None, chunked=False, timeout=10):
+        conn = http.client.HTTPConnection('127.0.0.1', self.port, timeout=timeout)
         try:
             conn.request(method, path, body=body, headers=headers or {}, encode_chunked=chunked)
             res = conn.getresponse()

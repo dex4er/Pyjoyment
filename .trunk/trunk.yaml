@@ -58,7 +58,7 @@ lint:
       paths:
         - .trunk/trunk.yaml
     # Examples and tests that need other libraries, which are not installed
-    # for the project: the ones that compare Pyjoyment with them, and the ASGI
+    # for the project: the ones that compare Pyjoyment with them, and the
     # servers of the dependency group "servers"
     - linters:
         - pyright

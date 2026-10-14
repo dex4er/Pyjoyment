@@ -72,14 +72,18 @@ def request(asgi, tx):
 app = asgi.to_asgi_app()
 """
 
+PYTHON = sys.executable
 LOCAL = ['--host', '127.0.0.1', '--port', '{port}']
 SERVERS = [
-    ('uvicorn', ['-m', 'uvicorn', 'app:app', '--loop', 'asyncio', '--log-level', 'warning', *LOCAL]),
-    ('uvicorn on uvloop', ['-m', 'uvicorn', 'app:app', '--loop', 'uvloop', '--log-level', 'warning', *LOCAL]),
-    ('Hypercorn', ['-m', 'hypercorn', 'app:app', '--bind', '127.0.0.1:{port}']),
-    ('Hypercorn on uvloop', ['-m', 'hypercorn', 'app:app', '--worker-class', 'uvloop', '--bind', '127.0.0.1:{port}']),
-    ('Daphne', ['-m', 'daphne', '-b', '127.0.0.1', '-p', '{port}', 'app:app']),
-    ('Granian', ['-m', 'granian', '--interface', 'asgi', 'app:app', *LOCAL]),
+    ('uvicorn', [PYTHON, '-m', 'uvicorn', 'app:app', '--loop', 'asyncio', '--log-level', 'warning', *LOCAL]),
+    ('uvicorn on uvloop', [PYTHON, '-m', 'uvicorn', 'app:app', '--loop', 'uvloop', '--log-level', 'warning', *LOCAL]),
+    ('Hypercorn', [PYTHON, '-m', 'hypercorn', 'app:app', '--bind', '127.0.0.1:{port}']),
+    (
+        'Hypercorn on uvloop',
+        [PYTHON, '-m', 'hypercorn', 'app:app', '--worker-class', 'uvloop', '--bind', '127.0.0.1:{port}'],
+    ),
+    ('Daphne', [PYTHON, '-m', 'daphne', '-b', '127.0.0.1', '-p', '{port}', 'app:app']),
+    ('Granian', [PYTHON, '-m', 'granian', '--interface', 'asgi', 'app:app', *LOCAL]),
 ]
 
 

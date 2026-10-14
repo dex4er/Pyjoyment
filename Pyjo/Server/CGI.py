@@ -28,6 +28,20 @@ Pyjo.Server.CGI - CGI server
 :mod:`Pyjo.Server.CGI` is a simple and portable implementation of
 :rfc:`3875`.
 
+The content of the response can come later, as the event loop of
+:mod:`Pyjo.IOLoop` runs while the script waits for it. The request body is
+read with the length of ``CONTENT_LENGTH``, so a chunked request, which has
+none, reaches the application without its body.
+
+CGI servers
+-----------
+
+* uWSGI with its plugin ``cgi``: a chunked request is not answered.
+* :mod:`http.server` with ``--cgi``, up to Python 3.14: it sends the output of
+  the script as it is, after a status line ``200`` and headers of its own,
+  so the status of the response is lost, and the ``Status`` header and the
+  ``Date`` header of the script reach the client.
+
 Events
 ------
 
@@ -37,13 +51,13 @@ Classes
 -------
 """
 
+import Pyjo.IOLoop
 import Pyjo.Server.Base
 
 from Pyjo.Util import convert
 
 import os
 import sys
-import time
 
 
 class Pyjo_Server_CGI(Pyjo.Server.Base.object):
@@ -116,11 +130,12 @@ class Pyjo_Server_CGI(Pyjo.Server.Base.object):
         stdout = sys.stdout.buffer if hasattr(sys.stdout, 'buffer') else sys.stdout
 
         while True:
-            # No chunk yet, try again
+            # Not in Mojolicious: no chunk yet, so the event loop runs once before it tries again, where Mojo sleeps
+            # for a second
             chunk = getattr(res, method)(offset)
-
             if chunk is None:
-                time.sleep(1)
+                Pyjo.IOLoop.one_tick()
+                continue
 
             # End of part
             length = len(chunk)
