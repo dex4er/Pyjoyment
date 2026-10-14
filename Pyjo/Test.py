@@ -515,7 +515,7 @@ def skip(why: str | None = None, how_many: int = 1) -> bool:
     """::
 
         if os.getenv('TEST_ONLINE'):
-            ok(Pyjo.UserAgent.new().get('https://mojolicious.org').success, 'online request')
+            ok(Pyjo.UserAgent.new().get('https://mojolicious.org').result.is_success, 'online request')
         else:
             skip('set TEST_ONLINE to enable this test', 1)
 

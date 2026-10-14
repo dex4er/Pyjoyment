@@ -18,12 +18,12 @@ try:
 except IndexError:
     raise Exception('get.py url opts') from None
 
-opts = dict(map(lambda a: a.split('='), sys.argv[2:]))
+opts = {name: int(value) if value.isdigit() else value for name, value in (a.split('=', 1) for a in sys.argv[2:])}
 
 tx = Pyjo.UserAgent.new(**opts).get(url)
 err = tx.error
 if err:
-    if err['code']:
+    if err.get('code'):
         die('{code} response: {message}'.format(**err))
     else:
         die('Connection error: {message}'.format(**err))

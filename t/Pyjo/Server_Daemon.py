@@ -5,9 +5,11 @@ os.environ['PYJO_NO_TLS'] = '1'
 # Left out from Mojolicious: MOJO_REACTOR, as the tests run on the reactor that Pyjo.Reactor.detect gives
 
 import Pyjo.IOLoop
+import Pyjo.Promise
 import Pyjo.Server
 import Pyjo.Server.Daemon
 import Pyjo.Transaction.HTTP
+import Pyjo.UserAgent
 
 from Pyjo.File import tempdir
 from Pyjo.Test import *
@@ -15,6 +17,7 @@ from Pyjo.Test import *
 import gc
 import importlib
 import re
+import socket
 import sys
 
 from unittest.mock import patch
@@ -33,7 +36,12 @@ class TestApp(Mojolicious):
         tx.resume()
 
 
-# TODO: the subtest "Minimal application", which needs Pyjo.UserAgent, when it is ported
+with subtest('Minimal application'):
+    ua = Pyjo.UserAgent.new()
+    ua.server.app = TestApp()
+    tx = ua.get('/')
+    is_ok(tx.res.code, 200, 'right status')
+    is_ok(tx.res.body, b'Hello TestApp!', 'right content')
 
 with subtest('Timeouts'):
     with patch.dict(os.environ):
@@ -126,8 +134,154 @@ with subtest('Transaction'):
 
 app = Mojolicious()
 
-# TODO: the subtest "Moniker", the routes of the application and the subtests from "Normal request" to "Timeout",
-# which need Pyjo.UserAgent, when it is ported
+ua = Pyjo.UserAgent.new(ioloop=Pyjo.IOLoop.singleton)
+
+with subtest('Moniker'):
+    ua.server.app = app
+    is_ok(ua.server.app.moniker, 'mojolicious', 'right moniker')
+
+# Silence
+app.log.level = 'fatal'
+
+
+@app.routes.post('/chunked')
+def chunked(c):
+    params = c.req.params.to_dict()
+    chunks = []
+    for key in sorted(params):
+        chunks.append(params[key])
+
+    def cb(c):
+        chunk = chunks.pop(0) if chunks else ''
+        c.write_chunk(chunk, cb if chunk else None)
+
+    cb(c)
+
+
+local_address = local_port = remote_address = remote_port = None
+
+
+@app.routes.post('/upload')
+def upload(c):
+    global local_address, local_port, remote_address, remote_port
+    local_address = c.tx.local_address
+    local_port = c.tx.local_port
+    remote_address = c.tx.remote_address
+    remote_port = c.tx.remote_port
+    c.render(data=c.req.upload('file').slurp())
+
+
+@app.routes.any('/port')
+def port_action(c):
+    c.render(text=c.req.url.to_abs().port)
+
+
+@app.routes.any('/timeout')
+def timeout_action(c):
+    id = c.tx.connection
+    c.res.headers.header('X-Connection-ID', id)
+    c.render(text=Pyjo.IOLoop.stream(id).timeout)
+
+
+app.routes.any('/*whatever', {'text': 'Whatever!'})
+
+with subtest('Normal request'):
+    tx = ua.get('/normal/')
+    ok(tx.keep_alive, 'will be kept alive')
+    is_ok(tx.res.code, 200, 'right status')
+    is_ok(tx.res.body, b'Whatever!', 'right content')
+
+with subtest('Keep-alive request'):
+    tx = ua.get('/normal/')
+    ok(tx.keep_alive, 'will be kept alive')
+    ok(tx.kept_alive, 'was kept alive')
+    is_ok(tx.res.code, 200, 'right status')
+    is_ok(tx.res.body, b'Whatever!', 'right content')
+
+with subtest('Non-keep-alive request'):
+    tx = ua.get('/close/', {'Connection': 'close'})
+    ok(not tx.keep_alive, 'will not be kept alive')
+    ok(tx.kept_alive, 'was kept alive')
+    is_ok(tx.res.code, 200, 'right status')
+    is_ok(tx.res.body, b'Whatever!', 'right content')
+
+with subtest('Second non-keep-alive request'):
+    tx = ua.get('/close/', {'Connection': 'close'})
+    ok(not tx.keep_alive, 'will not be kept alive')
+    ok(not tx.kept_alive, 'was not kept alive')
+    is_ok(tx.res.code, 200, 'right status')
+    is_ok(tx.res.body, b'Whatever!', 'right content')
+
+with subtest('HTTP/1.0 request'):
+    tx = ua.build_tx('GET', '/normal/')
+    tx.req.version = '1.0'
+    tx = ua.start(tx)
+    ok(not tx.keep_alive, 'will not be kept alive')
+    is_ok(tx.res.version, '1.1', 'right version')
+    is_ok(tx.res.code, 200, 'right status')
+    is_ok(tx.res.body, b'Whatever!', 'right content')
+
+with subtest('POST request'):
+    tx = ua.post('/fun/', {'Expect': 'fun'}, 'foo bar baz' * 128)
+    ok(tx.connection is not None, 'has connection id')
+    is_ok(tx.res.code, 200, 'right status')
+    is_ok(tx.res.body, b'Whatever!', 'right content')
+
+with subtest('Concurrent requests'):
+    tx = ua.post('/fun/', {'Expect': 'fun'}, 'foo bar baz' * 128)
+    txs = []
+    Pyjo.Promise.all(
+        ua.get_p('/concurrent1/'),
+        ua.post_p('/concurrent2/', {'Expect': 'fun'}, 'bar baz foo' * 128),
+        ua.get_p('/concurrent3/'),
+    ).then(lambda *results: txs.extend(result[0] for result in results)).wait()
+    tx, tx2, tx3 = txs
+    ok(tx.is_finished, 'transaction is finished')
+    is_ok(tx.res.body, b'Whatever!', 'right content')
+    ok(not tx.error, 'no error')
+    ok(tx2.is_finished, 'transaction is finished')
+    is_ok(tx2.res.body, b'Whatever!', 'right content')
+    ok(not tx2.error, 'no error')
+    ok(tx3.is_finished, 'transaction is finished')
+    is_ok(tx3.res.body, b'Whatever!', 'right content')
+    ok(not tx3.error, 'no error')
+
+with subtest('Form with chunked response'):
+    params = {}
+    for i in range(1, 11):
+        params[f'test{i}'] = i
+    result = ''
+    for key in sorted(params):
+        result += str(params[key])
+    tx = ua.post('/chunked', form=params)
+    is_ok(tx.res.code, 200, 'right status')
+    is_ok(tx.res.body, result.encode(), 'right content')
+
+with subtest('Upload'):
+    result = ''
+    tx = ua.post('/upload', form={'file': {'content': result}})
+    is_ok(tx.res.code, 200, 'right status')
+    is_ok(tx.res.body, result.encode(), 'right content')
+    ok(tx.local_address, 'has local address')
+    ok(tx.local_port > 0, 'has local port')
+    ok(tx.original_remote_address, 'has original remote address')
+    ok(tx.remote_address, 'has remote address')
+    ok(tx.remote_port > 0, 'has remote port')
+    ok(local_address, 'has local address')
+    ok(local_port > 0, 'has local port')
+    ok(remote_address, 'has remote address')
+    ok(remote_port > 0, 'has remote port')
+
+with subtest('Timeout'):
+    tx = ua.get('/timeout')
+    ok(tx.keep_alive, 'will be kept alive')
+    is_ok(tx.res.code, 200, 'right status')
+    is_ok(tx.res.body, b'30', 'inactivity timeout was used for the request')
+    is_ok(
+        Pyjo.IOLoop.stream(tx.res.headers.header('X-Connection-ID')).timeout,
+        5,
+        'keep-alive timeout was assigned after the request',
+    )
 
 with subtest('Pipelined'):
     daemon = Pyjo.Server.Daemon.new(listen=['http://127.0.0.1'], silent=True)
@@ -198,7 +352,32 @@ with subtest('Single-accept and connection limit'):
     ok(accepting[0], 'accepting connections')
     ok(not accepting[1], 'connection limit reached')
 
-# TODO: the subtests "Request limit" and "File descriptor", which need Pyjo.UserAgent, when it is ported
+with subtest('Request limit'):
+    daemon = Pyjo.Server.Daemon.new(app=app, listen=['http://127.0.0.1'], silent=True).start()
+    port = daemon.ports()[0]
+    is_ok(daemon.max_requests, 100, 'right value')
+    daemon.max_requests = 2
+    is_ok(daemon.max_requests, 2, 'right value')
+    tx = ua.get(f'http://127.0.0.1:{port}/keep_alive/1')
+    ok(tx.keep_alive, 'will be kept alive')
+    is_ok(tx.res.code, 200, 'right status')
+    is_ok(tx.res.body, b'Whatever!', 'right content')
+    tx = ua.get(f'http://127.0.0.1:{port}/keep_alive/1')
+    ok(not tx.keep_alive, 'will not be kept alive')
+    is_ok(tx.res.code, 200, 'right status')
+    is_ok(tx.res.body, b'Whatever!', 'right content')
+
+with subtest('File descriptor'):
+    listen = socket.socket()
+    listen.bind(('127.0.0.1', 0))
+    listen.listen(5)
+    fd = listen.fileno()
+    daemon = Pyjo.Server.Daemon.new(app=app, listen=[f'http://127.0.0.1?fd={fd}'], silent=True).start()
+    port = listen.getsockname()[1]
+    is_ok(daemon.ports()[0], port, 'same port')
+    tx = ua.get(f'http://127.0.0.1:{port}/port')
+    is_ok(tx.res.code, 200, 'right status')
+    is_ok(tx.res.body, str(port).encode(), 'right content')
 
 with subtest('No TLS support'):
     # Unlike Mojolicious: the message of Pyjo.IOLoop.Server, where Mojo names IO::Socket::SSL

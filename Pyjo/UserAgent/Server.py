@@ -29,6 +29,7 @@ import Pyjo.Server
 import Pyjo.Server.Daemon
 import Pyjo.URL
 
+import sys
 import weakref
 
 from typing import Any, cast
@@ -70,6 +71,14 @@ class Pyjo_UserAgent_Server(Pyjo.Base.object):
         self._server: Pyjo.Server.Daemon.object | None = None
         self._nb_server: Pyjo.Server.Daemon.object | None = None
 
+    def __del__(self) -> None:
+        if sys.is_finalizing():
+            return
+        try:
+            self.restart()
+        except Exception:
+            pass
+
     @property
     def app(self) -> Pyjo.Server.Application | None:
         """::
@@ -106,6 +115,10 @@ class Pyjo_UserAgent_Server(Pyjo.Base.object):
         Restart server with new port.
         """
         self._nb_port = self._port = None
+        self._close()
+
+    def _close(self) -> None:
+        _close_servers(self._server, self._nb_server)
         self._nb_server = self._server = None
 
     def url(self, proto: str | None = None) -> Pyjo.URL.object:
@@ -123,6 +136,7 @@ class Pyjo_UserAgent_Server(Pyjo.Base.object):
     def _url(self, nb: bool, proto: str | None) -> Pyjo.URL.object:
         if self._server is None or proto:
             proto = self._proto = proto or 'http'
+            self._close()
 
             # Blocking
             server = self._server = Pyjo.Server.Daemon.new(ioloop=self.ioloop, silent=True)
@@ -142,6 +156,14 @@ class Pyjo_UserAgent_Server(Pyjo.Base.object):
 
         port = self._nb_port if nb else self._port
         return Pyjo.URL.new(f'{self._proto}://127.0.0.1:{port}/')
+
+
+# Not in Mojolicious: the servers are closed where they are dropped, as Perl closes them when it frees them, and PyPy frees
+# them only when its garbage collector runs, after a new server has taken over the port
+def _close_servers(*servers: Pyjo.Server.Daemon.object | None) -> None:
+    for server in servers:
+        if server is not None:
+            server.__exit__(None, None, None)
 
 
 def app(value: Pyjo.Server.Application | None = None) -> Pyjo.Server.Application | None:

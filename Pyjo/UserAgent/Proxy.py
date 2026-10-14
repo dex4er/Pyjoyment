@@ -108,7 +108,7 @@ class Pyjo_UserAgent_Proxy(Pyjo.Base.object):
 
         Prepare proxy server information for transaction.
         """
-        if os.environ.get('PYJO_PROXY'):
+        if os.environ.get('PYJO_PROXY') not in (None, '', '0'):
             self.detect()
         req = tx.req
         url = req.url

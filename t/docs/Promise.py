@@ -50,7 +50,7 @@ with subtest('Synopsis'):
                 else:
                     promise.reject(err['message'])
 
-            ua.get(url, cb=cb)
+            ua.get(url, cb)
             return promise
 
         # Perform non-blocking operations sequentially
