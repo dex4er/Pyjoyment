@@ -176,12 +176,15 @@ Sphinx does) has no effect. Older test files still wrap their body in
 
 The tests run on the reactor that `Pyjo.Reactor.detect()` gives, the asyncio
 one, where Mojo's tests set `MOJO_REACTOR` to `Mojo::Reactor::Poll`. CI runs
-the tests of the event loop a second time on `Pyjo.Reactor.Poll`, as a reactor
+the tests of the event loop, and of the user agent and the daemon, which do
+the most of its I/O, a second time on `Pyjo.Reactor.Poll`, as a reactor
 without asyncio has to pass them too:
 
 ```sh
 PYJO_REACTOR=Pyjo.Reactor.Poll PYTHONPATH=. mise exec -- python -m Pyjo.Prove -j 4 \
-  t/Pyjo/IOLoop*.py t/Pyjo/TLS.py t/Pyjo/Promise*.py t/stdlib/IOLoop*.py
+  t/Pyjo/IOLoop*.py t/Pyjo/TLS.py t/Pyjo/Promise*.py t/stdlib/IOLoop*.py \
+  t/Pyjo/UserAgent*.py t/stdlib/UserAgent*.py t/Pyjo/Server_Daemon.py t/stdlib/Server_Daemon.py \
+  t/Pyjo/File_download.py
 ```
 
 CI runs the tests in `t/servers` on the Python of `mise.toml` only, with the
@@ -196,8 +199,9 @@ A server is a library of its own, so the known differences of a server are
 expected results with a comment: a fix of the server fails the test, which
 tells that the documentation of `Pyjo.Server.ASGI`, `Pyjo.Server.WSGI` or
 `Pyjo.Server.CGI` can change. The server processes do not get
-`PYTHONWARNINGS`, as the warnings of the servers and their libraries are not
-ours. Renovate bumps the dependency groups in one pull request.
+`PYTHONWARNINGS` or `PYTHONDEVMODE`, as the warnings of the servers and their
+libraries are not ours. Renovate bumps the dependency groups in one pull
+request.
 
 uWSGI is the package `uwsgi`, built from its source with a C compiler, as the
 wheels of `pyuwsgi` have no plugin `cgi`. `extra-build-variables` in
@@ -213,6 +217,19 @@ release. Python keeps an unknown escape such as `"\:"` as a backslash
 followed by the character, which is often exactly what a CSS selector or a
 regular expression ported from Perl needs; write it as `"\\:"` or as a raw
 string so it survives the Python release that turns the warning into an error.
+
+CI runs the tests in the development mode of Python, `PYTHONDEVMODE=1` (or
+`python -X dev`), which shows the `ResourceWarning` of a socket, a file or a
+temporary directory that nothing closed. Python writes it to the standard
+error, often from the garbage collector, where it cannot fail a test, so CI
+fails when `ResourceWarning:` appears in the output. A test closes what it
+gets, as the handle of an `accept` or `connect` event or a connection of
+`http.client`, where Perl closes it with the last reference. To find where a
+leaked object was made:
+
+```sh
+PYTHONPATH=. mise exec -- python -W default::ResourceWarning -X tracemalloc=50 t/Pyjo/IOLoop.py
+```
 
 CI runs the tests on every supported CPython version and on PyPy. PyPy frees
 objects only when its garbage collector runs, not when the last reference
@@ -476,7 +493,15 @@ copy:
   Perl closes in `DESTROY` when the port drops the last reference to it, as
   `Mojo::IOLoop` does with the acceptors and connections it deletes, is closed
   by the port where it drops it, as PyPy frees it only when its garbage
-  collector runs.
+  collector runs. A resource that an object opens for itself, as the file of
+  `path` in `Pyjo.Log`, is closed with the object by `weakref.finalize`.
+- Perl closes the handles that are left at the end of the interpreter, in its
+  global destruction; Python warns that they were not closed, as `__del__`
+  does nothing while it finalizes. A class whose objects hold a resource until
+  then, as `Pyjo.IOLoop`, `Pyjo.Server.Daemon` and `Pyjo.Asset.File`, keeps
+  them in a `weakref.WeakSet` and closes them in an `atexit` handler of its
+  module, which `Pyjo.IOLoop` follows with `gc.collect()`, so that the
+  objects in cycles are freed while `__del__` still works.
 - A method that Mojo calls on the class or on an object, like
   `Mojo::DOM->new_tag` and `$dom->new_tag`, is a descriptor that passes either
   of them.

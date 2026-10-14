@@ -15,6 +15,10 @@ CA = os.path.join(os.path.dirname(Pyjo.IOLoop.TLS.CERT), 'ca.crt')
 Pyjo.IOLoop.singleton.reactor = Pyjo.Reactor.Asyncio.new()
 
 
+# The handles of the negotiations, closed at the end
+handles = []
+
+
 def negotiate(server_options, client_options):
     a, b = socket.socketpair()
     a.setblocking(False)
@@ -30,6 +34,7 @@ def negotiate(server_options, client_options):
     def upgrade(side):
         def cb(tls, handle):
             got[side] = handle
+            handles.append(handle)
             finish()
 
         return cb
@@ -94,5 +99,8 @@ with subtest('ALPN with contexts'):
     # OpenSSL chooses by the order of the server, IO::Socket::SSL of Mojo's tests by the order of the client
     is_ok(got['server'].selected_alpn_protocol(), 'bar', 'right protocol')
     is_ok(got['client'].selected_alpn_protocol(), 'bar', 'right protocol')
+
+for handle in handles:
+    handle.close()
 
 done_testing()

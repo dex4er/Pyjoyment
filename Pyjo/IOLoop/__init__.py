@@ -105,7 +105,9 @@ import Pyjo.Reactor
 
 from Pyjo.Util import md5_sum, warn
 
+import atexit
 import builtins
+import gc
 import os
 import random
 import sys
@@ -133,6 +135,9 @@ DEBUG = bool(os.environ.get('PYJO_IOLOOP_DEBUG'))
 _FROZEN: list[dict[str, Any]] = []
 
 _singleton: 'Pyjo_IOLoop | None' = None
+
+# Not in Mojolicious: the event loops that exist, which are reset at the end of the interpreter
+_LOOPS: 'weakref.WeakSet[Pyjo_IOLoop]' = weakref.WeakSet()
 
 
 class Pyjo_IOLoop(Pyjo.EventEmitter.object):
@@ -179,6 +184,7 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
         connections, defaults to ``1000``.
         """
 
+        _LOOPS.add(self)
         self._accepting = False
         self._accepts: int | None = None
         self._acceptors: dict[str, Any] = {}
@@ -730,6 +736,35 @@ The global :mod:`Pyjo.IOLoop` singleton, as :meth:`Pyjo_IOLoop.singleton`
 gives it.
 """
 singleton.reactor
+
+
+# Not in Mojolicious: Perl closes the handles that are left at the end of the interpreter, Python warns that they were
+# not closed, as __del__ does nothing while it finalizes, so the connections of the event loops are closed and the
+# objects that close theirs are freed before; registered after the reactor, so that it runs before the event loops of
+# asyncio are closed
+@atexit.register
+def _cleanup() -> None:
+    def close(*objects: Any) -> None:
+        for obj in objects:
+            try:
+                obj.close()
+            except Exception:
+                pass
+
+    for loop in list(_LOOPS):
+        try:
+            loop.reset()
+        except Exception:
+            pass
+
+    # The frozen state too, which Perl frees then
+    for state in _FROZEN:
+        close(*state.get('_acceptors', {}).values())
+        for connection in [*state.get('_in', {}).values(), *state.get('_out', {}).values()]:
+            close(*connection.values())
+    _FROZEN.clear()
+    gc.collect()
+
 
 # What Mojo calls on the class works with the singleton
 acceptor = singleton.acceptor

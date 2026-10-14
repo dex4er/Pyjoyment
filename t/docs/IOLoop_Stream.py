@@ -101,4 +101,6 @@ with subtest('close and close_gracefully'):
     stream.close()
     is_deeply_ok(closed, [True], 'closed once')
 
+peer.close()
+
 done_testing()

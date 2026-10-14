@@ -378,6 +378,8 @@ with subtest('File descriptor'):
     tx = ua.get(f'http://127.0.0.1:{port}/port')
     is_ok(tx.res.code, 200, 'right status')
     is_ok(tx.res.body, str(port).encode(), 'right content')
+    # The daemon owns the file descriptor
+    listen.detach()
 
 with subtest('No TLS support'):
     # Unlike Mojolicious: the message of Pyjo.IOLoop.Server, where Mojo names IO::Socket::SSL

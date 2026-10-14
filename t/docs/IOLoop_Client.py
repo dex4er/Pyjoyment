@@ -28,6 +28,7 @@ with subtest('Synopsis'):
     if not client.reactor.is_running:
         client.reactor.start()
     isa_ok(connected[0], socket.socket, 'connected')
+    connected[0].close()
 
 with subtest('reactor'):
     import Pyjo.Reactor.Poll
@@ -51,6 +52,9 @@ with subtest('connect'):
     errors = []
 
     def stop(client, *args):
+        for handle in args:
+            if isinstance(handle, socket.socket):
+                handle.close()
         client.reactor.stop()
 
     client = Pyjo.IOLoop.Client.new()

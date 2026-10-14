@@ -90,6 +90,7 @@ class Pyjo_IOLoop_TLS(Pyjo.EventEmitter.object):
         try:
             if not sys.is_finalizing():
                 self._cleanup()
+                self._close()
         except Exception:
             pass
 
@@ -224,8 +225,15 @@ class Pyjo_IOLoop_TLS(Pyjo.EventEmitter.object):
             except Exception:
                 pass
 
+    # The handle that is not upgraded is closed where it is dropped, as Perl closes it with the last reference
+    def _close(self) -> None:
+        if (handle := self._handle) is not None:
+            self._handle = None
+            handle.close()
+
     def _error(self, err: Any) -> None:
         self._cleanup()
+        self._close()
         self.emit('error', err)
 
     def _tls(self, handle: ssl.SSLSocket) -> None:

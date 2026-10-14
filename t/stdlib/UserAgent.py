@@ -152,7 +152,9 @@ with subtest('TLS of ssl'):
     tx = ua.get(f'https://127.0.0.1:{tls.server_address[1]}/secure')
     like_ok(tx.error['message'], r'certificate verify failed', 'not verified without the CA')
     tls.shutdown()
+    tls.server_close()
 
 server.shutdown()
+server.server_close()
 
 done_testing()

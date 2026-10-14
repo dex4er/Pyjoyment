@@ -281,12 +281,13 @@ class Pyjo_IOLoop_Server(Pyjo.EventEmitter.object):
         else:
             backlog = options.get('backlog')
             backlog = socket.SOMAXCONN if backlog is None else int(backlog)
+            created: socket.socket | None = None
             try:
                 # UNIX domain socket
                 if path:
                     if os.path.exists(path) and stat.S_ISSOCK(os.stat(path).st_mode):
                         os.remove(path)
-                    handle = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                    handle = created = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
                     handle.bind(path)
                     handle.listen(backlog)
                     reuse = self._reuse = f'unix:{path}:{handle.fileno()}'
@@ -297,7 +298,7 @@ class Pyjo_IOLoop_Server(Pyjo.EventEmitter.object):
                     family, _, _, _, sockaddr = socket.getaddrinfo(
                         host, port or 0, type=socket.SOCK_STREAM, flags=socket.AI_PASSIVE
                     )[0]
-                    handle = socket.socket(family, socket.SOCK_STREAM)
+                    handle = created = socket.socket(family, socket.SOCK_STREAM)
                     handle.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                     if options.get('reuse'):
                         handle.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
@@ -305,6 +306,9 @@ class Pyjo_IOLoop_Server(Pyjo.EventEmitter.object):
                     handle.listen(backlog)
                     reuse = self._reuse = f'{address}:{handle.getsockname()[1]}:{handle.fileno()}'
             except OSError as e:
+                # The socket that cannot listen is closed, as Perl frees it
+                if created is not None:
+                    created.close()
                 raise _error(e, "Can't create listen socket") from e
 
             os.environ['PYJO_REUSE'] = f'{reuse_env},{reuse}' if len(reuse_env) else reuse

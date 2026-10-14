@@ -99,7 +99,9 @@ with subtest('POST request with a large body'):
         conn = http.client.HTTPConnection('127.0.0.1', port, timeout=10)
         conn.request('POST', '/post', body=b'x' * 1000000)
         res = conn.getresponse()
-        return res.status, res.read()
+        result = res.status, res.read()
+        conn.close()
+        return result
 
     is_deeply_ok(run(client), (200, b'POST /post 1.1 1000000'), 'whole body read')
 
@@ -109,7 +111,9 @@ with subtest('Chunked response'):
         conn = http.client.HTTPConnection('127.0.0.1', port, timeout=10)
         conn.request('GET', '/chunked')
         res = conn.getresponse()
-        return res.getheader('Transfer-Encoding'), res.read()
+        result = res.getheader('Transfer-Encoding'), res.read()
+        conn.close()
+        return result
 
     is_deeply_ok(run(client), ('chunked', b'Hello World!'), 'decoded by http.client')
 
@@ -187,7 +191,9 @@ with subtest('TLS of ssl'):
         conn.request('GET', '/secure')
         res = conn.getresponse()
         version = conn.sock.version()
-        return version, res.read()
+        result = version, res.read()
+        conn.close()
+        return result
 
     is_deeply_ok(run(client), ('TLSv1.2', b'GET /secure 1.1 0'), 'verified certificate, version of the location')
     tls.stop()

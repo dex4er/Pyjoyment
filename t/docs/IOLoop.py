@@ -115,6 +115,8 @@ with subtest('reactor'):
         # Remove handle again
         Pyjo.IOLoop.singleton.reactor.remove(handle)
     is_ok(output.getvalue(), 'Handle is writable\n', 'watched')
+    handle.close()
+    peer.close()
 
 with subtest('acceptor'):
     import Pyjo.IOLoop.Server
@@ -237,6 +239,8 @@ with subtest('singleton'):
         Pyjo.IOLoop.one_tick()
     Pyjo.IOLoop.singleton.reactor.remove(fd)
     is_ok(output.getvalue(), 'Handle is readable\n', 'watched')
+    handle.close()
+    peer.close()
 
 with subtest('start and stop'):
     Pyjo.IOLoop.timer(0.01, lambda loop: Pyjo.IOLoop.stop())
@@ -271,5 +275,6 @@ with subtest('stream'):
     loop.stream(id).timeout = 300
     is_ok(loop.stream(id).timeout, 300, 'timeout')
     loop.reset()
+    peer.close()
 
 done_testing()

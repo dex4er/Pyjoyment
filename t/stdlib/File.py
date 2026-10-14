@@ -7,7 +7,12 @@ import os
 import pathlib
 import shutil
 import tempfile
+import warnings
 
+
+# The temporary objects of the standard library that Pyjo.File keeps warn when they are removed with it, as tempdir()
+# and tempfile() do not
+warnings.filterwarnings('ignore', message='Implicitly cleaning up', category=ResourceWarning)
 
 with subtest('An os.PathLike'):
     dir = tempdir()

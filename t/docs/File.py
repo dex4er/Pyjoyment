@@ -5,7 +5,12 @@ import io
 import os
 import pathlib
 import tempfile
+import warnings
 
+
+# The temporary objects of the standard library that Pyjo.File keeps warn when they are removed with it, as tempdir()
+# and tempfile() do not
+warnings.filterwarnings('ignore', message='Implicitly cleaning up', category=ResourceWarning)
 
 tmp = tempfile.TemporaryDirectory()
 home = pathlib.Path(tmp.name, 'home', 'sri')
@@ -329,5 +334,7 @@ with subtest('tempfile'):
     # Longer version
     p = path(tempfile.NamedTemporaryFile(dir=tmp.name))
     ok(os.path.isfile(p), 'temporary file')
+
+tmp.cleanup()
 
 done_testing()

@@ -27,12 +27,15 @@ with subtest('Synopsis'):
 
     client = Pyjo.IOLoop.TLS.new(peer)
     client.on('upgrade', lambda tls, handle: ...)
+    client.on('upgrade', lambda tls, handle: upgraded.append(handle))
     client.negotiate(address='localhost', tls_ca=os.path.join(certs, 'ca.crt'))
 
     # Start reactor if necessary
     if not tls.reactor.is_running:
         tls.reactor.start()
     isa_ok(upgraded[0], ssl.SSLSocket, 'upgraded')
+    for handle in upgraded:
+        handle.close()
 
 with subtest('reactor'):
     import Pyjo.Reactor.Poll
@@ -64,9 +67,16 @@ with subtest('negotiate'):
     tls3.negotiate(address='mojolicious.org', tls_context=ssl.create_default_context())
     is_deeply_ok(errors, [], 'started')
     Pyjo.IOLoop.reset()
+    del tls, tls2, tls3
+    for sockets in (pair, pair2, pair3):
+        for sock in sockets:
+            sock.close()
 
 with subtest('new'):
-    tls = Pyjo.IOLoop.TLS.new(socket.socketpair()[0])
+    handle, peer = socket.socketpair()
+    tls = Pyjo.IOLoop.TLS.new(handle)
     isa_ok(tls, Pyjo.IOLoop.TLS.object, 'new')
+    handle.close()
+    peer.close()
 
 done_testing()

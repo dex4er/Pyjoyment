@@ -58,7 +58,7 @@ import string
 import tempfile as _tempfile
 import weakref
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from typing import IO, TYPE_CHECKING, Any, NoReturn, Self, cast
 
 
@@ -686,18 +686,20 @@ def tempdir(template: str | None = None, **kwargs: Any) -> Pyjo_File:
         path = tempdir()
         path = tempdir('tempXXXXX')
 
-    Construct a new :mod:`Pyjo.File` object for a temporary directory with
-    :class:`tempfile.TemporaryDirectory`, which is removed with the object.
-    The ``X`` characters at the end of a template are random, and a directory
-    with a template is made in the current working directory, as Perl's
-    ``File::Temp`` makes it. ::
+    Construct a new :mod:`Pyjo.File` object for a temporary directory, made
+    with :func:`tempfile.mkdtemp` and its keyword arguments, which is removed
+    with the object, as Perl's ``File::Temp`` removes it, without the
+    :exc:`ResourceWarning` that :class:`tempfile.TemporaryDirectory` gives when
+    it is not cleaned up explicitly. The ``X`` characters at the end of a
+    template are random, and a directory with a template is made in the
+    current working directory, as ``File::Temp`` makes it. ::
 
-        # Longer version
+        # Longer version, which warns when the directory is removed with the object
         path = path(tempfile.TemporaryDirectory())
     """
     if template is not None:
-        return Pyjo_File(_TempDir(template, **kwargs))
-    return Pyjo_File(_tempfile.TemporaryDirectory(**kwargs))
+        return Pyjo_File(_Temp(_mkdir(template, **kwargs), _rmtree))
+    return Pyjo_File(_Temp(cast(str, _tempfile.mkdtemp(**kwargs)), _rmtree))
 
 
 def tempfile(**kwargs: Any) -> Pyjo_File:
@@ -706,30 +708,50 @@ def tempfile(**kwargs: Any) -> Pyjo_File:
         path = tempfile()
         path = tempfile(dir='/tmp')
 
-    Construct a new :mod:`Pyjo.File` object for a temporary file with
-    :func:`tempfile.NamedTemporaryFile`, which is removed with the object. ::
+    Construct a new :mod:`Pyjo.File` object for a temporary file, made with
+    :func:`tempfile.mkstemp` and its keyword arguments, which is removed with
+    the object, as Perl's ``File::Temp`` removes it, without the
+    :exc:`ResourceWarning` that :func:`tempfile.NamedTemporaryFile` gives when
+    it is not closed explicitly. ::
 
-        # Longer version
+        # Longer version, which warns when the file is removed with the object
         path = path(tempfile.NamedTemporaryFile(dir='/tmp'))
     """
-    return Pyjo_File(cast(Anything, _tempfile.NamedTemporaryFile(**kwargs)))
+    handle, name = cast(tuple[int, str], _tempfile.mkstemp(**kwargs))
+    os.close(handle)
+    return Pyjo_File(_Temp(name, _unlink))
+
+
+# A temporary file or directory of File::Temp, removed with the object without a ResourceWarning
+class _Temp:
+    def __init__(self, name: str, remove: Callable[[str], Anything]) -> None:
+        self.name = name
+        weakref.finalize(self, remove, name)
 
 
 # File::Temp's newdir with a template
-class _TempDir:
-    def __init__(self, template: str, dir: str = '.') -> None:
-        prefix = template.rstrip('X')
-        size = len(template) - len(prefix)
-        chars = string.ascii_letters + string.digits
-        while True:
-            name = os.path.abspath(os.path.join(dir, prefix + ''.join(_random.choice(chars) for _ in range(size))))
-            try:
-                os.mkdir(name, 0o700)
-                break
-            except FileExistsError:
-                continue
-        self.name = name
-        weakref.finalize(self, shutil.rmtree, name, ignore_errors=True)
+def _mkdir(template: str, dir: str = '.') -> str:
+    prefix = template.rstrip('X')
+    size = len(template) - len(prefix)
+    chars = string.ascii_letters + string.digits
+    while True:
+        name = os.path.abspath(os.path.join(dir, prefix + ''.join(_random.choice(chars) for _ in range(size))))
+        try:
+            os.mkdir(name, 0o700)
+            return name
+        except FileExistsError:
+            continue
+
+
+def _rmtree(name: str) -> None:
+    shutil.rmtree(name, ignore_errors=True)
+
+
+def _unlink(name: str) -> None:
+    try:
+        os.unlink(name)
+    except OSError:
+        pass
 
 
 # File::Basename's basename
@@ -797,9 +819,7 @@ def _fileparse(path: str) -> tuple[str, str]:
 
 
 def _is_temp(value: Anything) -> bool:
-    return (
-        isinstance(value, (_TempDir, _tempfile.TemporaryDirectory)) or type(value).__name__ == '_TemporaryFileWrapper'
-    )
+    return isinstance(value, (_Temp, _tempfile.TemporaryDirectory)) or type(value).__name__ == '_TemporaryFileWrapper'
 
 
 def _str(value: Anything) -> str:

@@ -34,6 +34,7 @@ with subtest('Synopsis'):
         conn = http.client.HTTPConnection('127.0.0.1', port, timeout=10)
         conn.request('GET', '/foo')
         results.append(conn.getresponse().read())
+        conn.close()
 
     # The client in a thread of its own, and the event loop stops when it is done
     worker = threading.Thread(target=client)

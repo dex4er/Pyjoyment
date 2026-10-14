@@ -87,6 +87,7 @@ from Pyjo.String.Unicode import split
 from Pyjo.Util import term_escape, warn
 from Pyjo.WebSocket import server_handshake
 
+import atexit
 import os
 import re
 import signal
@@ -359,6 +360,7 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
 
         self._connections: dict[str, dict[str, Any]] = {}
         self._servers: dict[str, Any] = {}
+        _DAEMONS.add(self)
 
     def __del__(self) -> None:
         if sys.is_finalizing():
@@ -725,6 +727,20 @@ def _peer(handle: Any) -> str:
 
 def _url(tx: Pyjo.Transaction.object) -> str:
     return str(tx.req.url.to_abs())
+
+
+# Not in Mojolicious: the daemons that exist, whose listen sockets are closed at the end of the interpreter, as Perl
+# closes them then, before Pyjo.IOLoop closes the connections of its event loops
+_DAEMONS: 'weakref.WeakSet[Pyjo_Server_Daemon]' = weakref.WeakSet()
+
+
+@atexit.register
+def _cleanup() -> None:
+    for daemon in list(_DAEMONS):
+        try:
+            daemon._cleanup()  # pyright: ignore[reportPrivateUsage]
+        except Exception:
+            pass
 
 
 new = Pyjo_Server_Daemon.new

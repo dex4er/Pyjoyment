@@ -18,6 +18,7 @@ def get(loop, url):
         conn.request('GET', '/')
         res = conn.getresponse()
         results.append((res.status, res.read()))
+        conn.close()
 
     worker = threading.Thread(target=client)
     worker.start()

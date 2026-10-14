@@ -24,8 +24,9 @@ class Server:
         # is given
         self.port = port or free_port()
         args = [arg.format(port=self.port) for arg in command]
-        # The warnings of the servers and their libraries are not ours, so they are not errors there as in CI
-        env = {k: v for k, v in os.environ.items() if k != 'PYTHONWARNINGS'} | {
+        # The warnings of the servers and their libraries are not ours, so they are neither errors nor shown there, as
+        # in CI
+        env = {k: v for k, v in os.environ.items() if k not in ('PYTHONDEVMODE', 'PYTHONWARNINGS')} | {
             'PYTHONPATH': os.pathsep.join([dir, ROOT])
         }
         self.log = open(os.path.join(dir, 'server.log'), 'w+')
@@ -37,8 +38,9 @@ class Server:
                 return
             except OSError:
                 time.sleep(0.1)
+        output = self.output()
         self.close()
-        raise RuntimeError(f'the server did not start: {self.output()}')
+        raise RuntimeError(f'the server did not start: {output}')
 
     def close(self):
         self.process.terminate()
@@ -47,6 +49,7 @@ class Server:
         except subprocess.TimeoutExpired:
             self.process.kill()
             self.process.wait()
+        self.log.close()
 
     def output(self):
         self.log.seek(0)
