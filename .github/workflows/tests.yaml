@@ -65,7 +65,7 @@ jobs:
           PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
         run: |
           python --version
-          python -m Pyjo.Prove -j 4 -r t
+          python -m Pyjo.Prove -j 4 --timeout 60 -r t
 
       # The tests of the event loop run on the reactor without asyncio too.
       - name: Run tests on Pyjo.Reactor.Poll
@@ -73,7 +73,7 @@ jobs:
           PYJO_REACTOR: Pyjo.Reactor.Poll
           PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
         run: |
-          python -m Pyjo.Prove -j 4 t/Pyjo/IOLoop*.py t/Pyjo/TLS.py t/Pyjo/Promise*.py t/stdlib/IOLoop*.py
+          python -m Pyjo.Prove -j 4 --timeout 60 t/Pyjo/IOLoop*.py t/Pyjo/TLS.py t/Pyjo/Promise*.py t/stdlib/IOLoop*.py
 
   build:
     name: build

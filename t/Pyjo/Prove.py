@@ -3,10 +3,12 @@ import Pyjo.Prove
 from Pyjo.Test import *
 
 import os
+import signal
 import subprocess
 import sys
 import tempfile
 import textwrap
+import time
 
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -48,6 +50,29 @@ SCRIPTS = {
         from Pyjo.Test import *
         bail_out('no database')
     """,
+    'sleep.py': """
+        from Pyjo.Test import *
+        import time
+        ok(True)
+        time.sleep(60)
+        done_testing()
+    """,
+    'pid.py': """
+        from Pyjo.Test import *
+        import os, time
+        with open('pid', 'w') as f:
+            f.write(str(os.getpid()))
+        ok(True)
+        time.sleep(60)
+        done_testing()
+    """,
+    'child.py': """
+        from Pyjo.Test import *
+        import subprocess, sys
+        subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)'])
+        ok(True)
+        done_testing()
+    """,
 }
 
 
@@ -63,6 +88,39 @@ def prove(*args, scripts=SCRIPTS):
             [sys.executable, '-m', 'Pyjo.Prove', *args], cwd=tmp, env=env, capture_output=True, text=True
         )
     return p.stdout, p.returncode
+
+
+def interrupt(*args):
+    # Ctrl-C once the script that sleeps has started; SIGINT may be ignored in the process of the tests
+    with tempfile.TemporaryDirectory() as tmp:
+        for name in ('pass.py', 'pid.py'):
+            with open(os.path.join(tmp, name), 'w') as f:
+                f.write(textwrap.dedent(SCRIPTS[name]))
+        env = dict(os.environ, PYTHONPATH=ROOT)
+        p = subprocess.Popen(
+            [sys.executable, '-m', 'Pyjo.Prove', *args, 'pass.py', 'pid.py'],
+            cwd=tmp,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            preexec_fn=lambda: signal.signal(signal.SIGINT, signal.SIG_DFL),
+        )
+        path = os.path.join(tmp, 'pid')
+        deadline = time.monotonic() + 30
+        while not os.path.exists(path) and time.monotonic() < deadline:
+            time.sleep(0.1)
+        time.sleep(0.2)
+        p.send_signal(signal.SIGINT)
+        out, err = p.communicate(timeout=30)
+        with open(path) as f:
+            pid = int(f.read())
+    try:
+        os.kill(pid, 0)
+        alive = True
+    except ProcessLookupError:
+        alive = False
+    return out, err, p.returncode, alive
 
 
 def result(lines):
@@ -120,6 +178,9 @@ with subtest('Parse errors'):
     is_ok(result('1..1\nok 1\n1..1').errors, ['More than one plan found in TAP output'], 'two plans')
     is_ok(result('Bail out!  broken').bail_out, 'broken', 'bail out')
     is_ok(result('ok 1 - a \\# b # SKIP why').skipped, 1, 'escaped hash in the description')
+    r = Pyjo.Prove.Result('test.py', tests=1, exit_status=-9, timed_out=0.5)
+    Pyjo.Prove.finish(r)
+    is_ok(r.errors, ['Timed out after 0.5 seconds'], 'timed out')
 
 with subtest('Find scripts'):
     with tempfile.TemporaryDirectory() as tmp:
@@ -164,6 +225,39 @@ with subtest('Directories, recursion and parallel jobs'):
     out, code = prove('-r', '-j', '3', scripts=scripts)
     like_ok(out, r'(?m)^Files=3, Tests=4, ', 'recursive, in parallel')
     is_ok(code, 0, 'right exit status')
+
+with subtest('Timeout'):
+    started = time.monotonic()
+    out, code = prove('--timeout', '2', 'sleep.py', 'pass.py')
+    like_ok(out, r'(?m)^sleep\.py \.+ Timed out$', 'script stopped')
+    like_ok(out, r'(?m)^  Timed out after 2 seconds$', 'reason in the summary')
+    like_ok(out, r'(?m)^pass\.py \.+ ok$', 'next script still runs')
+    is_ok(code, 1, 'right exit status')
+    ok(time.monotonic() - started < 30, 'the run does not wait for the script')
+
+    started = time.monotonic()
+    out, code = prove('--timeout', '2', 'child.py')
+    like_ok(out, r'(?m)^child\.py \.+ Timed out$', 'a process of the script keeps its output open')
+    ok(time.monotonic() - started < 30, 'the process of the script is killed with it')
+
+    out, code = prove('--timeout', '30', 'pass.py')
+    like_ok(out, r'(?m)^pass\.py \.+ ok$', 'a script within the time')
+    is_ok(code, 0, 'right exit status')
+
+with subtest('Ctrl-C'):
+    out, err, code, alive = interrupt()
+    is_ok(code, -signal.SIGINT, 'dies of the signal')
+    unlike_ok(out, r'Result:', 'no summary')
+    unlike_ok(err, r'Traceback', 'no traceback')
+    ok(not alive, 'the running script is killed')
+
+    out, err, code, alive = interrupt('--trap')
+    like_ok(out, r'(?m)^pass\.py \.+ ok$', 'finished script')
+    like_ok(err, r'(?m)^Test run interrupted!$', 'interrupted')
+    like_ok(out, r'(?m)^Files=1, Tests=2, ', 'summary of the finished scripts')
+    like_ok(out, r'(?m)^Result: FAIL$', 'result')
+    is_ok(code, 1, 'right exit status')
+    ok(not alive, 'the running script is killed')
 
 with subtest('Verbose'):
     out, code = prove('-v', 'pass.py')

@@ -121,6 +121,11 @@ A single file runs on its own as well:
 because the output is standard TAP; `.proverc` supplies its
 `--ext=py --exec=python`.
 
+CI runs the tests with `--timeout 60`: a test script that hangs, such as a
+reactor that never stops, is killed with the processes it started and fails
+with its name, instead of the job running out of time. The slowest script
+takes a few seconds.
+
 - `t/Pyjo/` holds the module tests, ported from Mojo's `t/mojo/*.t`. A
   file has the name of Mojo's test with the part of the module as Pyjoyment
   names it: `reactor_detect.t` is `Reactor_detect.py`, `ioloop_tls.t` is
