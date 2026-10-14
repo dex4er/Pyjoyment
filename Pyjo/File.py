@@ -42,6 +42,7 @@ Functions
 
 import Pyjo.Base
 import Pyjo.Collection
+import Pyjo.Exception
 import Pyjo.String.Mixin
 
 from Pyjo.Util import decode, encode
@@ -58,7 +59,12 @@ import tempfile as _tempfile
 import weakref
 
 from collections.abc import Iterator
-from typing import IO, Any, NoReturn, Self, cast
+from typing import IO, TYPE_CHECKING, Any, NoReturn, Self, cast
+
+
+if TYPE_CHECKING:
+    import Pyjo.Transaction.HTTP
+    import Pyjo.UserAgent
 
 
 _random = random.SystemRandom()
@@ -226,7 +232,27 @@ class Pyjo_File(Pyjo.Base.object, Pyjo.String.Mixin.object):
         """
         return self.new(_dirname(self._path))
 
-    # TODO: download, when Pyjo.UserAgent is ported
+    def download(
+        self, url: Anything, *, headers: dict[str, Any] | None = None, ua: 'Pyjo.UserAgent.object | None' = None
+    ) -> bool:
+        """::
+
+            boolean = path.download('https://example.com/test.tar.gz')
+            boolean = path.download('https://example.com/test.tar.gz', headers={'Accept': '*/*'})
+            boolean = path.download('https://example.com/test.tar.gz', ua=Pyjo.UserAgent.new())
+
+        Download file from URL, returns true once the file has been downloaded
+        completely. Incomplete downloads are resumed. Follows ``10`` redirects
+        by default and does not limit the size of the response, which will be
+        streamed memory efficiently. Note that this method is **EXPERIMENTAL**
+        and might change without warning!
+        """
+        import Pyjo.UserAgent
+
+        if ua is None:
+            ua = Pyjo.UserAgent.new(max_redirects=10, max_response_size=0)
+        tx = _download_error(ua.transactor.download(ua.head(url, headers or {}), self._path))
+        return bool(_download_error(ua.start(tx))) if tx is not None else True
 
     @property
     def extname(self) -> str:
@@ -735,6 +761,16 @@ def _canonpath(path: str) -> str:
 # File::Spec's catfile
 def _catfile(*parts: str) -> str:
     return _canonpath('/'.join(parts))
+
+
+def _download_error(tx: 'Pyjo.Transaction.HTTP.object') -> 'Pyjo.Transaction.HTTP.object | None':
+    if not (err := tx.error):
+        return tx
+    if err['message'] in ('Download complete', 'Download incomplete'):
+        return None
+    if code := err.get('code'):
+        raise Pyjo.Exception.new(f'{code} response: {err["message"]}')
+    raise Pyjo.Exception.new(f'Download error: {err["message"]}')
 
 
 def _croak(e: OSError, message: str) -> NoReturn:
