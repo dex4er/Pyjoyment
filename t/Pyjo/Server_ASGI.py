@@ -405,6 +405,15 @@ for cb in (asgi.to_asgi_app, lambda: asyncio.run(asgi.run({'type': 'http'}, None
         'to_asgi_app and run raise an exception',
     )
 
+with subtest('Server without asyncio'):
+    asgi = Pyjo.Server.ASGI.new()
+
+    # A server that drives the coroutine without the event loop of asyncio, as Trio does
+    coroutine = asgi.run({'type': 'http'}, None, None)
+    throws_ok(
+        lambda: coroutine.send(None), re.compile(r'Pyjo.Server.ASGI needs an ASGI server on asyncio'), 'right error'
+    )
+
 with subtest('Unsupported connection type'):
     app = server(hello)
     throws_ok(

@@ -34,12 +34,7 @@ WebSocket and lifespan connections.
 The application runs in the event loop of the ASGI server: the reactor of
 :mod:`Pyjo.IOLoop` follows the loop that is running, so timers, promises and
 the I/O of :mod:`Pyjoyment` share it, and the response can be given later
-than the ``request`` event, once the transaction is resumed. This needs the
-reactor on :mod:`asyncio`, :mod:`Pyjo.Reactor.Asyncio` or a subclass of it,
-which is the default, and an ASGI server on :mod:`asyncio`, as uvicorn is, or
-hypercorn without Trio: with another reactor, as :mod:`Pyjo.Reactor.Poll`,
-:meth:`Pyjo_Server_ASGI.to_asgi_app` and :meth:`Pyjo_Server_ASGI.run` raise an exception, as nothing would run
-it in the loop of the server.
+than the ``request`` event, once the transaction is resumed.
 
 An HTTP request is read from the connection scope as the ``CGI`` environment
 that :meth:`Pyjo.Message.Request.Pyjo_Message_Request.parse` takes, as
@@ -50,6 +45,28 @@ server, unless the application sets one. A WebSocket handshake is a
 :mod:`Pyjo.Transaction.WebSocket`, as with :mod:`Pyjo.Server.Daemon`; a
 response other than ``101`` rejects it, and the ASGI server negotiates
 ``permessage-deflate`` on its own.
+
+This needs the reactor on :mod:`asyncio`, :mod:`Pyjo.Reactor.Asyncio` or a
+subclass of it, which is the default, and an ASGI server on :mod:`asyncio`.
+The loop may be another implementation of the event loop of :mod:`asyncio`,
+as uvloop is, as the reactor takes the loop that the server runs. With
+another reactor, as :mod:`Pyjo.Reactor.Poll`,
+:meth:`Pyjo_Server_ASGI.to_asgi_app` and :meth:`Pyjo_Server_ASGI.run` raise
+an exception, as nothing would run it in the loop of the server, and so does
+:meth:`Pyjo_Server_ASGI.run` in a server on Trio.
+
+ASGI servers
+------------
+
+* uvicorn, on :mod:`asyncio` or uvloop: HTTP and WebSocket.
+* Hypercorn, on :mod:`asyncio` or uvloop: HTTP and WebSocket; not on Trio.
+* Daphne: HTTP and WebSocket. It adds no ``Date`` header, so a response has
+  one only when the application sets it, and it sends no reason with a
+  WebSocket close code.
+* Granian: HTTP only. A ``websocket.close`` that the application sends is not
+  delivered while a ``receive`` is waiting, and an application of WebSocket
+  always waits for the next message, so a WebSocket that the application
+  closes stays open until the client closes it.
 
 Events
 ------
@@ -108,7 +125,7 @@ class Pyjo_Server_ASGI(Pyjo.Server.Base.object):
 
         Run ``ASGI`` for one connection.
         """
-        _check_reactor()
+        _check_reactor(running=True)
         type = scope['type']
         if type == 'http':
             await self._http(scope, receive, send)
@@ -359,12 +376,15 @@ class _Writer:
             await self._send({'type': 'websocket.send', 'bytes': payload})
 
 
-# A reactor without asyncio can neither run in the loop of the ASGI server nor give an awaitable that asyncio takes
-def _check_reactor() -> None:
+# A reactor without asyncio can neither run in the loop of the ASGI server nor give an awaitable that asyncio takes,
+# and an ASGI server without asyncio, as Hypercorn on Trio, runs no loop that the reactor could follow
+def _check_reactor(running: bool = False) -> None:
     reactor = Pyjo.IOLoop.object.singleton().reactor
     if not isinstance(reactor, Pyjo.Reactor.Asyncio.object):
         name = f'{type(reactor).__module__}.{type(reactor).__qualname__}'
         raise Pyjo.Exception.new(f'Pyjo.Server.ASGI needs Pyjo.Reactor.Asyncio, not {name}')
+    if running and not reactor.loop.is_running():
+        raise Pyjo.Exception.new('Pyjo.Server.ASGI needs an ASGI server on asyncio')
 
 
 # The body of a request, from http.request messages
