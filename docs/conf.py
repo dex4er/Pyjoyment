@@ -25,6 +25,10 @@ extensions = ['sphinx.ext.autodoc']
 # ambiguous.
 autodoc_default_options = {'exclude-members': 'object'}
 
+# The table of contents lists the pages, not the classes and functions that
+# autodoc documents on them.
+toc_object_entries = False
+
 exclude_patterns = ['_build']
 
 html_theme = 'alabaster'
