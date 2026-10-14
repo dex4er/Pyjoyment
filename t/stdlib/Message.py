@@ -93,6 +93,59 @@ with subtest('Request for http.server'):
     is_ok(handler.headers['Host'], '127.0.0.1:3000', 'host')
     is_ok(handler.rfile.read(int(handler.headers['Content-Length'])), b'Hello World!', 'body')
 
+with subtest('Request with http.client'):
+    req = Pyjo.Message.Request.new(method='POST')
+    req.url.parse('http://127.0.0.1:3000/foo?bar=baz')
+    req.headers.content_type = 'text/plain'
+    req.body = b'Hello World!'
+    res = Pyjo.Message.Response.new(code=200).set(body=b'Hi!')
+    sock = FakeSocket(res.to_bytes())
+    conn = http.client.HTTPConnection('127.0.0.1', 3000)
+    conn.sock = sock
+    conn.request(req.method, req.url.path_query, req.body, req.headers)
+    sent = Pyjo.Message.Request.new().parse(sock.sent)
+    ok(sent.is_finished, 'finished')
+    is_ok(sent.method, 'POST', 'method')
+    is_ok(sent.url.path_query, '/foo?bar=baz', 'path and query')
+    is_ok(sent.headers.content_type, 'text/plain', 'header')
+    is_ok(sent.headers.content_length, '12', 'length')
+    is_ok(sent.body, b'Hello World!', 'body')
+    res = Pyjo.Message.Response.new(conn.getresponse())
+    is_ok(res.code, 200, 'code of the response')
+    is_ok(res.body, b'Hi!', 'body of the response')
+
+with subtest('Request from http.server'):
+    handler = Handler(
+        b'POST /foo?bar=baz HTTP/1.1\x0d\x0aHost: 127.0.0.1:3000\x0d\x0aAuthorization: Basic Zm9vOmJhcg==\x0d\x0a'
+        b'Content-Length: 12\x0d\x0a\x0d\x0aHello World!GET /next HTTP/1.1\x0d\x0a\x0d\x0a'
+    )
+    req = Pyjo.Message.Request.new(handler)
+    ok(req.is_finished, 'finished')
+    is_ok(req.method, 'POST', 'method')
+    is_ok(req.version, '1.1', 'version')
+    is_ok(req.url.path, '/foo', 'path')
+    is_ok(req.param('bar'), 'baz', 'query parameter')
+    is_ok(req.url.to_abs().to_unsafe_str(), 'http://foo:bar@127.0.0.1:3000/foo?bar=baz', 'absolute URL')
+    is_ok(req.body, b'Hello World!', 'body')
+    is_ok(handler.rfile.read(), b'GET /next HTTP/1.1\x0d\x0a\x0d\x0a', 'next request not read')
+
+    handler = Handler(
+        b'PUT /chunked HTTP/1.1\x0d\x0aTransfer-Encoding: chunked\x0d\x0a\x0d\x0a'
+        b'6\x0d\x0aHello \x0d\x0a8\x0d\x0aWorld\x0d\x0a!\x0d\x0a0\x0d\x0a\x0d\x0aGET /next HTTP/1.1\x0d\x0a\x0d\x0a'
+    )
+    req = Pyjo.Message.Request.new(handler)
+    ok(req.is_finished, 'finished')
+    is_ok(req.method, 'PUT', 'method')
+    is_ok(req.body, b'Hello World\x0d\x0a!', 'chunked body')
+    is_ok(handler.rfile.read(), b'GET /next HTTP/1.1\x0d\x0a\x0d\x0a', 'next request not read')
+
+    handler = Handler(b'GET http://example.com/foo HTTP/1.0\x0d\x0a\x0d\x0a')
+    req = Pyjo.Message.Request.new(handler)
+    ok(req.is_finished, 'finished')
+    is_ok(req.version, '1.0', 'version')
+    is_ok(req.url.to_abs(), 'http://example.com/foo', 'absolute URL for a proxy')
+    is_ok(req.body, b'', 'no body')
+
 with subtest('WSGI environment of wsgiref'):
     environ = {'PATH_INFO': '/foo/bar', 'QUERY_STRING': 'baz=yada', 'REQUEST_METHOD': 'GET'}
     wsgiref.util.setup_testing_defaults(environ)
@@ -283,5 +336,45 @@ with subtest('Request and response through urllib.request.urlopen'):
     server.server_close()
     thread.join()
 
+
+# A server of http.server with a handler that answers with Pyjoyment
+class PyjoHandler(http.server.BaseHTTPRequestHandler):
+    protocol_version = 'HTTP/1.1'
+
+    def do_POST(self):
+        req = Pyjo.Message.Request.new(self)
+        res = Pyjo.Message.Response.new(code=200)
+        res.headers.content_type = 'text/plain'
+        res.body = f'{req.method} {req.url.path} '.encode() + req.body
+        self.wfile.write(res.to_bytes())
+
+    def log_message(self, *args):
+        pass
+
+
+with subtest('Request and response through http.client and http.server'):
+    server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), PyjoHandler)
+    thread = threading.Thread(target=server.serve_forever)
+    thread.start()
+    port = server.server_address[1]
+
+    conn = http.client.HTTPConnection('127.0.0.1', port, timeout=10)
+    req = Pyjo.Message.Request.new(method='POST')
+    req.url.parse(f'http://127.0.0.1:{port}/one')
+    req.body = b'Hello World!'
+    conn.request(req.method, req.url.path_query, req.body, req.headers)
+    res = Pyjo.Message.Response.new(conn.getresponse())
+    is_ok(res.code, 200, 'code')
+    is_ok(res.headers.content_type, 'text/plain', 'header')
+    is_ok(res.body, b'POST /one Hello World!', 'body')
+
+    conn.request('POST', '/two', iter([b'Hello ', b'World!']), {'Transfer-Encoding': 'chunked'}, encode_chunked=True)
+    res = Pyjo.Message.Response.new(conn.getresponse())
+    is_ok(res.body, b'POST /two Hello World!', 'chunked body on the same connection')
+    conn.close()
+
+    server.shutdown()
+    server.server_close()
+    thread.join()
 
 done_testing()

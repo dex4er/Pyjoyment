@@ -58,7 +58,11 @@ import time
 import urllib.request
 
 from collections.abc import Iterable, Mapping
-from typing import Any, Self, cast, overload
+from typing import TYPE_CHECKING, Any, Self, cast, overload
+
+
+if TYPE_CHECKING:
+    import http.server
 
 
 type Anything = builtins.object
@@ -72,7 +76,7 @@ class Pyjo_Message_Request(Pyjo.Message.object):
 
     def __init__(
         self,
-        request: urllib.request.Request | None = None,
+        request: 'urllib.request.Request | http.server.BaseHTTPRequestHandler | None' = None,
         /,
         *,
         env: Mapping[str, Any] | None = None,
@@ -90,10 +94,22 @@ class Pyjo_Message_Request(Pyjo.Message.object):
             req = Pyjo.Message.Request.new()
             req = Pyjo.Message.Request.new(method='POST', url=Pyjo.URL.new('http://127.0.0.1/'))
             req = Pyjo.Message.Request.new(urllib.request.Request('http://127.0.0.1/', data=b'Hi!'))
+            req = Pyjo.Message.Request.new(handler)
 
-        Construct a new :mod:`Pyjo.Message.Request` object, from a
-        :class:`urllib.request.Request` if it is given: its method, URL,
-        headers and data.
+        Construct a new :mod:`Pyjo.Message.Request` object, from a request of
+        the standard library if it is given: the method, URL, headers and data
+        of a :class:`urllib.request.Request`, or the request that a
+        :class:`http.server.BaseHTTPRequestHandler` has parsed, which is parsed
+        again, as :meth:`parse` does, with the body that it reads from the
+        ``rfile`` of the handler, of the ``Content-Length`` or chunked, and not
+        further. ::
+
+            # A request in a handler of http.server
+            class Handler(http.server.BaseHTTPRequestHandler):
+                def do_GET(self):
+                    req = Pyjo.Message.Request.new(self)
+                    res = Pyjo.Message.Response.new(code=200).set(body=bytes(req.url.path))
+                    self.wfile.write(res.to_bytes())
         """
         super().__init__(**kwargs)
 
@@ -163,9 +179,11 @@ class Pyjo_Message_Request(Pyjo.Message.object):
         self._start_buffer: bytes | None = None
         self._url = url
 
-        # Not in Mojolicious: a request of urllib
-        if request is not None:
+        # Not in Mojolicious: a request of urllib or http.server
+        if isinstance(request, urllib.request.Request):
             self._from_urllib(request)
+        elif request is not None:
+            self._from_http_server(request)
 
     @property
     def request_id(self) -> str:
@@ -536,6 +554,19 @@ class Pyjo_Message_Request(Pyjo.Message.object):
                 request.add_header('Proxy-Authorization', 'Basic ' + _basic_encode(info))
 
         return request
+
+    # Not in Mojolicious: a request of http.server
+    def _from_http_server(self, handler: 'http.server.BaseHTTPRequestHandler') -> None:
+        start = f'{handler.command} {handler.path} {handler.request_version}\x0d\x0a'
+        headers = ''.join(f'{name}: {value}\x0d\x0a' for name, value in handler.headers.items())
+        self.parse(f'{start}{headers}\x0d\x0a'.encode('latin-1'))
+
+        # The body of the Content-Length, or chunked line by line, so that nothing of the next request is read
+        rfile = handler.rfile
+        if not self.is_finished and (length := self.headers.content_length or '').isdigit():
+            self.parse(rfile.read(int(length)))
+        while not self.is_finished and (line := rfile.readline(131072)):
+            self.parse(line)
 
     # Not in Mojolicious: a request of urllib
     def _from_urllib(self, request: urllib.request.Request) -> None:
