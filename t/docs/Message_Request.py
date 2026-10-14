@@ -20,7 +20,7 @@ def output(cb):
 
 
 # A server of http.server for the examples with urllib.request.urlopen
-class Handler(http.server.BaseHTTPRequestHandler):
+class HiHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.send_header('Content-Length', '3')
@@ -31,7 +31,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         pass
 
 
-server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), HiHandler)
 threading.Thread(target=server.serve_forever, daemon=True).start()
 port = server.server_address[1]
 
@@ -74,6 +74,25 @@ with subtest('new'):
     is_ok(req.method, 'POST', 'method of urllib')
     is_ok(req.url, 'http://127.0.0.1/', 'URL of urllib')
     is_ok(req.body, b'Hi!', 'data of urllib')
+
+    import Pyjo.Message.Response
+
+    # A request in a handler of http.server
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            req = Pyjo.Message.Request.new(self)
+            res = Pyjo.Message.Response.new(code=200).set(body=bytes(req.url.path))
+            self.wfile.write(res.to_bytes())
+
+        def log_message(self, *args):
+            pass
+
+    handler_server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+    threading.Thread(target=handler_server.serve_forever, daemon=True).start()
+    with urllib.request.urlopen(f'http://127.0.0.1:{handler_server.server_address[1]}/foo/bar') as response:
+        is_ok(response.read(), b'/foo/bar', 'response of the handler')
+    handler_server.shutdown()
+    handler_server.server_close()
 
 with subtest('env'):
     req = Pyjo.Message.Request.new()
