@@ -206,7 +206,7 @@ if __name__ == '__main__':
     jar = Pyjo.UserAgent.CookieJar.new()
     tx = Pyjo.Transaction.HTTP.new()
     tx.req.url.parse('http://mojolicio.us/perldoc/Mojolicious')
-    tx.res.cookies = [Pyjo.Cookie.Response.new(name='foo', value='without')]
+    tx.res.cookies(Pyjo.Cookie.Response.new(name='foo', value='without'))
     jar.collect(tx)
     tx = Pyjo.Transaction.HTTP.new()
     tx.req.url.parse('http://mojolicio.us/perldoc')
@@ -231,10 +231,10 @@ if __name__ == '__main__':
     jar = Pyjo.UserAgent.CookieJar.new()
     tx = Pyjo.Transaction.HTTP.new()
     tx.req.url.parse('http://example.com/test')
-    tx.res.cookies = [
+    tx.res.cookies(
         Pyjo.Cookie.Response.new(name='foo', value='without'),
         Pyjo.Cookie.Response.new(name='foo', value='with', domain='example.com'),
-    ]
+    )
     jar.collect(tx)
     tx = Pyjo.Transaction.HTTP.new()
     tx.req.url.parse('http://example.com/test')
@@ -255,10 +255,10 @@ if __name__ == '__main__':
     jar = Pyjo.UserAgent.CookieJar.new()
     tx = Pyjo.Transaction.HTTP.new()
     tx.req.url.parse('http://localhost:3000')
-    tx.res.cookies = [
+    tx.res.cookies(
         Pyjo.Cookie.Response.new(name='foo', value='local', domain='localhost'),
         Pyjo.Cookie.Response.new(name='bar', value='local', domain='bar.localhost'),
-    ]
+    )
     jar.collect(tx)
     tx = Pyjo.Transaction.HTTP.new()
     tx.req.url.parse('http://localhost:8080')
@@ -271,11 +271,11 @@ if __name__ == '__main__':
     jar = Pyjo.UserAgent.CookieJar.new()
     tx = Pyjo.Transaction.HTTP.new()
     tx.req.url.parse('http://LABS.bücher.Com/perldoc/Mojolicious')
-    tx.res.cookies = [
+    tx.res.cookies(
         Pyjo.Cookie.Response.new(name='foo', value='with', domain='labs.xn--bcher-kva.com', path='/perldoc'),
         Pyjo.Cookie.Response.new(name='bar', value='with', domain='xn--bcher-kva.com', path='/'),
         Pyjo.Cookie.Response.new(name='0', value='with', domain='.xn--bcher-kva.cOm', path='/%70erldoc/Mojolicious/'),
-    ]
+    )
     jar.collect(tx)
     tx = Pyjo.Transaction.HTTP.new()
     tx.req.url.parse('http://labs.bücher.COM/perldoc/Mojolicious/Lite')
@@ -305,10 +305,10 @@ if __name__ == '__main__':
     jar = Pyjo.UserAgent.CookieJar.new()
     tx = Pyjo.Transaction.HTTP.new()
     tx.req.url.parse('http://213.133.102.53/perldoc/Mojolicious')
-    tx.res.cookies = [
+    tx.res.cookies(
         Pyjo.Cookie.Response.new(name='foo', value='valid', domain='213.133.102.53'),
         Pyjo.Cookie.Response.new(name='bar', value='too'),
-    ]
+    )
     jar.collect(tx)
     tx = Pyjo.Transaction.HTTP.new()
     tx.req.url.parse('http://213.133.102.53/perldoc/Mojolicious')
@@ -322,10 +322,10 @@ if __name__ == '__main__':
     jar = Pyjo.UserAgent.CookieJar.new()
     tx = Pyjo.Transaction.HTTP.new()
     tx.req.url.parse('http://labs.example.com/perldoc/Mojolicious')
-    tx.res.cookies = [
+    tx.res.cookies(
         Pyjo.Cookie.Response.new(name='foo', value='invalid', domain='a.s.example.com'),
         Pyjo.Cookie.Response.new(name='foo', value='invalid', domain='mojolicio.us'),
-    ]
+    )
     jar.collect(tx)
     is_deeply_ok(jar.all, [], 'no cookies')
 
@@ -333,12 +333,12 @@ if __name__ == '__main__':
     jar = Pyjo.UserAgent.CookieJar.new()
     tx = Pyjo.Transaction.HTTP.new()
     tx.req.url.parse('http://213.133.102.53/perldoc/Mojolicious')
-    tx.res.cookies = [
+    tx.res.cookies(
         Pyjo.Cookie.Response.new(name='foo', value='valid', domain='213.133.102.53.'),
         Pyjo.Cookie.Response.new(name='foo', value='valid', domain='.133.102.53'),
         Pyjo.Cookie.Response.new(name='foo', value='invalid', domain='102.53'),
         Pyjo.Cookie.Response.new(name='foo', value='invalid', domain='53'),
-    ]
+    )
     jar.collect(tx)
     is_deeply_ok(jar.all, [], 'no cookies')
 
@@ -346,11 +346,11 @@ if __name__ == '__main__':
     jar = Pyjo.UserAgent.CookieJar.new()
     tx = Pyjo.Transaction.HTTP.new()
     tx.req.url.parse('http://labs.example.com/perldoc/Mojolicious')
-    tx.res.cookies = [
+    tx.res.cookies(
         Pyjo.Cookie.Response.new(name='foo', value='invalid', path='/perldoc/index.html'),
         Pyjo.Cookie.Response.new(name='foo', value='invalid', path='/perldocMojolicious'),
         Pyjo.Cookie.Response.new(name='foo', value='invalid', path='/perldoc.Mojolicious'),
-    ]
+    )
     jar.collect(tx)
     is_deeply_ok(jar.all, [], 'no cookies')
 

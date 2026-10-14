@@ -143,8 +143,8 @@ class Pyjo_UserAgent_CookieJar(Pyjo.Base.object):
             return
 
         url = tx.req.url
-        if tx.res.cookies:
-            for cookie in tx.res.cookies:
+        if tx.res.cookies():
+            for cookie in tx.res.cookies():
                 # Validate domain
                 host = (url.ihost or '').lower()
                 if not cookie.domain:
@@ -233,7 +233,7 @@ class Pyjo_UserAgent_CookieJar(Pyjo.Base.object):
             return
 
         req = tx.req
-        req.set_cookie(*self.find(req.url))
+        req.cookies(*self.find(req.url))
 
     def _compare(self, cookie, path, name, domain):
         return cookie.path != path or cookie.name != name or cookie.domain != domain

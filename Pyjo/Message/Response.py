@@ -1,5 +1,5 @@
 r"""
-Pyjo.Message.Response - HTTP Response
+Pyjo.Message.Response - HTTP response
 =====================================
 ::
 
@@ -7,9 +7,9 @@ Pyjo.Message.Response - HTTP Response
 
     # Parse
     res = Pyjo.Message.Response.new()
-    res.parse(b"HTTP/1.0 200 OK\x0d\x0a")
-    res.parse(b"Content-Length: 12\x0d\x0a")
-    res.parse(b"Content-Type: text/plain\x0d\x0a\x0d\x0a")
+    res.parse(b'HTTP/1.0 200 OK\x0d\x0a')
+    res.parse(b'Content-Length: 12\x0d\x0a')
+    res.parse(b'Content-Type: text/plain\x0d\x0a\x0d\x0a')
     res.parse(b'Hello World!')
     print(res.code)
     print(res.headers.content_type)
@@ -20,37 +20,46 @@ Pyjo.Message.Response - HTTP Response
     res.code = 200
     res.headers.content_type = 'text/plain'
     res.body = b'Hello World!'
-    print(res)
+    print(res.to_bytes())
 
-:mod:`Pyjo.Message.Response` is a container for HTTP Responses based on
-:rfc:`7230` and
-:rfc:`7231`.
+:mod:`Pyjo.Message.Response` is a container for HTTP responses, based on
+`RFC 7230 <https://tools.ietf.org/html/rfc7230>`_ and
+`RFC 7231 <https://tools.ietf.org/html/rfc7231>`_.
 
 Events
 ------
 
 :mod:`Pyjo.Message.Response` inherits all events from :mod:`Pyjo.Message`.
 
-Classes
--------
+See also
+--------
+
+:mod:`Pyjoyment`, https://mojolicious.org.
+
+Ported from `Mojo::Message::Response <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/Message/Response.pm>`_
+of Mojolicious 9.49.
 """
 
+import Pyjo.Cookie
 import Pyjo.Cookie.Response
+import Pyjo.Date
 import Pyjo.Message
 
-from Pyjo.Regexp import r
-from Pyjo.Util import b, convert, notnone
+import builtins
+import re
+
+from collections.abc import Mapping
+from typing import Any, Self, cast, overload
 
 
-re_line = r(rb'^(.*?)\x0d?\x0a')
-re_http = r(rb'^\s*HTTP/(\d\.\d)\s+(\d\d\d)\s*(.+)?$')
+type Anything = builtins.object
 
-
-# Umarked codes are from RFC 7231
+# Unmarked codes are from RFC 7231
 MESSAGES = {
     100: 'Continue',
     101: 'Switching Protocols',
     102: 'Processing',  # RFC 2518 (WebDAV)
+    103: 'Early Hints',  # RFC 8297
     200: 'OK',
     201: 'Created',
     202: 'Accepted',
@@ -68,7 +77,7 @@ MESSAGES = {
     304: 'Not Modified',
     305: 'Use Proxy',
     307: 'Temporary Redirect',
-    308: 'Permanent Redirect',  # RFC 7238
+    308: 'Permanent Redirect',  # RFC 7538
     400: 'Bad Request',
     401: 'Unauthorized',
     402: 'Payment Required',
@@ -88,14 +97,16 @@ MESSAGES = {
     416: 'Request Range Not Satisfiable',
     417: 'Expectation Failed',
     418: "I'm a teapot",  # RFC 2324 :)
+    421: 'Misdirected Request',  # RFC 7540
     422: 'Unprocessable Entity',  # RFC 2518 (WebDAV)
     423: 'Locked',  # RFC 2518 (WebDAV)
     424: 'Failed Dependency',  # RFC 2518 (WebDAV)
-    425: 'Unordered Colection',  # RFC 3648 (WebDAV)
+    425: 'Too Early',  # RFC 8470
     426: 'Upgrade Required',  # RFC 2817
     428: 'Precondition Required',  # RFC 6585
     429: 'Too Many Requests',  # RFC 6585
     431: 'Request Header Fields Too Large',  # RFC 6585
+    451: 'Unavailable For Legal Reasons',  # RFC 7725
     500: 'Internal Server Error',
     501: 'Not Implemented',
     502: 'Bad Gateway',
@@ -113,14 +124,24 @@ MESSAGES = {
 
 class Pyjo_Message_Response(Pyjo.Message.object):
     """
-    :mod:`Pyjo.Message.Response` inherits all attributes and methods from
-    :mod:`Pyjo.Message` and implements the following new ones.
+    :mod:`Pyjo.Message.Response` inherits all methods from :mod:`Pyjo.Message`
+    and implements the following new ones.
     """
 
-    def __init__(self, **kwargs):
+    # The default of max_message_size, which a response raises
+    _MAX_MESSAGE_SIZE = 2147483648
+
+    def __init__(self, *, code: int | None = None, message: str | None = None, **kwargs: Any) -> None:
+        """::
+
+            res = Pyjo.Message.Response.new()
+            res = Pyjo.Message.Response.new(code=200, message='OK')
+
+        Construct a new :mod:`Pyjo.Message.Response` object.
+        """
         super().__init__(**kwargs)
 
-        self.code = kwargs.get('code')
+        self.code = code
         """::
 
             code = res.code
@@ -129,118 +150,114 @@ class Pyjo_Message_Response(Pyjo.Message.object):
         HTTP response status code.
         """
 
-        self.message = kwargs.get('message')
+        self.message = message
         """::
 
-            msg = res.message
+            message = res.message
             res.message = 'OK'
 
         HTTP response status message.
         """
 
-        self._start_buffer = None
+        self._start_buffer: bytes | None = None
 
-    def __repr__(self):
+    @overload
+    def cookies(self) -> list[Pyjo.Cookie.Response.object]: ...
+
+    @overload
+    def cookies(self, cookie: Pyjo.Cookie.object | Mapping[str, Any], /, *cookies: Anything) -> Self: ...
+
+    def cookies(self, *cookies: Anything) -> list[Pyjo.Cookie.Response.object] | Self:
         """::
 
-            string = repr(res)
-
-        String representation of an object shown in console.
-        """
-        return f'<{self.__class__.__module__}.{self.__class__.__name__} code={repr(self.code)} message={repr(self.message)}>'
-
-    @property
-    def cookies(self):
-        """::
-
-            cookies = res.cookies
-            res.cookies = cookies
+            cookies = res.cookies()
+            res = res.cookies(Pyjo.Cookie.Response.new())
+            res = res.cookies({'name': 'foo', 'value': 'bar'})
 
         Access response cookies, usually :mod:`Pyjo.Cookie.Response` objects. ::
 
             # Names of all cookies
-            for cookie in res.cookies:
+            for cookie in res.cookies():
                 print(cookie.name)
         """
         # Parse cookies
         headers = self.headers
-        cookies = headers.set_cookie
-        if cookies is not None:
-            return Pyjo.Cookie.Response.parse(cookies)
-        else:
-            return
+        if not cookies:
+            return Pyjo.Cookie.Response.parse(headers.set_cookie)
 
-    @cookies.setter
-    def cookies(self, value):
-        headers = self.headers
-        headers.cookies = []
-        for cookie in value:
-            self.set_cookie(cookie)
+        # Add cookies
+        for cookie in cookies:
+            if isinstance(cookie, Mapping):
+                cookie = Pyjo.Cookie.Response.new(**cast(Mapping[str, Any], cookie))
+            headers.add('Set-Cookie', str(cookie))
 
-    def default_message(self, code=None):
+        return self
+
+    def default_message(self, code: int | None = None) -> str:
         """::
 
-            msg = res.default_message()
-            msg = res.default_message(418)
+            message = res.default_message()
+            message = res.default_message(418)
 
         Generate default response message for status code, defaults to using
         :attr:`code`.
         """
-        return MESSAGES.get(code or notnone(self.code, 404), 0) or ''
+        code = code or self.code
+        return MESSAGES.get(code if code is not None else 404, '')
 
-    def extract_start_line(self, buf):
+    @property
+    def max_message_size(self) -> int:
         """::
 
-            boolean = res.extract_start_line(buf)
+            size = res.max_message_size
+            res.max_message_size = 1024
 
-        Extract status-line from string.
+        Maximum message size in bytes, defaults to the value of the
+        ``PYJO_MAX_MESSAGE_SIZE`` environment variable or ``2147483648``
+        (2GiB). Setting the value to ``0`` will allow messages of indefinite
+        size.
+        """
+        return self._max_message_size
+
+    @max_message_size.setter
+    def max_message_size(self, value: int) -> None:
+        self._max_message_size = value
+
+    def extract_start_line(self, buffer: bytearray) -> bool | None:
+        """::
+
+            boolean = res.extract_start_line(buffer)
+
+        Extract status-line from a :class:`bytearray`, which loses it.
         """
         # We have a full response line
-        m = re_line.search(buf)
-        if m:
-            line = m.group(1)
-            del buf[: m.end()]
-        else:
-            return
-
-        m = re_http.search(line)
-        if not m:
-            return not self.set_error(message='Bad response start-line')
-
-        try:
-            self.version = m.group(1).decode('ascii')
-        except:
-            self.version = None
-
-        self.code = convert(m.group(2), int)
-
-        try:
-            self.message = m.group(3).decode('ascii')
-        except:
-            self.message = None
+        if not (m := re.match(rb'(.*?)\x0d?\x0a', bytes(buffer))):
+            return None
+        del buffer[: m.end()]
+        if not (m := re.fullmatch(rb'\s*HTTP/(\d\.\d)\s+(\d\d\d)\s*(.+)?', m[1])):
+            self.error = {'message': 'Bad response start-line'}
+            return False
 
         content = self.content
+        self.code = int(m[2])
         if self.is_empty:
-            content.skip_body = 1
-
+            content.skip_body = True
         if content.auto_decompress is None:
             content.auto_decompress = True
         if content.auto_relax is None:
             content.auto_relax = True
-
-        if self.version == '1.0':
-            content.expect_close = True
-
+        self.version = m[1].decode('latin-1')
+        self.message = m[3].decode('latin-1') if m[3] is not None else None
         return True
 
-    def fix_headers(self):
+    def fix_headers(self) -> Self:
         """::
 
             res = res.fix_headers()
 
         Make sure response has all required headers.
         """
-        if self._fixed:
+        if self._fix:
             return self
         super().fix_headers()
 
@@ -249,64 +266,120 @@ class Pyjo_Message_Response(Pyjo.Message.object):
         if not headers.date:
             headers.date = Pyjo.Date.new().to_str()
 
+        # RFC 7230 3.3.2
+        if self.is_empty:
+            headers.remove('Content-Length')
+
         return self
 
-    def get_start_line_chunk(self, offset):
+    def get_start_line_chunk(self, offset: int) -> bytes:
         """::
 
-            chunk = res.get_start_line_chunk(offset)
+            data = res.get_start_line_chunk(offset)
 
         Get a chunk of status-line data starting from a specific position.
+        Note that this method finalizes the response.
         """
-        if self._start_buffer is None:
-            code = self.code or 404
-            msg = self.message or self.default_message()
-            self._start_buffer = bytearray(b(f'HTTP/{self.version} {code} {msg}\x0d\x0a'))
-
+        buffer = self._start_line()
         self.emit('progress', 'start_line', offset)
-        return self._start_buffer[offset : offset + 131072]
+        return buffer[offset : offset + 131072]
 
     @property
-    def is_empty(self):
+    def is_client_error(self) -> bool:
+        """::
+
+            boolean = res.is_client_error
+
+        Check if this response has a ``4xx`` status :attr:`code`.
+        """
+        return self._status_class(400)
+
+    @property
+    def is_empty(self) -> bool:
         """::
 
             boolean = res.is_empty
 
-        Check if this is a ``1xx``, ``204`` or ``304`` response.
+        Check if this response has a ``1xx``, ``204`` or ``304`` status
+        :attr:`code`.
         """
-        code = self.code
-        if not code:
-            return
-        else:
-            return self.is_status_class(100) or code == 204 or code == 304
+        if not (code := self.code):
+            return False
+        return self.is_info or code == 204 or code == 304
 
-    def is_status_class(self, status_class):
+    @property
+    def is_error(self) -> bool:
         """::
 
-            boolean = res.is_status_class(200)
+            boolean = res.is_error
 
-        Check response status class.
+        Check if this response has a ``4xx`` or ``5xx`` status :attr:`code`.
         """
-        code = self.code
-        if not code:
-            return
-        else:
-            return code >= status_class and code < (status_class + 100)
+        return self._status_class(400, 500)
 
-    def set_cookie(self, cookie):
+    @property
+    def is_info(self) -> bool:
         """::
 
-            res = res.set_cookie(Pyjo.Message.Response.new(name='foo', value='bar'))
-            res = res.set_cookie({'name': 'foo', 'value': 'bar'})
+            boolean = res.is_info
 
-        Set message cookies, usually :mod:`Pyjo.Cookie.Response` object.
+        Check if this response has a ``1xx`` status :attr:`code`.
         """
-        if isinstance(cookie, dict):
-            value = str(Pyjo.Cookie.Response.new(**cookie))
-        else:
-            value = str(cookie)
-        self.headers.add('Set-Cookie', value)
-        return self
+        return self._status_class(100)
+
+    @property
+    def is_redirect(self) -> bool:
+        """::
+
+            boolean = res.is_redirect
+
+        Check if this response has a ``3xx`` status :attr:`code`.
+        """
+        return self._status_class(300)
+
+    @property
+    def is_server_error(self) -> bool:
+        """::
+
+            boolean = res.is_server_error
+
+        Check if this response has a ``5xx`` status :attr:`code`.
+        """
+        return self._status_class(500)
+
+    @property
+    def is_success(self) -> bool:
+        """::
+
+            boolean = res.is_success
+
+        Check if this response has a ``2xx`` status :attr:`code`.
+        """
+        return self._status_class(200)
+
+    @property
+    def start_line_size(self) -> int:
+        """::
+
+            size = res.start_line_size
+
+        Size of the status-line in bytes. Note that this method finalizes the
+        response.
+        """
+        return len(self._start_line())
+
+    def _start_line(self) -> bytes:
+        if self._start_buffer is not None:
+            return self._start_buffer
+        code = self.code or 404
+        message = self.message or self.default_message()
+        self._start_buffer = f'HTTP/{self.version} {code} {message}\x0d\x0a'.encode('latin-1')
+        return self._start_buffer
+
+    def _status_class(self, *classes: int) -> bool:
+        if not (code := self.code):
+            return False
+        return any(code >= c and code < c + 100 for c in classes)
 
 
 new = Pyjo_Message_Response.new

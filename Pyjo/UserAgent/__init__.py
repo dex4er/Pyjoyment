@@ -315,7 +315,7 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
     def _error(self, cid, err):
         tx = self._connections[cid]['tx']
         if tx:
-            tx.res.set_error(message=err)
+            tx.res.error = {'message': err}
         self._finish(cid, True)
 
     def _finish(self, cid, close):
