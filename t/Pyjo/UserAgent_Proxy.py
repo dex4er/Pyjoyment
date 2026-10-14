@@ -37,7 +37,8 @@ with subtest('Proxy detection with lowercase variable names'):
 
         proxy = Pyjo.UserAgent.Proxy.new()
         proxy.detect()
-        is_deeply_ok(proxy.not_, ['localhost', 'localdomain', 'foo.com', 'example.com'], 'right list')
+        # Renamed from Mojolicious: not
+        is_deeply_ok(proxy.no, ['localhost', 'localdomain', 'foo.com', 'example.com'], 'right list')
         is_ok(proxy.http, 'proxy.example.com', 'right proxy')
         is_ok(proxy.https, 'tunnel.example.com', 'right proxy')
         ok(proxy.is_needed('dummy.mojolicious.org'), 'proxy needed')

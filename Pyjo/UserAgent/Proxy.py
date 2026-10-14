@@ -40,7 +40,7 @@ class Pyjo_UserAgent_Proxy(Pyjo.Base.object):
     implements the following new ones.
     """
 
-    def __init__(self, *, http: str | None = None, https: str | None = None, not_: list[str] | None = None) -> None:
+    def __init__(self, *, http: str | None = None, https: str | None = None, no: list[str] | None = None) -> None:
         """::
 
             proxy = Pyjo.UserAgent.Proxy.new()
@@ -66,11 +66,12 @@ class Pyjo_UserAgent_Proxy(Pyjo.Base.object):
         Proxy server to use for HTTPS and WebSocket requests.
         """
 
-        self.not_ = not_
+        # Renamed from Mojolicious: not, a keyword of Python, as the environment variable NO_PROXY names it
+        self.no = no
         """::
 
-            not_ = proxy.not_
-            proxy.not_ = ['localhost', 'intranet.mojolicious.org']
+            no = proxy.no
+            proxy.no = ['localhost', 'intranet.mojolicious.org']
 
         Domains that don't require a proxy server to be used.
         """
@@ -88,7 +89,7 @@ class Pyjo_UserAgent_Proxy(Pyjo.Base.object):
         env = os.environ
         self.http = env.get('HTTP_PROXY') or env.get('http_proxy')
         self.https = env.get('HTTPS_PROXY') or env.get('https_proxy')
-        self.not_ = [domain or '' for domain in split(',', env.get('NO_PROXY') or env.get('no_proxy') or '')]
+        self.no = [domain or '' for domain in split(',', env.get('NO_PROXY') or env.get('no_proxy') or '')]
         return self
 
     def is_needed(self, domain: str) -> bool:
@@ -98,7 +99,7 @@ class Pyjo_UserAgent_Proxy(Pyjo.Base.object):
 
         Check if request for domain would use a proxy server.
         """
-        return not any(domain.endswith(not_) for not_ in self.not_ or [])
+        return not any(domain.endswith(no) for no in self.no or [])
 
     def prepare(self, tx: Pyjo.Transaction.object) -> None:
         """::

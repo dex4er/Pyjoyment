@@ -31,16 +31,16 @@ with subtest('https'):
     proxy.https = 'http://sri:secret@127.0.0.1:8080'
     is_ok(proxy.https, 'http://sri:secret@127.0.0.1:8080', 'proxy.https')
 
-with subtest('not_'):
-    not_ = proxy.not_
-    is_ok(not_, None, 'not_')
-    proxy.not_ = ['localhost', 'intranet.mojolicious.org']
-    is_deeply_ok(proxy.not_, ['localhost', 'intranet.mojolicious.org'], 'proxy.not_')
+with subtest('no'):
+    no = proxy.no
+    is_ok(no, None, 'no')
+    proxy.no = ['localhost', 'intranet.mojolicious.org']
+    is_deeply_ok(proxy.no, ['localhost', 'intranet.mojolicious.org'], 'proxy.no')
 
 with subtest('detect'):
     with patch.dict(os.environ, {'NO_PROXY': 'localhost'}):
         is_ok(proxy.detect(), proxy, 'proxy')
-        is_deeply_ok(proxy.not_, ['localhost'], 'NO_PROXY')
+        is_deeply_ok(proxy.no, ['localhost'], 'NO_PROXY')
 
 with subtest('is_needed'):
     boolean = proxy.is_needed('intranet.example.com')
