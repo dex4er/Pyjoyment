@@ -58,6 +58,7 @@ from Pyjo.Reactor import Handle, IOCallback, TimerCallback
 from Pyjo.Util import md5_sum
 
 import asyncio
+import atexit
 import random
 import sys
 import time
@@ -148,6 +149,7 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
         elif loop is None or loop.is_closed() or (loop is not self._own and not loop.is_running()):
             if self._own is None or self._own.is_closed():
                 self._own = asyncio.new_event_loop()
+                _OWN.add(self._own)
             self._move(self._own)
 
         assert self._loop is not None
@@ -538,6 +540,19 @@ def _fileno(handle: Handle) -> int:
     if fd < 0:
         Pyjo.Exception.object.throw('Handle is closed')
     return fd
+
+
+# Not in Mojolicious: the event loops that the reactors make for themselves, which are closed at the exit of the
+# interpreter, before it finalizes the objects and the loops of the reactors that still exist would warn that they are
+# not closed
+_OWN: 'weakref.WeakSet[asyncio.AbstractEventLoop]' = weakref.WeakSet()
+
+
+@atexit.register
+def _close() -> None:
+    for loop in list(_OWN):
+        if not loop.is_running() and not loop.is_closed():
+            loop.close()
 
 
 new = Pyjo_Reactor_Asyncio.new

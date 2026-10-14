@@ -4,8 +4,11 @@ import Pyjo.Reactor.Asyncio
 from Pyjo.Test import *
 
 import asyncio
+import os
 import re
 import socket
+import subprocess
+import sys
 
 
 with subtest('Coroutines run in the loop of the reactor'):
@@ -104,5 +107,18 @@ with subtest('Handles'):
     a.close()
     throws_ok(lambda: reactor.remove(a), re.compile(r'^Handle is closed'), 'closed handle')
     b.close()
+
+with subtest('The event loop of a reactor that exists at the exit is closed'):
+    script = (
+        'import Pyjo.Reactor.Asyncio\n'
+        'reactor = Pyjo.Reactor.Asyncio.new()\n'
+        'reactor.timer(0, lambda reactor: reactor.stop())\n'
+        'reactor.start()\n'
+    )
+    root = os.path.join(os.path.dirname(__file__), '..', '..')
+    env = {**os.environ, 'PYTHONPATH': root, 'PYTHONWARNINGS': 'always::ResourceWarning'}
+    process = subprocess.run([sys.executable, '-c', script], env=env, capture_output=True, text=True, timeout=30)
+    is_ok(process.returncode, 0, 'exit status')
+    unlike_ok(process.stderr, r'unclosed event loop', 'no ResourceWarning')
 
 done_testing()

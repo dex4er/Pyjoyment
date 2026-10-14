@@ -358,7 +358,9 @@ copy:
   `tx` in `Mojo::UserAgent::Transactor` with its options
   (`form => {a => 'b'}, charset => 'UTF-8'`), is a keyword argument
   (`form={'a': 'b'}, charset='UTF-8'`), and a hash reference of headers or
-  the content before it are positional arguments.
+  the content before it are positional arguments. A callback that Mojo takes
+  after them, as the request methods of `Mojo::UserAgent` do, is the last
+  positional argument (`ua.get(url, {'DNT': 1}, cb, form={'a': 'b'})`).
 - A Perl string of characters is a `str`, and bytes in Python are `bytes`,
   encoded with the charset of the module. Perl keeps bytes that do not decode
   as a byte string, which is a `str` of the characters 0-255 in Python:

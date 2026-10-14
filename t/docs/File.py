@@ -114,6 +114,40 @@ with subtest('dirname'):
     # "/home/sri" (on UNIX)
     is_ok(path('/home/sri/.vimrc').dirname(), '/home/sri', 'dirname')
 
+with subtest('download'):
+    import Pyjo.IOLoop
+    import Pyjo.Server.Daemon
+    import Pyjo.UserAgent
+
+    import importlib
+    import sys
+
+    # The URL of a daemon with the minimal Mojolicious::Lite of the tests in place of https://example.com
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
+    Lite = importlib.import_module('Lite')
+    Lite.app.log.level = 'fatal'
+
+    @Lite.get('/test.tar.gz')
+    def tarball(c):
+        c.res.headers.accept_ranges = 'bytes'
+        c.render(data=(c.req.headers.accept or 'none').encode())
+
+    daemon = Pyjo.Server.Daemon.new(app=Lite.app, listen=['http://127.0.0.1'], silent=True).start()
+    url = f'http://127.0.0.1:{daemon.ports()[0]}/test.tar.gz'
+
+    def download():
+        file = Pyjo.File.tempdir().child('test.tar.gz')
+        # Not in the docstring: a blocking user agent on the event loop of the daemon
+        ua = Pyjo.UserAgent.new(ioloop=Pyjo.IOLoop.singleton)
+        boolean = file.download(url, headers={'Accept': '*/*'}, ua=ua)
+        return boolean, file.slurp()
+
+    is_deeply_ok(download(), (True, b'*/*'), 'boolean')
+    file = Pyjo.File.tempdir().child('test.tar.gz')
+    boolean = file.download(url, ua=Pyjo.UserAgent.new(ioloop=Pyjo.IOLoop.singleton))
+    ok(boolean, 'boolean')
+    daemon.stop()
+
 with subtest('extname'):
     # "js"
     is_ok(path('/home/sri/test.js').extname, 'js', 'extname')
