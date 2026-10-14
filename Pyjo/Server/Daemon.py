@@ -4,30 +4,38 @@ Pyjo.Server.Daemon - Non-blocking I/O HTTP and WebSocket server
 ::
 
     import Pyjo.Server.Daemon
-    from Pyjo.Util import b
 
-    with Pyjo.Server.Daemon.new(listen=['http://*:8080']) as daemon:
-        daemon.unsubscribe('request')
+    daemon = Pyjo.Server.Daemon.new(listen=['http://*:8080'])
 
-        @daemon.on
-        def request(daemon, tx):
-            # Request
-            method = tx.req.method
-            path = tx.req.url.path
 
-            # Response
-            tx.res.code = 200
-            tx.res.headers.content_type = 'text/plain'
-            tx.res.body = b("{0} request for {1}!".format(method, path))
+    @daemon.unsubscribe('request').on('request')
+    def request(daemon, tx):
+        # Request
+        method = tx.req.method
+        path = tx.req.url.path
 
-            # Resume transaction
-            tx.resume()
+        # Response
+        tx.res.code = 200
+        tx.res.headers.content_type = 'text/plain'
+        tx.res.body = f'{method} request for {path}!'.encode()
 
-        daemon.run()
+        # Resume transaction
+        tx.resume()
 
-:mod:`Pyjo.Server.Daemon` is a full featured, highly portable non-blocking I/O
-HTTP and WebSocket server, with IPv6, TLS, Comet (long polling), keep-alive and
-multiple event loop support.
+
+    daemon.run()
+
+:mod:`Pyjo.Server.Daemon` is a full featured, highly portable non-blocking
+I/O HTTP and WebSocket server, with IPv6, TLS, SNI, Comet (long polling),
+keep-alive and multiple event loop support.
+
+TLS support comes from :mod:`ssl` of the standard library, and can be
+disabled with the ``PYJO_NO_TLS`` environment variable, as name resolution
+and SOCKS5 support of :mod:`Pyjo.IOLoop` with ``PYJO_NO_NNR`` and
+``PYJO_NO_SOCKS``.
+
+A daemon is also a context manager, which stops listening and closes its
+connections at its end.
 
 Signals
 -------
@@ -48,75 +56,129 @@ Events
 Debugging
 ---------
 
-You can set the ``PYJO_DAEMON_DEBUG`` environment variable to get some advanced
-diagnostics information printed to :attr:`sys.stderr`. ::
+You can set the ``PYJO_SERVER_DEBUG`` environment variable to get some
+advanced diagnostics information printed to :data:`sys.stderr`. ::
 
-    MOJO_DAEMON_DEBUG=1
+    PYJO_SERVER_DEBUG=1
+
+See also
+--------
+
+:mod:`Pyjoyment`, https://mojolicious.org.
+
+Ported from `Mojo::Server::Daemon <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/Server/Daemon.pm>`_
+of Mojolicious 9.49.
 
 Classes
 -------
 """
 
+import Pyjo.Exception
 import Pyjo.IOLoop
+import Pyjo.IOLoop.Stream
+import Pyjo.IOLoop.TLS
 import Pyjo.Server
+import Pyjo.Transaction
+import Pyjo.Transaction.HTTP
 import Pyjo.Transaction.WebSocket
 import Pyjo.URL
 
-from Pyjo.Util import convert, getenv, isalive, notnone, warn
+from Pyjo.String.Unicode import split
+from Pyjo.Util import term_escape, warn
 from Pyjo.WebSocket import server_handshake
 
-import platform
+import os
+import re
 import signal
 import socket
+import ssl
+import sys
+import threading
 import weakref
 
+from types import TracebackType
+from typing import Any, Self
 
-DEBUG = getenv('PYJO_DAEMON_DEBUG', False)
+
+DEBUG = bool(os.environ.get('PYJO_SERVER_DEBUG'))
+
+# The protocol versions of IO::Socket::SSL's SSL_version
+VERSIONS = {
+    'TLSv1': ssl.TLSVersion.TLSv1,
+    'TLSv1_1': ssl.TLSVersion.TLSv1_1,
+    'TLSv1_2': ssl.TLSVersion.TLSv1_2,
+    'TLSv1_3': ssl.TLSVersion.TLSv1_3,
+}
 
 
 class Pyjo_Server_Daemon(Pyjo.Server.object):
     """
-    :mod:`Pyjo.Server.Daemon` inherits all attributes and methods from
-    :mod:`Pyjo.Server` and implements the following new ones.
+    :mod:`Pyjo.Server.Daemon` inherits all methods from :mod:`Pyjo.Server`
+    and implements the following new ones.
     """
 
-    def __init__(self, **kwargs):
-        # TODO: the arguments of Pyjo.Server, which takes no others, until this module is ported
-        super().__init__(**{k: kwargs[k] for k in ('app', 'reverse_proxy', 'trusted_proxies') if k in kwargs})
+    def __init__(
+        self,
+        *,
+        acceptors: list[str] | None = None,
+        backlog: int | None = None,
+        inactivity_timeout: float | None = None,
+        ioloop: Pyjo.IOLoop.object | None = None,
+        keep_alive_timeout: float | None = None,
+        listen: list[str] | None = None,
+        max_clients: int | None = None,
+        max_requests: int = 100,
+        silent: bool | None = None,
+        **kwargs: Any,
+    ) -> None:
+        """::
 
-        self.acceptors = kwargs.get('acceptors', [])
+            daemon = Pyjo.Server.Daemon.new()
+            daemon = Pyjo.Server.Daemon.new(listen=['http://*:8080'], silent=True)
+
+        Construct a new :mod:`Pyjo.Server.Daemon` object.
+        """
+        super().__init__(**kwargs)
+
+        self.acceptors: list[str] = acceptors if acceptors is not None else []
         """::
 
             acceptors = daemon.acceptors
-            daemon.acceptors = []
+            daemon.acceptors = ['6be0c140ef00a389c5d039536b56d139']
 
-        Active acceptors.
+        Active acceptor ids. ::
+
+            # Check port
+            port = daemon.ioloop.acceptor(daemon.acceptors[0]).port
         """
 
-        self.backlog = kwargs.get('backlog')
+        self.backlog = backlog
         """::
 
             backlog = daemon.backlog
             daemon.backlog = 128
 
-        Listen backlog size, defaults to ``SOMAXCONN``.
+        Listen backlog size, defaults to :data:`socket.SOMAXCONN`.
         """
 
-        self.inactivity_timeout = notnone(
-            kwargs.get('inactivity_timeout'), lambda: convert(getenv('PYJO_INACTIVITY_TIMEOUT'), int, 15)
+        self.inactivity_timeout: float = (
+            inactivity_timeout
+            if inactivity_timeout is not None
+            else _number(os.environ.get('PYJO_INACTIVITY_TIMEOUT'), 30)
         )
         """::
 
             timeout = daemon.inactivity_timeout
             daemon.inactivity_timeout = 5
 
-        Maximum amount of time in seconds a connection can be inactive before getting
-        closed, defaults to the value of the ``PYJO_INACTIVITY_TIMEOUT`` environment
-        variable or ``15``. Setting the value to ``0`` will allow connections to be
-        inactive indefinitely.
+        Maximum amount of time in seconds a connection with an active request
+        can be inactive before getting closed, defaults to the value of the
+        ``PYJO_INACTIVITY_TIMEOUT`` environment variable or ``30``. Setting
+        the value to ``0`` will allow connections to be inactive
+        indefinitely.
         """
 
-        self.ioloop = notnone(kwargs.get('ioloop'), lambda: Pyjo.IOLoop.singleton)
+        self.ioloop: Pyjo.IOLoop.object = ioloop if ioloop is not None else Pyjo.IOLoop.object.singleton()
         """::
 
             loop = daemon.ioloop
@@ -126,15 +188,36 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
         :mod:`Pyjo.IOLoop` singleton.
         """
 
-        self.listen = notnone(kwargs.get('listen'), lambda: (getenv('PYJO_LISTEN') or 'http://*:3000').split(','))
+        self.keep_alive_timeout: float = (
+            keep_alive_timeout
+            if keep_alive_timeout is not None
+            else _number(os.environ.get('PYJO_KEEP_ALIVE_TIMEOUT'), 5)
+        )
+        """::
+
+            timeout = daemon.keep_alive_timeout
+            daemon.keep_alive_timeout = 10
+
+        Maximum amount of time in seconds a connection without an active
+        request can be inactive before getting closed, defaults to the value
+        of the ``PYJO_KEEP_ALIVE_TIMEOUT`` environment variable or ``5``.
+        Setting the value to ``0`` will allow connections to be inactive
+        indefinitely.
+        """
+
+        self.listen: list[str] = (
+            listen
+            if listen is not None
+            else [location or '' for location in split(',', os.environ.get('PYJO_LISTEN') or 'http://*:3000')]
+        )
         """::
 
             listen = daemon.listen
             daemon.listen = ['https://127.0.0.1:8080']
 
-        List of one or more locations to listen on, defaults to the value of the
-        ``PYJO_LISTEN`` environment variable or ``http://*:3000`` (shortcut for
-        ``http://0.0.0.0:3000``). ::
+        List of one or more locations to listen on, defaults to the value of
+        the ``PYJO_LISTEN`` environment variable or ``http://*:3000``
+        (shortcut for ``http://0.0.0.0:3000``). ::
 
             # Listen on all IPv4 interfaces
             daemon.listen = ['http://*:3000']
@@ -148,6 +231,12 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
             # Listen on IPv4 and IPv6 interfaces
             daemon.listen = ['http://127.0.0.1:3000', 'http://[::1]:3000']
 
+            # Listen on UNIX domain socket "/tmp/myapp.sock" (percent encoded slash)
+            daemon.listen = ['http+unix://%2Ftmp%2Fmyapp.sock']
+
+            # File descriptor, as used by systemd
+            daemon.listen = ['http://127.0.0.1?fd=3']
+
             # Allow multiple servers to use the same port (SO_REUSEPORT)
             daemon.listen = ['http://*:8080?reuse=1']
 
@@ -157,76 +246,109 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
             # Use a custom certificate and key
             daemon.listen = ['https://*:3000?cert=/x/server.crt&key=/y/server.key']
 
+            # Domain specific certificates and keys (SNI)
+            daemon.listen = ['https://*:3000?example.com_cert=/x/my.crt&example.com_key=/y/my.key']
+
             # Or even a custom certificate authority
             daemon.listen = ['https://*:3000?cert=/x/server.crt&key=/y/server.key&ca=/z/ca.crt']
 
         These parameters are currently available:
 
-        ``ca``
+        ca
             ::
 
-                ca='/etc/tls/ca.crt'
+                ca=/etc/tls/ca.crt
 
-            Path to TLS certificate authority file.
+            Path to TLS certificate authority file used to verify the peer
+            certificate.
 
-        ``cert``
+        cert
             ::
 
-                cert='/etc/tls/server.crt'
+                cert=/etc/tls/server.crt
+                mojolicious.org_cert=/etc/tls/mojo.crt
 
-            Path to the TLS cert file, defaults to a built-in test certificate.
+            Path to the TLS cert file, defaults to a built-in test
+            certificate.
 
-        ``ciphers``
+        ciphers
             ::
 
-                ciphers='AES128-GCM-SHA256:RC4:HIGH:!MD5:!aNULL:!EDH'
+                ciphers=AES128-GCM-SHA256:RC4:HIGH:!MD5:!aNULL:!EDH
 
-            Cipher specification string.
+            TLS cipher specification string. For more information about the
+            format see
+            https://www.openssl.org/docs/manmaster/man1/ciphers.html#CIPHER-STRINGS.
 
-        ``key``
+        fd
             ::
 
-                key='/etc/tls/server.key'
+                fd=3
+
+            File descriptor with an already prepared listen socket.
+
+        key
+            ::
+
+                key=/etc/tls/server.key
+                mojolicious.org_key=/etc/tls/mojo.key
 
             Path to the TLS key file, defaults to a built-in test key.
 
-        ``reuse``
+        reuse
             ::
 
-                reuse=True
+                reuse=1
 
-            Allow multiple servers to use the same port with the ``SO_REUSEPORT`` socket
-            option.
+            Allow multiple servers to use the same port with the
+            ``SO_REUSEPORT`` socket option.
 
-        ``verify``
+        single_accept
+            ::
+
+                single_accept=1
+
+            Only accept one connection at a time.
+
+        verify
             ::
 
                 verify=0x00
 
-            TLS verification mode, defaults to ``0x03``.
+            TLS verification mode: ``0x00`` verifies no peer, ``0x01``
+            verifies a peer certificate if there is one, and ``0x03`` requires
+            it.
+
+        version
+            ::
+
+                version=TLSv1_2
+
+            TLS protocol version.
         """
 
-        self.max_clients = None
+        self.max_clients = max_clients
         """::
 
-          max_clients = daemon.max_clients
-          daemon.max_clients = 1000
+            max = daemon.max_clients
+            daemon.max_clients = 100
 
-        Maximum number of concurrent connections this server is allowed to handle
-        before stopping to accept new incoming connections, passed along to
-        :attr:`Pyjo.IOLoop.max_connections`.
+        Maximum number of accepted connections this server is allowed to
+        handle concurrently, before stopping to accept new incoming
+        connections, passed along to :attr:`Pyjo.IOLoop.Pyjo_IOLoop.max_connections`.
         """
 
-        self.max_requests = 25
+        self.max_requests = max_requests
         """::
 
-            max_requests = daemon.max_requests
-            daemon.max_requests = 100
+            max = daemon.max_requests
+            daemon.max_requests = 250
 
-        Maximum number of keep-alive requests per connection, defaults to ``25``.
+        Maximum number of keep-alive requests per connection, defaults to
+        ``100``.
         """
 
-        self.silent = None
+        self.silent = silent
         """::
 
             boolean = daemon.silent
@@ -235,133 +357,159 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
         Disable console messages.
         """
 
-        self._connections = {}
-        self._servers = {}
+        self._connections: dict[str, dict[str, Any]] = {}
+        self._servers: dict[str, Any] = {}
 
-    def __del__(self):
-        if DEBUG:
-            warn(f'-- Method {self}.__del__')
-
+    def __del__(self) -> None:
+        if sys.is_finalizing():
+            return
         try:
-            self.stop()
-        except:
+            self._cleanup()
+        except Exception:
             pass
 
-    def __enter__(self):
+    # Not in Mojolicious: a context manager, which does what DESTROY does, as PyPy frees the daemon only when its
+    # garbage collector runs
+    def __enter__(self) -> Self:
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.stop()
+    def __exit__(
+        self, exc_type: type[BaseException] | None, exc: BaseException | None, tb: TracebackType | None
+    ) -> None:
+        self._cleanup()
 
-    def run(self):
+    def ports(self) -> list[int]:
+        """::
+
+            ports = daemon.ports()
+
+        Get all ports this server is currently listening on. ::
+
+            # All ports
+            for port in daemon.ports():
+                print(port)
+        """
+        return [self.ioloop.acceptor(id).port for id in self.acceptors]
+
+    def run(self) -> None:
         """::
 
             daemon.run()
 
-        Run server.
+        Run server and wait for the signals ``INT`` and ``TERM``.
         """
         # Make sure the event loop can be stopped in regular intervals
-        loop = weakref.proxy(self.ioloop)
+        loop = self.ioloop
+        interval = loop.recurring(1, lambda loop: None)
 
-        def ticker_cb(loop):
-            pass
+        def stop(signum: int, frame: Any) -> None:
+            loop.stop()
 
-        ticker = loop.recurring(1, ticker_cb)
+        # Not in Mojolicious: a thread other than the main one cannot handle signals
+        handlers: dict[signal.Signals, Any] = {}
+        if threading.current_thread() is threading.main_thread():
+            for name in (signal.SIGINT, signal.SIGTERM):
+                handlers[name] = signal.signal(name, stop)
+        try:
+            self.start().ioloop.start()
+        finally:
+            for name, handler in handlers.items():
+                signal.signal(name, handler)
+            loop.remove(interval)
 
-        def signal_cb(signal, frame):
-            if isalive(loop):
-                loop.stop()
-
-        for sig in signal.SIGINT, signal.SIGTERM:
-            signal.signal(sig, signal_cb)
-
-        self.start().ioloop.start()
-        loop.remove(ticker)
-
-    def start(self):
+    def start(self) -> Self:
         """::
 
             daemon = daemon.start()
 
-        Start accepting connections. ::
+        Start or resume accepting connections through :attr:`ioloop`. ::
 
-            cid  = daemon.set(listen=['http://127.0.0.1']).start().acceptors[0]
-            port = daemon.ioloop.acceptor(cid).port
+            # Listen on random port
+            daemon.listen = ['http://127.0.0.1']
+            port = daemon.start().ports()[0]
+
+            # Run multiple web servers concurrently
+            daemon1 = Pyjo.Server.Daemon.new(listen=['http://*:3000']).start()
+            daemon2 = Pyjo.Server.Daemon.new(listen=['http://*:4000']).start()
+            if not Pyjo.IOLoop.is_running():
+                Pyjo.IOLoop.start()
         """
-        # Resume accepting connections
         loop = self.ioloop
-        max_clients = self.max_clients
-        if max_clients:
-            loop.max_connections = max_clients
-        servers = self._servers
-        if servers:
-            for name, server in servers.items():
-                self.acceptors.append(loop.acceptor(server))
-                del servers[name]
+        if max := self.max_clients:
+            loop.max_connections = max
+
+        # Resume accepting connections
+        if servers := self._servers:
+            for id in list(servers):
+                self.acceptors.append(loop.acceptor(servers.pop(id)))
 
         # Start listening
-        else:
+        elif not len(self.acceptors):
+            self.app.server(self)
             for listen in self.listen:
                 self._listen(listen)
 
         return self
 
-    def stop(self):
+    def stop(self) -> Self:
         """::
 
             daemon = daemon.stop()
 
-        Stop accepting connections. Used by context manager.
+        Stop accepting connections through :attr:`ioloop`.
         """
         # Suspend accepting connections but keep listen sockets open
         loop = self.ioloop
-        while self.acceptors:
-            cid = self.acceptors.pop(0)
-            server = self._servers[cid] = loop.acceptor(cid)
-            loop.remove(cid)
-            server.stop()
+        while len(self.acceptors):
+            id = self.acceptors.pop(0)
+            self._servers[id] = loop.acceptor(id)
+            loop.remove(id, close=False)
 
         return self
 
-    def _build_tx(self, cid, c):
+    def _build_tx(self, id: str, c: dict[str, Any]) -> Pyjo.Transaction.HTTP.object:
         tx = self.build_tx()
-        tx.connection = cid
-        tx.res.headers.server = f'Pyjoyment ({platform.python_implementation()})'
-        stream = self.ioloop.stream(cid)
+        tx.connection = id
+        # Unlike Mojolicious: Pyjoyment names itself
+        tx.res.headers.server = 'Pyjoyment (Python)'
+        stream = self.ioloop.stream(id)
         stream.timeout = self.inactivity_timeout
         handle = stream.handle
-        if handle.family != socket.AF_UNIX:
+        if handle.family != getattr(socket, 'AF_UNIX', None):
             tx.local_address, tx.local_port = handle.getsockname()[:2]
             tx.remote_address, tx.remote_port = handle.getpeername()[:2]
         if c.get('tls'):
             tx.req.url.base.scheme = 'https'
 
-        daemon = weakref.proxy(self)
+        ref = weakref.ref(self)
 
         @tx.on('request')
-        def request(tx):
-            if not isalive(daemon):
+        def request(tx: Pyjo.Transaction.HTTP.object) -> None:
+            if (this := ref()) is None:
                 return
             req = tx.req
             if error := req.error:
-                daemon._trace(cid, error['message'])
+                this._trace(id, error['message'])
 
             # WebSocket
             if req.is_handshake:
-                ws = daemon._connections[cid]['next'] = Pyjo.Transaction.WebSocket.new(handshake=tx)
-                daemon.emit('request', server_handshake(ws))
+                ws = this._connections[id]['next'] = Pyjo.Transaction.WebSocket.new(handshake=tx)
+                this.emit('request', server_handshake(ws))
 
             # HTTP
             else:
-                daemon.emit('request', tx)
+                this.emit('request', tx)
 
             # Last keep-alive request or corrupted connection
-            c = daemon._connections[cid]
-            if (c.get('requests') or 1) >= daemon.max_requests or req.error:
+            c = this._connections.get(id, {})
+            if (c.get('requests') or 1) >= this.max_requests or req.error:
                 tx.res.headers.connection = 'close'
 
-            tx.on('resume', lambda tx: daemon._write(cid) if isalive(daemon) else None)
-            daemon._write(cid)
+            def resume(tx: Pyjo.Transaction.HTTP.object) -> None:
+                _call(ref, '_write', id)
+
+            tx.on('resume', resume)
+            this._write(id)
 
         # Kept alive if we have more than one request on the connection
         c['requests'] = c.get('requests', 0) + 1
@@ -369,34 +517,44 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
             tx.kept_alive = True
         return tx
 
-    def _close(self, cid):
-        if tx := self._connections.get(cid, {}).get('tx'):
+    def _cleanup(self) -> None:
+        loop = self.ioloop
+        for id in [*self._connections, *self.acceptors]:
+            loop.remove(id)
+        # Not in Mojolicious: the listen sockets of a stopped daemon, which Perl closes as it frees them
+        for server in self._servers.values():
+            server.close()
+        self._servers = {}
+
+    def _close(self, id: str) -> None:
+        if (tx := self._connections.get(id, {}).get('tx')) is not None:
             tx.closed()
-        self._connections.pop(cid, None)
+        self._connections.pop(id, None)
 
-    def _trace(self, cid, message):
-        if self._connections.get(cid, {}).get('tx'):
-            self.app.log.trace(message)
-
-    def _finish(self, cid):
+    def _finish(self, id: str) -> None:
         # Always remove connection for WebSockets
-        c = self._connections.get(cid)
-        if not c or not (tx := c.get('tx')):
+        c = self._connections.get(id)
+        if c is None or (tx := c.get('tx')) is None:
             return
         if tx.is_websocket:
-            return self._remove(cid)
+            return self._remove(id)
 
         # Finish transaction
         c.pop('tx').closed()
 
         # Upgrade connection to WebSocket
-        if ws := c.pop('next', None):
+        if (ws := c.pop('next', None)) is not None:
             # Successful upgrade
             if ws.handshake.res.code == 101:
-                c['tx'] = ws.set(established=True)
-                daemon = weakref.proxy(self)
-                ws.on('resume', lambda ws: daemon._write(cid) if isalive(daemon) else None)
-                self._write(cid)
+                ws.established = True
+                c['tx'] = ws
+                ref = weakref.ref(self)
+
+                def resume(ws: Pyjo.Transaction.WebSocket.object) -> None:
+                    _call(ref, '_write', id)
+
+                ws.on('resume', resume)
+                self._write(id)
 
             # Failed upgrade
             else:
@@ -404,72 +562,90 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
 
         # Close connection if necessary
         if tx.error or not tx.keep_alive:
-            return self._remove(cid)
+            return self._remove(id)
 
         # Build new transaction for leftovers
         if len(leftovers := tx.req.content.leftovers()):
-            tx = c['tx'] = self._build_tx(cid, c)
+            tx = c['tx'] = self._build_tx(id, c)
             tx.server_read(leftovers)
 
-    def _listen(self, listen):
+        # Keep-alive connection
+        if c.get('tx') is None:
+            self.ioloop.stream(id).timeout = self.keep_alive_timeout
+
+    def _listen(self, listen: str) -> None:
         url = Pyjo.URL.new(listen)
+        proto = url.protocol
+        if proto not in ('http', 'https', 'http+unix'):
+            raise Pyjo.Exception.new(f'Invalid listen location "{listen}"')
+
         query = url.query
-        options = {
-            'address': url.host,
-            'backlog': self.backlog,
-            'reuse': query.param('reuse'),
-        }
-        port = url.port
-        if port:
-            options['port'] = port
-        for param in 'ca', 'cert', 'ciphers', 'key':
-            options['tls_' + param] = query.param(param)
-        verify = query.param('verify')
-        if verify is not None:
-            if verify.startswith('0x'):
-                options['tls_verify'] = int(verify, 16)
-            else:
-                options['tls_verify'] = int(verify)
-        if options['address'] == '*':
-            del options['address']
-        tls = options['tls'] = url.protocol == 'https'
+        options: dict[str, Any] = {'backlog': self.backlog}
+        if (fd := query.param('fd')) is not None:
+            options['fd'] = int(fd)
+        for name in ('single_accept', 'reuse'):
+            options[name] = (value := query.param(name)) is not None and value not in ('', '0')
+        if proto == 'http+unix':
+            options['path'] = url.host
+        else:
+            if (host := url.host) != '*':
+                options['address'] = host
+            if port := url.port:
+                options['port'] = port
 
-        daemon = weakref.proxy(self)
+        options['tls_ca'] = query.param('ca')
+        for name in query.names():
+            if m := re.fullmatch(r'(.*)_(cert|key)', name):
+                options.setdefault(f'tls_{m[2]}', {})[m[1]] = query.param(name)
+        if cert := query.param('cert'):
+            options.setdefault('tls_cert', {})[''] = cert
+        if key := query.param('key'):
+            options.setdefault('tls_key', {})[''] = key
+        tls = options['tls'] = proto == 'https'
 
-        @self.ioloop.server(**options)
-        def server(loop, stream, cid):
-            if isalive(daemon):
-                c = daemon._connections[cid] = {'tls': tls}
-                if DEBUG:
-                    warn(f'-- Accept {cid} {stream.handle.getpeername()}\n')
-                stream.timeout = daemon.inactivity_timeout
+        # Unlike Mojolicious: the options of IO::Socket::SSL change the context that the other options make
+        ciphers, verify, version = query.param('ciphers'), query.param('verify'), query.param('version')
+        if tls and (ciphers is not None or verify is not None or version is not None):
+            context = Pyjo.IOLoop.TLS.context(server=True, **options)
+            if ciphers is not None:
+                context.set_ciphers(ciphers)
+            if verify is not None:
+                mode = int(verify, 16)
+                context.verify_mode = (
+                    ssl.CERT_NONE if not mode & 1 else ssl.CERT_REQUIRED if mode & 2 else ssl.CERT_OPTIONAL
+                )
+            if version is not None and (tls_version := VERSIONS.get(version)) is not None:
+                context.minimum_version = context.maximum_version = tls_version
+            options['tls_context'] = context
 
-                def close_cb(stream):
-                    if isalive(daemon):
-                        daemon._close(cid)
+        ref = weakref.ref(self)
 
-                stream.on('close', close_cb)
+        def server(loop: Pyjo.IOLoop.object, stream: Pyjo.IOLoop.Stream.object, id: str) -> None:
+            if (this := ref()) is None:
+                return
+            this._connections[id] = {'tls': tls}
+            if DEBUG:
+                warn(f'-- Accept {id} ({_peer(stream.handle)})\n')
+            stream.timeout = this.inactivity_timeout
 
-                def error_cb(stream, err):
-                    if isalive(daemon):
-                        daemon.app.log.error(err)
-                        daemon._close(cid)
+            def close(stream: Pyjo.IOLoop.Stream.object) -> None:
+                _call(ref, '_close', id)
 
-                stream.on('error', error_cb)
+            def error(stream: Pyjo.IOLoop.Stream.object, err: Any) -> None:
+                _call(ref, '_error', id, err)
 
-                def read_cb(stream, chunk):
-                    if isalive(daemon):
-                        daemon._read(cid, chunk)
+            def read(stream: Pyjo.IOLoop.Stream.object, chunk: bytes) -> None:
+                _call(ref, '_read', id, chunk)
 
-                stream.on('read', read_cb)
+            def timeout(stream: Pyjo.IOLoop.Stream.object) -> None:
+                _call(ref, '_trace', id, 'Inactivity timeout (see FAQ for more)')
 
-                def timeout_cb(stream):
-                    if isalive(daemon) and c and c['tx']:
-                        self.app.log.debug('Inactivity timeout')
+            stream.on('close', close)
+            stream.on('error', error)
+            stream.on('read', read)
+            stream.on('timeout', timeout)
 
-                stream.on('timeout', timeout_cb)
-
-        self.acceptors.append(server)
+        self.acceptors.append(self.ioloop.server(server, **options))
 
         if self.silent:
             return
@@ -477,44 +653,78 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
         query.pairs = []
         if url.host == '*':
             url.host = '127.0.0.1'
-        print(f'Server available at {url}')
+        if not options.get('path') and not url.port:
+            url.port = self.ports()[-1]
+        print(f'Web application available at {options.get("path") or url}')
 
-    def _read(self, cid, chunk):
+    def _error(self, id: str, err: Any) -> None:
+        self.app.log.error(str(err))
+        self._close(id)
+
+    def _read(self, id: str, chunk: bytes) -> None:
         # Make sure we have a transaction
-        c = self._connections[cid]
-        if not c.get('tx'):
-            c['tx'] = self._build_tx(cid, c)
-        tx = c['tx']
+        c = self._connections[id]
+        if (tx := c.get('tx')) is None:
+            tx = c['tx'] = self._build_tx(id, c)
         if DEBUG:
-            warn(f'-- Server <<< Client ({self._url(tx)})\n{chunk!r}')
+            warn(term_escape(f'-- Server <<< Client ({_url(tx)})\n{chunk.decode("latin-1")}\n'))
         tx.server_read(chunk)
 
-    def _remove(self, cid):
-        self.ioloop.remove(cid)
-        self._close(cid)
+    def _remove(self, id: str) -> None:
+        self.ioloop.remove(id)
+        self._close(id)
 
-    def _url(self, tx):
-        return tx.req.url.to_abs()
+    def _trace(self, id: str, message: str) -> None:
+        if self._connections.get(id, {}).get('tx') is not None:
+            self.app.log.trace(message)
 
-    def _write(self, cid):
+    def _write(self, id: str) -> None:
         # Protect from resume event recursion
-        c = self._connections.get(cid)
-        if not c or not (tx := c.get('tx')) or c.get('writing'):
+        c = self._connections.get(id)
+        if c is None or (tx := c.get('tx')) is None or c.get('writing'):
             return
+        writing = c.get('writing')
         c['writing'] = True
         try:
             chunk = tx.server_write()
         finally:
-            c['writing'] = False
+            c['writing'] = writing
         if DEBUG:
-            warn(f'-- Server >>> Client ({self._url(tx)})\n{chunk!r}')
-        next = self._finish if tx.is_finished else self._write if len(chunk) else None
-        stream = self.ioloop.stream(cid)
+            warn(term_escape(f'-- Server >>> Client ({_url(tx)})\n{chunk.decode("latin-1")}\n'))
+        next = '_finish' if tx.is_finished else '_write' if len(chunk) else None
+        stream = self.ioloop.stream(id)
         if next is None:
             stream.write(chunk)
             return
-        daemon = weakref.proxy(self)
-        stream.write(chunk, lambda stream: next(cid) if isalive(daemon) else None)
+        ref = weakref.ref(self)
+
+        def written(stream: Pyjo.IOLoop.Stream.object) -> None:
+            _call(ref, next, id)
+
+        stream.write(chunk, written)
+
+
+# A method of the daemon, as long as it exists, as Mojo weakens the daemon in its callbacks
+def _call(ref: 'weakref.ref[Any]', method: str, *args: Any) -> None:
+    if (daemon := ref()) is not None:
+        getattr(daemon, method)(*args)
+
+
+def _number(value: str | None, default: float) -> float:
+    if value is None:
+        return default
+    number = float(value)
+    return int(number) if number.is_integer() else number
+
+
+def _peer(handle: Any) -> str:
+    if handle.family == getattr(socket, 'AF_UNIX', None):
+        return str(handle.getpeername())
+    return str(handle.getpeername()[0])
+
+
+def _url(tx: Pyjo.Transaction.object) -> str:
+    return str(tx.req.url.to_abs())
 
 
 new = Pyjo_Server_Daemon.new

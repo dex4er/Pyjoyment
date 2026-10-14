@@ -30,6 +30,7 @@ import Pyjo.EventEmitter
 import Pyjo.IOLoop
 import Pyjo.UserAgent.CookieJar
 import Pyjo.UserAgent.Proxy
+import Pyjo.UserAgent.Server
 import Pyjo.UserAgent.Transactor
 
 from Pyjo.Util import getenv, isalive, notnone, warn
@@ -64,6 +65,7 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
         self.request_timeout = notnone(kwargs.get('request_timeout'), lambda: getenv('PYJO_REQUEST_TIMEOUT', 0))
         self.proxy = notnone(kwargs.get('proxy'), lambda: Pyjo.UserAgent.Proxy.new())
         self.transactor = notnone(kwargs.get('transactor'), lambda: Pyjo.UserAgent.Transactor.new())
+        self.server = notnone(kwargs.get('server'), lambda: Pyjo.UserAgent.Server.new(ioloop=self.ioloop))
 
         self._connections = {}
         self._nb_queue = []
@@ -405,7 +407,7 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
         # Application server
         url = tx.req.url
         if not url.is_abs:
-            base = self.server.db_url if nb else self.server.url
+            base = self.server.nb_url() if nb else self.server.url()
             url.scheme, url.host, url.port = base.scheme, base.host, base.port
 
         if self.proxy:
