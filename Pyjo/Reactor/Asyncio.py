@@ -59,6 +59,7 @@ from Pyjo.Util import md5_sum
 
 import asyncio
 import atexit
+import os
 import random
 import sys
 import time
@@ -110,6 +111,7 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
         self._running = 0
         self._tasks: set[asyncio.Task[Any]] = set()
         self._timers: dict[str, _Timer] = {}
+        _REACTORS.add(self)
 
     def __del__(self) -> None:
         # Not in Mojolicious: the event loop of the reactor is closed with it, unless the interpreter is finishing
@@ -132,7 +134,9 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
         else the loop that is running, as inside :func:`asyncio.run`, or a
         loop of its own. A reactor that is not given a loop follows the loop
         that is running, and moves its handles and timers to it, unless it
-        has tasks in another loop, which cannot move.
+        has tasks in another loop, which cannot move. In the child of a fork,
+        it moves to a new loop of its own, as the selector of the loop of the
+        parent is not the child's.
         """
         loop = self._loop
         if self._fixed and loop is not None:
@@ -154,6 +158,17 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
 
         assert self._loop is not None
         return self._loop
+
+    # The child of a fork moves to a new loop, as the selector of the old one, epoll or kqueue, is the one of the parent;
+    # the old loop is kept, not closed, which would close the files of the parent
+    def _fork(self) -> None:
+        if self._fixed or self._loop is None:
+            return
+        _FORKED.append(self._loop)
+        self._loop = self._own = None
+        self._own = asyncio.new_event_loop()
+        _OWN.add(self._own)
+        self._move(self._own)
 
     # Move the handles and timers to another loop
     def _move(self, new: asyncio.AbstractEventLoop) -> None:
@@ -557,6 +572,24 @@ def _fileno(handle: Handle) -> int:
 # interpreter, before it finalizes the objects and the loops of the reactors that still exist would warn that they are
 # not closed
 _OWN: 'weakref.WeakSet[asyncio.AbstractEventLoop]' = weakref.WeakSet()
+
+
+# Not in Mojolicious: the reactors that exist, which move to new loops in the child of a fork, and the loops of the parent,
+# which the child keeps
+_REACTORS: 'weakref.WeakSet[Pyjo_Reactor_Asyncio]' = weakref.WeakSet()
+_FORKED: list[asyncio.AbstractEventLoop] = []
+
+
+def _after_fork_in_child() -> None:
+    for reactor in list(_REACTORS):
+        try:
+            reactor._fork()  # pyright: ignore[reportPrivateUsage]
+        except Exception:
+            pass
+
+
+if hasattr(os, 'register_at_fork'):
+    os.register_at_fork(after_in_child=_after_fork_in_child)
 
 
 @atexit.register
