@@ -33,10 +33,10 @@ with subtest('Synopsis'):
             )
 
         # Generate exception classes on demand
-        from Pyjo.Exception import check, raise_
+        from Pyjo.Exception import check, throw
 
         try:
-            raise_('MyApp.X.Name', 'The name Minion is already taken')
+            throw('MyApp.X.Name', 'The name Minion is already taken')
         except Exception as e:
             check(
                 e,
@@ -116,10 +116,13 @@ with subtest('check'):
             )
     is_ok(output.getvalue(), 'Error: Could not open file\n', 'output')
 
-with subtest('raise_'):
-    throws_ok(lambda: raise_('Something went wrong!'), Pyjo.Exception.object, 'Pyjo.Exception')
-    throws_ok(lambda: raise_('MyApp.X.Foo', 'Something went wrong!'), re.compile(r'^Something'), 'by name')
-    throws_ok(lambda: raise_(MyApp_X_Foo, 'Something went wrong!'), MyApp_X_Foo, 'by class')
+with subtest('throw'):
+    from Pyjo.Exception import raise_
+
+    throws_ok(lambda: throw('Something went wrong!'), Pyjo.Exception.object, 'Pyjo.Exception')
+    throws_ok(lambda: throw('MyApp.X.Foo', 'Something went wrong!'), re.compile(r'^Something'), 'by name')
+    throws_ok(lambda: throw(MyApp_X_Foo, 'Something went wrong!'), MyApp_X_Foo, 'by class')
+    is_ok(raise_, throw, 'alias')
 
 with subtest('new'):
     e = Pyjo.Exception.new()

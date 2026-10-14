@@ -63,6 +63,19 @@ with subtest('Resolved with finally'):
     Pyjo.IOLoop.one_tick()
     is_deeply_ok(results, ['finally', 'hello', 'world'], 'promise settled')
 
+# Not in Mojolicious: lastly, the name of finally_ that is not a keyword of Python
+with subtest('Resolved with lastly'):
+    promise = Pyjo.Promise.new()
+    results = []
+
+    def lastly_cb():
+        results[:] = ['lastly']
+
+    promise.lastly(lastly_cb).then(push(results))
+    promise.resolve('hello', 'world')
+    Pyjo.IOLoop.one_tick()
+    is_deeply_ok(results, ['lastly', 'hello', 'world'], 'promise settled')
+
 with subtest('Rejected'):
     promise = Pyjo.Promise.new()
     results, errors = [], []

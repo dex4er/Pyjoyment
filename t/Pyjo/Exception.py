@@ -1,6 +1,6 @@
 import Pyjo.Exception
 
-from Pyjo.Exception import check, raise_
+from Pyjo.Exception import check, raise_, throw
 from Pyjo.File import tempdir
 from Pyjo.Test import *
 
@@ -356,5 +356,9 @@ with subtest('Raise'):
     like_ok(str(err), r'^test21', 'right error')
     err = error(lambda: raise_('Pyjo.Base.object', 'fail'))
     like_ok(str(err), r'^Pyjo.Base.object is not a Pyjo.Exception subclass', 'right error')
+    # Not in Mojolicious: throw, the name of raise_ that is not a keyword of Python
+    err = error(lambda: throw('MyApp.X.Baz', 'test23'))
+    isa_ok(err, baz, 'is a MyApp.X.Baz')
+    like_ok(str(err), r'^test23', 'right error')
 
 done_testing()

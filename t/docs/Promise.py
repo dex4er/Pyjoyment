@@ -164,15 +164,16 @@ with subtest('clone'):
     isnt_ok(new, promise, 'new promise')
     is_ok(new.ioloop, promise.ioloop, 'same loop')
 
-with subtest('finally_'):
+with subtest('lastly'):
     output = io.StringIO()
     with contextlib.redirect_stdout(output):
         promise = Pyjo.Promise.resolve('done')
-        new = promise.finally_(lambda: ...)
+        new = promise.lastly(lambda: ...)
 
         # Do something on fulfillment and rejection
-        promise.finally_(lambda: print('We are done!')).wait()
+        promise.lastly(lambda: print('We are done!')).wait()
     is_ok(output.getvalue(), 'We are done!\n', 'finally')
+    is_ok(Pyjo.Promise.object.finally_, Pyjo.Promise.object.lastly, 'alias')
 
 with subtest('map'):
     items = [1, 2, 3, 4]
