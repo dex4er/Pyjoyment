@@ -403,7 +403,7 @@ class Pyjo_Server_Daemon(Pyjo.Server.Base.object):
             return self._remove(cid)
 
         # Build new transaction for leftovers
-        leftovers = req.content.leftovers
+        leftovers = req.content.leftovers()
         if not leftovers:
             return
         tx = c['tx'] = self._build_tx(cid, c)
