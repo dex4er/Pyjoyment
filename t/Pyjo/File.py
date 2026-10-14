@@ -10,6 +10,12 @@ import re
 import sys
 import tempfile as _tempfile
 import time
+import warnings
+
+
+# The temporary objects of the standard library that Pyjo.File keeps warn when they are removed with it, as tempdir()
+# and tempfile() do not
+warnings.filterwarnings('ignore', message='Implicitly cleaning up', category=ResourceWarning)
 
 
 # Perl's File::Basename and File::Spec, which Mojo's tests compare with

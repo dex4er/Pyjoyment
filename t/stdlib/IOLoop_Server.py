@@ -41,6 +41,7 @@ with subtest('A client of the standard library'):
     ok(not got[0].getblocking(), 'non-blocking')
     ok(got[0].getsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY), 'TCP_NODELAY')
     ok(server.handle.get_inheritable(), 'inheritable listen socket')
+    got[0].close()
     server.close()
 
 with subtest('IPv6'):
@@ -60,6 +61,7 @@ with subtest('IPv6'):
 
             got = serve(server, client)
             is_ok(got[0].family, socket.AF_INET6, 'accepted')
+            got[0].close()
             server.close()
 
 with subtest('UNIX domain socket'):
@@ -77,6 +79,7 @@ with subtest('UNIX domain socket'):
 
         got = serve(server, client)
         is_ok(got[0].family, socket.AF_UNIX, 'accepted')
+        got[0].close()
         server.close()
 
 with subtest('TLS'):
@@ -93,6 +96,7 @@ with subtest('TLS'):
     got = serve(server, client)
     isa_ok(got[0], ssl.SSLSocket, 'accepted after the handshake')
     ok(names, 'the client verified the built-in certificate')
+    got[0].close()
     server.close()
 
 with subtest("Can't create listen socket"):

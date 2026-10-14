@@ -232,6 +232,8 @@ for handle in (client, server):
     reactor.io(handle, reset_cb).watch(handle, False, True)
 reactor.start()
 is_ok(writable, 1, 'only one handle was writable')
+client.close()
+server.close()
 
 # Concurrent reactors
 timer = 0
@@ -340,6 +342,7 @@ like_ok(str(err), r'Timer not active', 'right error')
 ok(not reactor.remove(listen), 'not removed again')
 err = eval_(lambda: reactor.watch(listen, True, True))
 like_ok(str(err), r'I/O watcher not active', 'right error')
+listen.close()
 
 # Error
 err = None

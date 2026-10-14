@@ -48,6 +48,8 @@ with subtest('Synopsis'):
     ok('Second handle is readable' in lines, 'second handle')
     is_ok(lines[-1], 'Timeout!', 'timeout')
     ok('First handle is readable' not in lines, 'not readable')
+    for sock in (first, peer, second, other):
+        sock.close()
 
 with subtest('new'):
     reactor = Pyjo.Reactor.Asyncio.new()
@@ -76,6 +78,8 @@ with subtest('io'):
     reactor.start()
     ok(len(events), 'event')
     reactor.remove(handle)
+    handle.close()
+    peer.close()
 
 with subtest('next_tick and one_tick'):
     reactor = Pyjo.Reactor.Asyncio.new()
@@ -146,5 +150,7 @@ with subtest('watch'):
     # Pause watching for events
     reactor.watch(handle, False, False)
     ok(reactor.remove(handle), 'watched')
+    handle.close()
+    peer.close()
 
 done_testing()

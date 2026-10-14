@@ -30,6 +30,8 @@ with subtest('Synopsis'):
     if not server.reactor.is_running:
         server.reactor.start()
     isa_ok(accepted[0], socket.socket, 'accepted')
+    accepted[0].close()
+    client.close()
     server.close()
 
 with subtest('reactor'):

@@ -39,6 +39,8 @@ with subtest('Built-in certificate'):
     server_result, client_result = results
     isa_ok(client_result, ssl.SSLSocket, 'right class')
     isa_ok(server_result, ssl.SSLSocket, 'right class')
+    server_result.close()
+    client_result.close()
 
 with subtest('Built-in certificate (custom event loop and cipher)'):
     loop = Pyjo.IOLoop.new()
@@ -67,5 +69,7 @@ with subtest('Built-in certificate (custom event loop and cipher)'):
     expect = 'TLS_AES_256_GCM_SHA384' if server_result.version() == 'TLSv1.3' else 'AES256-SHA'
     is_ok(client_result.cipher()[0], expect, f'{expect} has been negotiated')
     is_ok(server_result.cipher()[0], expect, f'{expect} has been negotiated')
+    server_result.close()
+    client_result.close()
 
 done_testing()
