@@ -45,7 +45,7 @@ with subtest('can_nnr and can_socks'):
     boolean = Pyjo.IOLoop.Client.object.can_nnr()
     ok(boolean, 'name resolution in a thread')
     boolean = Pyjo.IOLoop.Client.object.can_socks()
-    ok(not boolean, 'no SOCKS')
+    ok(boolean, 'SOCKS5')
 
 with subtest('connect'):
     errors = []
@@ -76,6 +76,10 @@ with subtest('connect'):
     client.connect(
         address='localhost',
         port=port,
+        socks_address='127.0.0.1',
+        socks_pass='secr3t',
+        socks_port=9050,
+        socks_user='sri',
         tls=True,
         tls_ca='/etc/tls/ca.crt',
         tls_cert='/etc/tls/client.crt',

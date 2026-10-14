@@ -457,13 +457,15 @@ copy:
   whole body in a `try`: at the end of the interpreter the globals of the
   module may already be `None`, even `sys`.
 - An optional module of Perl that Mojo uses when it is installed has a
-  counterpart in the standard library, or is left out until something needs
-  it: Net::DNS::Native is `getaddrinfo` in a thread that tells the reactor
-  through a socket pair, IO::Socket::Socks is left out, and `socket_options`
-  of IO::Socket::IP is `source_address`, as `socket.create_connection` has
-  it. `SSL_hostname` and `SSL_verifycn_name` of IO::Socket::SSL are one
-  `tls_hostname`, as Python has one `server_hostname` for SNI and for the
-  verification.
+  counterpart in the standard library, one of the port's own where the
+  standard library has none, or is left out until something needs it:
+  Net::DNS::Native is `getaddrinfo` in a thread that tells the reactor through
+  a socket pair, IO::Socket::Socks is a SOCKS5 client in `Pyjo.IOLoop.Client`,
+  which `PYJO_NO_SOCKS` turns off as `PYJO_NO_TLS` does TLS, and
+  `socket_options` of IO::Socket::IP is `source_address`, as
+  `socket.create_connection` has it. `SSL_hostname` and `SSL_verifycn_name`
+  of IO::Socket::SSL are one `tls_hostname`, as Python has one
+  `server_hostname` for SNI and for the verification.
 - `tls_options` of IO::Socket::SSL is an `ssl.SSLContext`, `tls_context`, as
   asyncio takes `ssl=context`. OpenSSL chooses an ALPN protocol by the order
   of the server, IO::Socket::SSL by the order of the client.

@@ -63,16 +63,28 @@ import socket
 import sys
 import weakref
 
-from collections.abc import Callable
-from typing import Any
+from collections.abc import Callable, Generator
+from typing import Any, Literal
 
 
 # Non-blocking name resolution, which Mojo does with Net::DNS::Native, is a thread of the standard library here
 NNR = not os.environ.get('PYJO_NO_NNR')
 _executor: concurrent.futures.ThreadPoolExecutor | None = None
 
-# Left out from Mojolicious: SOCKS support, which requires IO::Socket::Socks
-SOCKS = False
+# SOCKS5 support, which Mojo does with IO::Socket::Socks, is a client of its own here
+SOCKS = not os.environ.get('PYJO_NO_SOCKS')
+
+# The replies of a SOCKS5 server, with the messages of IO::Socket::Socks
+_SOCKS_REPLIES = {
+    1: 'General failure',
+    2: 'Not allowed',
+    3: 'Network unreachable',
+    4: 'Host unreachable',
+    5: 'Connection refused',
+    6: 'TTL expired',
+    7: 'Command not supported',
+    8: 'Address not supported',
+}
 
 type AddrInfo = list[tuple[Any, Any, Any, Any, Any]]
 
@@ -103,6 +115,94 @@ class _Resolver:
         self._writer.close()
 
 
+class _SocksError(Exception):
+    """An error of the SOCKS5 handshake, with the message of IO::Socket::Socks."""
+
+
+class _Socks:
+    """
+    A SOCKS5 handshake on a socket that does not block, as the client of
+    IO::Socket::Socks does it: the proxy resolves the name, and the user and
+    the password of RFC 1929 are offered next to no authentication.
+    """
+
+    def __init__(self, handle: socket.socket, address: str, port: int, user: str | None, password: str | None) -> None:
+        self.handle = handle
+        self._steps = self._handshake(address, port, user, password)
+        self._done = False
+
+    def step(self) -> Literal['read', 'write'] | None:
+        """What the handshake waits for, or ``None`` once it is done."""
+        if self._done:
+            return None
+        try:
+            return next(self._steps)
+        except StopIteration:
+            self._done = True
+            return None
+
+    def _handshake(
+        self, address: str, port: int, user: str | None, password: str | None
+    ) -> Generator[Literal['read', 'write']]:
+        # The auth mechanisms
+        methods = b'\x00\x02' if user else b'\x00'
+        yield from self._send(b'\x05' + bytes([len(methods)]) + methods)
+        _, method = yield from self._read(2)
+        if method == 0xFF:
+            raise _SocksError('No valid auth mechanisms')
+
+        # The user and the password
+        if method != 0x00:
+            name, secret = (user or '').encode(), (password or '').encode()
+            yield from self._send(b'\x01' + bytes([len(name)]) + name + bytes([len(secret)]) + secret)
+            _, status = yield from self._read(2)
+            if status != 0x00:
+                raise _SocksError('Authentication failed with SOCKS5 proxy')
+
+        # The command, with the name that the proxy resolves
+        host = _encode_host(address)
+        yield from self._send(b'\x05\x01\x00\x03' + bytes([len(host)]) + host + port.to_bytes(2, 'big'))
+
+        # The reply
+        _, reply, _, atyp = yield from self._read(4)
+        if atyp == 0x03:
+            (length,) = yield from self._read(1)
+            yield from self._read(length)
+        elif atyp == 0x01:
+            yield from self._read(4)
+        elif atyp == 0x04:
+            yield from self._read(16)
+        else:
+            raise _SocksError(f'Unsupported address type returned by socks server: {atyp}')
+        yield from self._read(2)
+        if reply != 0x00:
+            raise _SocksError(_SOCKS_REPLIES.get(reply, _SOCKS_REPLIES[1]))
+
+    def _read(self, length: int) -> Generator[Literal['read', 'write'], None, bytes]:
+        data = b''
+        while len(data) < length:
+            try:
+                chunk = self.handle.recv(length - len(data))
+            except (BlockingIOError, InterruptedError):
+                yield 'read'
+                continue
+            except OSError as e:
+                raise _SocksError(f'read: {e.strerror or e}') from e
+            if not len(chunk):
+                raise _SocksError('Socket closed by remote side')
+            data += chunk
+        return data
+
+    def _send(self, data: bytes) -> Generator[Literal['read', 'write']]:
+        while len(data):
+            try:
+                data = data[self.handle.send(data) :]
+            except (BlockingIOError, InterruptedError):
+                yield 'write'
+            except OSError as e:
+                raise _SocksError(f'send: {e.strerror or e}') from e
+
+
 class Pyjo_IOLoop_Client(Pyjo.EventEmitter.object):
     """
     :mod:`Pyjo.IOLoop.Client` inherits all methods from
@@ -120,6 +220,7 @@ class Pyjo_IOLoop_Client(Pyjo.EventEmitter.object):
         super().__init__()
         self._addresses: AddrInfo = []
         self._dns: _Resolver | None = None
+        self._socks_handshake: _Socks | None = None
         self._handle: Any = None
         self._reactor: weakref.ref[Pyjo.Reactor.object] | None = None
         self._timer: str | None = None
@@ -173,7 +274,8 @@ class Pyjo_IOLoop_Client(Pyjo.EventEmitter.object):
 
             boolean = Pyjo.IOLoop.Client.object.can_socks()
 
-        True if SOCKS5 support is available, which it is not yet.
+        True if SOCKS5 support is enabled, as it is unless the
+        ``PYJO_NO_SOCKS`` environment variable is set.
         """
         return SOCKS
 
@@ -236,6 +338,34 @@ class Pyjo_IOLoop_Client(Pyjo.EventEmitter.object):
                 source_address=('127.0.0.1', 0)
 
             Local address and port to connect from.
+
+        socks_address
+            ::
+
+                socks_address='127.0.0.1'
+
+            Address or host name of SOCKS5 proxy server to use for connection.
+
+        socks_pass
+            ::
+
+                socks_pass='secr3t'
+
+            Password to use for SOCKS5 authentication.
+
+        socks_port
+            ::
+
+                socks_port=9050
+
+            Port of SOCKS5 proxy server to use for connection.
+
+        socks_user
+            ::
+
+                socks_user='sri'
+
+            Username to use for SOCKS5 authentication.
 
         timeout
             ::
@@ -334,8 +464,6 @@ class Pyjo_IOLoop_Client(Pyjo.EventEmitter.object):
             client._connect(args)
 
         reactor.io(dns.handle, resolved).watch(dns.handle, True, False)
-
-    # Left out from Mojolicious: can_socks and the options socks_*, as SOCKS support requires IO::Socket::Socks
 
     def _cleanup(self) -> None:
         reactor = self._reactor() if self._reactor is not None else None
@@ -447,10 +575,47 @@ class Pyjo_IOLoop_Client(Pyjo.EventEmitter.object):
 
         self._try_socks(args)
 
+    def _socks(self, args: dict[str, Any]) -> None:
+        handle, socks = self._handle, self._socks_handshake
+        if handle is None or socks is None:
+            return
+        try:
+            want = socks.step()
+        except _SocksError as e:
+            self.emit('error', str(e))
+            return
+
+        # Connected
+        if want is None:
+            self._socks_handshake = None
+            return self._try_tls(args)
+
+        # Switch between reading and writing
+        self.reactor.watch(handle, True, want == 'write')
+
     def _try_socks(self, args: dict[str, Any]) -> None:
+        handle = self._handle
         if not args.get('socks_address'):
             return self._try_tls(args)
-        self.emit('error', 'SOCKS support is not available')
+        if not SOCKS:
+            self.emit('error', 'SOCKS support is disabled')
+            return
+
+        port = int(args.get('port') or (443 if args.get('tls') else 80))
+        socks = self._socks_handshake = _Socks(
+            handle, args['address'], port, args.get('socks_user'), args.get('socks_pass')
+        )
+        reactor = self.reactor
+        reactor.remove(handle)
+        try:
+            socks.step()
+        except _SocksError as e:
+            # Unlike Mojolicious: the error of the handshake, not "SOCKS upgrade failed", which Mojo gives where the
+            # handshake fails before it would block for the first time, so that the message depends on timing
+            self.emit('error', str(e))
+            return
+
+        self._wait(self._socks, handle, args)
 
     def _try_tls(self, args: dict[str, Any]) -> None:
         handle = self._handle
@@ -489,6 +654,14 @@ class Pyjo_IOLoop_Client(Pyjo.EventEmitter.object):
                 getattr(client, name)(args)
 
         self.reactor.io(handle, cb).watch(handle, False, True)
+
+
+# The name of a host for SOCKS5, as IDNA where it is not ASCII
+def _encode_host(address: str) -> bytes:
+    try:
+        return address.encode('ascii')
+    except UnicodeEncodeError:
+        return address.encode('idna')
 
 
 # A connection that does not block
