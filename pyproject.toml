@@ -202,6 +202,7 @@ strict = [
   "Pyjo/Server/CGI.py",
   "Pyjo/Server/Daemon.py",
   "Pyjo/String/Bytes.py",
+  "Pyjo/String/Mixin.py",
   "Pyjo/String/Unicode.py",
   "Pyjo/Test.py",
   "Pyjo/Transaction/__init__.py",
