@@ -4,7 +4,6 @@ Pyjo.Server.WSGI - WSGI server
 ::
 
     import Pyjo.Server.WSGI
-    from Pyjo.Util import b
 
     from wsgiref.simple_server import make_server
 
@@ -20,7 +19,7 @@ Pyjo.Server.WSGI - WSGI server
         # Response
         tx.res.code = 200
         tx.res.headers.content_type = 'text/plain'
-        tx.res.body = b("{0} request for {1}!".format(method, path))
+        tx.res.body = f'{method} request for {path}!'.encode()
 
         # Resume transaction
         tx.resume()
@@ -33,6 +32,21 @@ Pyjo.Server.WSGI - WSGI server
 :mod:`Pyjo.Server.WSGI` allows :mod:`Pyjoyment` applications to run on all ``WSGI``
 compatible servers.
 
+The response is given in the ``request`` event, as ``WSGI`` is synchronous;
+its content can come later, as the event loop of :mod:`Pyjo.IOLoop` runs
+while the server waits for it. The request is read from the environment of
+:pep:`3333` with ``read``, a body of unknown length when the server sets
+``wsgi.input_terminated``, as for a chunked request. The response goes
+without the hop-by-hop headers that :pep:`3333` forbids, so chunked content is
+sent without its framing, which the server adds.
+
+WSGI servers
+------------
+
+* Gunicorn and Waitress: also chunked requests.
+* uWSGI with ``--http-socket``: a chunked request reaches the application
+  without its body.
+
 Events
 ------
 
@@ -42,9 +56,13 @@ Classes
 -------
 """
 
+import Pyjo.Content.Single
+import Pyjo.IOLoop
 import Pyjo.Server.Base
 
-from Pyjo.Util import convert
+from Pyjo.Util import url_escape
+
+import wsgiref.util
 
 
 class Pyjo_Server_WSGI(Pyjo.Server.Base.object):
@@ -56,42 +74,60 @@ class Pyjo_Server_WSGI(Pyjo.Server.Base.object):
     def run(self, environ):
         """::
 
-            res = psgi.run(environ)
+            status, headers, body = wsgi.run(environ)
 
         Run ``WSGI``.
         """
+        env = _environ(environ)
+        wsgi_input = environ.get('wsgi.input')
+
+        # Not in Mojolicious: a request body of unknown length, as a server that removes the chunked framing marks it
+        body = None
+        if 'CONTENT_LENGTH' not in env and wsgi_input is not None and environ.get('wsgi.input_terminated'):
+            body = b''
+            while chunk := wsgi_input.read(131072):
+                body += chunk
+            if len(body):
+                env['CONTENT_LENGTH'] = str(len(body))
+
         tx = self.build_tx()
-        req = tx.req.parse(environ)
+        req = tx.req.parse(env)
         tx.local_port = int(port) if (port := environ.get('SERVER_PORT')) else None
         tx.remote_address = environ.get('REMOTE_ADDR', None)
 
         # Request body (may block if we try to read too much)
-        length = convert(environ.get('CONTENT_LENGTH', 0), int, 0)
-        while not req.is_finished:
-            buf_size = length if length and length < 131072 else 131072
-            buf = bytearray(buf_size)
-            wsgi_input = environ.get('wsgi.input', None)
-            if not wsgi_input:
-                break
-            read = wsgi_input.readinto(buf)
-            if not read:
-                break
-            req.parse(buf[:read])
-            length -= read
-            if length <= 0:
-                break
+        if body is not None:
+            req.parse(body)
+        else:
+            length = int(env.get('CONTENT_LENGTH') or 0)
+            while not req.is_finished and wsgi_input is not None:
+                chunk = wsgi_input.read(length if length and length < 131072 else 131072)
+                if not chunk:
+                    break
+                req.parse(chunk)
+                length -= len(chunk)
+                if length <= 0:
+                    break
 
         self.emit('request', tx)
 
-        # Response headers
+        # Response headers, without the hop-by-hop headers that PEP 3333 forbids, so chunked content goes without its
+        # framing, which the server adds
         res = tx.res.fix_headers()
         status = f'{res.code or 404} {res.message or res.default_message()}'
-        headers = res.headers.to_list()
+        chunked = res.content.is_chunked
+        headers = [(name, value) for name, value in res.headers.to_list() if not wsgiref.util.is_hop_by_hop(name)]
 
         # WSGI response
-        return status, headers, self._body(tx, tx.is_empty)
+        return status, headers, self._body(tx, tx.is_empty, chunked)
 
     def to_wsgi_app(self):
+        """::
+
+            app = wsgi.to_wsgi_app()
+
+        Turn the application into a ``WSGI`` application.
+        """
         # Preload application and wrap it
         self.app
 
@@ -102,29 +138,63 @@ class Pyjo_Server_WSGI(Pyjo.Server.Base.object):
 
         return application
 
-    def _body(self, tx, empty):
+    def _body(self, tx, empty, chunked):
         # The end of the iteration closes the transaction, as close of the PSGI body does
         try:
             # Empty
             if empty:
                 return
 
-            # No content yet, try again later
+            unchunk = _Unchunk() if chunked else None
             offset = 0
             while True:
+                # Not in Mojolicious: no content yet, so the event loop runs once before it tries again, where Mojo
+                # tries again at once
                 chunk = tx.res.get_body_chunk(offset)
                 if chunk is None:
-                    yield b''
-                    return
+                    Pyjo.IOLoop.one_tick()
+                    continue
 
                 # End of content
                 if not len(chunk):
                     return
 
                 offset += len(chunk)
-                yield bytes(chunk)
+                if unchunk is not None:
+                    chunk = unchunk.parse(chunk)
+                if len(chunk):
+                    yield bytes(chunk)
         finally:
             tx.closed()
+
+
+# Chunked content without its framing, as in Pyjo.Server.ASGI
+class _Unchunk:
+    def __init__(self):
+        self._chunks = []
+        self._parser = Pyjo.Content.Single.new()
+        self._parser.unsubscribe('read').on('read', lambda content, chunk: self._chunks.append(chunk))
+        self._parser.parse(b'Transfer-Encoding: chunked\x0d\x0a\x0d\x0a')
+
+    def parse(self, chunk):
+        self._parser.parse(chunk)
+        chunks, self._chunks = self._chunks, []
+        return b''.join(chunks)
+
+
+# The environment of PEP 3333 as the CGI environment that Pyjo.Message.Request parses
+def _environ(environ):
+    env = dict(environ)
+
+    # A path is bytes as the characters 0-255, which a path of Pyjoyment takes as characters, so the bytes beyond ASCII
+    # are percent-encoded, as the path is escaped
+    for key in ('PATH_INFO', 'SCRIPT_NAME'):
+        if key in env:
+            env[key] = url_escape(env[key].encode('latin-1'), rb'\x80-\xff').decode('ascii')
+
+    # The server removes the chunked framing of a request
+    env.pop('HTTP_TRANSFER_ENCODING', None)
+    return env
 
 
 new = Pyjo_Server_WSGI.new
