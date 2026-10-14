@@ -139,6 +139,10 @@ takes a few seconds.
 - `t/stdlib/` checks the interaction with the Python standard library,
   written for Pyjoyment, as Mojolicious has no counterpart.
 - `t/examples/` runs the scripts from `examples/`.
+- `t/servers/` runs `Pyjo.Server.ASGI` on real ASGI servers, each in a process
+  of its own, as the ASGI server of the tests in `t/lib` cannot show how a
+  server differs. The servers are in the dependency group `servers`, not in
+  `dependencies`; without it, the tests are skipped.
 - `t/lib/` holds helpers shared by the tests. Run on their own, they skip with
   `plan(skip_all=...)`, so `-r t` reports them as skipped instead of failing.
 
@@ -172,6 +176,21 @@ without asyncio has to pass them too:
 PYJO_REACTOR=Pyjo.Reactor.Poll PYTHONPATH=. mise exec -- python -m Pyjo.Prove -j 4 \
   t/Pyjo/IOLoop*.py t/Pyjo/TLS.py t/Pyjo/Promise*.py t/stdlib/IOLoop*.py
 ```
+
+CI runs the tests in `t/servers` on the Python of `mise.toml` only, with the
+dependency group `servers` installed by uv in `.venv`:
+
+```sh
+PYTHONPATH=. mise exec -- uv run --python "$(mise exec -- which python)" \
+  --only-group servers python -m Pyjo.Prove --timeout 120 -r t/servers
+```
+
+A server is a library of its own, so the known differences of a server are
+expected results with a comment: a fix of the server fails the test, which
+tells that the documentation of `Pyjo.Server.ASGI` can change. The server
+processes do not get `PYTHONWARNINGS`, as the warnings of the servers and
+their libraries are not ours. Renovate bumps the dependency groups in one
+pull request.
 
 CI sets `PYTHONWARNINGS=error::SyntaxWarning,error::DeprecationWarning`, so an
 invalid escape sequence or a deprecated API fails the build, before a new

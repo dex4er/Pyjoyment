@@ -56,6 +56,18 @@ Documentation = "https://pyjoyment.readthedocs.io/"
 Source = "https://github.com/dex4er/Pyjoyment"
 Issues = "https://github.com/dex4er/Pyjoyment/issues"
 
+# Not dependencies of the package: the ASGI servers that the tests in t/servers run Pyjo.Server.ASGI on, and a client of
+# WebSocket for them
+[dependency-groups]
+servers = [
+  "daphne>=4.2.3",
+  "granian>=2.8.4",
+  "hypercorn>=0.18.0",
+  "uvicorn>=0.54.0",
+  "uvloop>=0.23.0; sys_platform != 'win32'",
+  "websockets>=17.2",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["Pyjo", "Pyjoyment"]
 

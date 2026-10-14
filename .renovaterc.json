@@ -26,6 +26,14 @@
     "schedule": ["at any time"],
     "automerge": true
   },
+  "packageRules": [
+    {
+      "description": "The dependency groups of pyproject.toml, as the ASGI servers of the tests in t/servers, in one pull request.",
+      "matchManagers": ["pep621"],
+      "matchDepTypes": ["dependency-groups"],
+      "groupName": "dependency groups"
+    }
+  ],
   "customManagers": [
     {
       "description": "Renovate hints in a comment after the version.",

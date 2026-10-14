@@ -57,8 +57,9 @@ lint:
         - yamlfmt
       paths:
         - .trunk/trunk.yaml
-    # Examples that compare Pyjoyment with other libraries, which are not
-    # installed for the project
+    # Examples and tests that need other libraries, which are not installed
+    # for the project: the ones that compare Pyjoyment with them, and the ASGI
+    # servers of the dependency group "servers"
     - linters:
         - pyright
       paths:
@@ -67,6 +68,7 @@ lint:
         - examples/microhttpd_twisted.py
         - examples/resolv_dns.py
         - examples/server_asgi_on_request.py
+        - t/servers/**
 actions:
   enabled:
     - git-blame-ignore-revs
