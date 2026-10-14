@@ -6,7 +6,6 @@ from Pyjo.Test import *
 import importlib
 import os
 import re
-import subprocess
 import sys
 
 
@@ -383,35 +382,6 @@ with subtest('Lifespan'):
     sent = ASGIClient.run(app, {'type': 'lifespan'}, [{'type': 'lifespan.startup'}, {'type': 'lifespan.shutdown'}])
     is_deeply_ok(
         sent, [{'type': 'lifespan.startup.complete'}, {'type': 'lifespan.shutdown.complete'}], 'startup and shutdown'
-    )
-
-with subtest('Reactor without asyncio'):
-    script = """
-import asyncio
-import Pyjo.Server.ASGI
-
-asgi = Pyjo.Server.ASGI.new()
-for cb in (asgi.to_asgi_app, lambda: asyncio.run(asgi.run({'type': 'http'}, None, None))):
-    try:
-        cb()
-    except Exception as e:
-        print(e, end="")
-"""
-    env = dict(os.environ, PYJO_REACTOR='Pyjo.Reactor.Poll')
-    result = subprocess.run([sys.executable, '-c', script], capture_output=True, text=True, env=env)
-    is_ok(
-        result.stdout,
-        'Pyjo.Server.ASGI needs Pyjo.Reactor.Asyncio, not Pyjo.Reactor.Poll.Pyjo_Reactor_Poll\n' * 2,
-        'to_asgi_app and run raise an exception',
-    )
-
-with subtest('Server without asyncio'):
-    asgi = Pyjo.Server.ASGI.new()
-
-    # A server that drives the coroutine without the event loop of asyncio, as Trio does
-    coroutine = asgi.run({'type': 'http'}, None, None)
-    throws_ok(
-        lambda: coroutine.send(None), re.compile(r'Pyjo.Server.ASGI needs an ASGI server on asyncio'), 'right error'
     )
 
 with subtest('Unsupported connection type'):

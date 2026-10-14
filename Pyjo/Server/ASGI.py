@@ -46,20 +46,23 @@ server, unless the application sets one. A WebSocket handshake is a
 response other than ``101`` rejects it, and the ASGI server negotiates
 ``permessage-deflate`` on its own.
 
-This needs the reactor on :mod:`asyncio`, :mod:`Pyjo.Reactor.Asyncio` or a
-subclass of it, which is the default, and an ASGI server on :mod:`asyncio`.
-The loop may be another implementation of the event loop of :mod:`asyncio`,
-as uvloop is, as the reactor takes the loop that the server runs. With
-another reactor, as :mod:`Pyjo.Reactor.Poll`,
-:meth:`Pyjo_Server_ASGI.to_asgi_app` and :meth:`Pyjo_Server_ASGI.run` raise
-an exception, as nothing would run it in the loop of the server, and so does
-:meth:`Pyjo_Server_ASGI.run` in a server on Trio.
+This needs a reactor that runs in the event loop of the ASGI server and
+gives awaitables for it. :mod:`Pyjo.Reactor.Asyncio`, the default, does so in
+an ASGI server on :mod:`asyncio`, whose loop may be another implementation of
+the event loop of :mod:`asyncio`, as uvloop is, as the reactor takes the loop
+that the server runs. :mod:`Pyjo.Reactor.Poll` runs a loop of its own, which
+nothing runs in an ASGI server, so a response given later than the
+``request`` event fails, with ``Task got bad yield`` in a server on
+:mod:`asyncio`. A server on another framework, as Hypercorn on Trio, needs a
+reactor for it, which may come from another distribution, as
+:mod:`Pyjo.Reactor` describes.
 
 ASGI servers
 ------------
 
 * uvicorn, on :mod:`asyncio` or uvloop: HTTP and WebSocket.
-* Hypercorn, on :mod:`asyncio` or uvloop: HTTP and WebSocket; not on Trio.
+* Hypercorn, on :mod:`asyncio` or uvloop: HTTP and WebSocket; on Trio only
+  with a reactor for Trio, which Pyjoyment does not have.
 * Daphne: HTTP and WebSocket. It adds no ``Date`` header, so a response has
   one only when the application sets it, and it sends no reason with a
   WebSocket close code.
@@ -84,10 +87,7 @@ counterpart of
 """
 
 import Pyjo.Content.Single
-import Pyjo.Exception
-import Pyjo.IOLoop
 import Pyjo.Promise
-import Pyjo.Reactor.Asyncio
 import Pyjo.Server.Base
 import Pyjo.Transaction
 import Pyjo.Transaction.HTTP
@@ -125,7 +125,6 @@ class Pyjo_Server_ASGI(Pyjo.Server.Base.object):
 
         Run ``ASGI`` for one connection.
         """
-        _check_reactor(running=True)
         type = scope['type']
         if type == 'http':
             await self._http(scope, receive, send)
@@ -143,8 +142,6 @@ class Pyjo_Server_ASGI(Pyjo.Server.Base.object):
 
         Turn the application into an ``ASGI`` application.
         """
-        _check_reactor()
-
         # Preload application and wrap it, the attribute of Pyjo.Server.Base, which is not typed yet
         cast(object, self.app)  # pyright: ignore[reportUnknownMemberType]
 
@@ -374,17 +371,6 @@ class _Writer:
             await self._send({'type': 'websocket.send', 'text': payload.decode('utf-8', 'replace')})
         else:
             await self._send({'type': 'websocket.send', 'bytes': payload})
-
-
-# A reactor without asyncio can neither run in the loop of the ASGI server nor give an awaitable that asyncio takes,
-# and an ASGI server without asyncio, as Hypercorn on Trio, runs no loop that the reactor could follow
-def _check_reactor(running: bool = False) -> None:
-    reactor = Pyjo.IOLoop.object.singleton().reactor
-    if not isinstance(reactor, Pyjo.Reactor.Asyncio.object):
-        name = f'{type(reactor).__module__}.{type(reactor).__qualname__}'
-        raise Pyjo.Exception.new(f'Pyjo.Server.ASGI needs Pyjo.Reactor.Asyncio, not {name}')
-    if running and not reactor.loop.is_running():
-        raise Pyjo.Exception.new('Pyjo.Server.ASGI needs an ASGI server on asyncio')
 
 
 # The body of a request, from http.request messages
