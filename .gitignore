@@ -17,5 +17,7 @@ __pycache__
 *.pfx
 *.pem
 *.key
-# Default self-signed certificate for TLS servers, like in Mojo
+# The key of the default certificate for TLS servers, like in Mojo
 !/Pyjo/IOLoop/certs/server.key
+# Certificates of the tests, like t/mojo/certs in Mojo
+!/t/certs/*.key

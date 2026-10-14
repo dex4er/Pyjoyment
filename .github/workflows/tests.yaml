@@ -35,13 +35,10 @@ jobs:
           - pypy3.12
 
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 20
+    timeout-minutes: 10
 
     env:
       PYTHONPATH: .
-      # Invalid escape sequences and deprecated APIs become errors in a future
-      # Python; fail now instead.
-      PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
 
     steps:
       - name: Checkout
@@ -60,10 +57,23 @@ jobs:
           python-version: ${{ matrix.python }}
           allow-prereleases: true
 
+      # Invalid escape sequences and deprecated APIs become errors in a future
+      # Python; fail now instead. Only the tests: setup-python runs pip, whose
+      # warnings are not ours.
       - name: Run tests
+        env:
+          PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
         run: |
           python --version
           python -m Pyjo.Prove -j 4 -r t
+
+      # The tests of the event loop run on the reactor without asyncio too.
+      - name: Run tests on Pyjo.Reactor.Poll
+        env:
+          PYJO_REACTOR: Pyjo.Reactor.Poll
+          PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
+        run: |
+          python -m Pyjo.Prove -j 4 t/Pyjo/IOLoop*.py t/Pyjo/TLS.py t/Pyjo/Promise*.py t/stdlib/IOLoop*.py
 
   build:
     name: build
