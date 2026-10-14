@@ -25,6 +25,24 @@ extensions = ['sphinx.ext.autodoc']
 # ambiguous.
 autodoc_default_options = {'exclude-members': 'object'}
 
+
+# A function or a method under a second name, as `raise_` of `throw`, is an alias
+# that the documentation of the first one names, so it is not documented twice:
+# its own name is public and finds the same object.
+def skip_alias(app, what, name, obj, skip, options):
+    canonical = getattr(obj, '__name__', name)
+    if canonical == name or canonical.startswith('_') or isinstance(obj, type):
+        return None
+    found = sys.modules.get(getattr(obj, '__module__', None) or '')
+    for part in getattr(obj, '__qualname__', '').split('.'):
+        found = getattr(found, part, None)
+    return True if found is obj else None
+
+
+def setup(app):
+    app.connect('autodoc-skip-member', skip_alias)
+
+
 # The table of contents lists the pages, not the classes and functions that
 # autodoc documents on them.
 toc_object_entries = False

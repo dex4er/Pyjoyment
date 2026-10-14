@@ -345,20 +345,24 @@ class Pyjo_Promise(Pyjo.Base.object):
         new.ioloop = self.ioloop
         return new
 
-    def finally_(self, cb: Callable[[], Any]) -> 'Pyjo_Promise':
+    def lastly(self, cb: Callable[[], Any]) -> 'Pyjo_Promise':
         """::
 
-            new = promise.finally_(lambda: ...)
+            new = promise.lastly(lambda: ...)
 
         Appends a fulfillment and rejection handler to the promise, and returns
         a new :mod:`Pyjo.Promise` object resolving to the original fulfillment
-        value or rejection reason. ::
+        value or rejection reason. ``finally_`` is an alias, the name of
+        Mojolicious with an underscore. ::
 
             # Do something on fulfillment and rejection
-            promise.finally_(lambda: print('We are done!'))
+            promise.lastly(lambda: print('We are done!'))
         """
-        # Renamed from Mojolicious: finally, a keyword of Python
+        # Renamed from Mojolicious: finally, a keyword of Python, as Bluebird names it
         return self._finally(True, cb)
+
+    # The name of Mojolicious, with an underscore as finally is a keyword of Python
+    finally_ = lastly
 
     @classmethod
     def map(cls, cb: Callable[[Any], 'Pyjo_Promise'], *items: Any, concurrency: int = 0) -> 'Pyjo_Promise':

@@ -23,9 +23,9 @@ Pyjo.Exception - Exception base class
         ])
 
     # Generate exception classes on demand
-    from Pyjo.Exception import check, raise_
+    from Pyjo.Exception import check, throw
     try:
-        raise_('MyApp.X.Name', 'The name Minion is already taken')
+        throw('MyApp.X.Name', 'The name Minion is already taken')
     except Exception as e:
         check(e, [
             ('MyApp.X.Name', lambda e: print(f'Name error: {e}')),
@@ -398,21 +398,27 @@ def check(
     return True
 
 
-def raise_(first: Anything, *rest: Anything) -> NoReturn:
+def throw(first: Anything, *rest: Anything) -> NoReturn:
     """::
 
-        raise_('Something went wrong!')
-        raise_('MyApp.X.Foo', 'Something went wrong!')
-        raise_(MyApp_X_Foo, 'Something went wrong!')
+        throw('Something went wrong!')
+        throw('MyApp.X.Foo', 'Something went wrong!')
+        throw(MyApp_X_Foo, 'Something went wrong!')
 
     Raise a :mod:`Pyjo.Exception`, if the class does not exist yet, one is
-    created as a :mod:`Pyjo.Exception` subclass on demand.
+    created as a :mod:`Pyjo.Exception` subclass on demand. ``raise_`` is an
+    alias, the name of Mojolicious with an underscore.
     """
+    # Renamed from Mojolicious: raise, a keyword of Python
     name, err = (first, rest[0]) if len(rest) else (Pyjo_Exception, first)
     cls = _class(name) if isinstance(name, str) else name
     if not (isinstance(cls, type) and issubclass(cls, Pyjo_Exception)):
         raise TypeError(f'{_name(name)} is not a Pyjo.Exception subclass')
     raise cls.new(err).trace(2)
+
+
+# The name of Mojolicious, with an underscore as raise is a keyword of Python
+raise_ = throw
 
 
 # Mojo makes the class with eval

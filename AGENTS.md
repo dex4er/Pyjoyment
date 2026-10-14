@@ -411,9 +411,14 @@ copy:
   `None`. A test of the end of a list, `is $cookies->[1], undef`, becomes
   `is_ok(len(cookies), 1)`, or `is_ok(collection.get(1), None)` for a
   `Pyjo.Collection`.
-- A function named after a keyword of Python has a trailing underscore, as
-  `raise` of `Mojo::Exception` is `raise_`. The functions of `Pyjo.Test` are
-  the exception: they have an `_ok` suffix, as `is_ok`.
+- A function or a method named after a keyword of Python gets a name that is
+  not one, which the documentation uses, and the name with a trailing
+  underscore is its alias, which the ported tests use, so that the diff of a
+  newer Mojolicious applies to them: `raise` of `Mojo::Exception` is `throw`
+  and `raise_`, and `finally` of `Mojo::Promise` is `lastly`, as Bluebird
+  names it, and `finally_`. An attribute only gets the other name, as `not`
+  of `Mojo::UserAgent::Proxy` is `no`, after `NO_PROXY`. The functions of
+  `Pyjo.Test` are the exception: they have an `_ok` suffix, as `is_ok`.
 - A name of a Perl package, as `Mojo::Exception` takes them, is a dotted name
   of a class in Python (`'MyApp.X.Foo'`), resolved by importing the longest
   prefix that is a module.
