@@ -68,6 +68,7 @@ lint:
         - examples/microhttpd_twisted.py
         - examples/resolv_dns.py
         - examples/server_asgi_on_request.py
+        - t/lib/ServerProcess.py
         - t/servers/**
 actions:
   enabled:

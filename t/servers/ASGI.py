@@ -1,14 +1,10 @@
 from Pyjo.Test import *
 
-import http.client
 import importlib.util
 import os
-import socket
-import subprocess
 import sys
 import tempfile
 import textwrap
-import time
 
 
 # The servers of the dependency group "servers": uv run --only-group servers python -m Pyjo.Prove t/servers
@@ -18,10 +14,11 @@ if missing := [
     plan(skip_all=f'needs the dependency group "servers", without {", ".join(missing)}')
 
 from websockets.exceptions import ConnectionClosed, InvalidStatus  # noqa: E402
-from websockets.sync.client import connect  # noqa: E402
 
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+# The servers in processes of their own
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
+Server = importlib.import_module('ServerProcess').Server
 
 APP = """
 import Pyjo.IOLoop
@@ -75,68 +72,15 @@ def request(asgi, tx):
 app = asgi.to_asgi_app()
 """
 
-LOCAL = ['--host', '127.0.0.1', '--port']
+LOCAL = ['--host', '127.0.0.1', '--port', '{port}']
 SERVERS = [
-    ('uvicorn', ['uvicorn', 'app:app', '--loop', 'asyncio', '--log-level', 'warning', *LOCAL]),
-    ('uvicorn on uvloop', ['uvicorn', 'app:app', '--loop', 'uvloop', '--log-level', 'warning', *LOCAL]),
-    ('Hypercorn', ['hypercorn', 'app:app', '--bind']),
-    ('Hypercorn on uvloop', ['hypercorn', 'app:app', '--worker-class', 'uvloop', '--bind']),
-    ('Daphne', ['daphne', '-b', '127.0.0.1', 'app:app', '-p']),
-    ('Granian', ['granian', '--interface', 'asgi', 'app:app', *LOCAL]),
+    ('uvicorn', ['-m', 'uvicorn', 'app:app', '--loop', 'asyncio', '--log-level', 'warning', *LOCAL]),
+    ('uvicorn on uvloop', ['-m', 'uvicorn', 'app:app', '--loop', 'uvloop', '--log-level', 'warning', *LOCAL]),
+    ('Hypercorn', ['-m', 'hypercorn', 'app:app', '--bind', '127.0.0.1:{port}']),
+    ('Hypercorn on uvloop', ['-m', 'hypercorn', 'app:app', '--worker-class', 'uvloop', '--bind', '127.0.0.1:{port}']),
+    ('Daphne', ['-m', 'daphne', '-b', '127.0.0.1', '-p', '{port}', 'app:app']),
+    ('Granian', ['-m', 'granian', '--interface', 'asgi', 'app:app', *LOCAL]),
 ]
-
-
-def free_port():
-    with socket.socket() as sock:
-        sock.bind(('127.0.0.1', 0))
-        return sock.getsockname()[1]
-
-
-class Server:
-    def __init__(self, dir, command):
-        self.port = free_port()
-        port = f'127.0.0.1:{self.port}' if command[-1] == '--bind' else str(self.port)
-        # The warnings of the servers and their libraries are not ours, so they are not errors there as in CI
-        env = {k: v for k, v in os.environ.items() if k != 'PYTHONWARNINGS'} | {
-            'PYTHONPATH': os.pathsep.join([dir, ROOT])
-        }
-        self.log = open(os.path.join(dir, 'server.log'), 'w+')
-        self.process = subprocess.Popen(
-            [sys.executable, '-m', *command, port], cwd=dir, env=env, stdout=self.log, stderr=subprocess.STDOUT
-        )
-        deadline = time.monotonic() + 20
-        while time.monotonic() < deadline:
-            try:
-                socket.create_connection(('127.0.0.1', self.port), 0.2).close()
-                return
-            except OSError:
-                time.sleep(0.1)
-        self.close()
-        raise RuntimeError(f'the server did not start: {self.output()}')
-
-    def close(self):
-        self.process.terminate()
-        try:
-            self.process.wait(10)
-        except subprocess.TimeoutExpired:
-            self.process.kill()
-            self.process.wait()
-
-    def output(self):
-        self.log.seek(0)
-        return self.log.read()
-
-    def request(self, method, path, body=None, headers=None, chunked=False):
-        conn = http.client.HTTPConnection('127.0.0.1', self.port, timeout=10)
-        try:
-            conn.request(method, path, body=body, headers=headers or {}, encode_chunked=chunked)
-            res = conn.getresponse()
-            return res.status, res.headers, res.read()
-        finally:
-            conn.close()
-
-    def websocket(self, path):
-        return connect(f'ws://127.0.0.1:{self.port}{path}', open_timeout=10, close_timeout=2)
 
 
 with tempfile.TemporaryDirectory() as dir:
