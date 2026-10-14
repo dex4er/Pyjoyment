@@ -607,8 +607,8 @@ keys are tracked, and `.gitignore` lets `t/certs/*.key` in, as the tests of
 TLS need them. Another CA of its own, `t/certs/ca.crt`, whose key is not kept
 either, signs `server` (`localhost`, `127.0.0.1`, `::1`, `serverAuth`),
 `mojo_server` (`mojolicious.org`) and `client` (`clientAuth`), and `bad` is
-self-signed. They are made as the default certificate is, all of them
-together with a new CA. Claude Code does not read these keys either: the
+self-signed. They are made all of them together with a new CA, with the
+commands in `t/certs/README.md`. Claude Code does not read these keys either: the
 rules of `.claude/settings.json` stay as they are, and the tests read the
 keys.
 

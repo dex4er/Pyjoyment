@@ -1,0 +1,57 @@
+# Certificates of the tests
+
+The certificates and keys that the tests of TLS use, as `t/mojo/certs` in
+Mojolicious. They are not secret and must not be used for anything else.
+
+| Files                                | Certificate                                                      |
+| ------------------------------------ | ---------------------------------------------------------------- |
+| `ca.crt`                             | The CA that signs the others, `Pyjoyment Test CA (t/certs)`      |
+| `server.crt`, `server.key`           | `localhost`, `127.0.0.1` and `::1`, for a server                 |
+| `mojo_server.crt`, `mojo_server.key` | `mojolicious.org`, for a server                                  |
+| `client.crt`, `client.key`           | `client`, for a client                                           |
+| `bad.crt`, `bad.key`                 | `localhost` and `127.0.0.1`, self-signed, which `ca.crt` rejects |
+
+The key of the CA is not kept, so a certificate cannot be added to the set:
+all of them are made again, with a new CA. They are RSA 2048 keys, valid for
+a hundred years, made with OpenSSL 3 in a temporary directory, from the root
+of the repository:
+
+```sh
+certs=$PWD/t/certs
+cd "$(mktemp -d)"
+
+openssl req -x509 -newkey rsa:2048 -nodes -days 36500 \
+  -keyout ca.key -out ca.crt -subj '/O=Pyjoyment/CN=Pyjoyment Test CA (t\/certs)' \
+  -addext 'basicConstraints=critical,CA:TRUE' \
+  -addext 'keyUsage=critical,keyCertSign,cRLSign' \
+  -addext 'subjectKeyIdentifier=hash'
+
+sign() {
+  name=$1 cn=$2 ext=$3
+  openssl req -newkey rsa:2048 -nodes -keyout "$name.key" -out "$name.csr" -subj "/O=Pyjoyment/CN=$cn"
+  printf "basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\n$ext\nsubjectKeyIdentifier=hash\nauthorityKeyIdentifier=keyid\n" > "$name.ext"
+  openssl x509 -req -days 36500 -in "$name.csr" -CA ca.crt -CAkey ca.key -CAcreateserial \
+    -out "$name.crt" -extfile "$name.ext"
+}
+
+sign server localhost 'extendedKeyUsage=serverAuth\nsubjectAltName=DNS:localhost,IP:127.0.0.1,IP:::1'
+sign mojo_server mojolicious.org 'extendedKeyUsage=serverAuth\nsubjectAltName=DNS:mojolicious.org'
+sign client client 'extendedKeyUsage=clientAuth'
+
+openssl req -x509 -newkey rsa:2048 -nodes -days 36500 \
+  -keyout bad.key -out bad.crt -subj '/O=Pyjoyment/CN=bad' \
+  -addext 'basicConstraints=critical,CA:FALSE' \
+  -addext 'extendedKeyUsage=serverAuth,clientAuth' \
+  -addext 'subjectAltName=DNS:localhost,IP:127.0.0.1'
+
+openssl verify -CAfile ca.crt server.crt mojo_server.crt client.crt
+```
+
+Then copy the certificates and their keys into `t/certs`, readable by
+everyone, and delete the temporary directory, the key of the CA with it:
+
+```sh
+chmod 644 *.key
+cp ca.crt {server,mojo_server,client,bad}.{crt,key} "$certs/"
+cd "$certs" && rm -rf "$OLDPWD"
+```
