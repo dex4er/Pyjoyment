@@ -5,186 +5,213 @@ Pyjo.Asset.Memory - In-memory storage for HTTP content
 
     import Pyjo.Asset.Memory
 
-    asset_mem = Pyjo.Asset.Memory.new()
-    asset_mem.add_chunk(b'foo bar baz')
-    print(asset_mem.slurp())
+    mem = Pyjo.Asset.Memory.new()
+    mem.add_chunk(b'foo bar baz')
+    print(mem.slurp())
 
 :mod:`Pyjo.Asset.Memory` is an in-memory storage backend for HTTP content.
 
 Events
 ------
 
-:mod:`Pyjo.Asset.Memory` inherits all events from :mod:`Pyjo.Asset` and can emit
-the following new ones.
+:mod:`Pyjo.Asset.Memory` inherits all events from :mod:`Pyjo.Asset` and can
+emit the following new ones.
 
 upgrade
-^^^^^^^
+~~~~~~~
 ::
 
-    @content.on
-    def upgrade(asset_mem, asset_file):
-        ...
+    mem.on('upgrade', lambda mem, file: ...)
 
 Emitted when asset gets upgraded to a :mod:`Pyjo.Asset.File` object. ::
 
-    @content.on
-    def upgrade(asset_mem, asset_file):
-        asset_file.tmpdir = '/tmp'
+    mem.on('upgrade', lambda mem, file: file.set(tmpdir='/tmp'))
 
-Classes
--------
+See also
+--------
+
+:mod:`Pyjoyment`, https://mojolicious.org.
+
+Ported from `Mojo::Asset::Memory <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/Asset/Memory.pm>`_
+of Mojolicious 9.49.
 """
 
+import Pyjo.Asset
 import Pyjo.Asset.File
+import Pyjo.Exception
+import Pyjo.File
 
-from Pyjo.Util import convert, getenv, notnone, spurtb, steady_time
+import builtins
+import os
+import time
+
+from typing import Self
 
 
-MTIME = steady_time()
+type Anything = builtins.object
+
+# The time the program started, as Perl's $^T: the time this module is loaded
+MTIME = time.time()
 
 
 class Pyjo_Asset_Memory(Pyjo.Asset.object):
     """
-    :mod:`Pyjo.Asset.Memory` inherits all attributes and methods from
-    :mod:`Pyjo.Asset` and implements the following new ones.
+    :mod:`Pyjo.Asset.Memory` inherits all methods from :mod:`Pyjo.Asset`
+    and implements the following new ones.
     """
 
-    mtime = None
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-        self.auto_upgrade = kwargs.get('auto_upgrade', False)
+    def __init__(
+        self,
+        *,
+        auto_upgrade: bool | None = None,
+        end_range: int | None = None,
+        max_memory_size: int | None = None,
+        mtime: float | None = None,
+        start_range: int = 0,
+    ) -> None:
         """::
 
-            boolean = asset_mem.auto_upgrade
-            asset_mem.auto_upgrade = boolean
+            mem = Pyjo.Asset.Memory.new()
+            mem = Pyjo.Asset.Memory.new(max_memory_size=1024, auto_upgrade=True)
 
-        Try to detect if content size exceeds :attr:`max_memory_size` limit and
-        automatically upgrade to a :mod:`Pyjo.Asset.File` object.
+        Construct a new :mod:`Pyjo.Asset.Memory` object.
+        """
+        super().__init__(end_range=end_range, start_range=start_range)
+
+        self.auto_upgrade = auto_upgrade
+        """::
+
+            boolean = mem.auto_upgrade
+            mem.auto_upgrade = boolean
+
+        Try to detect if content size exceeds :attr:`max_memory_size` limit
+        and automatically upgrade to a :mod:`Pyjo.Asset.File` object.
         """
 
-        self.max_memory_size = notnone(
-            kwargs.get('max_memory_size'), lambda: convert(getenv('PYJO_MAX_MEMORY_SIZE'), int, 262144)
+        self.max_memory_size = (
+            max_memory_size if max_memory_size is not None else int(os.environ.get('PYJO_MAX_MEMORY_SIZE') or 262144)
         )
         """::
 
-            size = asset_mem.max_memory_size
-            asset_mem.max_memory_size = 1024
+            size = mem.max_memory_size
+            mem.max_memory_size = 1024
 
-        Maximum size in bytes of data to keep in memory before automatically upgrading
-        to a :mod:`Pyjo.Asset.File` object, defaults to the value of the
-        ``MOJO_MAX_MEMORY_SIZE`` environment variable or ``262144`` (256KB).
+        Maximum size in bytes of data to keep in memory before automatically
+        upgrading to a :mod:`Pyjo.Asset.File` object, defaults to the value
+        of the ``PYJO_MAX_MEMORY_SIZE`` environment variable or ``262144``
+        (256KiB).
         """
 
-        self.mtime = kwargs.get('mtime', MTIME)
+        self._content = b''
+        self._frozen = False
+        self._mtime = mtime if mtime is not None else MTIME
+
+    @property
+    def mtime(self) -> float:
         """::
 
-            mtime = asset_mem.mtime
-            asset_mem.mtime = 1408567500
+            mtime = mem.mtime
+            mem.mtime = 1408567500
 
-        Modification time of asset, defaults to the time this class was loaded.
+        Modification time of asset, defaults to the time the program started,
+        as Perl's ``$^T``.
         """
+        return self._mtime
 
-        self._content = bytearray()
+    @mtime.setter
+    def mtime(self, value: float) -> None:
+        self._mtime = value
 
-    def __repr__(self):
+    def add_chunk(self, chunk: bytes) -> Pyjo.Asset.object:
         """::
 
-            string = repr(asset_mem)
+            mem = mem.add_chunk(b'foo bar baz')
+            file = mem.add_chunk(b'abc' * 262144)
 
-        String representation of an object shown in console.
+        Add chunk of data and upgrade to :mod:`Pyjo.Asset.File` object if
+        necessary.
         """
-        return f'<{self.__class__.__module__}.{self.__class__.__name__} _content={repr(self._content)}>'
+        if self._frozen:
+            raise Pyjo.Exception.new('Asset has been upgraded and is now frozen')
+        if self.auto_upgrade and (self.size + len(chunk)) > self.max_memory_size:
+            file = Pyjo.Asset.File.new()
+            self.emit('upgrade', file)
+            self._frozen = True
+            return file.add_chunk(self.slurp() + chunk)
 
-    def add_chunk(self, chunk=b''):
+        self._content += chunk
+        return self
+
+    def contains(self, string: bytes) -> int:
         """::
 
-            asset_mem = asset_mem.add_chunk(b'foo bar baz')
-            asset_mem.auto_upgrade = True
-            asset_file = asset_mem.add_chunk(b'abc' * 262144)
-
-        Add chunk of data and upgrade to :mod:`Pyjo.Asset.File` object if necessary.
-        """
-        # Upgrade if necessary
-        self._content.extend(chunk)
-        if not self.auto_upgrade or self.size <= self.max_memory_size:
-            return self
-
-        asset_file = Pyjo.Asset.File.new()
-        return asset_file.add_chunk(self.emit('upgrade', asset_file).slurp())
-
-    def close(self):
-        """::
-
-            asset_mem.close()
-
-        Close asset immediately and free resources.
-        """
-        self._content = bytearray()
-
-    def contains(self, chunk):
-        """::
-
-            position = asset_mem.contains(b'bar')
+            position = mem.contains(b'bar')
 
         Check if asset contains a specific string.
         """
         start = self.start_range
-        pos = notnone(self._content, b'').find(chunk, start)
+        pos = self._content.find(string, start)
         if start and pos >= 0:
             pos -= start
         end = self.end_range
 
-        if end and (pos + len(chunk)) >= end:
-            return -1
-        else:
-            return pos
+        return -1 if end and (pos + len(string)) >= end else pos
 
-    def get_chunk(self, offset, maximum=131072):
+    def get_chunk(self, offset: int, max: int | None = None) -> bytes:
         """::
 
-            chunk = asset_mem.get_chunk(offset)
-            chunk = asset_mem.get_chunk(offset, maximum)
+            chunk = mem.get_chunk(offset)
+            chunk = mem.get_chunk(offset, max)
 
-        Get chunk of data starting from a specific position, defaults to a maximum
-        chunk size of ``131072`` bytes (128KB).
+        Get chunk of data starting from a specific position, defaults to a
+        maximum chunk size of ``131072`` bytes (128KiB).
         """
+        if max is None:
+            max = 131072
+
         offset += self.start_range
-        end = self.end_range
-        if end and offset + maximum > end:
-            maximum = end + 1 - offset
+        if (end := self.end_range) and (offset + max) > end:
+            max = end + 1 - offset
 
-        return self._content[offset : offset + maximum]
+        return self._content[offset : offset + max] if max > 0 else b''
 
-    def move_to(self, dst):
+    def move_to(self, to: Anything) -> Self:
         """::
 
-            file = asset_mem.move_to('/home/pyjo/bar.txt')
+            mem = mem.move_to('/home/sri/foo.txt')
 
         Move asset data into a specific file.
         """
-        spurtb(self._content, dst)
+        Pyjo.File.new(to).spew(self._content)
         return self
 
     @property
-    def size(self):
+    def size(self) -> int:
         """::
 
-            size = asset_mem.size
+            size = mem.size
 
         Size of asset data in bytes.
         """
-        return len(notnone(self._content, b''))
+        return len(self._content)
 
-    def slurp(self):
+    def slurp(self) -> bytes:
         """::
 
-            bstring = asset_mem.slurp()
+            content = mem.slurp()
 
         Read all asset data at once.
         """
-        return notnone(self._content, bytearray())
+        return self._content
+
+    def to_file(self) -> Pyjo.Asset.File.object:
+        """::
+
+            file = mem.to_file()
+
+        Convert asset to :mod:`Pyjo.Asset.File` object.
+        """
+        return Pyjo.Asset.File.new().add_chunk(self.slurp())
 
 
 new = Pyjo_Asset_Memory.new
