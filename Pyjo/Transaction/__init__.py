@@ -159,11 +159,11 @@ class Pyjo_Transaction(Pyjo.EventEmitter.object):
         # Premature connection close
         res = self.res.finish()
         if close and not res.code and not res.error:
-            res.set_error(message='Premature connection close')
+            res.error = {'message': 'Premature connection close'}
 
         # 4xx/5xx
-        elif res.is_status_class(400) or res.is_status_class(500):
-            res.set_error(message=res.message, code=res.code)
+        elif res.is_error:
+            res.error = {'message': res.message, 'code': res.code}
 
         return self.server_close()
 

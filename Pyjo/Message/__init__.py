@@ -1,4 +1,4 @@
-"""
+r"""
 Pyjo.Message - HTTP message base class
 ======================================
 ::
@@ -6,147 +6,172 @@ Pyjo.Message - HTTP message base class
     import Pyjo.Message
 
     class MyMessage(Pyjo.Message.object):
+        def cookies(self, *cookies): ...
+        def extract_start_line(self, buffer): ...
+        def get_start_line_chunk(self, offset): ...
+        @property
+        def start_line_size(self): ...
 
-        def cookies(self):
-            ...
-
-        def extract_start_line(self, buf):
-            ...
-
-        def get_start_line_chunk(self):
-            ...
-
-:mod:`Pyjo.Message` is an abstract base class for HTTP messages based on
-:rfc:`7230`,
-:rfc:`7231` and
-:rfc:`2388`.
+:mod:`Pyjo.Message` is an abstract base class for HTTP message containers,
+based on `RFC 7230 <https://tools.ietf.org/html/rfc7230>`_,
+`RFC 7231 <https://tools.ietf.org/html/rfc7231>`_ and
+`RFC 2388 <https://tools.ietf.org/html/rfc2388>`_, like
+:mod:`Pyjo.Message.Request` and :mod:`Pyjo.Message.Response`.
 
 Events
 ------
 
-:mod:`Pyjo.Message` inherits all events from :mod:`Pyjo.EventEmitter` and can emit
-the following new ones.
+:mod:`Pyjo.Message` inherits all events from :mod:`Pyjo.EventEmitter` and can
+emit the following new ones.
 
 finish
 ~~~~~~
 ::
 
-    @msg.on
-    def finish(msg):
-        ...
+    msg.on('finish', lambda msg: ...)
 
 Emitted after message building or parsing is finished. ::
 
-    from Pyjo.Util import steady_time
-    before = steady_time()
-
-    @msg.on
-    def finish(msg):
-        msg.headers.header('X-Parser-Time', int(steady_time() - before))
+    before = time.time()
+    msg.on('finish', lambda msg: msg.headers.header('X-Parser-Time', int(time.time() - before)))
 
 progress
 ~~~~~~~~
 ::
 
-    @msg.on
-    def progress(msg, state, offset):
-        ...
+    msg.on('progress', lambda msg, *args: ...)
 
 Emitted when message building or parsing makes progress. ::
 
     # Building
-    @msg.on
-    def progress(msg, state, offset):
-        print("Building {0} at offset {1}".format(state, offset))
+    msg.on('progress', lambda msg, state, offset: print(f'Building "{state}" at offset {offset}'))
 
     # Parsing
-    @msg.on
-    def progress(msg, state, offset):
-        length = msg.headers.content_length
-        if length:
-            size = msg.content.progress
-            print("Progress: {0}%".format(100 if size == length
-                                          else int(size / (length / 100))))
+    @msg.on('progress')
+    def progress(msg):
+        if not (length := int(msg.headers.content_length or 0)):
+            return
+        size = msg.content.progress
+        print('Progress:', 100 if size == length else int(size / (length / 100)), '%')
 
-Classes
--------
+See also
+--------
+
+:mod:`Pyjoyment`, https://mojolicious.org.
+
+Ported from `Mojo::Message <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/Message.pm>`_
+of Mojolicious 9.49.
 """
 
 import Pyjo.Asset.Memory
+import Pyjo.Collection
+import Pyjo.Content
+import Pyjo.Content.MultiPart
 import Pyjo.Content.Single
+import Pyjo.Cookie
 import Pyjo.DOM
 import Pyjo.EventEmitter
+import Pyjo.Exception
+import Pyjo.Headers
 import Pyjo.JSON.Pointer
 import Pyjo.Parameters
 import Pyjo.Upload
 
 from Pyjo.JSON import j
-from Pyjo.Regexp import r
-from Pyjo.Util import convert, decode, getenv, not_implemented, notnone, u
+from Pyjo.Util import decode
+
+import builtins
+import os
+import re
+
+from collections.abc import Callable, Mapping, Sequence
+from typing import Any, NotRequired, Self, TypedDict, cast, overload
 
 
-re_filename = r(r'[; ]filename="((?:\\"|[^"])*)"')
-re_name = r(r'[; ]name="((?:\\"|[^;"])*)"')
+type Anything = builtins.object
+
+
+class Error(TypedDict):
+    """An error of a message, with the status code of a response for a 4xx or
+    5xx response."""
+
+    message: str
+    code: NotRequired[int]
+
+
+# A part of multipart/form-data: the name, the value or the content of an upload, and the filename
+type _FormData = tuple[str, Any, str | None]
 
 
 class Pyjo_Message(Pyjo.EventEmitter.object):
     """
-    :mod:`Pyjo.Message` inherits all attributes and methods from
-    :mod:`Pyjo.EventEmitter` and implements the following new ones.
+    :mod:`Pyjo.Message` inherits all methods from :mod:`Pyjo.EventEmitter` and
+    implements the following new ones.
     """
 
-    def __init__(self, **kwargs):
-        super().__init__()
+    # The default of max_message_size, which a response raises
+    _MAX_MESSAGE_SIZE = 16777216
 
-        self.content = notnone(kwargs.get('content'), lambda: Pyjo.Content.Single.new())
+    def __init__(
+        self,
+        *,
+        content: Pyjo.Content.object | None = None,
+        default_charset: str | None = 'UTF-8',
+        max_line_size: int | None = None,
+        max_message_size: int | None = None,
+        version: str = '1.1',
+    ) -> None:
         """::
 
-            content = msg.content
-            msg.content = Pyjo.Content.Single.new()
+            msg = Pyjo.Message.Request.new()
+            msg = Pyjo.Message.Response.new(content=Pyjo.Content.MultiPart.new())
 
-        Message content, defaults to a :mod:`Pyjo.Content.Single` object.
+        Construct a new message object.
         """
+        super().__init__()
 
-        self.default_charset = kwargs.get('default_charset', 'utf-8')
+        self.default_charset = default_charset
         """::
 
             charset = msg.default_charset
-            msg.default_charset = 'utf-8'
+            msg.default_charset = 'UTF-8'
 
         Default charset used by :attr:`text` and to extract data from
-        ``application/x-www-form-urlencoded`` or ``multipart/form-data`` message body,
-        defaults to ``utf-8``.
+        ``application/x-www-form-urlencoded`` or ``multipart/form-data``
+        message body, defaults to ``UTF-8``.
         """
 
-        self.max_line_size = notnone(
-            kwargs.get('max_line_size'), lambda: convert(getenv('PYJO_MAX_LINE_SIZE'), int) or 8192
+        self.max_line_size = (
+            max_line_size if max_line_size is not None else int(os.environ.get('PYJO_MAX_LINE_SIZE') or 8192)
         )
         """::
 
             size = msg.max_line_size
-            msg.max_line_size = 8192
+            msg.max_line_size = 1024
 
         Maximum start-line size in bytes, defaults to the value of the
-        ``PYJO_MAX_LINE_SIZE`` environment variable or ``8192`` (8KB).
+        ``PYJO_MAX_LINE_SIZE`` environment variable or ``8192`` (8KiB).
         """
 
-        self.max_message_size = notnone(
-            kwargs.get('max_message_size'), lambda: notnone(convert(getenv('PYJO_MAX_MESSAGE_SIZE'), int), 16777216)
+        self.max_message_size = (
+            max_message_size
+            if max_message_size is not None
+            else int(size)
+            if (size := os.environ.get('PYJO_MAX_MESSAGE_SIZE')) is not None
+            else self._MAX_MESSAGE_SIZE
         )
         """::
 
             size = msg.max_message_size
-            msg.max_message_size = 16777216
+            msg.max_message_size = 1024
 
         Maximum message size in bytes, defaults to the value of the
-        ``PYJO_MAX_MESSAGE_SIZE`` environment variable or ``16777216`` (16MB). Setting
-        the value to ``0`` will allow messages of indefinite size. Note that increasing
-        this value can also drastically increase memory usage, should you for example
-        attempt to parse an excessively large message body with the :attr:`body_params`,
-        :meth:`dom` or :meth:`json` methods.
+        ``PYJO_MAX_MESSAGE_SIZE`` environment variable or ``16777216``
+        (16MiB). Setting the value to ``0`` will allow messages of indefinite
+        size.
         """
 
-        self.version = kwargs.get('version', '1.1')
+        self.version = version
         """::
 
             version = msg.version
@@ -155,76 +180,95 @@ class Pyjo_Message(Pyjo.EventEmitter.object):
         HTTP version of message, defaults to ``1.1``.
         """
 
-        self._body_params = None
+        self._content = content
+
+        # The state of the parser and of the generator, as the keys of Mojo's hash
+        self._body_params: Pyjo.Parameters.object | None = None
         self._buffer = bytearray()
-        self._cookies = {}
-        self._dom = None
-        self._error = {}
+        self._cached: dict[str, dict[str | None, list[Any]]] = {}
+        self._dom: Pyjo.DOM.object | None = None
+        self._error: Error | None = None
         self._finished = False
-        self._fixed = False
-        self._json = None
-        self._limited = False
+        self._fix = False
+        self._json: Any = None
+        self._limit = False
         self._raw_size = 0
-        self._state = None
-        self._uploads = {}
+        self._state: str | None = None
 
     @property
-    def body(self):
+    def content(self) -> Pyjo.Content.object:
         """::
 
-            bytes = msg.body
-            msg.body = b'Hello!'
+            content = msg.content
+            msg.content = Pyjo.Content.Single.new()
 
-        Slurp or replace :attr:`content`, :mod:`Mojo.Content.MultiPart` will be
-        automatically downgraded to :mod:`Pyjo.Content.Single`.
+        Message content, defaults to a :mod:`Pyjo.Content.Single` object.
         """
-        content = self._downgrade_content()
-        return content.asset.slurp()
+        if self._content is None:
+            self._content = Pyjo.Content.Single.new()
+        return self._content
 
-    @body.setter
-    def body(self, value):
-        content = self._downgrade_content()
-        return content.set(asset=Pyjo.Asset.Memory.new().add_chunk(value))
+    @content.setter
+    def content(self, value: Pyjo.Content.object) -> None:
+        self._content = value
 
     @property
-    def body_params(self):
+    def body(self) -> bytes:
+        """::
+
+            data = msg.body
+            msg.body = b'Hello!'
+
+        Slurp or replace :attr:`content`.
+        """
+        content = self.content
+        return b'' if content.is_multipart else _single(content).asset.slurp()
+
+    @body.setter
+    def body(self, value: bytes) -> None:
+        # Multipart content needs to be downgraded
+        content = self.content
+        if content.is_multipart:
+            content = self.content = Pyjo.Content.Single.new()
+        _single(content).asset = Pyjo.Asset.Memory.new().add_chunk(value)
+
+    @property
+    def body_params(self) -> Pyjo.Parameters.object:
         """::
 
             params = msg.body_params
 
-        ``POST`` parameters extracted from ``application/x-www-form-urlencoded`` or
-        ``multipart/form-data`` message body, usually a :mod:`Pyjo.Parameters` object. Note
-        that this method caches all data, so it should not be called before the entire
-        message body has been received. Parts of the message body need to be loaded
-        into memory to parse ``POST`` parameters, so you have to make sure it is not
-        excessively large, there's a 16MB limit by default. ::
+        ``POST`` parameters extracted from ``application/x-www-form-urlencoded``
+        or ``multipart/form-data`` message body, usually a
+        :mod:`Pyjo.Parameters` object. Note that this method caches all data, so
+        it should not be called before the entire message body has been
+        received. Parts of the message body need to be loaded into memory to
+        parse ``POST`` parameters, so you have to make sure it is not
+        excessively large. There's a 16MiB limit for requests and a 2GiB limit
+        for responses by default. ::
 
             # Get POST parameter names and values
-            params_dict = msg.body_params.to_dict()
+            params = msg.body_params.to_dict()
         """
-        if self._body_params:
+        if self._body_params is not None:
             return self._body_params
-
-        params = Pyjo.Parameters.new()
-        self._body_params = params
+        params = self._body_params = Pyjo.Parameters.new()
         params.charset = self.content.charset or self.default_charset
 
         # "application/x-www-form-urlencoded"
-        content_type = notnone(self.headers.content_type, '')
-        if content_type.lower().find('application/x-www-form-urlencoded') >= 0:
-            params.parse(self.content.asset.slurp())
+        type = self.headers.content_type or ''
+        if re.search(r'application/x-www-form-urlencoded', type, re.I):
+            params.parse(_single(self.content).asset.slurp())
 
         # "multipart/form-data"
-        elif content_type.lower().find('multipart/form-data') >= 0:
+        elif re.search(r'multipart/form-data', type, re.I):
             for name, value, _ in self._parse_formdata():
-                params.append(
-                    (name, u(value, params.charset)),
-                )
+                params.append(name, value)
 
         return params
 
     @property
-    def body_size(self):
+    def body_size(self) -> int:
         """::
 
             size = msg.body_size
@@ -233,139 +277,160 @@ class Pyjo_Message(Pyjo.EventEmitter.object):
         """
         return self.content.body_size
 
-    def build_body(self):
+    def build_body(self) -> bytes:
         """::
 
-            chunk = msg.build_body()
+            data = msg.build_body()
 
-        Render whole body.
+        Render whole body with :meth:`get_body_chunk`.
         """
-        return self._build('get_body_chunk')
+        return self._build(self.get_body_chunk)
 
-    def build_headers(self):
+    def build_headers(self) -> bytes:
         """::
 
-            chunk = msg.build_headers()
+            data = msg.build_headers()
 
-        Render all headers.
+        Render all headers with :meth:`get_header_chunk`.
         """
-        return self._build('get_header_chunk')
+        return self._build(self.get_header_chunk)
 
-    def build_start_line(self):
+    def build_start_line(self) -> bytes:
         """::
 
-            chunk = msg.build_start_line()
+            data = msg.build_start_line()
 
-        Render start-line.
+        Render start-line with :meth:`get_start_line_chunk`.
         """
-        return self._build('get_start_line_chunk')
+        return self._build(self.get_start_line_chunk)
 
-    def cookie(self, name):
+    def cookie(self, name: str) -> Pyjo.Cookie.object | None:
         """::
 
             cookie = msg.cookie('foo')
 
         Access message cookies, usually :mod:`Pyjo.Cookie.Request` or
-        :mod:`Pyjo.Cookie.Response` objects. If there are multiple cookies sharing the
-        same name, and you want to access more than just the last one, you can use
-        :meth:`every_cookie`. Note that this method caches all data, so it should not be
-        called before all headers have been received. ::
+        :mod:`Pyjo.Cookie.Response` objects. If there are multiple cookies
+        sharing the same name, and you want to access more than just the last
+        one, you can use :meth:`every_cookie`. Note that this method caches all
+        data, so it should not be called before all headers have been
+        received. ::
 
             # Get cookie value
             print(msg.cookie('foo').value)
         """
-        return self._cache('cookie', False, name)
+        cookies = self._cache('cookies', self.cookies, name)
+        return cookies[-1] if cookies else None
 
-    @not_implemented
-    def cookies(self):
+    @overload
+    def cookies(self) -> Sequence[Pyjo.Cookie.object]: ...
+
+    @overload
+    def cookies(self, cookie: Pyjo.Cookie.object | Mapping[str, Any], /, *cookies: Anything) -> Self: ...
+
+    def cookies(self, *cookies: Anything) -> Sequence[Pyjo.Cookie.object] | Self:
         """::
 
-            cookies = msg.cookies
+            cookies = msg.cookies()
 
         Access message cookies. Meant to be overloaded in a subclass.
         """
-        pass
+        raise NotImplementedError('Method "cookies" not implemented by subclass')
 
-    def dom(self, pattern=None):
+    @overload
+    def dom(self) -> Pyjo.DOM.object | None: ...
+
+    @overload
+    def dom(self, css: Anything, /) -> 'Pyjo.Collection.object[Pyjo.DOM.object] | None': ...
+
+    def dom(self, *args: Anything) -> 'Pyjo.DOM.object | Pyjo.Collection.object[Pyjo.DOM.object] | None':
         r"""::
 
             dom = msg.dom()
             collection = msg.dom('a[href]')
 
-        Retrieve message body from :attr:`text` and turn it into a :mod:`Pyjo.DOM` object,
-        an optional selector can be used to call the method :meth:`Pyjo.DOM.find` on it
-        right away, which then returns a :mod:`Pyjo.Collection` object. Note that this
-        method caches all data, so it should not be called before the entire message
-        body has been received. The whole message body needs to be loaded into memory
-        to parse it, so you have to make sure it is not excessively large, there's a
-        16MB limit by default. ::
+        Retrieve message body from :attr:`text` and turn it into a
+        :mod:`Pyjo.DOM` object, an optional selector can be used to call the
+        method :meth:`Pyjo.DOM.Pyjo_DOM.find` on it right away, which then
+        returns a :mod:`Pyjo.Collection` object. Note that this method caches
+        all data, so it should not be called before the entire message body has
+        been received. The whole message body needs to be loaded into memory to
+        parse it, so you have to make sure it is not excessively large. There's
+        a 16MiB limit for requests and a 2GiB limit for responses by default. ::
 
             # Perform "find" right away
             print(msg.dom('h1, h2, h3').map('text').join("\n"))
 
-            # Use everything else Mojo::DOM has to offer
-            print(msg.dom.at('title').text)
-            print(msg.dom.at('body').children().map('tag').uniq().join("\n"))
+            # Use everything else Pyjo.DOM has to offer
+            print(msg.dom().at('title').text)
+            print(msg.dom().at('body').children().map('tag').uniq().join("\n"))
         """
         if self.content.is_multipart:
-            return
-        else:
-            if self._dom is None:
-                self._dom = Pyjo.DOM.new(self.text)
-            dom = self._dom
-            if pattern is None:
-                return dom
-            else:
-                return dom.find(pattern)
+            return None
+        if self._dom is None:
+            self._dom = Pyjo.DOM.new(self.text)
+        return self._dom.find(args[0]) if args else self._dom
 
     @property
-    def error(self):
+    def error(self) -> Error | None:
         """::
 
             err = msg.error
+            msg.error = {'message': 'Parser error'}
 
-        Get message error, a ``None`` return value indicates that there is no
-        error.
+        Get or set message error, a ``None`` return value indicates that there
+        is no error. Setting it finishes the message. ::
+
+            # Connection or parser error
+            msg.error = {'message': 'Connection refused'}
+
+            # 4xx/5xx response
+            msg.error = {'message': 'Internal Server Error', 'code': 500}
         """
         return self._error
 
-    def every_cookie(self, name):
+    @error.setter
+    def error(self, value: Error | None) -> None:
+        self._error = value
+        self.finish()
+
+    def every_cookie(self, name: str) -> list[Pyjo.Cookie.object]:
         """::
 
             cookies = msg.every_cookie('foo')
 
-        Similar to :meth:`cookie`, but returns all message cookies sharing the same name
-        as an array reference. ::
+        Similar to :meth:`cookie`, but returns all message cookies sharing the
+        same name as a list. ::
 
             # Get first cookie value
             print(msg.every_cookie('foo')[0].value)
         """
-        return self._cache('cookie', True, name)
+        return self._cache('cookies', self.cookies, name)
 
-    def every_upload(self, name):
+    def every_upload(self, name: str) -> list[Pyjo.Upload.object]:
         """::
 
             uploads = msg.every_upload('foo')
 
-        Similar to :meth:`upload`, but returns all file uploads sharing the same name as
-        an array reference. ::
+        Similar to :meth:`upload`, but returns all file uploads sharing the
+        same name as a list. ::
 
             # Get content of first uploaded file
             print(msg.every_upload('foo')[0].asset.slurp())
         """
-        return self._cache('upload', True, name)
+        return self._cache('uploads', self.uploads, name)
 
-    @not_implemented
-    def extract_start_line(self, buf):
+    def extract_start_line(self, buffer: bytearray) -> bool | None:
         """::
 
-            boolean = msg.extract_start_line(buf)
+            boolean = msg.extract_start_line(buffer)
 
-        Extract start-line from string. Meant to be overloaded in a subclass.
+        Extract start-line from a :class:`bytearray`, which loses it. Meant to
+        be overloaded in a subclass.
         """
-        pass
+        raise NotImplementedError('Method "extract_start_line" not implemented by subclass')
 
-    def finish(self):
+    def finish(self) -> Self:
         """::
 
             msg = msg.finish()
@@ -375,28 +440,26 @@ class Pyjo_Message(Pyjo.EventEmitter.object):
         self._state = 'finished'
         if self._finished:
             return self
-        else:
-            self._finished = True
-            return self.emit('finish')
+        self._finished = True
+        return self.emit('finish')
 
-    def fix_headers(self):
+    def fix_headers(self) -> Self:
         """::
 
             msg = msg.fix_headers()
 
         Make sure message has all required headers.
         """
-        if self._fixed:
+        if self._fix:
             return self
+        self._fix = True
 
-        self._fixed = True
-
-        # Content-Length or Connection (unless chunked transfer encoding is used)
+        # Content-Length or Connection (unless chunked transfer encoding is used), "0" is false as in Perl
         content = self.content
         headers = content.headers
         if content.is_multipart:
             headers.remove('Content-Length')
-        elif content.is_chunked or headers.content_length:
+        elif content.is_chunked or headers.content_length not in (None, '', '0'):
             return self
         if content.is_dynamic:
             headers.connection = 'close'
@@ -405,52 +468,56 @@ class Pyjo_Message(Pyjo.EventEmitter.object):
 
         return self
 
-    def get_body_chunk(self, offset):
+    def get_body_chunk(self, offset: int) -> bytes | None:
         """::
 
-            chunk = msg.get_body_chunk(offset)
+            data = msg.get_body_chunk(offset)
 
-        Get a chunk of body data starting from a specific position.
+        Get a chunk of body data starting from a specific position. Note that
+        it might not be possible to get the same chunk twice if content was
+        generated dynamically.
         """
         self.emit('progress', 'body', offset)
         chunk = self.content.get_body_chunk(offset)
-        if chunk is not None and not len(chunk):
-            self.finish()
+        if chunk is None or len(chunk):
+            return chunk
+        self.finish()
+
         return chunk
 
-    def get_header_chunk(self, offset):
+    def get_header_chunk(self, offset: int) -> bytes:
         """::
 
-            chunk = msg.get_header_chunk(offset)
+            data = msg.get_header_chunk(offset)
 
-        Get a chunk of header data, starting from a specific position.
+        Get a chunk of header data, starting from a specific position. Note
+        that this method finalizes the message.
         """
         self.emit('progress', 'headers', offset)
         return self.fix_headers().content.get_header_chunk(offset)
 
-    @not_implemented
-    def get_start_line_chunk(self, offset):
+    def get_start_line_chunk(self, offset: int) -> bytes:
         """::
 
-            chunk = msg.get_start_line_chunk(offset)
+            data = msg.get_start_line_chunk(offset)
 
-        Get a chunk of start-line data starting from a specific position. Meant to be
-        overloaded in a subclass.
+        Get a chunk of start-line data starting from a specific position. Meant
+        to be overloaded in a subclass.
         """
-        pass
+        raise NotImplementedError('Method "get_start_line_chunk" not implemented by subclass')
 
     @property
-    def header_size(self):
+    def header_size(self) -> int:
         """::
 
             size = msg.header_size
 
-        Size of headers in bytes.
+        Size of headers in bytes. Note that this method finalizes the message.
         """
         return self.fix_headers().content.header_size
 
     @property
-    def headers(self):
+    def headers(self) -> Pyjo.Headers.object:
         """::
 
             headers = msg.headers
@@ -463,7 +530,7 @@ class Pyjo_Message(Pyjo.EventEmitter.object):
         return self.content.headers
 
     @property
-    def is_finished(self):
+    def is_finished(self) -> bool:
         """::
 
             boolean = msg.is_finished
@@ -473,54 +540,52 @@ class Pyjo_Message(Pyjo.EventEmitter.object):
         return self._state == 'finished'
 
     @property
-    def is_limit_exceeded(self):
+    def is_limit_exceeded(self) -> bool:
         """::
 
             boolean = msg.is_limit_exceeded
 
-        Check if message has exceeded :attr:`max_line_size`, :attr:`max_message_size`,
-        :attr:`Pyjo.Content.max_buffer_size` or :attr:`Pyjo.Headers.max_line_size`.
+        Check if message has exceeded :attr:`max_line_size`,
+        :attr:`max_message_size`,
+        :attr:`Pyjo.Content.Pyjo_Content.max_buffer_size` or
+        :attr:`Pyjo.Headers.Pyjo_Headers.max_line_size`.
         """
-        return self._limited
+        return self._limit
 
-    def json(self, pointer=None):
+    def json(self, pointer: str | None = None) -> Any:
         """::
 
             value = msg.json()
             value = msg.json('/foo/bar')
 
-        Decode JSON message body directly using :mod:`Pyjo.JSON` if possible, an ``None``
-        return value indicates a bare ``null`` or that decoding failed. An optional JSON
-        Pointer can be used to extract a specific value with :mod:`Pyjo.JSON.Pointer`.
-        Note that this method caches all data, so it should not be called before the
-        entire message body has been received. The whole message body needs to be
-        loaded into memory to parse it, so you have to make sure it is not excessively
-        large, there's a 16MB limit by default. ::
+        Decode JSON message body directly using :mod:`Pyjo.JSON` if possible,
+        a ``None`` return value indicates a bare ``null`` or that decoding
+        failed. An optional JSON Pointer can be used to extract a specific value
+        with :mod:`Pyjo.JSON.Pointer`. Note that this method caches all data,
+        so it should not be called before the entire message body has been
+        received. The whole message body needs to be loaded into memory to
+        parse it, so you have to make sure it is not excessively large. There's
+        a 16MiB limit for requests and a 2GiB limit for responses by default. ::
 
             # Extract JSON values
             print(msg.json()['foo']['bar'][23])
             print(msg.json('/foo/bar/23'))
         """
         if self.content.is_multipart:
-            return
-
+            return None
         if self._json is None:
             self._json = j(self.body)
-
         data = self._json
-        if pointer:
-            return Pyjo.JSON.Pointer.new(data).get(pointer)
-        else:
-            return data
+        return Pyjo.JSON.Pointer.new(data).get(pointer) if pointer else data
 
-    def parse(self, chunk=b''):
+    def parse(self, chunk: bytes) -> Self:
         """::
 
-            msg = msg.parse('HTTP/1.1 200 OK...')
+            msg = msg.parse(b'HTTP/1.1 200 OK...')
 
         Parse message chunk.
         """
-        if self._error:
+        if self._error is not None:
             return self
         self._raw_size += len(chunk)
         self._buffer += chunk
@@ -528,233 +593,202 @@ class Pyjo_Message(Pyjo.EventEmitter.object):
         # Start-line
         if not self._state:
             # Check start-line size
-            try:
-                l = self._buffer.index(b'\x0a')
-            except ValueError:
-                l = len(self._buffer)
-            if l > self.max_line_size:
-                return self._limit('Maximum start-line size exceeded')
+            length = self._buffer.find(b'\x0a')
+            if length < 0:
+                length = len(self._buffer)
+            if length > self.max_line_size:
+                return self._limit_exceeded('Maximum start-line size exceeded')
 
             if self.extract_start_line(self._buffer):
                 self._state = 'content'
 
         # Content
-        if self._state == 'content' or self._state == 'finished':
-            self.content = self.content.parse(self._buffer)
-            self._buffer = bytearray()
+        state = self._state or ''
+        if state == 'content' or state == 'finished':
+            buffer, self._buffer = bytes(self._buffer), bytearray()
+            self.content = self.content.parse(buffer)
 
         # Check message size
-        max_size = self.max_message_size
-        if max_size and max_size < self._raw_size:
-            return self._limit('Maximum message size exceeded')
+        max = self.max_message_size
+        if max and max < self._raw_size:
+            return self._limit_exceeded('Maximum message size exceeded')
 
         # Check header size
         if self.headers.is_limit_exceeded:
-            return self._limit('Maximum header size exceeded')
+            return self._limit_exceeded('Maximum header size exceeded')
 
         # Check buffer size
         if self.content.is_limit_exceeded:
-            return self._limit('Maximum buffer size exceeded')
+            return self._limit_exceeded('Maximum buffer size exceeded')
 
-        if self.emit('progress', 'parse', 0).content.is_finished:
-            return self.finish()
-        else:
-            return self
+        return self.finish() if self.emit('progress').content.is_finished else self
 
-    def set_error(self, message=None, code=None):
+    def save_to(self, path: Anything) -> Self:
         """::
 
-            msg = msg.set_error(message, code)
+            msg = msg.save_to('/some/path/index.html')
 
-        Set message error, a ``None`` for message indicates that there is no
-        error. ::
-
-            # Connection or parser error
-            msg.set_error(message='Connection refused')
-
-            # 4xx/5xx response
-            msg.set_error(message='Internal Server Error', code=500)
+        Save message body to a file.
         """
-        if message:
-            self._error = {
-                'message': message,
-                'code': code,
-            }
-            return self.finish()
-        else:
-            self._error = {}
-            return self
+        content = self.content
+        if content.is_multipart:
+            raise Pyjo.Exception.new('Multipart content cannot be saved to files')
+        _single(content).asset.move_to(path)
+        return self
 
     @property
-    def start_line_size(self):
+    def start_line_size(self) -> int:
         """::
 
             size = msg.start_line_size
 
-        Size of the start-line in bytes.
+        Size of the start-line in bytes. Meant to be overloaded in a subclass.
         """
-        return len(self.build_start_line())
+        raise NotImplementedError('Method "start_line_size" not implemented by subclass')
 
     @property
-    def text(self):
+    def text(self) -> str:
         """::
 
             string = msg.text
 
-        Retrieve :attr:`body` and try to decode it with :attr:`Pyjo.Content.charset` or
-        :attr:`default_charset`.
+        Retrieve :attr:`body` and try to decode it with
+        :attr:`Pyjo.Content.Pyjo_Content.charset` or :attr:`default_charset`.
+        A body that does not decode is a string of the characters 0-255, one
+        for each byte.
         """
         body = self.body
-        charset = self.content.charset or 'utf-8'
-        try:
-            return bytes(body).decode(charset)
-        except UnicodeDecodeError:
-            return body.decode('iso-8859-1')
+        charset = self.content.charset or self.default_charset
+        if charset and (text := decode(charset, body)) is not None:
+            return text
+        return body.decode('latin-1')
 
-    def to_bytes(self):
+    def to_bytes(self) -> bytes:
         """::
 
-            bstring = msg.to_bytes()
+            data = msg.to_bytes()
 
-        Render whole message.
+        Render whole message. Note that this method finalizes the message, and
+        that it might not be possible to render the same message twice if
+        content was generated dynamically.
         """
-        return bytes(self.build_start_line() + self.build_headers() + self.build_body())
+        # Renamed from Mojolicious: to_string, as the message is rendered as bytes
+        return self.build_start_line() + self.build_headers() + self.build_body()
 
-    def upload(self, name):
+    def upload(self, name: str) -> Pyjo.Upload.object | None:
         """::
 
             upload = msg.upload('foo')
 
-        Access ``multipart/form-data`` file uploads, usually :mod:`Pyjo.Upload` objects. If
-        there are multiple uploads sharing the same name, and you want to access more
-        than just the last one, you can use :meth:`every_upload`. Note that this method
-        caches all data, so it should not be called before the entire message body has
-        been received. ::
+        Access ``multipart/form-data`` file uploads, usually :mod:`Pyjo.Upload`
+        objects. If there are multiple uploads sharing the same name, and you
+        want to access more than just the last one, you can use
+        :meth:`every_upload`. Note that this method caches all data, so it
+        should not be called before the entire message body has been
+        received. ::
 
             # Get content of uploaded file
             print(msg.upload('foo').asset.slurp())
         """
-        return self._cache('upload', False, name)
+        uploads = self._cache('uploads', self.uploads, name)
+        return uploads[-1] if uploads else None
 
-    @property
-    def uploads(self):
+    def uploads(self) -> list[Pyjo.Upload.object]:
         """::
 
-            uploads = msg.uploads
+            uploads = msg.uploads()
 
-        All ``multipart/form-data`` file uploads, usually :mod:`Pyjo.Upload` objects. ::
+        All ``multipart/form-data`` file uploads, usually :mod:`Pyjo.Upload`
+        objects. ::
 
             # Names of all uploads
-            for upload in msg.uploads:
+            for upload in msg.uploads():
                 print(upload.name)
         """
-        uploads = []
-        for data in self._parse_formdata(True):
-            upload = Pyjo.Upload.new(name=data[0], filename=data[2], asset=data[1].asset, headers=data[1].headers)
+        uploads: list[Pyjo.Upload.object] = []
+        for name, part, filename in self._parse_formdata(True):
+            upload = Pyjo.Upload.new(name=name, filename=filename, asset=part.asset, headers=part.headers)
             uploads.append(upload)
+
         return uploads
 
-    def _build(self, method):
-        buf = b''
-        offset = 0
-
+    def _build(self, method: Callable[[int], bytes | None]) -> bytes:
+        buffer, offset = b'', 0
         while True:
             # No chunk yet, try again
-            chunk = getattr(self, method)(offset)
-            if chunk is None:
+            if (chunk := method(offset)) is None:
                 continue
 
             # End of part
-            l = len(chunk)
-            if not l:
+            if not (length := len(chunk)):
                 break
 
-            offset += l
-            buf += chunk
+            offset += length
+            buffer += chunk
 
-        return buf
+        return buffer
 
-    def _cache(self, method, ret_all, name):
+    def _cache[T: Pyjo.Cookie.object | Pyjo.Upload.object](
+        self, method: str, objects: Callable[[], Sequence[T]], name: str
+    ) -> list[T]:
         # Cache objects by name
-        method += 's'
-        attr = '_' + method
+        if method not in self._cached:
+            cached = self._cached[method] = {}
+            for obj in objects():
+                cached.setdefault(obj.name, []).append(obj)
 
-        if not getattr(self, attr):
-            setattr(self, attr, {})
-            c = getattr(self, method)
-            if c:
-                for a in c:
-                    if a.name not in getattr(self, attr):
-                        getattr(self, attr)[a.name] = []
-                    getattr(self, attr)[a.name].append(a)
+        return self._cached[method].get(name, [])
 
-        if name in getattr(self, attr):
-            objects = getattr(self, attr)[name]
-        else:
-            objects = []
+    def _limit_exceeded(self, message: str) -> Self:
+        # Renamed from Mojolicious: _limit, the attribute _limit is the flag
+        self._limit = True
+        self.error = {'message': message}
+        return self
 
-        if ret_all:
-            return objects
-        else:
-            if objects:
-                return objects[-1]
-            else:
-                return
-
-    def _downgrade_content(self):
-        # Downgrade multipart content
-        if self.content.is_multipart:
-            self.content = Pyjo.Content.Single.new()
-        return self.content
-
-    def _limit(self, message):
-        self._limited = True
-        return self.set_error(message=message)
-
-    def _parse_formdata(self, upload=False):
+    def _parse_formdata(self, upload: bool = False) -> list[_FormData]:
+        formdata: list[_FormData] = []
         content = self.content
-
         if not content.is_multipart:
-            return
-
+            return formdata
         charset = content.charset or self.default_charset
 
         # Check all parts recursively
-        parts = [content]
+        parts: list[Pyjo.Content.object] = [content]
         while parts:
             part = parts.pop(0)
             if part.is_multipart:
-                parts = part.parts + parts
+                parts[:0] = cast(Pyjo.Content.MultiPart.object, part).parts
                 continue
 
-            try:
-                disposition = part.headers.content_disposition
-            except:
-                disposition = None
-
-            if not disposition:
+            if not (disposition := part.headers.content_disposition):
                 continue
-
-            m = re_filename.search(disposition)
-            filename = m.group(1) if m else None
-
+            filename = m[1] if (m := re.search(r'[; ]filename="((?:\\"|[^"])*)"', disposition)) else None
             if upload and filename is None or not upload and filename is not None:
                 continue
-
-            m = re_name.search(disposition)
-            name = m.group(1) if m else None
-            if not upload:
-                part = part.asset.slurp()
+            if (name := m[1] if (m := re.search(r'[; ]name="((?:\\"|[^;"])*)"', disposition)) else None) is None:
+                continue
+            value: Any = part if upload else _single(part).asset.slurp()
 
             if charset:
-                if name and (decoded := decode(charset, name)) is not None:
-                    name = decoded
-                if filename and (decoded := decode(charset, filename)) is not None:
-                    filename = decoded
-                if not upload and (decoded := decode(charset, part)) is not None:
-                    part = decoded
+                if name:
+                    name = decoded if (decoded := decode(charset, name)) is not None else name
+                if filename:
+                    filename = decoded if (decoded := decode(charset, filename)) is not None else filename
+                if not upload:
+                    value = decoded if (decoded := decode(charset, value)) is not None else value
 
-            yield name, part, filename
+            # A value that does not decode is a string of the characters 0-255, as a Perl byte string
+            if isinstance(value, bytes):
+                value = value.decode('latin-1')
+
+            formdata.append((name, value, filename))
+
+        return formdata
+
+
+# The asset of content that is not multipart
+def _single(content: Pyjo.Content.object) -> Pyjo.Content.Single.object:
+    return cast(Pyjo.Content.Single.object, content)
 
 
 new = Pyjo_Message.new

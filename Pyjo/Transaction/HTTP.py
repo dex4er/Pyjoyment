@@ -124,7 +124,7 @@ class Pyjo_Transaction_HTTP(Pyjo.Transaction.object):
             return
 
         # Unexpected 1xx response
-        if not res.is_status_class(100) or res.headers.upgrade:
+        if not res.is_info or res.headers.upgrade:
             self._state = 'finished'
             return
 
