@@ -3,6 +3,7 @@ from Pyjo.Test import *
 import importlib
 import importlib.util
 import os
+import shutil
 import sys
 import tempfile
 import textwrap
@@ -60,14 +61,16 @@ def request(wsgi, tx):
 app = wsgi.to_wsgi_app()
 """
 
+PYTHON = sys.executable
+UWSGI = shutil.which('uwsgi', path=os.path.dirname(sys.executable))
 SERVERS = [
-    ('Gunicorn', 'gunicorn', ['-m', 'gunicorn', 'app:app', '--bind', '127.0.0.1:{port}']),
     (
-        'uWSGI',
-        'pyuwsgi',
-        ['-c', 'import pyuwsgi; pyuwsgi.run()', '--http-socket', '127.0.0.1:{port}', '--module', 'app:app'],
+        'Gunicorn',
+        importlib.util.find_spec('gunicorn'),
+        [PYTHON, '-m', 'gunicorn', 'app:app', '--bind', '127.0.0.1:{port}'],
     ),
-    ('Waitress', 'waitress', ['-m', 'waitress', '--listen=127.0.0.1:{port}', 'app:app']),
+    ('uWSGI', UWSGI, [UWSGI, '--http-socket', '127.0.0.1:{port}', '--module', 'app:app']),
+    ('Waitress', True, [PYTHON, '-m', 'waitress', '--listen=127.0.0.1:{port}', 'app:app']),
 ]
 
 
@@ -75,8 +78,8 @@ with tempfile.TemporaryDirectory() as dir:
     with open(os.path.join(dir, 'app.py'), 'w') as file:
         file.write(textwrap.dedent(APP))
 
-    for name, module, command in SERVERS:
-        if not importlib.util.find_spec(module):
+    for name, available, command in SERVERS:
+        if not available:
             continue
 
         with subtest(name):

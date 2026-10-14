@@ -139,11 +139,12 @@ takes a few seconds.
 - `t/stdlib/` checks the interaction with the Python standard library,
   written for Pyjoyment, as Mojolicious has no counterpart.
 - `t/examples/` runs the scripts from `examples/`.
-- `t/servers/` runs `Pyjo.Server.ASGI` and `Pyjo.Server.WSGI` on real ASGI
-  and WSGI servers, each in a process of its own, as the ASGI server of the
-  tests in `t/lib` and the validator of `wsgiref` cannot show how a server
-  differs. The servers are in the dependency group `servers`, not in
-  `dependencies`; without it, the tests are skipped.
+- `t/servers/` runs `Pyjo.Server.ASGI`, `Pyjo.Server.WSGI` and
+  `Pyjo.Server.CGI` on real ASGI, WSGI and CGI servers, each in a process of
+  its own, as the ASGI server of the tests in `t/lib` and the validator of
+  `wsgiref` cannot show how a server differs. The servers are in the
+  dependency group `servers`, not in `dependencies`; without it, the tests
+  are skipped.
 - `t/lib/` holds helpers shared by the tests. Run on their own, they skip with
   `plan(skip_all=...)`, so `-r t` reports them as skipped instead of failing.
 
@@ -188,11 +189,17 @@ PYTHONPATH=. mise exec -- uv run --python "$(mise exec -- which python)" \
 
 A server is a library of its own, so the known differences of a server are
 expected results with a comment: a fix of the server fails the test, which
-tells that the documentation of `Pyjo.Server.ASGI` or `Pyjo.Server.WSGI` can
-change. The server
-processes do not get `PYTHONWARNINGS`, as the warnings of the servers and
-their libraries are not ours. Renovate bumps the dependency groups in one
-pull request.
+tells that the documentation of `Pyjo.Server.ASGI`, `Pyjo.Server.WSGI` or
+`Pyjo.Server.CGI` can change. The server processes do not get
+`PYTHONWARNINGS`, as the warnings of the servers and their libraries are not
+ours. Renovate bumps the dependency groups in one pull request.
+
+uWSGI is the package `uwsgi`, built from its source with a C compiler, as the
+wheels of `pyuwsgi` have no plugin `cgi`. `extra-build-variables` in
+`pyproject.toml` builds the plugin into it with `UWSGI_EMBED_PLUGINS=cgi`, and
+uv keeps such a build apart from one without the variable in its cache.
+`http.server --cgi` runs the CGI tests too, on a Python that still has
+`CGIHTTPRequestHandler`, which Python 3.15 removed.
 
 CI sets `PYTHONWARNINGS=error::SyntaxWarning,error::DeprecationWarning`, so an
 invalid escape sequence or a deprecated API fails the build, before a new

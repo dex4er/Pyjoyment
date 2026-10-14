@@ -33,6 +33,15 @@ The content of the response can come later, as the event loop of
 read with the length of ``CONTENT_LENGTH``, so a chunked request, which has
 none, reaches the application without its body.
 
+CGI servers
+-----------
+
+* uWSGI with its plugin ``cgi``: a chunked request is not answered.
+* :mod:`http.server` with ``--cgi``, up to Python 3.14: it sends the output of
+  the script as it is, after a status line ``200`` and headers of its own,
+  so the status of the response is lost, and the ``Status`` header and the
+  ``Date`` header of the script reach the client.
+
 Events
 ------
 

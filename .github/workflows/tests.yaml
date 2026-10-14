@@ -75,9 +75,10 @@ jobs:
         run: |
           python -m Pyjo.Prove -j 4 --timeout 60 t/Pyjo/IOLoop*.py t/Pyjo/TLS.py t/Pyjo/Promise*.py t/stdlib/IOLoop*.py
 
-      # The tests of Pyjo.Server.ASGI and Pyjo.Server.WSGI with real servers,
-      # from the dependency group "servers", on the Python of mise.toml only.
-      - name: Run tests on ASGI and WSGI servers
+      # The tests of Pyjo.Server.ASGI, Pyjo.Server.WSGI and Pyjo.Server.CGI with
+      # real servers, from the dependency group "servers", on the Python of
+      # mise.toml only.
+      - name: Run tests on ASGI, WSGI and CGI servers
         if: matrix.python == 'mise'
         env:
           PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning

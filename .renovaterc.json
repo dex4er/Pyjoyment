@@ -28,7 +28,7 @@
   },
   "packageRules": [
     {
-      "description": "The dependency groups of pyproject.toml, as the ASGI servers of the tests in t/servers, in one pull request.",
+      "description": "The dependency groups of pyproject.toml, as the servers of the tests in t/servers, in one pull request.",
       "matchManagers": ["pep621"],
       "matchDepTypes": ["dependency-groups"],
       "groupName": "dependency groups"
