@@ -517,11 +517,17 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
         # Not in Mojolicious: the buffers of the standard streams are written before, so that the worker does not write
         # them again
         _flush()
+        # Unlike Mojolicious: QUIT is blocked while the manager forks, until the worker has its handler, where the worker
+        # of Mojo takes it with the handler of the manager and serves on, and Python clears a signal that comes during
+        # the fork
+        signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGQUIT})
         try:
             pid = os.fork()
         except OSError as e:
+            signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal.SIGQUIT})
             raise OSError(e.errno, f"Can't fork: {e.strerror}") from e
         if pid:
+            signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal.SIGQUIT})
             self.emit('spawn', pid)._pool[pid] = {'time': time.monotonic()}
             return
 
@@ -624,6 +630,9 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
                     loop.stop_gracefully()
 
             loop.reactor.io(wakee, wake).watch(wakee, True, False)
+
+            # Not in Mojolicious: QUIT, which the manager blocks while it forks, comes now that the worker has its handler
+            signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal.SIGQUIT})
 
             def max_requests(loop: Any) -> None:
                 if (prefork := ref()) is not None:
