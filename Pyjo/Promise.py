@@ -100,7 +100,10 @@ exception the promise was rejected with, or a :mod:`Pyjo.Exception` of the
 first reason. A coroutine is a promise with :meth:`~Pyjo_Promise.new` or
 :func:`coroutine`. The reactor of the event loop runs it: a coroutine awaits the
 promises of Pyjoyment with any reactor, and with :mod:`Pyjo.Reactor.Asyncio`
-anything of asyncio too, and a promise can be awaited in any asyncio task. ::
+anything of asyncio too, and a promise can be awaited in any asyncio task.
+Another awaitable, as a future of asyncio, is a promise with
+:meth:`~Pyjo_Promise.new` too, and :meth:`~Pyjo_Promise.to_future` turns a
+promise into a future of the reactor. ::
 
     async def main():
         title = (await get_p('https://mojolicious.org')).res.dom.at('title').text
@@ -128,6 +131,7 @@ Functions
 import Pyjo.Base
 import Pyjo.Exception
 import Pyjo.IOLoop
+import Pyjo.Reactor
 
 from Pyjo.Util import warn
 
@@ -137,7 +141,7 @@ import os
 import warnings
 import weakref
 
-from collections.abc import Callable, Coroutine, Generator
+from collections.abc import Awaitable, Callable, Coroutine, Generator
 from typing import Any, Concatenate, cast
 
 
@@ -170,12 +174,13 @@ class Pyjo_Promise(Pyjo.Base.object):
     implements the following new ones.
     """
 
-    def __init__(self, cb: Callable[[Handler, Handler], Anything] | Coroutine[Any, Any, Any] | None = None) -> None:
+    def __init__(self, cb: Callable[[Handler, Handler], Anything] | Awaitable[Any] | None = None) -> None:
         """::
 
             promise = Pyjo.Promise.new()
             promise = Pyjo.Promise.new(lambda resolve, reject: ...)
             promise = Pyjo.Promise.new(coroutine)
+            promise = Pyjo.Promise.new(future)
 
         Construct a new :mod:`Pyjo.Promise` object. ::
 
@@ -195,6 +200,14 @@ class Pyjo_Promise(Pyjo.Base.object):
                 return 'Lucky!'
 
             promise = Pyjo.Promise.new(lucky())
+
+        Another awaitable, like an :class:`asyncio.Future` or an
+        :class:`asyncio.Task`, is awaited in a coroutine, so with a reactor
+        that can await it, as :mod:`Pyjo.Reactor.Asyncio`. ::
+
+            # Wrap a future of asyncio
+            future = asyncio.get_running_loop().run_in_executor(None, time.sleep, 1)
+            promise = Pyjo.Promise.new(future)
         """
         self._debug: Pyjo.Exception.object | None = None
         self._handled = False
@@ -207,13 +220,16 @@ class Pyjo_Promise(Pyjo.Base.object):
         if DEBUG:
             self._debug = Pyjo.Exception.new().trace()
 
-        # Not in Mojolicious: a coroutine
-        if isinstance(cb, Coroutine):
+        # Not in Mojolicious: a coroutine, or another awaitable in one, as a future of asyncio
+        # TODO: a concurrent.futures.Future, which needs a reactor woken up from another thread, with
+        # Pyjo.IOLoop.Subprocess
+        if isinstance(cb, Awaitable):
+            coro = cast(Coroutine[Any, Any, Any], cb) if isinstance(cb, Coroutine) else _await(cast(Awaitable[Any], cb))
 
             def resolve(value: Any) -> None:
                 self.resolve() if value is None else self.resolve(value)
 
-            self.ioloop.reactor.run_coroutine(cast(Coroutine[Any, Any, Any], cb), resolve, lambda e: self.reject(e))
+            self.ioloop.reactor.run_coroutine(coro, resolve, lambda e: self.reject(e))
 
         elif cb is not None:
             cb(lambda *values: self.resolve(*values), lambda *values: self.reject(*values))
@@ -253,10 +269,8 @@ class Pyjo_Promise(Pyjo.Base.object):
 
         results: tuple[Any, ...] = self._results or ()
         if self._status == 'resolve':
-            return None if not len(results) else results[0] if len(results) == 1 else results
-        if len(results) and isinstance(results[0], BaseException):
-            raise results[0]
-        raise Pyjo.Exception.new(results[0] if len(results) else None)
+            return _result(results)
+        raise _exception(results)
 
     def __del__(self) -> None:
         if getattr(self, '_handled', True) or getattr(self, '_status', '') != 'reject' or self._results is None:
@@ -525,6 +539,37 @@ class Pyjo_Promise(Pyjo.Base.object):
         """
         return _timer(self_or_cls, 'reject', after, reason)
 
+    # Not in Mojolicious: a future of the reactor
+    def to_future(self) -> Pyjo.Reactor.Future[Any]:
+        """::
+
+            future = promise.to_future()
+
+        Turn promise into a future of the reactor of :attr:`ioloop`, an
+        :class:`asyncio.Future` of its loop with :mod:`Pyjo.Reactor.Asyncio`,
+        or a :class:`concurrent.futures.Future` with a reactor without asyncio,
+        as :mod:`Pyjo.Reactor.Poll`. The future is done when the promise is
+        fulfilled or rejected, with what ``await promise`` gives: its value, a
+        tuple of several values, or ``None`` for none, or the exception it was
+        rejected with, or a :mod:`Pyjo.Exception` of the first reason. ::
+
+            # Print the value when the future is done
+            future = Pyjo.Promise.timer(1, 'Done!').to_future()
+            future.add_done_callback(lambda future: print(future.result()))
+        """
+        future = self.ioloop.reactor.future()
+
+        def resolve(*values: Any) -> None:
+            if not future.done():
+                future.set_result(_result(values))
+
+        def reject(*reason: Any) -> None:
+            if not future.done():
+                future.set_exception(_exception(reason))
+
+        self.then(resolve, reject)
+        return future
+
     def wait(self) -> None:
         """::
 
@@ -712,6 +757,23 @@ def _timer(
 
     promise.ioloop.timer(after, timer)
     return promise
+
+
+# An awaitable in a coroutine, which the reactor runs
+async def _await(awaitable: Awaitable[Any]) -> Any:
+    return await awaitable
+
+
+# The exception of a rejection: the reason, or an exception of it
+def _exception(reason: tuple[Any, ...]) -> BaseException:
+    if len(reason) and isinstance(reason[0], BaseException):
+        return reason[0]
+    return Pyjo.Exception.new(reason[0] if len(reason) else None)
+
+
+# The value of a fulfillment: none, one, or a tuple of several
+def _result(values: tuple[Any, ...]) -> Any:
+    return None if not len(values) else values[0] if len(values) == 1 else values
 
 
 # The value of a handler that passes values on: none, one, or a promise of several

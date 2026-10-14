@@ -102,6 +102,12 @@ with subtest('awaitable and coroutine'):
     Pyjo.IOLoop.one_tick()
     is_deeply_ok(got, ['done'], 'driven without asyncio')
 
+with subtest('future'):
+    import concurrent.futures
+
+    future = Pyjo.Reactor.new().future()
+    isa_ok(future, concurrent.futures.Future, 'future without an event loop')
+
 with subtest('Abstract methods'):
     reactor = Pyjo.Reactor.new()
     for call in (

@@ -98,6 +98,110 @@ print(got)
     result = subprocess.run([sys.executable, '-c', code], env=env, capture_output=True, text=True)
     is_ok(result.stdout, "[42, 'TypeError']\n", 'promises of Pyjoyment only')
 
+with subtest('Promise of a future or a task of asyncio'):
+
+    async def futures():
+        loop = asyncio.get_running_loop()
+        got = [await Pyjo.Promise.new(loop.run_in_executor(None, lambda: 'executor'))]
+        got.append(await Pyjo.Promise.new(asyncio.ensure_future(asyncio.sleep(0.01, 'task'))))
+        future = loop.create_future()
+        loop.call_later(0.01, future.set_result, ('a', 'b'))
+        got.append(await Pyjo.Promise.new(future))
+        failed = loop.create_future()
+        failed.set_exception(KeyError('key'))
+        try:
+            await Pyjo.Promise.new(failed)
+        except KeyError as e:
+            got.append(type(e).__name__)
+        cancelled = loop.create_future()
+        cancelled.cancel()
+        try:
+            await Pyjo.Promise.new(cancelled)
+        except asyncio.CancelledError as e:
+            got.append(type(e).__name__)
+        return got
+
+    is_deeply_ok(
+        asyncio.run(futures()),
+        ['executor', 'task', ('a', 'b'), 'KeyError', 'CancelledError'],
+        'value, tuple as one value, exception and cancellation',
+    )
+
+    got = []
+    Pyjo.Promise.new(Pyjo.Promise.timer(0.01, 'promise')).then(got.append).wait()
+    is_deeply_ok(got, ['promise'], 'promise of a promise')
+
+with subtest('Future of asyncio'):
+
+    async def futures():
+        future = Pyjo.Promise.timer(0.01, 'one').to_future()
+        got = [isinstance(future, asyncio.Future), future.get_loop() is asyncio.get_running_loop()]
+        got.append(await future)
+        got.append(await asyncio.wait_for(Pyjo.Promise.timer(0.01, 'a', 'b').to_future(), 5))
+        got.append(await Pyjo.Promise.resolve().to_future())
+        got.append(await asyncio.gather(Pyjo.Promise.timer(0.01, 'g').to_future(), asyncio.sleep(0, 's')))
+        try:
+            await Pyjo.Promise.reject(KeyError('key')).to_future()
+        except KeyError as e:
+            got.append(type(e).__name__)
+        try:
+            await Pyjo.Promise.reject('reason').to_future()
+        except Pyjo.Exception.object as e:
+            got.append(e.message)
+        done = []
+        future = Pyjo.Promise.timer(0.01, 'callback').to_future()
+        future.add_done_callback(lambda future: done.append(future.result()))
+        await asyncio.sleep(0.05)
+        got.append(done)
+        return got
+
+    is_deeply_ok(
+        asyncio.run(futures()),
+        [True, True, 'one', ('a', 'b'), None, ['g', 's'], 'KeyError', 'reason', ['callback']],
+        'future of the loop, values and exceptions',
+    )
+
+    with warnings.catch_warnings(record=True) as warn:
+        warnings.simplefilter('always')
+        promise = Pyjo.Promise.new()
+        future = promise.to_future()
+        future.cancel()
+        promise.reject('Too late')
+        Pyjo.Promise.timer(0.01).wait()
+        del promise
+        gc.collect()
+        ok(future.cancelled(), 'cancelled future')
+        is_ok(len(warn), 0, 'rejection handled by the future')
+
+with subtest('Future of concurrent.futures without asyncio'):
+    code = """
+import asyncio, concurrent.futures, threading, Pyjo.Promise
+
+future = Pyjo.Promise.timer(0.05, 'thread').to_future()
+got = [type(future).__module__ + '.' + type(future).__name__]
+thread = threading.Thread(target=lambda: got.append(future.result(timeout=5)))
+thread.start()
+Pyjo.Promise.timer(0.1).wait()
+thread.join()
+
+futures = [Pyjo.Promise.timer(0.01, 'a').to_future(), Pyjo.Promise.reject('b').to_future()]
+Pyjo.Promise.timer(0.05).wait()
+done, pending = concurrent.futures.wait(futures, timeout=0)
+got.append((len(done), len(pending), futures[0].result(), str(futures[1].exception()).strip()))
+
+loop = asyncio.new_event_loop()
+Pyjo.Promise.new(loop.create_future()).catch(lambda e: got.append(type(e).__name__)).wait()
+loop.close()
+print(got)
+"""
+    env = dict(os.environ, PYJO_REACTOR='Pyjo.Reactor.Poll')
+    result = subprocess.run([sys.executable, '-c', code], env=env, capture_output=True, text=True)
+    is_ok(
+        result.stdout,
+        "['concurrent.futures._base.Future', 'thread', (2, 0, 'a', 'b'), 'TypeError']\n",
+        'waited for in another thread and with concurrent.futures, no future of asyncio',
+    )
+
 with subtest('warnings'):
     with warnings.catch_warnings(record=True) as warn:
         warnings.simplefilter('always')

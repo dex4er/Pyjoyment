@@ -208,6 +208,17 @@ with subtest('new'):
     promise.then(got.append).wait()
     is_deeply_ok(got, ['Lucky!'], 'coroutine')
 
+    # Wrap a future of asyncio
+    async def wrap():
+        import time
+
+        future = asyncio.get_running_loop().run_in_executor(None, time.sleep, 0.01)
+        promise = Pyjo.Promise.new(future)
+        isa_ok(promise, Pyjo.Promise.object, 'promise of a future')
+        return await promise
+
+    is_ok(asyncio.run(wrap()), None, 'future')
+
 with subtest('reject and resolve'):
     got = []
     new = Pyjo.Promise.reject('a', 'b')
@@ -271,6 +282,18 @@ with subtest('timer and timeout'):
     promise.catch(got.append)
     Pyjo.Promise.timer(0.05).wait()
     is_deeply_ok(sorted(got), ['Promise timeout', 'Success!', 'Timeout!'], 'timers')
+
+with subtest('to_future'):
+    future = Pyjo.Promise.timer(0.01, 'value').to_future()
+    ok(hasattr(future, 'add_done_callback'), 'future')
+
+    # Print the value when the future is done
+    output = io.StringIO()
+    with contextlib.redirect_stdout(output):
+        future = Pyjo.Promise.timer(0.01, 'Done!').to_future()
+        future.add_done_callback(lambda future: print(future.result()))
+        Pyjo.Promise.timer(0.05).wait()
+    is_ok(output.getvalue(), 'Done!\n', 'printed')
 
 with subtest('wait'):
     promise = Pyjo.Promise.timer(0.01, 'waited')
