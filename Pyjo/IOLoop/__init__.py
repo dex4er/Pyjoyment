@@ -598,7 +598,7 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
         c = self._in.get(stream) or self._out.get(stream) or {}
         return c.get('stream')
 
-    # Left out from Mojolicious: subprocess, as Mojo::IOLoop::Subprocess is not ported
+    # TODO: subprocess, when Mojo::IOLoop::Subprocess is ported
 
     @overload
     def timer(self, after: float, cb: TimerCallback) -> str: ...

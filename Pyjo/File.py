@@ -226,7 +226,7 @@ class Pyjo_File(Pyjo.Base.object, Pyjo.String.Mixin.object):
         """
         return self.new(_dirname(self._path))
 
-    # Left out from Mojolicious: download, until Pyjo.UserAgent is ported
+    # TODO: download, when Pyjo.UserAgent is ported
 
     @property
     def extname(self) -> str:

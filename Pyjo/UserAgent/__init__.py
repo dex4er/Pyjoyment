@@ -119,7 +119,7 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
         return self.start(self.build_tx('POST', url, *args, **kwargs), cb)
 
     def start(self, tx, cb=None):
-        # TODO Pyjo.UserAgent.Server and fork safety
+        # TODO: Pyjo.UserAgent.Server and fork safety
 
         # Non-blocking
         if cb:
@@ -155,7 +155,7 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
         if handle:
             options['handle'] = handle
 
-        # TODO SOCKS
+        # TODO: SOCKS
 
         # TLS
         options['tls'] = proto == 'https'
@@ -336,13 +336,13 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
         if close and not res.code and not res.error:
             res.error = {'message': 'Premature connection close'}
 
-        # TODO Finish WebSocket
+        # TODO: Finish WebSocket
 
         jar = self.cookie_jar
         if jar:
             jar.collect(old)
 
-        # TODO Upgrade connection to WebSocket
+        # TODO: Upgrade connection to WebSocket
 
         # Finish normal connection and handle redirects
         self._remove(cid, close)

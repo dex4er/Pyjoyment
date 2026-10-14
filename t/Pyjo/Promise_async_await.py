@@ -13,8 +13,8 @@ import warnings
 # Left out from Mojolicious: test_awaitable of Test::Future::AsyncAwait::Awaitable, the API of Future::AsyncAwait is
 # __await__ in Python, which t/stdlib/Promise.py checks with asyncio
 
-# Left out from Mojolicious: the application, its routes, the user agent and Test::Mojo, as Pyjoyment.Lite,
-# Pyjo.UserAgent and Test::Mojo are not ported yet
+# TODO: the application, its routes, the user agent and Test::Mojo, when Pyjoyment.Lite, Pyjo.UserAgent and Test::Mojo
+# are ported
 
 
 # Not in Mojolicious: Perl frees a promise at the end of the statement, PyPy when its garbage collector runs, which

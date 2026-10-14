@@ -300,6 +300,15 @@ otherwise, so that a newer Mojolicious does not bring the old behaviour back.
 Where the difference comes from a bug of Mojolicious, the bug also goes to
 the issue that collects them.
 
+These markers are for what stays. What waits for a module that is not ported
+yet, as a method left out, a stand-in for a class of Mojolicious or a test
+that runs without a command, has a comment that starts with `# TODO:` and
+says what to do and when, so that the port of that module finds it:
+
+```sh
+grep -rn "TODO:" Pyjo Pyjoyment t
+```
+
 Mojo's tests and the behaviour of its code at the tag are the reference, not
 its POD: the examples in the POD are not tested and can be wrong. Where they
 disagree, run the Perl code from the clone (`perl -Imojo/lib -MMojo::URL -e ...`)
