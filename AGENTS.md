@@ -176,7 +176,7 @@ Sphinx does) has no effect. Older test files still wrap their body in
 
 The tests run on the reactor that `Pyjo.Reactor.detect()` gives, the asyncio
 one, where Mojo's tests set `MOJO_REACTOR` to `Mojo::Reactor::Poll`. CI runs
-the tests of the event loop, and of the user agent and the daemon, which do
+the tests of the event loop, and of the user agent and the servers, which do
 the most of its I/O, a second time on `Pyjo.Reactor.Poll`, as a reactor
 without asyncio has to pass them too:
 
@@ -184,7 +184,7 @@ without asyncio has to pass them too:
 PYJO_REACTOR=Pyjo.Reactor.Poll PYTHONPATH=. mise exec -- python -m Pyjo.Prove -j 4 \
   t/Pyjo/IOLoop*.py t/Pyjo/TLS.py t/Pyjo/Promise*.py t/Pyjo/Subprocess.py t/stdlib/IOLoop*.py \
   t/Pyjo/UserAgent*.py t/stdlib/UserAgent*.py t/Pyjo/Server_Daemon.py t/stdlib/Server_Daemon.py \
-  t/Pyjo/File_download.py
+  t/Pyjo/Server_Prefork.py t/stdlib/Server_Prefork.py t/Pyjo/File_download.py
 ```
 
 CI runs the tests in `t/servers` on the Python of `mise.toml` only, with the
@@ -545,6 +545,16 @@ copy:
 - A method that the base class of Mojo leaves to a subclass raises
   `NotImplementedError` with the message of Mojo's croak,
   `Method "x" not implemented by subclass`.
+- Perl defers the handler of a signal to a safe point and returns from a
+  system call that the signal interrupts. Python runs the handler in the
+  middle of what the main thread does, where writing to a stream that is
+  being written raises `RuntimeError`, and repeats the interrupted call until
+  its timeout. So the handler of a server, as the ones of
+  `Pyjo.Server.Prefork`, only notes the signal, which the main loop handles,
+  and `signal.set_wakeup_fd` with a socket pair that the loop watches wakes it
+  up. In the child of a fork, a reactor of asyncio that is not given a loop
+  moves to a new one, as the selector of the loop of the parent, epoll or
+  kqueue, is not the child's.
 - `local` on an attribute, as `local $self->{running}`, is the value saved
   before and set back in a `finally`.
 - `__del__`, the counterpart of `DESTROY`, does nothing when

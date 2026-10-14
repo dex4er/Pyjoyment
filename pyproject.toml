@@ -202,6 +202,7 @@ strict = [
   "Pyjo/Server/ASGI.py",
   "Pyjo/Server/CGI.py",
   "Pyjo/Server/Daemon.py",
+  "Pyjo/Server/Prefork.py",
   "Pyjo/Server/WSGI.py",
   "Pyjo/String/Bytes.py",
   "Pyjo/String/Mixin.py",
