@@ -87,6 +87,7 @@ from Pyjo.WebSocket import challenge, client_handshake
 import builtins
 import os
 import re
+import weakref
 
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any, Self, cast
@@ -208,6 +209,10 @@ class Pyjo_UserAgent_Transactor(Pyjo.Base.object):
             tx.req.headers.range = f'bytes={current_size}-{size}'
 
         fh = file.open('ab', buffering=0)
+
+        # Not in Mojolicious: the file is closed with the transaction that is not finished, as Perl closes it with the
+        # last reference
+        weakref.finalize(tx, fh.close)
 
         @res.content.unsubscribe('read').on('read')
         def read(content: Pyjo.Content.object, chunk: bytes) -> None:

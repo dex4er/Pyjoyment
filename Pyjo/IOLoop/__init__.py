@@ -105,7 +105,9 @@ import Pyjo.Reactor
 
 from Pyjo.Util import md5_sum, warn
 
+import atexit
 import builtins
+import gc
 import os
 import random
 import sys
@@ -730,6 +732,19 @@ The global :mod:`Pyjo.IOLoop` singleton, as :meth:`Pyjo_IOLoop.singleton`
 gives it.
 """
 singleton.reactor
+
+
+# Not in Mojolicious: Perl closes the handles that are left at the end of the interpreter, Python warns that they were
+# not closed, as __del__ does nothing while it finalizes, so the connections of the singleton are closed and the objects
+# that close theirs are freed before; registered after the reactor, so that it runs before the event loops are closed
+@atexit.register
+def _cleanup() -> None:
+    try:
+        if _singleton is not None:
+            _singleton.reset()
+    finally:
+        gc.collect()
+
 
 # What Mojo calls on the class works with the singleton
 acceptor = singleton.acceptor

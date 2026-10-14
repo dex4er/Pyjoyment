@@ -71,6 +71,7 @@ import logging
 import os
 import sys
 import time
+import weakref
 
 from collections.abc import Callable, Iterable, Iterator
 from types import TracebackType
@@ -224,7 +225,13 @@ class Pyjo_Log(Pyjo.EventEmitter.object):
         if self._handle is _UNSET:
             # STDERR, or the file
             path = self.path
-            self._handle = sys.stderr if path is None else Pyjo.File.new(path).open('a', encoding='UTF-8')
+            if path is None:
+                self._handle = sys.stderr
+            else:
+                handle = self._handle = Pyjo.File.new(path).open('a', encoding='UTF-8')
+
+                # Not in Mojolicious: the file is closed with the object, as Perl closes it with the last reference
+                weakref.finalize(self, handle.close)
         return self._handle
 
     @handle.setter
