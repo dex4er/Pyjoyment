@@ -338,10 +338,16 @@ class Pyjo_IOLoop_Client(Pyjo.EventEmitter.object):
     # Left out from Mojolicious: can_socks and the options socks_*, as SOCKS support requires IO::Socket::Socks
 
     def _cleanup(self) -> None:
+        reactor = self._reactor() if self._reactor is not None else None
         if (dns := self._dns) is not None:
             self._dns = None
+            # The reactor forgets the socket before it is closed, as epoll does and asyncio does not
+            if reactor is not None:
+                try:
+                    reactor.remove(dns.handle)
+                except Exception:
+                    pass
             dns.close()
-        reactor = self._reactor() if self._reactor is not None else None
         if reactor is None:
             return
         for name in ('_timer', '_handle'):
