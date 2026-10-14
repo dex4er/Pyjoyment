@@ -18,7 +18,8 @@ modules, which can be used for all kinds of applications independently of the
 web framework:
 
 * HTTP and WebSocket client and server.
-* Non-blocking I/O web server, which also runs as a WSGI or CGI application.
+* Non-blocking I/O web server, which also runs as an ASGI, WSGI or CGI
+  application.
 * HTML/XML parser with CSS selector support, and JSON with JSON Pointers.
 * Containers for URLs, paths, query strings, headers, cookies and HTTP
   messages.
