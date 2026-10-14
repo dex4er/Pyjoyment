@@ -123,6 +123,12 @@ with subtest('awaitable and coroutine'):
     Pyjo.Promise.new().set(ioloop=loop).timer(0.05).wait()
     is_deeply_ok(got, ['done'], 'task of the loop')
 
+with subtest('future'):
+    reactor = Pyjo.Reactor.Asyncio.new()
+    future = reactor.future()
+    isa_ok(future, asyncio.Future, 'future of the loop')
+    ok(future.get_loop() is reactor.loop, 'right loop')
+
 with subtest('watch'):
     handle, peer = socket.socketpair()
     reactor = Pyjo.Reactor.Asyncio.new()

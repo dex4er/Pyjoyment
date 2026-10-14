@@ -98,6 +98,7 @@ import Pyjo.EventEmitter
 from Pyjo.Loader import load_class
 
 import builtins
+import concurrent.futures
 import os
 
 from collections.abc import Awaitable, Callable, Coroutine, Generator
@@ -120,6 +121,26 @@ type IOCallback = Callable[[Any, bool], Anything]
 
 # A callback of a timer gets the reactor
 type TimerCallback = Callable[[Any], Anything]
+
+
+# Not in Mojolicious: what the futures of concurrent.futures and asyncio have in common
+class Future[T](Protocol):
+    def add_done_callback(self, fn: Callable[[Any], object], /) -> None: ...
+
+    def cancel(self) -> bool: ...
+
+    def cancelled(self) -> bool: ...
+
+    def done(self) -> bool: ...
+
+    def exception(self) -> BaseException | None: ...
+
+    def result(self) -> T: ...
+
+    def set_exception(self, exception: BaseException, /) -> None: ...
+
+    def set_result(self, result: T, /) -> None: ...
+
 
 _DETECTED: dict[str, str] = {}
 
@@ -217,6 +238,21 @@ class Pyjo_Reactor(Pyjo.EventEmitter.object):
             _DETECTED[tried] = default if load_class(tried) else tried
         load_class(_DETECTED[tried])
         return _DETECTED[tried]
+
+    # Not in Mojolicious: a future that a promise turns into
+    def future(self) -> Future[Any]:
+        """::
+
+            future = reactor.future()
+
+        Return a new future, which :meth:`Pyjo.Promise.Pyjo_Promise.to_future`
+        turns a promise into. The base class gives a
+        :class:`concurrent.futures.Future`, which needs no event loop and
+        can be waited for in another thread, and a reactor of an event loop
+        gives one of its loop, so that it can be awaited in the tasks of that
+        loop.
+        """
+        return concurrent.futures.Future()
 
     def io(self, handle: Handle, cb: IOCallback) -> Self:
         """::

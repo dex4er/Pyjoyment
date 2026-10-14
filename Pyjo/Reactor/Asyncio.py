@@ -239,6 +239,17 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
 
         task.add_done_callback(done)
 
+    # Not in Mojolicious: a future of the loop
+    def future(self) -> asyncio.Future[Any]:
+        """::
+
+            future = reactor.future()
+
+        Return a new :class:`asyncio.Future` of :attr:`loop`, which
+        :meth:`Pyjo.Promise.Pyjo_Promise.to_future` turns a promise into.
+        """
+        return self.loop.create_future()
+
     def io(self, handle: Handle, cb: IOCallback) -> Self:
         """::
 
