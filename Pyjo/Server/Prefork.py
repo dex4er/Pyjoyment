@@ -403,8 +403,15 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
             self.app.log.info(f'Manager {os.getpid()} stopped')
         finally:
             signal.set_wakeup_fd(wakeup)
-            for name, handler in handlers.items():
-                signal.signal(name, handler)
+
+            # Not in Mojolicious: the signals are blocked while the handlers are set back, so that a signal that comes
+            # in between is not left to a handler that is gone, which Python reports as a race condition
+            signal.pthread_sigmask(signal.SIG_BLOCK, handlers)
+            try:
+                for name, handler in handlers.items():
+                    signal.signal(name, handler)
+            finally:
+                signal.pthread_sigmask(signal.SIG_UNBLOCK, handlers)
 
             # Not in Mojolicious: the pipe is closed at the end, as Perl closes it with the object
             os.close(reader)
