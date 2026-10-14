@@ -158,6 +158,16 @@ and only once a test function has been called, so importing the module (as
 Sphinx does) has no effect. Older test files still wrap their body in
 `if __name__ == '__main__':`, which is no longer needed.
 
+The tests run on the reactor that `Pyjo.Reactor.detect()` gives, the asyncio
+one, where Mojo's tests set `MOJO_REACTOR` to `Mojo::Reactor::Poll`. CI runs
+the tests of the event loop a second time on `Pyjo.Reactor.Poll`, as a reactor
+without asyncio has to pass them too:
+
+```sh
+PYJO_REACTOR=Pyjo.Reactor.Poll PYTHONPATH=. mise exec -- python -m Pyjo.Prove -j 4 \
+  t/Pyjo/IOLoop*.py t/Pyjo/TLS.py t/Pyjo/Promise*.py t/stdlib/IOLoop*.py
+```
+
 CI sets `PYTHONWARNINGS=error::SyntaxWarning,error::DeprecationWarning`, so an
 invalid escape sequence or a deprecated API fails the build, before a new
 Python removes it; the weekly run catches the deprecations of a new Python

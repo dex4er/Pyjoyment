@@ -65,6 +65,13 @@ jobs:
           python --version
           python -m Pyjo.Prove -j 4 -r t
 
+      # The tests of the event loop run on the reactor without asyncio too.
+      - name: Run tests on Pyjo.Reactor.Poll
+        env:
+          PYJO_REACTOR: Pyjo.Reactor.Poll
+        run: |
+          python -m Pyjo.Prove -j 4 t/Pyjo/IOLoop*.py t/Pyjo/TLS.py t/Pyjo/Promise*.py t/stdlib/IOLoop*.py
+
   build:
     name: build
 
