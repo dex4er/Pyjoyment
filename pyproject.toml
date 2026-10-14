@@ -200,6 +200,7 @@ strict = [
   "Pyjo/Server/__init__.py",
   "Pyjo/Server/ASGI.py",
   "Pyjo/Server/CGI.py",
+  "Pyjo/Server/Daemon.py",
   "Pyjo/String/Bytes.py",
   "Pyjo/String/Unicode.py",
   "Pyjo/Test.py",
@@ -210,6 +211,7 @@ strict = [
   "Pyjo/Upload.py",
   "Pyjo/UserAgent/CookieJar.py",
   "Pyjo/UserAgent/Proxy.py",
+  "Pyjo/UserAgent/Server.py",
   "Pyjo/UserAgent/Transactor.py",
   "Pyjo/WebSocket.py",
 ]

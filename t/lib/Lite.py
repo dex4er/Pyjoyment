@@ -159,8 +159,13 @@ class Mojolicious:
         return self
 
 
-# The application of the script, as Mojolicious::Lite makes it for the package that uses it
-app = Mojolicious(moniker=os.path.splitext(os.path.basename(sys.argv[0] if sys.argv else ''))[0] or 'mojolicious')
+class Lite(Mojolicious):
+    pass
+
+
+# The application of the script, as Mojolicious::Lite makes it for the package that uses it, shared by the scripts that
+# import it, as Python imports a module once
+app = Lite(moniker=os.path.splitext(os.path.basename(sys.argv[0] if sys.argv else ''))[0] or 'mojolicious')
 
 
 def any(pattern, *args):

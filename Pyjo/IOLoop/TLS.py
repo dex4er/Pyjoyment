@@ -200,7 +200,7 @@ class Pyjo_IOLoop_TLS(Pyjo.EventEmitter.object):
         handle = self._handle
         server = bool(options.get('server'))
         try:
-            context = self._expand(options)
+            context = _expand(options)
             # Not in Mojolicious: tls_hostname for the SSL_hostname and SSL_verifycn_name of IO::Socket::SSL
             hostname = None if server else options.get('tls_hostname', options.get('address')) or None
             handle = context.wrap_socket(
@@ -215,52 +215,6 @@ class Pyjo_IOLoop_TLS(Pyjo.EventEmitter.object):
             self._tls(handle)
 
         self.reactor.io(handle, cb)
-
-    # Left out from Mojolicious: _expand makes the options of IO::Socket::SSL, here an ssl.SSLContext
-    def _expand(self, options: dict[str, Any]) -> ssl.SSLContext:
-        # Unlike Mojolicious: tls_options of IO::Socket::SSL is tls_context, an ssl.SSLContext
-        if (context := options.get('tls_context')) is not None:
-            return context
-
-        ca = options.get('tls_ca')
-        if ca is not None and not os.path.isfile(ca):
-            ca = None
-        cert, key = options.get('tls_cert'), options.get('tls_key')
-
-        if options.get('server'):
-
-            def server_context(cert: str, key: str) -> ssl.SSLContext:
-                context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-                context.load_cert_chain(cert, key)
-                if ca is not None:
-                    context.load_verify_locations(ca)
-                    context.verify_mode = ssl.CERT_REQUIRED
-                return context
-
-            certs, keys = _named(cert), _named(key)
-            context = server_context(certs.pop('', None) or CERT, keys.pop('', None) or KEY)
-
-            # Not in Mojolicious: a certificate for each name, which IO::Socket::SSL chooses by SNI
-            if len(certs):
-                contexts = {name: server_context(c, keys.get(name) or KEY) for name, c in certs.items()}
-
-                def sni(socket: ssl.SSLObject | ssl.SSLSocket, name: str | None, context: ssl.SSLContext) -> None:
-                    if name is not None and (named := contexts.get(name)) is not None:
-                        socket.context = named
-
-                context.sni_callback = sni
-            return context
-
-        context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-        if ca is not None:
-            context.load_verify_locations(ca)
-        else:
-            context.load_default_certs()
-        if cert:
-            context.load_cert_chain(cert, key)
-        if not options.get('tls_hostname', options.get('address')):
-            context.check_hostname = False
-        return context
 
     def _cleanup(self) -> None:
         reactor = self._reactor() if self._reactor is not None else None
@@ -297,6 +251,66 @@ def _named(value: Any) -> dict[str, str]:
     if isinstance(value, dict):
         return {str(k): str(v) for k, v in cast(dict[Any, Any], value).items()}
     return {'': value} if value else {}
+
+
+# Left out from Mojolicious: _expand makes the options of IO::Socket::SSL, here an ssl.SSLContext
+def _expand(options: dict[str, Any]) -> ssl.SSLContext:
+    # Unlike Mojolicious: tls_options of IO::Socket::SSL is tls_context, an ssl.SSLContext
+    if (context := options.get('tls_context')) is not None:
+        return context
+
+    ca = options.get('tls_ca')
+    if ca is not None and not os.path.isfile(ca):
+        ca = None
+    cert, key = options.get('tls_cert'), options.get('tls_key')
+
+    if options.get('server'):
+
+        def server_context(cert: str, key: str) -> ssl.SSLContext:
+            context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            context.load_cert_chain(cert, key)
+            if ca is not None:
+                context.load_verify_locations(ca)
+                context.verify_mode = ssl.CERT_REQUIRED
+            return context
+
+        certs, keys = _named(cert), _named(key)
+        context = server_context(certs.pop('', None) or CERT, keys.pop('', None) or KEY)
+
+        # Not in Mojolicious: a certificate for each name, which IO::Socket::SSL chooses by SNI
+        if len(certs):
+            contexts = {name: server_context(c, keys.get(name) or KEY) for name, c in certs.items()}
+
+            def sni(socket: ssl.SSLObject | ssl.SSLSocket, name: str | None, context: ssl.SSLContext) -> None:
+                if name is not None and (named := contexts.get(name)) is not None:
+                    socket.context = named
+
+            context.sni_callback = sni
+        return context
+
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    if ca is not None:
+        context.load_verify_locations(ca)
+    else:
+        context.load_default_certs()
+    if cert:
+        context.load_cert_chain(cert, key)
+    if not options.get('tls_hostname', options.get('address')):
+        context.check_hostname = False
+    return context
+
+
+# Not in Mojolicious: the context that negotiate makes of the options, for a server that changes it, as
+# Mojo::Server::Daemon adds tls_options of IO::Socket::SSL to the other options
+def context(**options: Any) -> ssl.SSLContext:
+    """::
+
+        context = context(server=True, tls_cert='/etc/tls/server.crt', tls_key='/etc/tls/server.key')
+
+    The :class:`ssl.SSLContext` that :meth:`Pyjo_IOLoop_TLS.negotiate` makes
+    of its options.
+    """
+    return _expand(options)
 
 
 new = Pyjo_IOLoop_TLS.new

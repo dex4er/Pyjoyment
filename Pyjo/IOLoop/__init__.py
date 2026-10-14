@@ -388,19 +388,22 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
         """
         return self._timer('recurring', after, cb)
 
-    def remove(self, id: str) -> None:
+    def remove(self, id: str, *, close: bool = True) -> None:
         """::
 
             Pyjo.IOLoop.remove(id)
             loop.remove(id)
+            loop.remove(id, close=False)
 
         Remove anything with an id, connections will be dropped gracefully by
-        allowing them to finish writing all data in their write buffers.
+        allowing them to finish writing all data in their write buffers. An
+        acceptor keeps its listen socket open with ``close=False``, so that it
+        can be turned into an acceptor again.
         """
         c = self._in.get(id) or self._out.get(id)
         if c and (stream := c.get('stream')):
             return stream.close_gracefully()
-        self._remove(id)
+        self._remove(id, close)
 
     def reset(self, *, freeze: bool = False) -> None:
         """::
@@ -645,15 +648,19 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
             acceptor.stop()
         return self
 
-    def _remove(self, id: str) -> None:
+    def _remove(self, id: str, close: bool = True) -> None:
         # Timer
         if self.reactor.remove(id):
             return
 
         # Acceptor
         if (acceptor := self._acceptors.pop(id, None)) is not None:
-            # Perl closes the acceptor it frees at once, Python later
-            acceptor.close()
+            # Perl closes the acceptor it frees at once, Python later; Not in Mojolicious: one that a server keeps to
+            # resume it later, as Perl does not free it
+            if close:
+                acceptor.close()
+            else:
+                acceptor.stop()
             return self._not_accepting()._maybe_accepting()
 
         # Connection
