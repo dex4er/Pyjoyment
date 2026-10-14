@@ -74,7 +74,7 @@ ASGI servers
 Events
 ------
 
-:mod:`Pyjo.Server.ASGI` inherits all events from :mod:`Pyjo.Server.Base`.
+:mod:`Pyjo.Server.ASGI` inherits all events from :mod:`Pyjo.Server`.
 
 See also
 --------
@@ -88,7 +88,7 @@ counterpart of
 
 import Pyjo.Content.Single
 import Pyjo.Promise
-import Pyjo.Server.Base
+import Pyjo.Server
 import Pyjo.Transaction
 import Pyjo.Transaction.HTTP
 import Pyjo.Transaction.WebSocket
@@ -100,7 +100,7 @@ import struct
 import sys
 
 from collections.abc import Awaitable, Callable, Mapping
-from typing import Any, cast
+from typing import Any
 
 
 # The connection scope, a message, and the functions that receive and send messages
@@ -111,14 +111,14 @@ type Send = Callable[[Message], Awaitable[None]]
 type Application = Callable[[Scope, Receive, Send], Awaitable[None]]
 
 
-class Pyjo_Server_ASGI(Pyjo.Server.Base.object):
+class Pyjo_Server_ASGI(Pyjo.Server.object):
     """
     :mod:`Pyjo.Server.ASGI` inherits all attributes and methods from
-    :mod:`Pyjo.Server.Base` and implements the following new ones.
+    :mod:`Pyjo.Server` and implements the following new ones.
     """
 
-    # The run of Pyjo.Server.Base, which is not ported yet, takes no arguments, as the one of Mojo::Server; the run of an
-    # ASGI server is a coroutine for one connection, as the one of Mojo::Server::PSGI takes the environment
+    # The run of Pyjo.Server takes no arguments, as the one of Mojo::Server; the run of an ASGI server is a coroutine for
+    # one connection, as the one of Mojo::Server::PSGI takes the environment
     async def run(self, scope: Scope, receive: Receive, send: Send) -> None:  # pyright: ignore[reportIncompatibleMethodOverride]
         """::
 
@@ -143,8 +143,8 @@ class Pyjo_Server_ASGI(Pyjo.Server.Base.object):
 
         Turn the application into an ``ASGI`` application.
         """
-        # Preload application and wrap it, the attribute of Pyjo.Server.Base, which is not typed yet
-        cast(object, self.app)  # pyright: ignore[reportUnknownMemberType]
+        # Preload application and wrap it
+        self.app
 
         async def application(scope: Scope, receive: Receive, send: Send) -> None:
             await self.run(scope, receive, send)
@@ -152,7 +152,7 @@ class Pyjo_Server_ASGI(Pyjo.Server.Base.object):
         return application
 
     def _build(self, scope: Scope) -> Pyjo.Transaction.HTTP.object:
-        tx = cast(Pyjo.Transaction.HTTP.object, self.build_tx())
+        tx = self.build_tx()
         if (client := scope.get('client')) is not None:
             tx.remote_address, tx.remote_port = client[0], client[1]
         if (server := scope.get('server')) is not None and server[1] is not None:

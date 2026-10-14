@@ -67,6 +67,8 @@ lint:
         - examples/microhttpd_gevent.py
         - examples/microhttpd_twisted.py
         - examples/resolv_dns.py
+        - examples/hello_world_uvicorn.py
+        - examples/hello_world_werkzeug.py
         - examples/server_asgi_on_request.py
         - t/lib/ServerProcess.py
         - t/servers/**

@@ -142,13 +142,16 @@ takes a few seconds.
   written for Pyjoyment, as Mojolicious has no counterpart.
 - `t/examples/` runs the scripts from `examples/`.
 - `t/servers/` runs `Pyjo.Server.ASGI`, `Pyjo.Server.WSGI` and
-  `Pyjo.Server.CGI` on real ASGI, WSGI and CGI servers, each in a process of
-  its own, as the ASGI server of the tests in `t/lib` and the validator of
+  `Pyjo.Server.CGI` on real ASGI, WSGI and CGI servers, and the examples of
+  the quick start in `README.rst`, each in a process of its own, as the ASGI server of the tests in `t/lib` and the validator of
   `wsgiref` cannot show how a server differs. The servers are in the
   dependency group `servers`, not in `dependencies`; without it, the tests
   are skipped.
 - `t/lib/` holds helpers shared by the tests. Run on their own, they skip with
   `plan(skip_all=...)`, so `-r t` reports them as skipped instead of failing.
+  `t/lib/Lite.py` is a minimal Mojolicious::Lite for the tests that Mojo
+  writes on it, with routes, hooks and a controller that renders, until
+  Pyjoyment has its own.
 
 A test script imports the test functions and groups its tests in subtests,
 like Mojo's tests do; Python keywords give some functions an `_ok` suffix
@@ -440,6 +443,14 @@ copy:
   `traceback.FrameSummary`, the most recent first, as Mojo keeps it.
 - `like` of `Test::More` stringifies what it checks, `like_ok` does not:
   a test of an object is `like_ok(str(obj), ...)`.
+- `Test::More` writes to a copy of STDOUT that it makes when it starts,
+  `Pyjo.Test` to `sys.stdout` at the time of the call. A test that replaces
+  `sys.stdout` to capture the output of the code, as `local *STDOUT` does,
+  checks the results after it gives `sys.stdout` back.
+- A script that Mojo loads with `do`, taking the application from its value,
+  as `load_app` of `Mojo::Server` does, starts its application, and `start`
+  keeps it in `Pyjo.Server.loaded_app` when `PYJO_APP_LOADER` is set, where
+  Mojo's `start` returns it; `MyApp.new().start()` chains as in Perl.
 - A test that depends on the layout of its own source lines, as the context
   of `Mojo::Exception` does, is kept from the formatter with `# fmt: off`.
 - Perl frees a temporary object at the end of the statement, Python as soon

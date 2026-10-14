@@ -71,6 +71,15 @@ SERVERS = [
     ),
     ('uWSGI', UWSGI, [UWSGI, '--http-socket', '127.0.0.1:{port}', '--module', 'app:app']),
     ('Waitress', True, [PYTHON, '-m', 'waitress', '--listen=127.0.0.1:{port}', 'app:app']),
+    (
+        'Werkzeug',
+        importlib.util.find_spec('werkzeug'),
+        [
+            PYTHON,
+            '-c',
+            "from werkzeug.serving import run_simple; from app import app; run_simple('127.0.0.1', {port}, app)",
+        ],
+    ),
 ]
 
 
@@ -88,7 +97,8 @@ with tempfile.TemporaryDirectory() as dir:
                 status, headers, body = server.request('GET', '/foo?a=1')
                 is_ok(status, 200, 'right status')
                 is_ok(body, b"GET /foo {'a': '1'} b''", 'right content')
-                is_ok(len(headers.get_all('Date') or []), 1, 'one Date header')
+                # Werkzeug adds a Date header of its own, as http.server does for every response
+                is_ok(len(headers.get_all('Date') or []), 2 if name == 'Werkzeug' else 1, 'Date header')
 
                 type = {'Content-Type': 'application/x-www-form-urlencoded'}
                 status, headers, body = server.request('POST', '/form', b'x=1&y=2', type)

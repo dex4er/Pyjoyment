@@ -254,6 +254,8 @@ with subtest('Stream'):
     Pyjo.IOLoop.start()
     ok(not Pyjo.IOLoop.stream(id), 'stream does not exist anymore')
     is_ok(buffer, b'acceptedhelloworld', 'right result')
+    # Not in Mojolicious: no id is no stream, as Mojo looks up undef, which is not a reference
+    is_ok(Pyjo.IOLoop.stream(None), None, 'no stream without id')
 
 with subtest('Removed listen socket'):
     loop = Pyjo.IOLoop.new()
