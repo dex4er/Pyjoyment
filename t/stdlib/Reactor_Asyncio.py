@@ -121,4 +121,38 @@ with subtest('The event loop of a reactor that exists at the exit is closed'):
     is_ok(process.returncode, 0, 'exit status')
     unlike_ok(process.stderr, r'unclosed event loop', 'no ResourceWarning')
 
+with subtest('A reactor moves to a new loop in the child of a fork'):
+    if not hasattr(os, 'fork'):
+        skip('no os.fork', 3)
+    else:
+        script = """
+import Pyjo.Reactor.Asyncio, os, socket
+
+reactor = Pyjo.Reactor.Asyncio.new()
+parent = reactor.loop
+a, b = socket.socketpair()
+got = []
+reactor.io(a, lambda reactor, writable: (got.append(a.recv(10)), reactor.stop())).watch(a, True, False)
+reactor.timer(0, lambda reactor: b.send(b'io'))
+r, w = os.pipe()
+pid = os.fork()
+if not pid:
+    reactor.start()
+    os.write(w, f'{reactor.loop is not parent} {got}'.encode())
+    os._exit(0)
+os.close(w)
+os.waitpid(pid, 0)
+child = os.read(r, 100).decode()
+reactor.start()
+print(child, reactor.loop is parent, got)
+a.close()
+b.close()
+"""
+        root = os.path.join(os.path.dirname(__file__), '..', '..')
+        env = {**os.environ, 'PYTHONPATH': root, 'PYTHONWARNINGS': 'always::ResourceWarning,error::DeprecationWarning'}
+        process = subprocess.run([sys.executable, '-c', script], env=env, capture_output=True, text=True, timeout=30)
+        is_ok(process.returncode, 0, 'exit status')
+        is_ok(process.stdout, "True [b'io'] True [b'io']\n", 'a new loop in the child, the loop of the parent in it')
+        is_ok(process.stderr, '', 'no warning')
+
 done_testing()
