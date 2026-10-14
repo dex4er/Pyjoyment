@@ -136,8 +136,10 @@ import Pyjo.Reactor
 from Pyjo.Util import warn
 
 import builtins
+import concurrent.futures
 import functools
 import os
+import socket
 import warnings
 import weakref
 
@@ -174,7 +176,9 @@ class Pyjo_Promise(Pyjo.Base.object):
     implements the following new ones.
     """
 
-    def __init__(self, cb: Callable[[Handler, Handler], Anything] | Awaitable[Any] | None = None) -> None:
+    def __init__(
+        self, cb: Callable[[Handler, Handler], Anything] | Awaitable[Any] | concurrent.futures.Future[Any] | None = None
+    ) -> None:
         """::
 
             promise = Pyjo.Promise.new()
@@ -208,6 +212,15 @@ class Pyjo_Promise(Pyjo.Base.object):
             # Wrap a future of asyncio
             future = asyncio.get_running_loop().run_in_executor(None, time.sleep, 1)
             promise = Pyjo.Promise.new(future)
+
+        A :class:`concurrent.futures.Future`, which is done in another thread
+        or process, is waited for with any reactor, which the thread that
+        completes the future wakes up. ::
+
+            # Wrap a future of a pool of threads
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                promise = Pyjo.Promise.new(executor.submit(time.sleep, 1))
+                promise.wait()
         """
         self._debug: Pyjo.Exception.object | None = None
         self._handled = False
@@ -220,10 +233,12 @@ class Pyjo_Promise(Pyjo.Base.object):
         if DEBUG:
             self._debug = Pyjo.Exception.new().trace()
 
+        # Not in Mojolicious: a future of concurrent.futures, done in another thread
+        if isinstance(cb, concurrent.futures.Future):
+            _wait_future(self, cast(concurrent.futures.Future[Any], cb))
+
         # Not in Mojolicious: a coroutine, or another awaitable in one, as a future of asyncio
-        # TODO: a concurrent.futures.Future, which needs a reactor woken up from another thread, with
-        # Pyjo.IOLoop.Subprocess
-        if isinstance(cb, Awaitable):
+        elif isinstance(cb, Awaitable):
             coro = cast(Coroutine[Any, Any, Any], cb) if isinstance(cb, Coroutine) else _await(cast(Awaitable[Any], cb))
 
             def resolve(value: Any) -> None:
@@ -757,6 +772,30 @@ def _timer(
 
     promise.ioloop.timer(after, timer)
     return promise
+
+
+# A future of concurrent.futures settles the promise in the thread of the reactor, which a socket pair wakes up from the
+# thread that completes the future, as the resolver of Pyjo.IOLoop.Client does, so that it works with any reactor
+def _wait_future(promise: Pyjo_Promise, future: concurrent.futures.Future[Any]) -> None:
+    reactor = promise.ioloop.reactor
+    reader, writer = socket.socketpair()
+    reader.setblocking(False)
+
+    def ready(reactor: Any, writable: bool) -> None:
+        reactor.remove(reader)
+        reader.close()
+        writer.close()
+        if future.cancelled():
+            promise.reject(concurrent.futures.CancelledError())
+        elif (e := future.exception()) is not None:
+            promise.reject(e)
+        elif (value := future.result()) is None:
+            promise.resolve()
+        else:
+            promise.resolve(value)
+
+    reactor.io(reader, ready).watch(reader, True, False)
+    future.add_done_callback(lambda future: writer.send(b'\x00'))
 
 
 # An awaitable in a coroutine, which the reactor runs

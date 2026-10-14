@@ -6,10 +6,12 @@ import Pyjo.Reactor.Asyncio
 from Pyjo.Test import *
 
 import asyncio
+import concurrent.futures
 import gc
 import os
 import subprocess
 import sys
+import time
 import warnings
 
 
@@ -192,15 +194,44 @@ got.append((len(done), len(pending), futures[0].result(), str(futures[1].excepti
 loop = asyncio.new_event_loop()
 Pyjo.Promise.new(loop.create_future()).catch(lambda e: got.append(type(e).__name__)).wait()
 loop.close()
+
+with concurrent.futures.ThreadPoolExecutor() as executor:
+    Pyjo.Promise.new(executor.submit(lambda: 'pool')).then(got.append).wait()
 print(got)
 """
     env = dict(os.environ, PYJO_REACTOR='Pyjo.Reactor.Poll')
     result = subprocess.run([sys.executable, '-c', code], env=env, capture_output=True, text=True)
     is_ok(
         result.stdout,
-        "['concurrent.futures._base.Future', 'thread', (2, 0, 'a', 'b'), 'TypeError']\n",
-        'waited for in another thread and with concurrent.futures, no future of asyncio',
+        "['concurrent.futures._base.Future', 'thread', (2, 0, 'a', 'b'), 'TypeError', 'pool']\n",
+        'waited for in another thread and with concurrent.futures, no future of asyncio, a promise of a pool',
     )
+
+with subtest('Promise of a future of concurrent.futures'):
+    got = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        Pyjo.Promise.new(executor.submit(lambda: (time.sleep(0.05), 'thread')[1])).then(got.append).wait()
+        Pyjo.Promise.new(executor.submit(lambda: ('a', 'b'))).then(got.append).wait()
+        Pyjo.Promise.new(executor.submit(lambda: None)).then(lambda *values: got.append(values)).wait()
+        Pyjo.Promise.new(executor.submit(lambda: 1 / 0)).catch(lambda e: got.append(type(e).__name__)).wait()
+        busy = executor.submit(time.sleep, 0.05)
+        later = executor.submit(lambda: 'never')
+        later.cancel()
+        Pyjo.Promise.new(later).catch(lambda e: got.append(type(e).__name__)).wait()
+    done = concurrent.futures.Future()
+    done.set_result('done')
+    Pyjo.Promise.new(done).then(got.append).wait()
+    is_deeply_ok(
+        got,
+        ['thread', ('a', 'b'), (), 'ZeroDivisionError', 'CancelledError', 'done'],
+        'value, tuple as one value, none, exception, cancellation and a future that is done',
+    )
+
+    async def futures():
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            return await Pyjo.Promise.new(executor.submit(lambda: 'awaited'))
+
+    is_ok(asyncio.run(futures()), 'awaited', 'awaited in a task of asyncio')
 
 with subtest('warnings'):
     with warnings.catch_warnings(record=True) as warn:

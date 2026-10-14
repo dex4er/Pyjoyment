@@ -219,6 +219,17 @@ with subtest('new'):
 
     is_ok(asyncio.run(wrap()), None, 'future')
 
+    import concurrent.futures
+    import time
+
+    # Wrap a future of a pool of threads
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        promise = Pyjo.Promise.new(executor.submit(time.sleep, 0.01))
+        promise.wait()
+    got = []
+    promise.then(lambda *values: got.append(values)).wait()
+    is_deeply_ok(got, [()], 'future of concurrent.futures')
+
 with subtest('reject and resolve'):
     got = []
     new = Pyjo.Promise.reject('a', 'b')
