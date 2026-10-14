@@ -176,6 +176,7 @@ strict = [
   "Pyjo/Reactor/Asyncio.py",
   "Pyjo/Reactor/Poll.py",
   "Pyjo/SSE.py",
+  "Pyjo/Server/ASGI.py",
   "Pyjo/String/Bytes.py",
   "Pyjo/String/Unicode.py",
   "Pyjo/Test.py",

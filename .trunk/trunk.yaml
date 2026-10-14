@@ -66,6 +66,7 @@ lint:
         - examples/microhttpd_gevent.py
         - examples/microhttpd_twisted.py
         - examples/resolv_dns.py
+        - examples/server_asgi_on_request.py
 actions:
   enabled:
     - git-blame-ignore-revs
