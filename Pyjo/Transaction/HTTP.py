@@ -1,4 +1,4 @@
-"""
+r"""
 Pyjo.Transaction.HTTP - HTTP transaction
 ========================================
 ::
@@ -15,146 +15,153 @@ Pyjo.Transaction.HTTP - HTTP transaction
     print(tx.res.body)
     print(tx.remote_address)
 
-:mod:`Pyjo.Transaction.HTTP` is a container for HTTP transactions based on
-:rfc:`7230` and
-:rfc:`7231`.
+    # Server
+    tx = Pyjo.Transaction.HTTP.new()
+    print(tx.req.method)
+    print(tx.req.url.to_abs())
+    print(tx.req.headers.accept)
+    print(tx.remote_address)
+    tx.res.code = 200
+    tx.res.headers.content_type = 'text/plain'
+    tx.res.body = b'Hello World!'
+
+:mod:`Pyjo.Transaction.HTTP` is a container for HTTP transactions, based on
+`RFC 7230 <https://tools.ietf.org/html/rfc7230>`_ and
+`RFC 7231 <https://tools.ietf.org/html/rfc7231>`_.
 
 Events
 ------
 
-:mod:`Pyjo.Transaction.HTTP` inherits all events from :mod:`Pyjo.Transaction` and
-can emit the following new ones.
+:mod:`Pyjo.Transaction.HTTP` inherits all events from :mod:`Pyjo.Transaction`
+and can emit the following new ones.
 
 request
 ~~~~~~~
 ::
 
-    @tx.on
-    def request(tx):
-        ...
+    tx.on('request', lambda tx: ...)
 
 Emitted when a request is ready and needs to be handled. ::
 
-    @tx.on
-    def request(tx):
-        tx.res.headers.header('X-Bender', 'Bite my shiny metal ass!')
+    tx.on('request', lambda tx: tx.res.headers.header('X-Bender', 'Bite my shiny metal ass!'))
+
+resume
+~~~~~~
+::
+
+    tx.on('resume', lambda tx: ...)
+
+Emitted when transaction is resumed.
 
 unexpected
 ~~~~~~~~~~
 ::
 
-    @tx.on
-    def unexpected(tx, res):
-        ...
+    tx.on('unexpected', lambda tx, res: ...)
 
 Emitted for unexpected ``1xx`` responses that will be ignored. ::
 
-    @tx.on
-    def unexpected(tx, res):
-        @tx.res.on
-        def finish():
-            print('Follow-up response is finished.')
+    tx.on('unexpected', lambda tx, res: tx.res.on('finish', lambda res: print('Follow-up response is finished.')))
 
-upgrade
-~~~~~~~
-::
+See also
+--------
 
-    @tx.on
-    def upgrade(tx, ws):
-        ...
+:mod:`Pyjoyment`, https://mojolicious.org.
 
-Emitted when transaction gets upgraded to a :mod:`Pyjo.Transaction.WebSocket`
-object. ::
-
-    @tx.on
-    def upgrade(tx, ws):
-        ws.res.headers.header('X-Bender', 'Bite my shiny metal ass!')
-
-Classes
--------
+Ported from `Mojo::Transaction::HTTP <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/Transaction/HTTP.pm>`_
+of Mojolicious 9.49.
 """
 
-import Pyjo.Transaction.WebSocket
+import Pyjo.Message
+import Pyjo.Transaction
 
-from Pyjo.Util import notnone
+from typing import Any, Self
 
 
 class Pyjo_Transaction_HTTP(Pyjo.Transaction.object):
     """
-    :mod:`Pyjo.Transaction.HTTP` inherits all attributes and methods from
+    :mod:`Pyjo.Transaction.HTTP` inherits all methods from
     :mod:`Pyjo.Transaction` and implements the following new ones.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, *, previous: 'Pyjo_Transaction_HTTP | None' = None, **kwargs: Any) -> None:
+        """::
+
+            tx = Pyjo.Transaction.HTTP.new()
+            tx = Pyjo.Transaction.HTTP.new(req=Pyjo.Message.Request.new())
+
+        Construct a new :mod:`Pyjo.Transaction.HTTP` object.
+        """
         super().__init__(**kwargs)
 
-        self.previous = kwargs.get('previous')
+        self.previous = previous
         """::
 
             previous = tx.previous
             tx.previous = Pyjo.Transaction.HTTP.new()
 
-        Previous transaction that triggered this follow-up transaction, usually a
-        :mod:`Pyjo.Transaction.HTTP` object. ::
+        Previous transaction that triggered this follow-up transaction, usually
+        a :mod:`Pyjo.Transaction.HTTP` object. ::
 
             # Paths of previous requests
             print(tx.previous.previous.req.url.path)
             print(tx.previous.req.url.path)
         """
 
-        self._delay = False
+        # The state of the reader and of the writer, as the keys of Mojo's hash
         self._handled = False
-        self._http_state = None
-        self._offset = None
-        self._state = None
-        self._towrite = None
+        self._http_state: str | None = None
+        self._offset = 0
+        self._write = 0
+        self._writing: bool | None = None
 
-    def client_read(self, chunk):
+    def client_read(self, chunk: bytes) -> Self | None:
         """::
 
-            tx.client_read(chunk)
+            tx.client_read(data)
 
-        Read data client-side, used to implement user agents.
+        Read data client-side, used to implement user agents such as
+        :mod:`Pyjo.UserAgent`.
         """
         # Skip body for HEAD request
         res = self.res
         if self.req.method.upper() == 'HEAD':
             res.content.skip_body = True
         if not res.parse(chunk).is_finished:
-            return
+            return None
 
         # Unexpected 1xx response
         if not res.is_info or res.headers.upgrade:
-            self._state = 'finished'
-            return
+            return self.completed()
+        self.res = res.new()
+        self.emit('unexpected', res)
+        if not len(leftovers := res.content.leftovers()):
+            return None
+        return self.client_read(leftovers)
 
-        self.res(res.new()).emit('unexpected', res)
-        leftovers = res.content.leftovers()
-        if not len(leftovers):
-            return
-        self.client_read(leftovers)
-
-    def client_write(self):
+    def client_write(self) -> bytes:
         """::
 
-            chunk = tx.client_write
+            data = tx.client_write()
 
-        Write data client-side, used to implement user agents.
+        Write data client-side, used to implement user agents such as
+        :mod:`Pyjo.UserAgent`.
         """
-        return self._write(False)
+        return self._write_chunk(False)
 
     @property
-    def is_empty(self):
+    def is_empty(self) -> bool:
         """::
 
             boolean = tx.is_empty
 
-        Check transaction for ``HEAD`` request and ``1xx``, ``204`` or ``304`` response.
+        Check transaction for ``HEAD`` request and ``1xx``, ``204`` or ``304``
+        response.
         """
-        return bool(self.req.method.upper() == 'HEAD' or self.res.is_empty)
+        return self.req.method.upper() == 'HEAD' or self.res.is_empty
 
     @property
-    def keep_alive(self):
+    def keep_alive(self) -> bool:
         """::
 
             boolean = tx.keep_alive
@@ -162,10 +169,9 @@ class Pyjo_Transaction_HTTP(Pyjo.Transaction.object):
         Check if connection can be kept alive.
         """
         # Close
-        req = self.req
-        res = self.res
-        req_conn = notnone(req.headers.connection, '').lower()
-        res_conn = notnone(res.headers.connection, '').lower()
+        req, res = self.req, self.res
+        req_conn = (req.headers.connection or '').lower()
+        res_conn = (res.headers.connection or '').lower()
         if req_conn == 'close' or res_conn == 'close':
             return False
 
@@ -178,165 +184,122 @@ class Pyjo_Transaction_HTTP(Pyjo.Transaction.object):
         # Keep-alive is the default for 1.1
         return True
 
-    @property
-    def redirects(self):
+    def redirects(self) -> list['Pyjo_Transaction_HTTP']:
         """::
 
-            redirects = tx.redirects
+            redirects = tx.redirects()
 
-        Return a list of all previous transactions that preceded this follow-up
-        transaction. ::
+        Return a list with all previous transactions that preceded this
+        follow-up transaction. ::
 
             # Paths of all previous requests
-            for redir in tx.redirects:
-                print(redir.req.url.path)
+            for previous in tx.redirects():
+                print(previous.req.url.path)
         """
-        redirects = []
+        redirects: list[Pyjo_Transaction_HTTP] = []
         previous = self
-        while True:
-            previous = previous.previous
-            if not previous:
-                break
+        while previous := previous.previous:
             redirects.insert(0, previous)
         return redirects
 
-    def server_read(self, chunk):
+    def resume(self) -> Self:
         """::
 
-            tx.server_read(chunk)
+            tx = tx.resume()
 
-        Read data server-side, used to implement web servers.
+        Resume transaction.
+        """
+        self._writing = True
+        return self.emit('resume')
+
+    def server_read(self, chunk: bytes) -> None:
+        """::
+
+            tx.server_read(data)
+
+        Read data server-side, used to implement web servers such as
+        :mod:`Pyjo.Server.Daemon`.
         """
         # Parse request
         req = self.req
         if not req.error:
             req.parse(chunk)
-        if self._state is None:
-            self._state = 'read'
 
         # Generate response
-        if not req.is_finished or self._handled:
-            return
+        if req.is_finished and not self._handled:
+            self._handled = True
+            self.emit('request')
 
-        # Pyjo.Transaction.WebSocket
-        if req.is_handshake:
-            self.emit('upgrade', Pyjo.Transaction.WebSocket.new(handshake=self))
-
-        self.emit('request')
-
-    def server_write(self):
+    def server_write(self) -> bytes:
         """::
 
-            chunk = tx.server_write()
+            data = tx.server_write()
 
-        Write data server-side, used to implement web servers.
+        Write data server-side, used to implement web servers such as
+        :mod:`Pyjo.Server.Daemon`.
         """
-        return self._write(True)
+        return self._write_chunk(True)
 
-    def _body(self, msg, finish):
+    def _body(self, msg: Pyjo.Message.object, finish: bool) -> bytes:
         # Prepare body chunk
-        buf = msg.get_body_chunk(self._offset)
-
-        if buf is not None:
-            written = len(buf)
-        else:
-            written = 0
-
-        if msg.content.is_dynamic:
-            self._towrite = 1
-        else:
-            self._towrite = self._towrite - written
-
-        self._offset += written
-
-        if buf is not None:
-            self._delay = False
+        buffer = msg.get_body_chunk(self._offset)
+        self._offset += len(buffer) if buffer is not None else 0
 
         # Delayed
-        else:
-            if self._delay:
-                self._delay = False
-                self._state = 'paused'
-            else:
-                self._delay = True
+        if buffer is None:
+            self._writing = False
 
         # Finished
-        if self._towrite <= 0 or buf is not None and not len(buf):
+        elif not len(buffer):
             if finish:
-                self._state = 'finished'
+                self.completed()
             else:
-                self._state = 'read'
+                self._writing = False
 
-        if buf is not None:
-            return buf
-        else:
-            return b''
+        return buffer if buffer is not None else b''
 
-    def _headers(self, msg, head):
+    def _headers(self, msg: Pyjo.Message.object, head: bool) -> bytes:
         # Prepare header chunk
-        buf = msg.get_header_chunk(self._offset)
-        written = len(buf) if buf is not None else 0
-        self._towrite -= written
+        buffer = msg.get_header_chunk(self._offset)
+        written = len(buffer)
+        self._write -= written
         self._offset += written
 
         # Switch to body
-        if self._towrite <= 0:
-            self._offset = 0
+        if self._write <= 0:
+            self._http_state, self._offset = 'body', 0
 
             # Response without body
             if head and self.is_empty:
-                self._state = 'finished'
+                self.completed()._http_state = 'empty'
 
-            # Body
-            else:
-                self._http_state = 'body'
-                self._towrite = 1 if msg.content.is_dynamic else msg.body_size
+        return buffer
 
-        return buf
-
-    def _start_line(self, msg):
+    def _start_line(self, msg: Pyjo.Message.object) -> bytes:
         # Prepare start-line chunk
-        buf = msg.get_start_line_chunk(self._offset)
-        written = len(buf) if buf is not None else 0
-        self._towrite -= written
+        buffer = msg.get_start_line_chunk(self._offset)
+        written = len(buffer)
+        self._write -= written
         self._offset += written
 
         # Switch to headers
-        if self._towrite <= 0:
-            self._http_state = 'headers'
-            self._towrite = msg.header_size
-            self._offset = 0
+        if self._write <= 0:
+            self._http_state, self._write, self._offset = 'headers', msg.header_size, 0
 
-        return buf
+        return buffer
 
-    def _write(self, server):
+    # Renamed from Mojolicious: _write, the attribute _write is the size left to write
+    def _write_chunk(self, server: bool) -> bytes:
         # Client starts writing right away
-        if not server and self._state is None:
-            self._state = 'write'
-
-        if self._state != 'write':
-            return ''
+        if self._writing is None and not server:
+            self._writing = True
+        if not self._writing:
+            return b''
 
         # Nothing written yet
-        if self._offset is None:
-            self._offset = 0
-        if self._towrite is None:
-            self._towrite = 0
-
-        if server:
-            msg = self.res
-        else:
-            msg = self.req
-
+        msg = self.res if server else self.req
         if not self._http_state:
-            # Connection header
-            headers = msg.headers
-            if not headers.connection:
-                headers.connection = 'keep-alive' if self.keep_alive else 'close'
-
-            # Switch to start-line
-            self._http_state = 'start_line'
-            self._written = msg.start_line_size
+            self._http_state, self._write = 'start_line', msg.start_line_size
 
         # Start-line
         chunk = b''

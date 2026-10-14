@@ -70,7 +70,7 @@ class Pyjo_Server_CGI(Pyjo.Server.Base.object):
         """
         tx = self.build_tx()
         req = tx.req.parse(os.environ)
-        tx.local_port = os.environ.get('SERVER_PORT', None)
+        tx.local_port = int(port) if (port := os.environ.get('SERVER_PORT')) else None
         tx.remote_address = os.environ.get('REMOTE_ADDR', None)
 
         # Request body (may block if we try to read too much)
@@ -107,7 +107,7 @@ class Pyjo_Server_CGI(Pyjo.Server.Base.object):
             return
 
         # Finish transaction
-        tx.server_close()
+        tx.closed()
 
         return res.code
 
