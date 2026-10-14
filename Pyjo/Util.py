@@ -27,6 +27,7 @@ import os
 import random
 import re
 import select
+import socket
 import sys
 import time
 import unicodedata
@@ -485,6 +486,51 @@ def md5_sum(data: bytes) -> str:
         md5_sum(b'foo')
     """
     return hashlib.md5(data).hexdigest()
+
+
+def network_contains(cidr: str, addr: str) -> bool:
+    """::
+
+        boolean = network_contains(network, address)
+
+    Check that a given address is contained within a network in CIDR form. If
+    the network is a single address, the addresses must be equivalent. ::
+
+        # True
+        network_contains('10.0.0.0/8', '10.10.10.10')
+        network_contains('10.10.10.10', '10.10.10.10')
+        network_contains('fc00::/7', 'fc00::c0:ff:ee')
+
+        # False
+        network_contains('10.0.0.0/29', '10.10.10.10')
+        network_contains('10.10.10.12', '10.10.10.10')
+        network_contains('fc00::/7', '::1')
+    """
+    if not len(cidr) or not len(addr):
+        return False
+
+    # Parse inputs
+    net, slash, mask = cidr.partition('/')
+    v6 = ':' in net
+    if v6 != (':' in addr):
+        return False
+
+    # Convert addresses to binary
+    family = socket.AF_INET6 if v6 else socket.AF_INET
+    try:
+        net_bytes, addr_bytes = socket.inet_pton(family, net), socket.inet_pton(family, addr)
+    except OSError:
+        return False
+    length = 128 if v6 else 32
+
+    # Apply mask if given
+    addr_int = int.from_bytes(addr_bytes)
+    if slash:
+        bits = int(mask) if mask.isdigit() else 0
+        addr_int &= int(('1' * bits).ljust(length, '0')[:length], 2)
+
+    # Compare
+    return int.from_bytes(net_bytes) ^ addr_int == 0
 
 
 def not_implemented(method):

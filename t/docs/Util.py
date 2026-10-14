@@ -78,6 +78,19 @@ with subtest('md5_sum'):
     # "acbd18db4cc2f85cedef654fccc4a4d8"
     is_ok(md5_sum(b'foo'), 'acbd18db4cc2f85cedef654fccc4a4d8', 'foo')
 
+with subtest('network_contains'):
+    from Pyjo.Util import network_contains
+
+    # True
+    ok(network_contains('10.0.0.0/8', '10.10.10.10'), 'network')
+    ok(network_contains('10.10.10.10', '10.10.10.10'), 'single address')
+    ok(network_contains('fc00::/7', 'fc00::c0:ff:ee'), 'IPv6 network')
+
+    # False
+    ok(not network_contains('10.0.0.0/29', '10.10.10.10'), 'outside the network')
+    ok(not network_contains('10.10.10.12', '10.10.10.10'), 'other address')
+    ok(not network_contains('fc00::/7', '::1'), 'outside the IPv6 network')
+
 with subtest('punycode_decode'):
     from Pyjo.Util import punycode_decode
 

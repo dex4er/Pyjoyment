@@ -179,6 +179,10 @@ strict = [
   "Pyjo/String/Bytes.py",
   "Pyjo/String/Unicode.py",
   "Pyjo/Test.py",
+  "Pyjo/Transaction/__init__.py",
+  "Pyjo/Transaction/HTTP.py",
+  "Pyjo/Transaction/WebSocket.py",
   "Pyjo/URL.py",
   "Pyjo/Upload.py",
+  "Pyjo/WebSocket.py",
 ]

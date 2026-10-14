@@ -1,4 +1,4 @@
-"""
+r"""
 Pyjo.Transaction.WebSocket - WebSocket transaction
 ==================================================
 ::
@@ -8,51 +8,44 @@ Pyjo.Transaction.WebSocket - WebSocket transaction
     # Send and receive WebSocket messages
     ws = Pyjo.Transaction.WebSocket.new()
     ws.send('Hello World!')
+    ws.on('message', lambda ws, msg: print(f'Message: {msg}'))
+    ws.on('finish', lambda ws, code, reason: print(f'WebSocket closed with status {code}.'))
 
-    @ws.on
-    def message(ws, msg):
-        print("Message: {0}".format(repr(msg)))
-
-    @ws.on
-    def finish(ws, code, reason):
-        print("WebSocket closed with status {0}".format(code))
-
-:mod:`Pyjo.Transaction.WebSocket` is a container for WebSocket transactions based
-on :rfc:`6455`.
+:mod:`Pyjo.Transaction.WebSocket` is a container for WebSocket transactions,
+based on `RFC 6455 <https://tools.ietf.org/html/rfc6455>`_ and
+`RFC 7692 <https://tools.ietf.org/html/rfc7692>`_.
 
 Events
 ------
 
-:mod:`Pyjo.Transaction.WebSocket` inherits all events from :mod:`Pyjo.Transaction` and
-can emit the following new ones.
+:mod:`Pyjo.Transaction.WebSocket` inherits all events from
+:mod:`Pyjo.Transaction` and can emit the following new ones.
 
 binary
 ~~~~~~
 ::
 
-    @ws.on
-    def binary(ws, chunk):
-        ...
+    ws.on('binary', lambda ws, data: ...)
 
-Emitted when a complete WebSocket binary message has been received.
+Emitted when a complete WebSocket binary message has been received. ::
+
+    ws.on('binary', lambda ws, data: print(f'Binary: {data}'))
 
 drain
 ~~~~~
 ::
 
-    @ws.on
-    def drain(ws):
-        ...
+    ws.on('drain', lambda ws: ...)
 
-Emitted once all data has been sent.
+Emitted once all data has been sent. ::
+
+    ws.on('drain', lambda ws: ws.send(str(time.time())))
 
 finish
 ~~~~~~
 ::
 
-    @ws.on
-    def finish(ws, code, reason):
-        ...
+    ws.on('finish', lambda ws, code, reason: ...)
 
 Emitted when the WebSocket connection has been closed.
 
@@ -60,95 +53,114 @@ frame
 ~~~~~
 ::
 
-    @ws.on
-    def frame(ws, frame):
-        ...
+    ws.on('frame', lambda ws, frame: ...)
 
 Emitted when a WebSocket frame has been received. ::
 
-    ws.unsubscribe('frame')
-
-    @ws.on
+    @ws.on('frame')
     def frame(ws, frame):
-        print("FIN: {0}".format(frame))
-        print("RSV1: {1}".format(frame))
-        print("RSV2: {2}".format(frame))
-        print("RSV3: {3}".format(frame))
-        print("Opcode: {4}".format(frame))
-        print("Payload: {5}".format(frame))
+        print(f'FIN: {frame[0]}')
+        print(f'RSV1: {frame[1]}')
+        print(f'RSV2: {frame[2]}')
+        print(f'RSV3: {frame[3]}')
+        print(f'Opcode: {frame[4]}')
+        print(f'Payload: {frame[5]}')
 
 json
 ~~~~
 ::
 
-    @ws.on
-    def json(ws, json):
-        ...
+    ws.on('json', lambda ws, json: ...)
 
 Emitted when a complete WebSocket message has been received, all text and
 binary messages will be automatically JSON decoded. Note that this event only
 gets emitted when it has at least one subscriber. ::
 
-    @ws.on
-    def json(ws, json):
-        print("Message: {msg}".format(json))
+    ws.on('json', lambda ws, data: print(f'Message: {data["msg"]}'))
 
 message
 ~~~~~~~
 ::
 
-    @ws.on
-    def message(ws, msg):
-        ...
+    ws.on('message', lambda ws, msg: ...)
 
-Emitted when a complete WebSocket message has been received, text messages will
-be automatically decoded. Note that this event only gets emitted when it has at
-least one subscriber.
+Emitted when a complete WebSocket message has been received, text messages
+will be automatically decoded. Note that this event only gets emitted when it
+has at least one subscriber. ::
+
+    ws.on('message', lambda ws, msg: print(f'Message: {msg}'))
+
+resume
+~~~~~~
+::
+
+    tx.on('resume', lambda tx: ...)
+
+Emitted when transaction is resumed.
 
 text
 ~~~~
 ::
 
-    @ws.on
-    def text(ws, chunk):
-        ...
+    ws.on('text', lambda ws, data: ...)
 
-Emitted when a complete WebSocket text message has been received.
+Emitted when a complete WebSocket text message has been received. ::
 
-Classes
--------
+    ws.on('text', lambda ws, data: print(f'Text: {data}'))
+
+See also
+--------
+
+:mod:`Pyjoyment`, https://mojolicious.org.
+
+Ported from `Mojo::Transaction::WebSocket <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/Transaction/WebSocket.pm>`_
+of Mojolicious 9.49.
 """
 
+import Pyjo.Message.Request
+import Pyjo.Message.Response
 import Pyjo.Transaction
+import Pyjo.Transaction.HTTP
+import Pyjo.WebSocket
 
-from Pyjo.JSON import encode_json
-from Pyjo.Util import b, getenv, notnone, rand, warn, xor_encode
+from Pyjo.JSON import encode_json, j
+from Pyjo.Util import decode, encode, trim
+from Pyjo.WebSocket import WS_BINARY, WS_CLOSE, WS_PING, WS_PONG, WS_TEXT, Frame
 
+import os
 import struct
 import zlib
 
-
-DEBUG = getenv('PYJO_WEBSOCKET_DEBUG', 0)
-
-# Opcodes
-CONTINUATION = 0x0
-TEXT = 0x1
-BINARY = 0x2
-CLOSE = 0x8
-PING = 0x9
-PONG = 0xA
+from collections.abc import Callable, Mapping, Sequence
+from typing import Any, Self
 
 
 class Pyjo_Transaction_WebSocket(Pyjo.Transaction.object):
     """
-    :mod:`Pyjo.Transaction.WebSocket` inherits all attributes and methods from
+    :mod:`Pyjo.Transaction.WebSocket` inherits all methods from
     :mod:`Pyjo.Transaction` and implements the following new ones.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(
+        self,
+        *,
+        compressed: bool | None = None,
+        established: bool | None = None,
+        handshake: Pyjo.Transaction.HTTP.object | None = None,
+        masked: bool | None = None,
+        max_websocket_size: int | None = None,
+        **kwargs: Any,
+    ) -> None:
+        """::
+
+            ws = Pyjo.Transaction.WebSocket.new()
+            ws = Pyjo.Transaction.WebSocket.new(compressed=True)
+
+        Construct a new :mod:`Pyjo.Transaction.WebSocket` object.
+        """
         super().__init__(**kwargs)
 
-        self.compressed = kwargs.get('compressed', False)
+        self.compressed = compressed
         """::
 
             boolean = ws.compressed
@@ -157,7 +169,26 @@ class Pyjo_Transaction_WebSocket(Pyjo.Transaction.object):
         Compress messages with ``permessage-deflate`` extension.
         """
 
-        self.masked = kwargs.get('masked', False)
+        self.established = established
+        """::
+
+            boolean = ws.established
+            ws.established = boolean
+
+        WebSocket connection established.
+        """
+
+        self.handshake = handshake if handshake is not None else Pyjo.Transaction.HTTP.new()
+        """::
+
+            handshake = ws.handshake
+            ws.handshake = Pyjo.Transaction.HTTP.new()
+
+        The original handshake transaction, usually a
+        :mod:`Pyjo.Transaction.HTTP` object.
+        """
+
+        self.masked = masked
         """::
 
             boolean = ws.masked
@@ -166,8 +197,10 @@ class Pyjo_Transaction_WebSocket(Pyjo.Transaction.object):
         Mask outgoing frames with XOR cipher and a random 32-bit key.
         """
 
-        self.max_websocket_size = notnone(
-            kwargs.get('max_websocket_size'), lambda: getenv('PYJO_MAX_WEBSOCKET_SIZE', 0) or 262144
+        self.max_websocket_size = (
+            max_websocket_size
+            if max_websocket_size is not None
+            else int(os.environ.get('PYJO_MAX_WEBSOCKET_SIZE') or 262144)
         )
         """::
 
@@ -175,266 +208,389 @@ class Pyjo_Transaction_WebSocket(Pyjo.Transaction.object):
             ws.max_websocket_size = 1024
 
         Maximum WebSocket message size in bytes, defaults to the value of the
-        ``PYJO_MAX_WEBSOCKET_SIZE`` environment variable or ``262144`` (256KB).
+        ``PYJO_MAX_WEBSOCKET_SIZE`` environment variable or ``262144``
+        (256KiB).
         """
 
-        self._close = None
-        self._deflate = None
-        self._finished = False
-        self._state = None
-        self._write = bytearray()
+        # The state of the transaction, as the keys of Mojo's hash
+        self._close: list[Any] | None = None
+        self._closing = False
+        self._inflate: Any = None
+        self._message: bytes | None = None
+        self._op: int | None = None
+        self._pmc = False
+        self._read = bytearray()
+        self._write: bytes | None = None
 
-        def frame_cb(ws, frame):
-            ws._message(*frame)
-
-        self.on('frame', frame_cb)
-
-    def build_frame(self, fin, rsv1, rsv2, rsv3, op, payload):
+    def build_message(self, frame: str | Mapping[str, Any]) -> Frame:
         """::
 
-            chunk = ws.build_frame(fin, rsv1, rsv2, rsv3, op, payload)
-
-        Build WebSocket frame. ::
-
-            # Binary frame with FIN bit and payload
-            print(ws.build_frame(1, 0, 0, 0, 2, b'Hello World!'))
-
-            # Text frame with payload but without FIN bit
-            print(ws.build_frame(0, 0, 0, 0, 1, b'Hello '))
-
-            # Continuation frame with FIN bit and payload
-            print(ws.build_frame(1, 0, 0, 0, 0, b'World!'))
-
-            # Close frame with FIN bit and without payload
-            print(ws.build_frame(1, 0, 0, 0, 8, b''))
-
-            # Ping frame with FIN bit and payload
-            print(ws.build_frame(1, 0, 0, 0, 9, b'Test 123'))
-
-            # Pong frame with FIN bit and payload
-            print(ws.build_frame(1, 0, 0, 0, 10, b'Test 123'))
-        """
-
-        if DEBUG:
-            warn(f'-- Building frame ({fin}, {rsv1}, {rsv2}, {rsv3}, {op})\n')
-
-        frame = bytearray()
-
-        # Head
-        head = op + (128 if fin else 0)
-        if rsv1:
-            head |= 0b01000000
-        if rsv2:
-            head |= 0b00100000
-        if rsv3:
-            head |= 0b00010000
-        frame += struct.pack('B', head)
-
-        # Small payload
-        length = len(payload)
-        masked = self.masked
-        if length < 126:
-            if DEBUG:
-                warn(f'-- Small payload ({length})\n-- {repr(payload)}')
-            frame += struct.pack('B', length | 128 if masked else length)
-
-        # Extended payload (16-bit)
-        elif length < 65536:
-            if DEBUG:
-                warn(f'-- Extended 16-bit payload ({length})\n-- {repr(payload)}')
-            frame += struct.pack('B', 126 | 128 if masked else 126) + struct.pack('!H', length)
-
-        # Extended payload (64-bit with 32-bit fallback)
-        else:
-            if DEBUG:
-                warn(f'-- Extended 64-bit payload ({length})\n-- {repr(payload)}')
-            frame += struct.pack('B', 127 | 128 if masked else 127)
-            frame += struct.pack('!Q', length)
-
-        # Mask payload
-        if masked:
-            mask = struct.pack('!L', int(rand(9999999)))
-            payload = mask + xor_encode(payload, mask * 128)
-
-        return frame + payload
-
-    def build_message(self, **kwargs):
-        """::
-
-            chunk = ws.build_message(binary=message)
-            chunk = ws.build_message(text=message)
-            chunk = ws.build_message(json={'test': [1, 2, 3]})
+            frame = ws.build_message({'binary': data})
+            frame = ws.build_message({'text': data})
+            frame = ws.build_message({'json': {'test': [1, 2, 3]}})
+            frame = ws.build_message(chars)
 
         Build WebSocket message.
         """
-        # JSON
-        if 'json' in kwargs:
-            text = encode_json(kwargs['json'])
-        elif 'text' in kwargs:
-            text = b(kwargs['text'])
-        else:
-            text = None
+        # Text
+        message = {'text': encode('UTF-8', frame)} if isinstance(frame, str) else dict(frame)
 
-        if text is not None:
-            frame = [1, 0, 0, 0, TEXT, text]
-        elif 'binary' in kwargs:
-            frame = [1, 0, 0, 0, BINARY, kwargs['binary']]
-        else:
-            return
+        # JSON
+        if 'json' in message:
+            message['text'] = encode_json(message['json'])
+
+        # Raw text or binary
+        op, payload = (WS_TEXT, message['text']) if 'text' in message else (WS_BINARY, message['binary'])
 
         # "permessage-deflate" extension
         if not self.compressed:
-            return self.build_frame(*frame)
+            return (1, 0, 0, 0, op, payload)
+        # A new context for each message, as deflateReset gives
+        deflate = zlib.compressobj(zlib.Z_DEFAULT_COMPRESSION, zlib.DEFLATED, -15, 8)
+        out = deflate.compress(payload) + deflate.flush(zlib.Z_SYNC_FLUSH)
 
-        if self._deflate is None:
-            self._deflate = zlib.compressobj(
-                zlib.Z_DEFAULT_COMPRESSION, zlib.DEFLATED, -zlib.MAX_WBITS, zlib.DEF_MEM_LEVEL
-            )
-        deflate = self._deflate
-        out = deflate.compress(frame[5])
-        out += deflate.flush(zlib.Z_FULL_FLUSH)
-        frame[1] = 1
-        frame[5] = out[: len(out) - 4]
-        return self.build_frame(*frame)
+        return (1, 1, 0, 0, op, out[:-4])
 
-    def finish(self, code=None, reason=None):
+    def client_read(self, chunk: bytes) -> None:
         """::
 
-            ws = ws->finish()
-            ws = ws->finish(1000)
-            ws = ws->finish(1003, 'Cannot accept data!')
+            ws.client_read(data)
+
+        Read data client-side, used to implement user agents such as
+        :mod:`Pyjo.UserAgent`.
+        """
+        self.server_read(chunk)
+
+    def client_write(self) -> bytes:
+        """::
+
+            data = ws.client_write()
+
+        Write data client-side, used to implement user agents such as
+        :mod:`Pyjo.UserAgent`.
+        """
+        return self.server_write()
+
+    def closed(self) -> Self:
+        """::
+
+            ws = ws.closed()
+
+        Same as :meth:`Pyjo.Transaction.Pyjo_Transaction.completed`, but also
+        indicates that all transaction data has been sent.
+        """
+        self.completed()
+        args = list(self._close) if self._close else [1006]
+        return self.emit('finish', *(args if len(args) > 1 else [*args, None]))
+
+    @property
+    def connection(self) -> str | None:
+        """::
+
+            id = ws.connection
+
+        Connection identifier.
+        """
+        return self.handshake.connection
+
+    # Not in Mojolicious: setting it sets the handshake's, which Mojo's getter ignores
+    @connection.setter
+    def connection(self, value: str | None) -> None:
+        self.handshake.connection = value
+
+    def finish(self, code: int | None = None, reason: str | None = None) -> Self:
+        """::
+
+            ws = ws.finish()
+            ws = ws.finish(1000)
+            ws = ws.finish(1003, 'Cannot accept data!')
 
         Close WebSocket connection gracefully.
         """
-        close = self._close = [code, reason]
-        payload = struct.pack('!H', close[0]) if close[0] else b''
-        if close[1] is not None:
-            payload += b(close[1])
-        if close[0] is None:
+        close = self._close = [code, reason] if reason is not None else [code] if code is not None else []
+        payload = struct.pack('>H', close[0]) if close and close[0] else b''
+        if reason is not None:
+            payload += encode('UTF-8', reason)
+        if not close:
+            close.append(1005)
+        elif close[0] is None:
             close[0] = 1005
-        self.send([1, 0, 0, 0, CLOSE, payload])
-        self._finished = True
+        self.send((1, 0, 0, 0, WS_CLOSE, payload))._closing = True
+
         return self
 
-    def parse_frame(self, chunk):
+    @property
+    def is_websocket(self) -> bool:
         """::
 
-            frame = ws.parse_frame(chunk)
+            boolean = ws.is_websocket
 
-        Parse WebSocket frame. ::
-
-            # Parse single frame and remove it from buffer
-            frame = ws.parse_frame(chunk)
-            print("FIN: {0}".format(frame))
-            print("RSV1: {1}".format(frame))
-            print("RSV2: {2}".format(frame))
-            print("RSV3: {3}".format(frame))
-            print("Opcode: {4}".format(frame))
-            print("Payload: {5}".format(frame))
+        True, this is a :mod:`Pyjo.Transaction.WebSocket` object.
         """
-        if not isinstance(chunk, bytearray):
-            chunk = bytearray(chunk)
+        return True
 
-        # Head
-        if len(chunk) < 2:
-            return
-
-        first, second = struct.unpack('BB', bytes(chunk[:2]))
-
-        # FIN
-        fin = 1 if first & 0b10000000 == 0b10000000 else 0
-
-        # RSV1-3
-        rsv1 = 1 if first & 0b01000000 == 0b01000000 else 0
-        rsv2 = 1 if first & 0b00100000 == 0b00100000 else 0
-        rsv3 = 1 if first & 0b00010000 == 0b00010000 else 0
-
-        # Opcode
-        op = first & 0b00001111
-        if DEBUG:
-            warn(f'-- Parsing frame ({fin}, {rsv1}, {rsv2}, {rsv3}, {op})\n')
-
-        # Small payload
-        hlength, length = 2, second & 0b01111111
-        if length < 126:
-            if DEBUG:
-                warn(f'-- Small payload ({length})\n')
-
-        # Extended payload (16-bit)
-        elif length == 126:
-            if len(chunk) <= 4:
-                return
-
-            hlength = 4
-            (length,) = struct.unpack('!H', bytes(chunk[2:4]))
-            if DEBUG:
-                warn(f'-- Extended 16-bit payload ({length})\n')
-
-        # Extended payload (64-bit with 32-bit fallback)
-        elif length == 127:
-            if len(chunk) <= 10:
-                return
-
-            hlength = 10
-            ext = chunk[2:10]
-            (length,) = struct.unpack('!Q', bytes(ext))
-            if DEBUG:
-                warn(f'-- Extended 64-bit payload ({length})\n')
-
-        # Check message size
-        if length > self.max_websocket_size:
-            self.finish(1009)
-            return
-
-        # Check if whole packet has arrived
-        masked = bool(second & 0b10000000)
-        if masked:
-            length += 4
-        if len(chunk) < (hlength + length):
-            return
-        del chunk[:hlength]
-
-        # Payload
-        if length > 0:
-            payload = chunk[:length]
-            del chunk[:length]
-            if masked:
-                mask = payload[:4]
-                del payload[:4]
-                payload = xor_encode(payload, mask * 128)
-        else:
-            payload = bytearray()
-
-        if DEBUG:
-            warn(f'-- {repr(payload)}\n')
-
-        return fin, rsv1, rsv2, rsv3, op, payload
-
-    def send(self, cb=None, **kwargs):
+    @property
+    def kept_alive(self) -> bool | None:
         """::
 
-            ws = ws.send(binary=message)
-            ws = ws.send(text=message)
-            ws = ws.send(json={'test': [1, 2, 3]})
-            ws = ws.send(frame=[fin, rsv1, rsv2, rsv3, op, payload])
-            ws = ws.send(cb, ...)
+            boolean = ws.kept_alive
 
-        Send message or frame non-blocking via WebSocket, the optional drain callback
-        will be invoked once all data has been written.
+        Connection has been kept alive.
+        """
+        return self.handshake.kept_alive
+
+    # Not in Mojolicious: setting it sets the handshake's, which Mojo's getter ignores
+    @kept_alive.setter
+    def kept_alive(self, value: bool | None) -> None:
+        self.handshake.kept_alive = value
+
+    @property
+    def local_address(self) -> str | None:
+        """::
+
+            address = ws.local_address
+
+        Local interface address.
+        """
+        return self.handshake.local_address
+
+    # Not in Mojolicious: setting it sets the handshake's, which Mojo's getter ignores
+    @local_address.setter
+    def local_address(self, value: str | None) -> None:
+        self.handshake.local_address = value
+
+    @property
+    def local_port(self) -> int | None:
+        """::
+
+            port = ws.local_port
+
+        Local interface port.
+        """
+        return self.handshake.local_port
+
+    # Not in Mojolicious: setting it sets the handshake's, which Mojo's getter ignores
+    @local_port.setter
+    def local_port(self, value: int | None) -> None:
+        self.handshake.local_port = value
+
+    def parse_message(self, frame: Sequence[Any]) -> object:
+        """::
+
+            ws.parse_message((fin, rsv1, rsv2, rsv3, op, payload))
+
+        Parse WebSocket message.
+        """
+        self.emit('frame', frame)
+
+        # Ping/Pong
+        op, payload = frame[4], bytes(frame[5])
+        if op == WS_PING:
+            return self.send((1, 0, 0, 0, WS_PONG, payload))
+        if op == WS_PONG:
+            return None
+
+        # Close
+        if op == WS_CLOSE:
+            if not len(payload) >= 2:
+                return self.finish()
+            return self.finish(struct.unpack('>H', payload[:2])[0], decode('UTF-8', payload[2:]))
+
+        # Append chunk and check message size
+        if self._op is None:
+            self._op, self._pmc = op, bool(self.compressed and frame[1])
+        self._message = (self._message or b'') + payload
+        max = self.max_websocket_size
+        if len(self._message) > max:
+            return self.finish(1009)
+
+        # No FIN bit (Continuation)
+        if not frame[0]:
+            return None
+
+        # "permessage-deflate" extension (handshake and RSV1)
+        msg, self._message = self._message, None
+        if self.compressed and self._pmc:
+            if self._inflate is None:
+                self._inflate = zlib.decompressobj(-15)
+            out = self._inflate.decompress(msg + b'\x00\x00\xff\xff', max)
+            if len(self._inflate.unconsumed_tail):
+                return self.finish(1009)
+            msg = out
+
+        if self.has_subscribers('json'):
+            self.emit('json', j(msg))
+        op, self._op = self._op, None
+        self.emit('text' if op == WS_TEXT else 'binary', msg)
+        if self.has_subscribers('message'):
+            self.emit('message', decode('UTF-8', msg) if op == WS_TEXT else msg)
+        return None
+
+    @property
+    def protocol(self) -> str | None:
+        """::
+
+            proto = ws.protocol
+
+        Return negotiated subprotocol or ``None``.
+        """
+        return self.res.headers.sec_websocket_protocol
+
+    @property
+    def remote_address(self) -> str | None:
+        """::
+
+            address = ws.remote_address
+
+        Remote interface address.
+        """
+        return self.handshake.remote_address
+
+    # Not in Mojolicious: setting it sets the handshake's, which Mojo's getter ignores
+    @remote_address.setter
+    def remote_address(self, value: str | None) -> None:
+        self.handshake.remote_address = value
+
+    @property
+    def remote_port(self) -> int | None:
+        """::
+
+            port = ws.remote_port
+
+        Remote interface port.
+        """
+        return self.handshake.remote_port
+
+    # Not in Mojolicious: setting it sets the handshake's, which Mojo's getter ignores
+    @remote_port.setter
+    def remote_port(self, value: int | None) -> None:
+        self.handshake.remote_port = value
+
+    @property
+    def req(self) -> Pyjo.Message.Request.object:
+        """::
+
+            req = ws.req
+
+        Handshake request, usually a :mod:`Pyjo.Message.Request` object.
+        """
+        return self.handshake.req
+
+    # Not in Mojolicious: setting it sets the handshake's, which Mojo's getter ignores
+    @req.setter
+    def req(self, value: Pyjo.Message.Request.object) -> None:
+        self.handshake.req = value
+
+    @property
+    def res(self) -> Pyjo.Message.Response.object:
+        """::
+
+            res = ws.res
+
+        Handshake response, usually a :mod:`Pyjo.Message.Response` object.
+        """
+        return self.handshake.res
+
+    # Not in Mojolicious: setting it sets the handshake's, which Mojo's getter ignores
+    @res.setter
+    def res(self, value: Pyjo.Message.Response.object) -> None:
+        self.handshake.res = value
+
+    def resume(self) -> Self:
+        """::
+
+            ws = ws.resume()
+
+        Resume :attr:`handshake` transaction.
+        """
+        self.handshake.resume()
+        return self
+
+    def send(self, msg: str | Mapping[str, Any] | Sequence[Any], cb: Callable[..., object] | None = None) -> Self:
+        """::
+
+            ws = ws.send({'binary': data})
+            ws = ws.send({'text': data})
+            ws = ws.send({'json': {'test': [1, 2, 3]}})
+            ws = ws.send((fin, rsv1, rsv2, rsv3, op, payload))
+            ws = ws.send(chars)
+            ws = ws.send(chars, lambda ws: ...)
+
+        Send message or frame non-blocking via WebSocket, the optional drain
+        callback will be executed once all data has been written. ::
 
             # Send "Ping" frame
-            ws.send(frame=[1, 0, 0, 0, 9, b'Hello World!'])
+            from Pyjo.WebSocket import WS_PING
+            ws.send((1, 0, 0, 0, WS_PING, b'Hello World!'))
         """
-        if cb:
+        if cb is not None:
             self.once('drain', cb)
-
-        if 'frame' in kwargs:
-            self._write += self.build_frame(*kwargs['frame'])
-        else:
-            self._write += self.build_message(**kwargs)
-        self._state = 'write'
-
+        frame = self.build_message(msg) if isinstance(msg, str | Mapping) else msg
+        fin, rsv1, rsv2, rsv3, op, payload = frame
+        self._write = (self._write or b'') + Pyjo.WebSocket.build_frame(self.masked, fin, rsv1, rsv2, rsv3, op, payload)
         return self.emit('resume')
+
+    def server_read(self, chunk: bytes) -> None:
+        """::
+
+            ws.server_read(data)
+
+        Read data server-side, used to implement web servers such as
+        :mod:`Pyjo.Server.Daemon`.
+        """
+        self._read += chunk
+        max = self.max_websocket_size
+        while frame := Pyjo.WebSocket.parse_frame(self._read, max):
+            if not isinstance(frame, tuple):
+                self.finish(1009)
+                break
+            self.parse_message(frame)
+
+        self.emit('resume')
+
+    def server_write(self) -> bytes:
+        """::
+
+            data = ws.server_write()
+
+        Write data server-side, used to implement web servers such as
+        :mod:`Pyjo.Server.Daemon`.
+        """
+        if self._write is None:
+            self._write = b''
+        if not len(self._write):
+            self.emit('drain')
+        if not len(self._write or b'') and self._closing:
+            self.completed()
+        write, self._write = self._write or b'', None
+        return write
+
+    def with_compression(self) -> None:
+        """::
+
+            ws.with_compression()
+
+        Negotiate ``permessage-deflate`` extension for this WebSocket
+        connection.
+        """
+        # "permessage-deflate" extension
+        if 'permessage-deflate' in (self.req.headers.sec_websocket_extensions or ''):
+            self.compressed = True
+            self.res.headers.sec_websocket_extensions = 'permessage-deflate'
+
+    def with_protocols(self, *protos: str) -> str | None:
+        """::
+
+            proto = ws.with_protocols('v2.proto', 'v1.proto')
+
+        Negotiate subprotocol for this WebSocket connection.
+        """
+        offered = {trim(p) for p in (self.req.headers.sec_websocket_protocol or '').split(',')}
+        if (proto := next((p for p in protos if p in offered), None)) is None:
+            return None
+
+        self.res.headers.sec_websocket_protocol = proto
+        return proto
 
 
 new = Pyjo_Transaction_WebSocket.new

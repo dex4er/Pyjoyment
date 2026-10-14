@@ -59,12 +59,15 @@ Classes
 
 import Pyjo.IOLoop
 import Pyjo.Server.Base
+import Pyjo.Transaction.WebSocket
 import Pyjo.URL
 
 from Pyjo.Util import convert, getenv, isalive, notnone, warn
+from Pyjo.WebSocket import server_handshake
 
 import platform
 import signal
+import socket
 import weakref
 
 
@@ -323,91 +326,89 @@ class Pyjo_Server_Daemon(Pyjo.Server.Base.object):
         tx = self.build_tx()
         tx.connection = cid
         tx.res.headers.server = f'Pyjoyment ({platform.python_implementation()})'
-        handle = self.ioloop.stream(cid).handle
-        tx.local_address, tx.local_port = handle.getsockname()
-        tx.remove_address, tx.remote_port = handle.getpeername()
-        if c.get('tls', None):
+        stream = self.ioloop.stream(cid)
+        stream.timeout = self.inactivity_timeout
+        handle = stream.handle
+        if handle.family != socket.AF_UNIX:
+            tx.local_address, tx.local_port = handle.getsockname()[:2]
+            tx.remote_address, tx.remote_port = handle.getpeername()[:2]
+        if c.get('tls'):
             tx.req.url.base.scheme = 'https'
 
-        # Handle upgrades and requests
         daemon = weakref.proxy(self)
 
-        @tx.on
-        def upgrade(tx, ws):
-            if isalive(daemon):
-                ws.server_handshake()
-                daemon._connections[cid]['ws'] = ws
-
-        @tx.on
+        @tx.on('request')
         def request(tx):
-            if isalive(daemon):
-                daemon.emit('request', daemon._connections[cid].get('ws', tx))
+            if not isalive(daemon):
+                return
+            req = tx.req
+            if error := req.error:
+                daemon._trace(cid, error['message'])
 
-                def resume_cb(tx):
-                    daemon._write(cid)
+            # WebSocket
+            if req.is_handshake:
+                ws = daemon._connections[cid]['next'] = Pyjo.Transaction.WebSocket.new(handshake=tx)
+                daemon.emit('request', server_handshake(ws))
 
-                tx.on('resume', resume_cb)
+            # HTTP
+            else:
+                daemon.emit('request', tx)
+
+            # Last keep-alive request or corrupted connection
+            c = daemon._connections[cid]
+            if (c.get('requests') or 1) >= daemon.max_requests or req.error:
+                tx.res.headers.connection = 'close'
+
+            tx.on('resume', lambda tx: daemon._write(cid) if isalive(daemon) else None)
+            daemon._write(cid)
 
         # Kept alive if we have more than one request on the connection
-        n = c.get('requests', 0)
-        c['requests'] = n + 1
+        c['requests'] = c.get('requests', 0) + 1
         if c['requests'] > 1:
             tx.kept_alive = True
         return tx
 
     def _close(self, cid):
-        # Finish gracefully
-        c = self._connections.get(cid, None)
-        if not c:
-            return
+        if tx := self._connections.get(cid, {}).get('tx'):
+            tx.closed()
+        self._connections.pop(cid, None)
 
-        tx = c.get('tx', None)
-        if tx:
-            tx.server_close()
-        del self._connections[cid]
+    def _trace(self, cid, message):
+        if self._connections.get(cid, {}).get('tx'):
+            self.app.log.trace(message)
 
     def _finish(self, cid):
         # Always remove connection for WebSockets
-        c = self._connections[cid]
-        tx = c.get('tx', None)
-        if not tx:
+        c = self._connections.get(cid)
+        if not c or not (tx := c.get('tx')):
             return
-
         if tx.is_websocket:
-            self._remove(cid)
+            return self._remove(cid)
 
         # Finish transaction
-        tx.server_close()
+        c.pop('tx').closed()
 
         # Upgrade connection to WebSocket
-        ws = c['tx'] = c.get('ws', None)
-        if ws:
+        if ws := c.pop('next', None):
             # Successful upgrade
-            if ws.res.code == 101:
+            if ws.handshake.res.code == 101:
+                c['tx'] = ws.set(established=True)
                 daemon = weakref.proxy(self)
-
-                def resume_cb(ws):
-                    daemon._write(cid)
-
-                ws.on('resume', resume_cb)
-                ws.server_open()
+                ws.on('resume', lambda ws: daemon._write(cid) if isalive(daemon) else None)
+                self._write(cid)
 
             # Failed upgrade
             else:
-                del c['tx']
-                ws.server_close()
+                ws.closed()
 
         # Close connection if necessary
-        req = tx.req
-        if req.error or not tx.keep_alive:
+        if tx.error or not tx.keep_alive:
             return self._remove(cid)
 
         # Build new transaction for leftovers
-        leftovers = req.content.leftovers()
-        if not leftovers:
-            return
-        tx = c['tx'] = self._build_tx(cid, c)
-        tx.server_read(leftovers)
+        if len(leftovers := tx.req.content.leftovers()):
+            tx = c['tx'] = self._build_tx(cid, c)
+            tx.server_read(leftovers)
 
     def _listen(self, listen):
         url = Pyjo.URL.new(listen)
@@ -478,27 +479,14 @@ class Pyjo_Server_Daemon(Pyjo.Server.Base.object):
         print(f'Server available at {url}')
 
     def _read(self, cid, chunk):
-        # Make sure we have a transaction and parse chunk
+        # Make sure we have a transaction
         c = self._connections[cid]
-        if not c:
-            return
-
-        if not c.get('tx', None):
+        if not c.get('tx'):
             c['tx'] = self._build_tx(cid, c)
         tx = c['tx']
         if DEBUG:
-            warn(f'-- Server <<< Client ({self._url(tx)})\n{repr(chunk)}\n')
+            warn(f'-- Server <<< Client ({self._url(tx)})\n{chunk!r}')
         tx.server_read(chunk)
-
-        # Last keep-alive request or corrupted connection
-        if c.get('requests', 0) >= self.max_requests or tx.req.error:
-            tx.res.headers.connection = 'close'
-
-        # Finish or start writing
-        if tx.is_finished:
-            self._finish(cid)
-        elif tx.is_writing:
-            self._write(cid)
 
     def _remove(self, cid):
         self.ioloop.remove(cid)
@@ -508,44 +496,24 @@ class Pyjo_Server_Daemon(Pyjo.Server.Base.object):
         return tx.req.url.to_abs()
 
     def _write(self, cid):
-        # Get chunk and write
-        c = self._connections.get(cid, None)
-        if not c:
-            return
-        tx = c.get('tx', None)
-        if not tx:
-            return
-
-        if not tx.is_writing or c.get('writing', False):
+        # Protect from resume event recursion
+        c = self._connections.get(cid)
+        if not c or not (tx := c.get('tx')) or c.get('writing'):
             return
         c['writing'] = True
-        chunk = tx.server_write()
-        c['writing'] = False
+        try:
+            chunk = tx.server_write()
+        finally:
+            c['writing'] = False
         if DEBUG:
-            warn(f'-- Server >>> Client ({self._url(tx)})\n{repr(chunk)}\n')
-        stream = self.ioloop.stream(cid).write(chunk)
-
-        # Finish or continue writing
+            warn(f'-- Server >>> Client ({self._url(tx)})\n{chunk!r}')
+        next = self._finish if tx.is_finished else self._write if len(chunk) else None
+        stream = self.ioloop.stream(cid)
+        if next is None:
+            stream.write(chunk)
+            return
         daemon = weakref.proxy(self)
-
-        def write_cb(stream):
-            if isalive(daemon):
-                return daemon._write(cid)
-
-        cb = write_cb
-
-        if tx.is_finished:
-            if tx.has_subscribers('finish'):
-
-                def finish_cb(stream):
-                    return daemon._finish(cid)
-
-                cb = finish_cb
-            else:
-                self._finish(cid)
-                if not c.get('tx', None):
-                    return
-        stream.write(b'', cb)
+        stream.write(chunk, lambda stream: next(cid) if isalive(daemon) else None)
 
 
 new = Pyjo_Server_Daemon.new

@@ -62,7 +62,7 @@ class Pyjo_Server_WSGI(Pyjo.Server.Base.object):
         """
         tx = self.build_tx()
         req = tx.req.parse(environ)
-        tx.local_port = environ.get('SERVER_PORT', None)
+        tx.local_port = int(port) if (port := environ.get('SERVER_PORT')) else None
         tx.remote_address = environ.get('REMOTE_ADDR', None)
 
         # Request body (may block if we try to read too much)
@@ -103,24 +103,28 @@ class Pyjo_Server_WSGI(Pyjo.Server.Base.object):
         return application
 
     def _body(self, tx, empty):
-        # Empty
-        if empty:
-            return
-
-        # No content yet, try again later
-        offset = 0
-        while True:
-            chunk = tx.res.get_body_chunk(offset)
-            if chunk is None:
-                yield b''
+        # The end of the iteration closes the transaction, as close of the PSGI body does
+        try:
+            # Empty
+            if empty:
                 return
 
-            # End of content
-            if not len(chunk):
-                return
+            # No content yet, try again later
+            offset = 0
+            while True:
+                chunk = tx.res.get_body_chunk(offset)
+                if chunk is None:
+                    yield b''
+                    return
 
-            offset += len(chunk)
-            yield bytes(chunk)
+                # End of content
+                if not len(chunk):
+                    return
+
+                offset += len(chunk)
+                yield bytes(chunk)
+        finally:
+            tx.closed()
 
 
 new = Pyjo_Server_WSGI.new

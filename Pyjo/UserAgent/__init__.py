@@ -32,7 +32,7 @@ import Pyjo.UserAgent.CookieJar
 import Pyjo.UserAgent.Proxy
 import Pyjo.UserAgent.Transactor
 
-from Pyjo.Util import getenv, notnone, warn
+from Pyjo.Util import getenv, isalive, notnone, warn
 
 import weakref
 
@@ -229,8 +229,8 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
         tx = c['tx']
         tx.connection = cid
         handle = stream.handle
-        tx.local_address, tx.local_port = handle.getsockname()
-        tx.remove_address, tx.remote_port = handle.getpeername()
+        tx.local_address, tx.local_port = handle.getsockname()[:2]
+        tx.remote_address, tx.remote_port = handle.getpeername()[:2]
 
         # Start writing
         def resume_cb(ua):
@@ -248,7 +248,7 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
                 warn(f'-- Reusing connection {cid} ({proto}://{host}:{port})\n')
             self._connections[cid] = {'cb': cb, 'nb': nb, 'tx': tx}
             if not tx.connection:
-                tx.kept_alive
+                tx.kept_alive = True
             self._connected(cid)
             return cid
 
@@ -335,18 +335,23 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
         if not old:
             return self._remove(cid, close)
 
+        # Premature connection close
+        res = old.closed().res.finish()
+        if close and not res.code and not res.error:
+            res.error = {'message': 'Premature connection close'}
+
         # TODO Finish WebSocket
 
         jar = self.cookie_jar
         if jar:
             jar.collect(old)
 
-        # TODO cookie_jar
-
         # TODO Upgrade connection to WebSocket
 
         # Finish normal connection and handle redirects
         self._remove(cid, close)
+        if res.is_error:
+            res.error = {'message': res.message, 'code': res.code}
         if not self._redirect(c, old):
             c['cb'](self, old)
 
@@ -375,25 +380,21 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
         tx.client_read(chunk)
         if tx.is_finished:
             self._finish(cid, False)
-        elif tx.is_writing:
-            self._write(cid)
 
     def _redirect(self, c, old):
         new = self.transactor.redirect(old)
         if not new:
             return
 
-        if len(old.redirects) >= self.max_redirects:
+        if len(old.redirects()) >= self.max_redirects:
             return
 
         return self._start(c['nb'], new, c.pop('cb', None))
 
     def _remove(self, cid, close):
         # Close connection
-        c = self._connections.get(cid)
-        if c is not None:
-            del self._connections[cid]
-        tx = c['tx']
+        c = self._connections.pop(cid, None)
+        tx = c['tx'] if c else None
         if close or not tx or not tx.keep_alive or tx.error:
             for nb in True, False:
                 self._dequeue(nb, cid)
@@ -424,7 +425,7 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
             def timeout_cb(loop):
                 self._error(cid, 'Request timeout')
 
-            self.connections[id][timeout] = self._loop(nb).timer(timeout, timeout_cb)
+            self._connections[cid]['timeout'] = self._loop(nb).timer(timeout, timeout_cb)
 
         return cid
 
@@ -432,44 +433,22 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
         return tx.req.url.to_abs()
 
     def _write(self, cid):
-        # Get and write chunk
-        if cid not in self._connections:
+        # Protect from resume event recursion
+        c = self._connections.get(cid)
+        if not c or not (tx := c.get('tx')) or c.get('writing'):
             return
-
-        c = self._connections[cid]
-
-        if not c:
-            return
-
-        tx = c['tx']
-
-        if not tx:
-            return
-
-        if not tx.is_writing:
-            return
-
-        if c['writing']:
-            return
-
         c['writing'] = True
-        chunk = tx.client_write()
-        c['writing'] = False
+        try:
+            chunk = tx.client_write()
+        finally:
+            c['writing'] = False
         if DEBUG:
-            warn(f'-- Client >>> Server ({self._url(tx)})\n{str(chunk)}\n')
-
-        stream = self._loop(c['nb']).stream(cid).write(chunk)
-        if tx.is_finished:
-            self._finish(cid)
-
-        # Continue writing
-        if not tx.is_writing:
+            warn(f'-- Client >>> Server ({self._url(tx)})\n{chunk!r}')
+        if not len(chunk):
             return
 
-        def write_cb(ua):
-            ua._write(cid)
-
-        stream.write(b'', cb=write_cb)
+        ua = weakref.proxy(self)
+        self._loop(c['nb']).stream(cid).write(chunk, lambda stream: ua._write(cid) if isalive(ua) else None)
 
 
 new = Pyjo_UserAgent.new
