@@ -262,7 +262,7 @@ class Pyjo_UserAgent_Transactor(Pyjo.Base.object):
         if method == 'GET' or method == 'HEAD':
             req.url.query = p
         else:
-            req.body = p.to_bytes()
+            req.body = p.to_str().encode()
             self._type(headers, 'application/x-www-form-urlencoded')
 
         return tx
