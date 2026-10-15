@@ -35,7 +35,7 @@ import zlib
 
 from gzip import compress as _gzip_compress
 from gzip import decompress as _gzip_decompress
-from typing import Any, overload
+from typing import Any, Protocol, overload
 
 
 class Error(Exception):
@@ -976,26 +976,33 @@ def warn(msg: str, *args: object) -> None:
 XML = {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}
 
 
-def xml_escape(string: str | None) -> str:
+# Not in Mojolicious: markup, as the __html__ protocol of markupsafe, Jinja and Django marks it
+class Markup(Protocol):
+    def __html__(self) -> str: ...
+
+
+def xml_escape(string: str | Markup | None) -> str:
     """::
 
         escaped = xml_escape(string)
 
     Escape unsafe characters ``&``, ``<``, ``>``, ``"`` and ``'`` in string,
-    but do not escape :mod:`Pyjo.String.Unicode` objects. ::
+    but do not escape markup: an object with the method ``__html__``, as
+    :mod:`Pyjo.String.HTML`, which gives the markup. ::
 
         # "&lt;div&gt;"
         xml_escape('<div>')
 
         # "<div>"
-        from Pyjo.String.Unicode import u
-        xml_escape(u('<div>'))
+        from Pyjo.String.HTML import html
+        xml_escape(html('<div>'))
     """
-    import Pyjo.String.Unicode
-
-    if isinstance(string, Pyjo.String.Unicode.Pyjo_String_Unicode):
-        return string
-    return re.sub(r'[&<>"\']', lambda m: XML[m[0]], string if string is not None else '')
+    # Unlike Mojolicious: markup is what has __html__, not every Pyjo.String.Unicode, as Mojo leaves every
+    # Mojo::ByteStream, which u() and Pyjo.Collection.join make of any string
+    if (markup := getattr(string, '__html__', None)) is not None:
+        return markup()
+    string = str(string) if string is not None else ''
+    return re.sub(r'[&<>"\']', lambda m: XML[m[0]], string)
 
 
 def xor_encode(data: bytes, key: bytes) -> bytes:

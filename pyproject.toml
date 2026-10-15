@@ -215,6 +215,7 @@ strict = [
   "Pyjo/Server/Reload/Backend/Poll.py",
   "Pyjo/Server/WSGI.py",
   "Pyjo/String/Bytes.py",
+  "Pyjo/String/HTML.py",
   "Pyjo/String/Mixin.py",
   "Pyjo/String/Unicode.py",
   "Pyjo/Test.py",
