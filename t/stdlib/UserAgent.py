@@ -139,6 +139,34 @@ with subtest('Non-blocking with the event loop'):
     Pyjo.IOLoop.start()
     is_deeply_ok(results, ['/nb'], 'right path')
 
+with subtest('A callback as a keyword argument'):
+    results = []
+
+    def cb(ua, tx):
+        results.append(tx.res.json()['body'])
+        Pyjo.IOLoop.stop()
+
+    ua.post(f'{url}/form', form={'a': 'b'}, cb=cb)
+    Pyjo.IOLoop.start()
+    is_deeply_ok(results, ['a=b'], 'non-blocking')
+    throws_ok(lambda: ua.get(f'{url}/nb', cb, cb=cb), TypeError, 'not twice')
+
+    def handshake(ua, tx):
+        results.append(tx.is_websocket)
+        Pyjo.IOLoop.stop()
+
+    isa_ok(ua.websocket(f'{url}/ws', cb=handshake), str, 'id of the WebSocket connection')
+    Pyjo.IOLoop.start()
+    is_deeply_ok(results, ['a=b', False], 'no WebSocket with http.server')
+    throws_ok(lambda: ua.websocket(f'{url}/ws', handshake, cb=handshake), TypeError, 'not twice')
+
+    @ua.websocket(f'{url}/ws')
+    def ws(ua, tx):
+        Pyjo.IOLoop.stop()
+
+    isa_ok(ws, str, 'the decorated name is the id of the connection')
+    Pyjo.IOLoop.start()
+
 with subtest('TLS of ssl'):
     certs = os.path.join(os.path.dirname(__file__), '..', 'certs')
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)

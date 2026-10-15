@@ -224,9 +224,11 @@ class _Request:
         :mod:`Pyjo.Transaction.HTTP` object, takes the same arguments as
         :meth:`Pyjo.UserAgent.Transactor.Pyjo_UserAgent_Transactor.tx`
         (except for the ``{method}`` method, which is implied). You can also
-        append a callback to perform requests non-blocking. ::
+        append a callback, or pass it as ``cb``, to perform requests
+        non-blocking. ::
 
             ua.{name}('http://example.com', lambda ua, tx: print(tx.result.body), json={{'a': 'b'}})
+            ua.{name}('http://example.com', json={{'a': 'b'}}, cb=lambda ua, tx: print(tx.result.body))
             if not Pyjo.IOLoop.is_running():
                 Pyjo.IOLoop.start()
         """
@@ -251,10 +253,9 @@ class _Request:
 
             return request_p
 
-        def request(*args: Any, **generator: Any) -> Any:
-            cb = args[-1] if args and callable(args[-1]) else None
-            if cb is not None:
-                args = args[:-1]
+        # Unlike Mojolicious: the callback is also the keyword argument cb
+        def request(*args: Any, cb: Callback | None = None, **generator: Any) -> Any:
+            args, cb = _callback(args, cb)
             return ua.start(ua.build_tx(method, *args, **generator), cb)
 
         return request
@@ -676,8 +677,7 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
 
         Perform blocking request for a custom :mod:`Pyjo.Transaction.HTTP`
         object, which can be prepared manually or with :meth:`build_tx`. You
-        can also append a callback to perform requests non-blocking, or use
-        the method as a decorator of the callback. ::
+        can also append a callback to perform requests non-blocking. ::
 
             tx = ua.build_tx('GET', 'http://example.com')
             ua.start(tx, lambda ua, tx: print(tx.result.body))
@@ -731,19 +731,22 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
         self.start(tx, lambda ua, tx: ua.transactor.promisify(promise, tx))
         return promise
 
-    # The arguments of the transactor come before the callback, so the method is not typed further
-    def websocket(self, *args: Any) -> Any:
+    # The arguments of the transactor come before the callback, so the method is not typed further; unlike
+    # Mojolicious, the callback is also the keyword argument cb
+    def websocket(self, *args: Any, cb: Callback | None = None) -> Any:
         """::
 
             ua.websocket('ws://example.com', lambda ua, tx: ...)
             ua.websocket('ws://example.com', {'DNT': 1}, ['v1.proto'], lambda ua, tx: ...)
+            ua.websocket('ws://example.com', cb=lambda ua, tx: ...)
 
         Open a non-blocking WebSocket connection with transparent handshake,
         takes the same arguments as
         :meth:`Pyjo.UserAgent.Transactor.Pyjo_UserAgent_Transactor.websocket`.
         The callback will receive either a :mod:`Pyjo.Transaction.WebSocket`
         or :mod:`Pyjo.Transaction.HTTP` object, depending on if the handshake
-        was successful, and without it the method is a decorator. ::
+        was successful. Without it the method is a decorator, and the decorated
+        name is the id of the connection. ::
 
             @ua.websocket('wss://example.com/echo', ['v1.proto'])
             def echo(ua, tx):
@@ -770,16 +773,17 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
 
             ua.websocket('ws://example.com/foo', {'Sec-WebSocket-Extensions': 'permessage-deflate'}, lambda ua, tx: ...)
         """
-        # Not in Mojolicious: a decorator without the callback
-        if not args or not callable(args[-1]):
+        args, cb = _callback(args, cb)
 
-            def decorator(cb: Callback) -> Callback:
-                self.start(self.build_websocket_tx(*args), cb)
-                return cb
+        # Not in Mojolicious: a decorator without the callback
+        if cb is None:
+
+            def decorator(cb: Callback) -> str | None:
+                return self.start(self.build_websocket_tx(*args), cb)
 
             return decorator
 
-        return self.start(self.build_websocket_tx(*args[:-1]), args[-1])
+        return self.start(self.build_websocket_tx(*args), cb)
 
     def websocket_p(self, *args: Any) -> Pyjo.Promise.object:
         """::
@@ -1115,6 +1119,15 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
             c['ioloop'].stream(id).write(chunk, written)
         finally:
             c['writing'] = writing
+
+
+# The callback, the last of the arguments or the keyword argument cb, and the arguments before it
+def _callback(args: tuple[Any, ...], cb: Callback | None) -> tuple[tuple[Any, ...], Callback | None]:
+    if args and callable(args[-1]):
+        if cb is not None:
+            raise TypeError('callback given twice, as the last argument and as cb')
+        return args[:-1], args[-1]
+    return args, cb
 
 
 # A method of the user agent, as long as it exists, as Mojo weakens the user agent in its callbacks

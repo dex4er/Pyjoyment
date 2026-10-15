@@ -134,6 +134,10 @@ with subtest('client and server'):
     loop = Pyjo.IOLoop.new()
     got = []
 
+    id = loop.server(cb=lambda loop, stream, id: None, address='127.0.0.1')
+    ok(loop.acceptor(id).port, 'listening with cb')
+    loop.remove(id)
+
     # Listen on random port
     id = loop.server(lambda loop, stream, id: got.append('accepted'), address='127.0.0.1')
     port = loop.acceptor(id).port
@@ -146,6 +150,11 @@ with subtest('client and server'):
     loop.start()
     ok('connected' in got, 'connected')
     isa_ok(id, str, 'id')
+
+    got.clear()
+    id = loop.client(cb=cb, address='127.0.0.1', port=port)
+    loop.start()
+    ok('connected' in got, 'connected with cb')
 
     @loop.client(address='127.0.0.1', port=port)
     def id2(loop, err, stream):

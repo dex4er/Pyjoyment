@@ -393,8 +393,9 @@ copy:
   (`form => {a => 'b'}, charset => 'UTF-8'`), is a keyword argument
   (`form={'a': 'b'}, charset='UTF-8'`), and a hash reference of headers or
   the content before it are positional arguments. A callback that Mojo takes
-  after them, as the request methods of `Mojo::UserAgent` do, is the last
-  positional argument (`ua.get(url, {'DNT': 1}, cb, form={'a': 'b'})`).
+  after them, as the request methods of `Mojo::UserAgent` do, is the keyword
+  argument `cb` (`ua.get(url, {'DNT': 1}, form={'a': 'b'}, cb=cb)`), or the last
+  positional argument, as the ported tests pass it.
 - A Perl string of characters is a `str`, and bytes in Python are `bytes`,
   encoded with the charset of the module. Perl keeps bytes that do not decode
   as a byte string, which is a `str` of the characters 0-255 in Python:
@@ -540,8 +541,19 @@ copy:
 - The name of the class of an object in a message, `blessed $self` or
   `ref $self`, is `module.qualname` of its class, as
   `Pyjo.EventEmitter.Pyjo_EventEmitter`.
-- A method that subscribes a callback, like `on` of `Pyjo.EventEmitter`,
-  takes it last, as Mojo does, and is a decorator without it.
+- A callback is an argument in the order that suits Python, not necessarily
+  the one of Mojo, and a call can also pass it as `cb`, where it is the only
+  callback. A method that takes a callback, and means nothing else without
+  it, is a decorator without it, and the decorated name is what the method
+  returns with it: the id of a timer, a server or a connection of
+  `Pyjo.IOLoop` or `Pyjo.UserAgent`, which `remove` takes, and the callback
+  that `on` of `Pyjo.EventEmitter` subscribes. Where a call without the
+  callback means something else, as a blocking request of
+  `Pyjo.UserAgent`, there is no decorator. The callback is positional-only
+  only where the keyword arguments of the method go on, to the callback, as
+  in `map` of `Pyjo.Collection`, or somewhere else, as the attributes of
+  `tag` of `Pyjo.DOM.HTML`. Where the order or the keyword differs from Mojo,
+  a comment at the declaration says so.
 - An object that undoes something when it goes away, like the one that
   `capture` of `Mojo::Log` returns, is a context manager: PyPy does not free
   it when the last reference goes, and `with` says where it ends.

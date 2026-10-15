@@ -17,7 +17,7 @@ def server_cb(loop, stream, cid):
     stream.on('read', on_read_cb)
 
 
-server = Pyjo.IOLoop.server(server_cb, port=3000)
+server = Pyjo.IOLoop.server(port=3000, cb=server_cb)
 
 
 # Connect to port 3000
@@ -33,7 +33,7 @@ def client_cb(loop, err, stream):
     stream.write(b'GET / HTTP/1.1\x0d\x0a\x0d\x0a')
 
 
-Pyjo.IOLoop.client(client_cb, port=3000)
+Pyjo.IOLoop.client(port=3000, cb=client_cb)
 
 
 # Add a timer

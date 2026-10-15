@@ -19,6 +19,6 @@ def client_cb(loop, err, stream):
     stream.write(b'GET / HTTP/1.0\x0d\x0a\x0d\x0a')
 
 
-Pyjo.IOLoop.client(client_cb, address='127.0.0.1', port=port)
+Pyjo.IOLoop.client(address='127.0.0.1', port=port, cb=client_cb)
 
 Pyjo.IOLoop.start()
