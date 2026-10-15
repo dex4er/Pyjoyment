@@ -426,7 +426,10 @@ copy:
 - `Mojo::ByteStream` is `Pyjo.String.Unicode` for characters and
   `Pyjo.String.Bytes` for bytes. A Mojo test's `b(...)` is `u(...)` or
   `b(...)`, by what the string holds.
-- A callback that Mojo calls with `$_` gets the element as its first
+  Markup, which Mojo keeps from escaping as a `Mojo::ByteStream`, as a tag
+  helper returns it, is `Pyjo.String.HTML`, `html(...)`: escaping leaves only
+  what has the method `__html__`, so a string that `u()` or
+  `Pyjo.Collection.join` makes is escaped.- A callback that Mojo calls with `$_` gets the element as its first
   argument. A method name in a string, as in `$collection->map('text')`, can
   name a property, which is how a Mojo attribute is ported.
 - A method of `Mojo::Collection` that has the name of a `list` method, like
