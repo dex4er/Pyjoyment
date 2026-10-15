@@ -21,6 +21,7 @@ web framework:
 * Non-blocking I/O web server, which also runs as an ASGI, WSGI or CGI
   application.
 * HTML/XML parser with CSS selector support, and JSON with JSON Pointers.
+* Python-ish templates and template strings, with automatic escaping.
 * Containers for URLs, paths, query strings, headers, cookies and HTTP
   messages.
 * Event emitter, event loop with TCP, UDP and UNIX domain sockets, logger
@@ -45,11 +46,12 @@ Status
 Pyjoyment was written against Mojolicious 6 and is being revived as a port of
 Mojolicious 9 to Python 3.12 and newer, with ``asyncio`` as its event loop.
 The toolkit, the ``Pyjo`` package, is ported: URLs, DOM and CSS selectors,
-JSON, HTTP messages and cookies, the event loop with promises, the user agent,
-and the servers, on their own, preforking, with hot deployment or reloading,
-and through ASGI, WSGI and CGI. A ported module names the Mojolicious version
-it was ported from in its documentation. Templates and the web framework, the
-``Pyjoyment`` package with routes, controllers and plugins, are not there yet.
+JSON, templates, HTTP messages and cookies, the event loop with promises, the
+user agent, and the servers, on their own, preforking, with hot deployment or
+reloading, and through ASGI, WSGI and CGI. A ported module names the
+Mojolicious version it was ported from in its documentation. The web
+framework, the ``Pyjoyment`` package with routes, controllers and plugins, is
+not there yet.
 
 The progress is tracked in `GitHub Issues <https://github.com/dex4er/Pyjoyment/issues>`_.
 
