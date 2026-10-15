@@ -114,16 +114,21 @@ if hasattr(os, 'register_at_fork'):
 
 
 class _Resolver:
-    """A name resolution in a thread, which makes a socket readable once it is done."""
+    """A name resolution in a thread, which makes a socket readable once it is done, for Pyjo.IOLoop.Datagram too."""
 
-    def __init__(self, host: str, port: int) -> None:
+    def __init__(self, host: str, port: int, type: int = socket.SOCK_STREAM, family: int = 0) -> None:
         global _executor
         if _executor is None:
             _executor = concurrent.futures.ThreadPoolExecutor(max_workers=5, thread_name_prefix='Pyjo.IOLoop.Client')
         self.handle, self._writer = socket.socketpair()
         self.handle.setblocking(False)
         self.future = _executor.submit(
-            socket.getaddrinfo, host, port, type=socket.SOCK_STREAM, proto=socket.IPPROTO_TCP
+            socket.getaddrinfo,
+            host,
+            port,
+            family,
+            type,
+            socket.IPPROTO_TCP if type == socket.SOCK_STREAM else socket.IPPROTO_UDP,
         )
         self.future.add_done_callback(self._done)
 

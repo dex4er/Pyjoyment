@@ -23,7 +23,8 @@ web framework:
 * HTML/XML parser with CSS selector support, and JSON with JSON Pointers.
 * Containers for URLs, paths, query strings, headers, cookies and HTTP
   messages.
-* Event emitter, event loop, logger and utility functions.
+* Event emitter, event loop with TCP, UDP and UNIX domain sockets, logger
+  and utility functions.
 * Test scripts which print the `Test Anything Protocol <https://testanything.org/>`_
   (TAP), with ``Pyjo.Test``, inspired by Perl's ``Test::More``, and a test
   harness, ``Pyjo.Prove``, inspired by Perl's ``prove``.
