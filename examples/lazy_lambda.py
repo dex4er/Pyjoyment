@@ -1,1 +1,0 @@
-(lambda: print('Hello'))()
