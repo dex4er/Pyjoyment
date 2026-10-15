@@ -2,6 +2,7 @@ from Pyjo.Test import *
 
 import atexit
 import http.client
+import importlib
 import os
 import pathlib
 import signal
@@ -25,6 +26,9 @@ import Pyjo.Server.Reload.Backend.Poll
 
 ROOT = os.path.join(os.path.dirname(__file__), '..', '..')
 LIB = os.path.join(os.path.dirname(__file__), '..', 'lib')
+
+sys.path.insert(0, LIB)
+ServerStart = importlib.import_module('ServerStart')
 
 with subtest('Paths of pathlib and times of os.utime'), tempfile.TemporaryDirectory() as dir:
     root = pathlib.Path(dir)
@@ -55,13 +59,19 @@ get('/', {{'text': 'version 1'}})
 app.start()
 """
     )
-    port = Pyjo.IOLoop.Server.object.generate_port()
-    process = subprocess.Popen(
-        [sys.executable, '-m', 'Pyjo.Server.Reload', '-l', f'http://127.0.0.1:{port}', str(app)],
-        env=dict(os.environ, PYTHONPATH=ROOT),
-        stdout=subprocess.DEVNULL,
-    )
-    atexit.register(lambda: process.poll() is None and process.kill())
+
+    # The server is started again on a new port when it is taken
+    def start():
+        port = Pyjo.IOLoop.Server.object.generate_port()
+        process = subprocess.Popen(
+            [sys.executable, '-m', 'Pyjo.Server.Reload', '-l', f'http://127.0.0.1:{port}', str(app)],
+            env=dict(os.environ, PYTHONPATH=ROOT),
+            stdout=subprocess.DEVNULL,
+        )
+        atexit.register(lambda: process.poll() is None and process.kill())
+        return (port, process) if ServerStart.listening(port, process) else None
+
+    port, process = ServerStart.retry(start)
 
     # The response of the worker, once there is one with the content
     def get(content):

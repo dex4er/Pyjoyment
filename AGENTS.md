@@ -130,6 +130,16 @@ reactor that never stops, is killed with the processes it started and fails
 with its name, instead of the job running out of time. The slowest script
 takes a few seconds.
 
+A server that a test starts in a process of its own, as those of
+`Pyjo.Server.Hot`, `Pyjo.Server.Reload` and `Pyjo.Server.Prefork`, listens on
+a port of `generate_port`, which is free when it is found, but not
+necessarily when the process binds it a second later: an outgoing connection
+of a test that runs at the same time can get it as its local port, and Linux
+does not let a server bind it then, even with `SO_REUSEADDR`. Such a test
+starts its server with `retry` of `t/lib/ServerStart.py`, which tries again
+on new ports, and waits for it with a limit of time, so that a server that
+does not start fails the test instead of hanging it.
+
 - `t/Pyjo/` holds the module tests, ported from Mojo's `t/mojo/*.t`. A
   file has the name of Mojo's test with the part of the module as Pyjoyment
   names it: `reactor_detect.t` is `Reactor_detect.py`, `ioloop_tls.t` is

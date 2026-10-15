@@ -2,13 +2,12 @@ from Pyjo.Test import *
 
 import contextlib
 import http.client
+import importlib
 import io
 import os
 import signal
-import socket
 import subprocess
 import sys
-import time
 
 
 if not hasattr(os, 'fork'):
@@ -26,20 +25,24 @@ from Pyjo.File import tempdir
 
 ROOT = os.path.join(os.path.dirname(__file__), '..', '..')
 
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
+ServerStart = importlib.import_module('ServerStart')
 
-# A server in a process of its own, which answers once its port accepts connections
-def server(code, port):
-    process = subprocess.Popen(
-        [sys.executable, '-c', code], env=dict(os.environ, PYTHONPATH=ROOT), stdout=subprocess.PIPE, text=True
-    )
-    deadline = time.monotonic() + 20
-    while time.monotonic() < deadline:
-        try:
-            socket.create_connection(('127.0.0.1', port), 0.2).close()
-            break
-        except OSError:
-            time.sleep(0.1)
-    return process
+
+# A server in a process of its own, with the code for a port, which answers once its port accepts connections, started
+# again on a new port when it is taken
+def server(code):
+    def start():
+        port = Pyjo.IOLoop.Server.object.generate_port()
+        process = subprocess.Popen(
+            [sys.executable, '-c', code(port)], env=dict(os.environ, PYTHONPATH=ROOT), stdout=subprocess.PIPE, text=True
+        )
+        if ServerStart.listening(port, process):
+            return port, process
+        process.stdout.close()
+        return None
+
+    return ServerStart.retry(start)
 
 
 def get(port, path):
@@ -51,10 +54,10 @@ def get(port, path):
 
 
 with subtest('Synopsis'):
-    port = Pyjo.IOLoop.Server.object.generate_port()
     pid_file = tempdir().child('prefork.pid')
-    process = server(
-        f"""
+    port, process = server(
+        lambda port: (
+            f"""
 import Pyjo.Server.Prefork
 
 prefork = Pyjo.Server.Prefork.new(listen=['http://*:{port}'])
@@ -78,8 +81,8 @@ def request(prefork, tx):
 
 
 prefork.run()
-""",
-        port,
+"""
+        )
     )
     is_ok(get(port, '/foo'), b'GET request for /foo!', 'served by a worker')
     process.send_signal(signal.SIGQUIT)

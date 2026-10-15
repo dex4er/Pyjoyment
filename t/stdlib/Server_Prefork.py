@@ -1,10 +1,10 @@
 from Pyjo.Test import *
 
 import http.client
+import importlib
 import os
 import pathlib
 import signal
-import socket
 import subprocess
 import sys
 import tempfile
@@ -23,6 +23,9 @@ import Pyjo.IOLoop.Server
 
 ROOT = os.path.join(os.path.dirname(__file__), '..', '..')
 
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
+ServerStart = importlib.import_module('ServerStart')
+
 
 # The lines that the manager prints about its workers, until one matches
 def until(process, prefix):
@@ -35,13 +38,16 @@ def until(process, prefix):
 
 
 with subtest('Signals, the process id file and http.client'), tempfile.TemporaryDirectory() as dir:
-    port = Pyjo.IOLoop.Server.object.generate_port()
     pid_file = pathlib.Path(dir, 'prefork.pid')
-    process = subprocess.Popen(
-        [
-            sys.executable,
-            '-c',
-            f"""
+
+    # The server is started again on a new port when it is taken
+    def start():
+        port = Pyjo.IOLoop.Server.object.generate_port()
+        process = subprocess.Popen(
+            [
+                sys.executable,
+                '-c',
+                f"""
 import os, Pyjo.Server.Prefork
 
 prefork = Pyjo.Server.Prefork.new(
@@ -63,19 +69,18 @@ def request(prefork, tx):
 prefork.run()
 print('stopped', flush=True)
 """,
-        ],
-        env=dict(os.environ, PYTHONPATH=ROOT),
-        stdout=subprocess.PIPE,
-        text=True,
-    )
+            ],
+            env=dict(os.environ, PYTHONPATH=ROOT),
+            stdout=subprocess.PIPE,
+            text=True,
+        )
+        if ServerStart.listening(port, process):
+            return port, process
+        process.stdout.close()
+        return None
+
+    port, process = ServerStart.retry(start)
     spawned = until(process, 'spawn') + until(process, 'spawn')
-    deadline = time.monotonic() + 20
-    while time.monotonic() < deadline:
-        try:
-            socket.create_connection(('127.0.0.1', port), 0.2).close()
-            break
-        except OSError:
-            time.sleep(0.1)
     is_ok(len(spawned), 2, 'two workers')
 
     deadline = time.monotonic() + 10
