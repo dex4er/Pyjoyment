@@ -5,10 +5,14 @@ from Pyjo.Util import (
     b64_decode,
     b64_encode,
     camelize,
+    class_to_file,
+    class_to_path,
     decamelize,
     decode,
     die,
+    dumper,
     encode,
+    generate_secret,
     getenv,
     gunzip,
     gzip,
@@ -20,11 +24,14 @@ from Pyjo.Util import (
     isalive,
     md5_bytes,
     md5_sum,
+    monkey_patch,
     network_contains,
     notnone,
     punycode_decode,
     punycode_encode,
     quote,
+    random_bytes,
+    scope_guard,
     secure_compare,
     setenv,
     sha1_bytes,
@@ -35,6 +42,7 @@ from Pyjo.Util import (
     split_header,
     spurt,
     steady_time,
+    tablify,
     term_escape,
     trim,
     unindent,
@@ -48,13 +56,35 @@ from Pyjo.Util import (
 
 import contextlib
 import gc
+import importlib
 import io
 import os
 import pathlib
 import re
+import sys
 import tempfile
+import textwrap
+import traceback
+import types
+import warnings
 import weakref
 
+
+# The module of t/mojo/lib/Mojo/DeprecationTest.pm
+lib = tempfile.TemporaryDirectory()
+with open(os.path.join(lib.name, 'DeprecationTest.py'), 'w') as f:
+    f.write(
+        textwrap.dedent("""
+            from Pyjo.Util import deprecated
+
+
+            def foo():
+                deprecated('foo is DEPRECATED')
+                return 'bar'
+        """)
+    )
+sys.path.insert(0, lib.name)
+DeprecationTest = importlib.import_module('DeprecationTest')
 
 # Pyjo.Util is brought to Mojolicious 9.49 one function at a time, so only the
 # subtests of t/mojo/util.t for those functions are here
@@ -73,8 +103,21 @@ with subtest('decamelize'):
     is_ok(decamelize('FooBB'), 'foo_b_b', 'right decamelized result')
     is_ok(decamelize('Foo::BB'), 'foo-b_b', 'right decamelized result')
 
-# Left out from Mojolicious: the subtests "class_to_file" and "class_to_path"
-# TODO: the subtests "class_to_file" and "class_to_path", with the functions
+with subtest('class_to_file'):
+    is_ok(class_to_file('Foo.Bar'), 'foo_bar', 'right file')
+    is_ok(class_to_file('FooBar'), 'foo_bar', 'right file')
+    is_ok(class_to_file('FOOBar'), 'foobar', 'right file')
+    is_ok(class_to_file('FOOBAR'), 'foobar', 'right file')
+    is_ok(class_to_file('FOO.Bar'), 'foobar', 'right file')
+    is_ok(class_to_file('FooBAR'), 'foo_bar', 'right file')
+    is_ok(class_to_file('Foo.BAR'), 'foo_bar', 'right file')
+    # Left out from Mojolicious: the deprecated package separator "'", which Python has never had
+
+with subtest('class_to_path'):
+    is_ok(class_to_path('Foo.Bar'), 'Foo/Bar.py', 'right path')
+    # Left out from Mojolicious: the deprecated package separator "'", which Python has never had
+    is_ok(class_to_path('Foo.Bar.Baz'), 'Foo/Bar/Baz.py', 'right path')
+    # Left out from Mojolicious: the deprecated package separator "'", which Python has never had
 
 with subtest('split_header'):
     is_deeply_ok(split_header(''), [], 'right result')
@@ -154,6 +197,8 @@ with subtest('header_params'):
     is_deeply_ok(
         header_params('rel="x"; t*=UTF-8\'de\'a%20b'), ({'rel': 'x', 't*': "UTF-8'de'a%20b"}, ''), 'right result'
     )
+
+# TODO: the subtests "extract_usage", "getopt" and "getopt (return value)", with the commands of Pyjoyment
 
 with subtest('unindent'):
     is_ok(unindent(' test\n  123\n 456\n'), 'test\n 123\n456\n', 'right unindented result')
@@ -422,8 +467,40 @@ with subtest('xor_encode'):
 with subtest('steady_time'):
     like_ok(str(steady_time()), r'^[\d.]+$', 'high resolution time')
 
-# Left out from Mojolicious: the subtests "monkey_patch" and "monkey_patch (with name)"
-# TODO: the subtests "monkey_patch" and "monkey_patch (with name)", with the function
+with subtest('monkey_patch'):
+
+    class MojoMonkeyTest:
+        @staticmethod
+        def foo():
+            return 'foo'
+
+    ok(hasattr(MojoMonkeyTest, 'foo'), 'function "foo" exists')
+    is_ok(MojoMonkeyTest.foo(), 'foo', 'right result')
+    ok(not hasattr(MojoMonkeyTest, 'bar'), 'function "bar" does not exist')
+    monkey_patch(MojoMonkeyTest, bar=lambda: 'bar')
+    ok(hasattr(MojoMonkeyTest, 'bar'), 'function "bar" exists')
+    is_ok(MojoMonkeyTest.bar(), 'bar', 'right result')
+    monkey_patch(MojoMonkeyTest, foo=lambda: 'baz')
+    ok(hasattr(MojoMonkeyTest, 'foo'), 'function "foo" exists')
+    is_ok(MojoMonkeyTest.foo(), 'baz', 'right result')
+    ok(not hasattr(MojoMonkeyTest, 'yin'), 'function "yin" does not exist')
+    ok(not hasattr(MojoMonkeyTest, 'yang'), 'function "yang" does not exist')
+    monkey_patch(MojoMonkeyTest, yin=lambda: 'yin', yang=lambda: 'yang')
+    ok(hasattr(MojoMonkeyTest, 'yin'), 'function "yin" exists')
+    is_ok(MojoMonkeyTest.yin(), 'yin', 'right result')
+    ok(hasattr(MojoMonkeyTest, 'yang'), 'function "yang" exists')
+    is_ok(MojoMonkeyTest.yang(), 'yang', 'right result')
+
+with subtest('monkey_patch (with name)'):
+    is_ok(MojoMonkeyTest.foo.__qualname__, 'MojoMonkeyTest.foo', 'right name')
+    is_ok(MojoMonkeyTest.bar.__qualname__, 'MojoMonkeyTest.bar', 'right name')
+
+# Not in Mojolicious: a module, the other target of monkey_patch
+with subtest('monkey_patch (module)'):
+    module = types.ModuleType('MojoMonkeyModule')
+    monkey_patch(module, foo=lambda: 'foo')
+    is_ok(module.foo(), 'foo', 'right result')
+    is_ok(f'{module.foo.__module__}.{module.foo.__qualname__}', 'MojoMonkeyModule.foo', 'right name')
 
 with subtest('network_contains'):
     ok(not network_contains('10.0.0.0/8', ''), 'empty address')
@@ -500,6 +577,51 @@ with subtest('network_contains'):
     ok(not network_contains('::ffff:127.0.0.0/120', '::ffff:127.0.1.255'), 'v6 network does not contain address')
     ok(not network_contains('::ffff:10.10.10.8/127', '::ffff:10.10.10.12'), 'v6 network does not contain address')
 
+with subtest('tablify'):
+    is_ok(tablify([['f\r\no o\r\n', 'bar']]), 'fo o  bar\n', 'right result')
+    is_ok(tablify([['  foo', '  b a r']]), '  foo    b a r\n', 'right result')
+    is_ok(tablify([['foo']]), 'foo\n', 'right result')
+    is_ok(tablify([['foo', 'yada'], ['yada', 'yada']]), 'foo   yada\nyada  yada\n', 'right result')
+    is_ok(tablify([[None, 'yada'], ['yada', None]]), '      yada\nyada  \n', 'right result')
+    is_ok(
+        tablify([['foo', 'bar', 'baz'], ['yada', 'yada', 'yada']]),
+        'foo   bar   baz\nyada  yada  yada\n',
+        'right result',
+    )
+    is_ok(tablify([['a', '', 0], [0, '', 'b']]), 'a    0\n0    b\n', 'right result')
+    is_ok(tablify([[1, 2], [3]]), '1  2\n3\n', 'right result')
+    is_ok(tablify([[1], [2, 3]]), '1\n2  3\n', 'right result')
+    is_ok(tablify([[1], [], [2, 3]]), '1\n\n2  3\n', 'right result')
+
+with subtest('deprecated'):
+    warn_, die_ = None, None
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter('always')
+        try:
+            is_ok(DeprecationTest.foo(), 'bar', 'right result')
+        except Exception as e:
+            die_ = e
+    warn_ = f'{caught[0].message} at {caught[0].filename} line {caught[0].lineno}' if caught else None
+    like_ok(warn_, r'foo is DEPRECATED at .*Util\.py line \d+', 'right warning')
+    ok(not die_, 'no exception')
+    warn_, die_ = None, None
+    setenv('PYJO_FATAL_DEPRECATIONS', '1')
+    result = None
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter('always')
+        try:
+            result = DeprecationTest.foo()
+        except DeprecationWarning as e:
+            frame = traceback.extract_tb(e.__traceback__)[0]
+            die_ = f'{e} at {frame.filename} line {frame.lineno}'
+    setenv('PYJO_FATAL_DEPRECATIONS', None)
+    ok(not result, 'no result')
+    ok(not caught, 'no warning')
+    like_ok(die_, r'foo is DEPRECATED at .*Util\.py line \d+', 'right exception')
+
+with subtest('dumper'):
+    is_ok(dumper([1, 2]), '[1, 2]\n', 'right result')
+
 with subtest('term_escape'):
     is_ok(term_escape('Accept: */*\x0d\x0a'), 'Accept: */*\\x0d\x0a', 'right result')
     is_ok(term_escape('\t\b\r\n\f'), '\\x09\\x08\\x0d\n\\x0c', 'right result')
@@ -535,6 +657,13 @@ with subtest('gzip/gunzip'):
     result = gunzip(compressed)
     is_ok(result, uncompressed, 'same string')
 
+with subtest('scope_guard'):
+    test = ['a']
+    with scope_guard(lambda: test.append('c')):
+        test.append('b')
+    test.append('d')
+    is_ok(''.join(test), 'abcd', 'right order')
+
 with subtest('humanize_bytes'):
     is_ok(humanize_bytes(0), '0B', 'zero Bytes')
     is_ok(humanize_bytes(1), '1B', 'one Byte')
@@ -553,6 +682,27 @@ with subtest('humanize_bytes'):
     is_ok(humanize_bytes(717946880), '685MiB', 'large MiB')
     is_ok(humanize_bytes(-717946880), '-685MiB', 'large negative MiB')
     is_ok(humanize_bytes(245760), '240KiB', 'less than a MiB')
+
+# TODO: the subtest "encrypt_cookie/decrypt_cookie", with the functions
+
+with subtest('random_bytes'):
+    isnt_ok(random_bytes(16), random_bytes(16), 'two random_bytes invocations are not the same')
+    is_ok(len(random_bytes(16)), 16, 'random_bytes(16) returns 16 bytes')
+
+with subtest('generate_secret'):
+    like_ok(generate_secret(), r'^[A-Za-z0-9_-]{32,}$', 'right format')
+
+# Left out from Mojolicious: the subtest "Hide DATA usage from error messages", as Python has no DATA handle
+
+# Not in Mojolicious: the errors of random_bytes
+with subtest('random_bytes (invalid count)'):
+    throws_ok(
+        lambda: random_bytes(-1), re.compile(r'^Byte count must be a defined, non-negative integer'), 'right error'
+    )
+    throws_ok(
+        lambda: random_bytes(None), re.compile(r'^Byte count must be a defined, non-negative integer'), 'right error'
+    )
+    is_ok(random_bytes(0), b'', 'no bytes')
 
 # Not in Mojolicious: the helpers that turn statements into expressions
 with subtest('die'):
@@ -611,5 +761,7 @@ with subtest('isalive'):
     del obj
     gc.collect()
     ok(not isalive(proxy), 'dead')
+
+lib.cleanup()
 
 done_testing()

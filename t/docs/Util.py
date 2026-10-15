@@ -1,5 +1,9 @@
 from Pyjo.Test import *
 
+import contextlib
+import io
+import warnings
+
 
 # Pyjo.Util is brought to Mojolicious 9.49 one function at a time, so only the
 # documented code of those functions is here
@@ -24,6 +28,30 @@ with subtest('camelize'):
     # "FooBar::Baz"
     is_ok(camelize('FooBar::Baz'), 'FooBar::Baz', 'FooBar::Baz')
 
+with subtest('class_to_file'):
+    from Pyjo.Util import class_to_file
+
+    # "foo_bar"
+    is_ok(class_to_file('Foo.Bar'), 'foo_bar', 'Foo.Bar')
+
+    # "foobar"
+    is_ok(class_to_file('FOO.Bar'), 'foobar', 'FOO.Bar')
+
+    # "foo_bar"
+    is_ok(class_to_file('FooBar'), 'foo_bar', 'FooBar')
+
+    # "foobar"
+    is_ok(class_to_file('FOOBar'), 'foobar', 'FOOBar')
+
+with subtest('class_to_path'):
+    from Pyjo.Util import class_to_path
+
+    # "Foo/Bar.py"
+    is_ok(class_to_path('Foo.Bar'), 'Foo/Bar.py', 'Foo.Bar')
+
+    # "FooBar.py"
+    is_ok(class_to_path('FooBar'), 'FooBar.py', 'FooBar')
+
 with subtest('decamelize'):
     from Pyjo.Util import decamelize
 
@@ -35,6 +63,25 @@ with subtest('decamelize'):
 
     # "foo_bar-baz"
     is_ok(decamelize('foo_bar-baz'), 'foo_bar-baz', 'foo_bar-baz')
+
+with subtest('deprecated'):
+    from Pyjo.Util import deprecated
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter('always')
+        deprecated('foo is DEPRECATED in favor of bar')
+    is_ok(str(caught[0].message), 'foo is DEPRECATED in favor of bar', 'warning')
+    is_ok(caught[0].category, DeprecationWarning, 'category')
+
+with subtest('dumper'):
+    from Pyjo.Util import dumper
+
+    is_ok(dumper({'some': 'data'}), "{'some': 'data'}\n", 'Python data structure')
+
+with subtest('generate_secret'):
+    from Pyjo.Util import generate_secret
+
+    like_ok(generate_secret(), r'^[A-Za-z0-9_-]{171}$', 'random secret')
 
 with subtest('hmac_sha1_sum'):
     from Pyjo.Util import hmac_sha1_sum
@@ -78,6 +125,20 @@ with subtest('md5_sum'):
     # "acbd18db4cc2f85cedef654fccc4a4d8"
     is_ok(md5_sum(b'foo'), 'acbd18db4cc2f85cedef654fccc4a4d8', 'foo')
 
+with subtest('monkey_patch'):
+    from Pyjo.Util import monkey_patch
+
+    class MyApp:
+        pass
+
+    output = io.StringIO()
+    with contextlib.redirect_stdout(output):
+        monkey_patch(MyApp, one=lambda: print('One!'), two=lambda: print('Two!'), three=lambda: print('Three!'))
+        MyApp.one()
+        MyApp.two()
+        MyApp.three()
+    is_ok(output.getvalue(), 'One!\nTwo!\nThree!\n', 'patched')
+
 with subtest('network_contains'):
     from Pyjo.Util import network_contains
 
@@ -103,6 +164,21 @@ with subtest('punycode_encode'):
     # "bcher-kva"
     is_ok(punycode_encode('bücher'), 'bcher-kva', 'bücher')
 
+with subtest('random_bytes'):
+    from Pyjo.Util import random_bytes
+
+    is_ok(len(random_bytes(16)), 16, 'random bytes')
+
+with subtest('scope_guard'):
+    from Pyjo.Util import scope_guard
+
+    # Execute callback at end of block
+    output = io.StringIO()
+    with contextlib.redirect_stdout(output):
+        with scope_guard(lambda: print('Mojo!')):
+            print('Hello')
+    is_ok(output.getvalue(), 'Hello\nMojo!\n', 'right order')
+
 with subtest('sha1_sum'):
     from Pyjo.Util import sha1_sum
 
@@ -120,6 +196,16 @@ with subtest('slugify'):
 
     # "this-is-my-résumé"
     is_ok(slugify('This is: my - résumé! ☃ ', True), 'this-is-my-résumé', 'unicode')
+
+with subtest('tablify'):
+    from Pyjo.Util import tablify
+
+    # "foo   bar\nyada  yada\nbaz   yada\n"
+    is_ok(
+        tablify([['foo', 'bar'], ['yada', 'yada'], ['baz', 'yada']]),
+        'foo   bar\nyada  yada\nbaz   yada\n',
+        'text table',
+    )
 
 with subtest('term_escape'):
     from Pyjo.Util import term_escape
