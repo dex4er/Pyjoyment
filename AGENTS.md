@@ -74,7 +74,11 @@ of them is a regression.
   templates auto-escaping without a template language. The `t"..."` syntax is
   written by the user, not by the library: the library only accepts
   `string.templatelib.Template` objects, so it supports them where the module
-  exists and stays importable on Python 3.12 and 3.13, where PyPy is.
+  exists and stays importable on Python 3.12 and 3.13, where PyPy is. On
+  every Python, `t()` of `Pyjo.String.Template` takes a string with the
+  fields of `str.format` in their place, without `eval`: a t-string is safe
+  because it is code, not data, and a string that `eval` reads would run the
+  code of whoever wrote it.
 - **PyPy is supported on a best-effort basis.** Helper code for PyPy is fine,
   and a test may be skipped on PyPy where PyPy clearly differs from CPython,
   with the reason in the skip message.
@@ -441,7 +445,8 @@ copy:
   Markup, which Mojo keeps from escaping as a `Mojo::ByteStream`, as a tag
   helper returns it, is `Pyjo.String.HTML`, `html(...)`: escaping leaves only
   what has the method `__html__`, so a string that `u()` or
-  `Pyjo.Collection.join` makes is escaped.- A callback that Mojo calls with `$_` gets the element as its first
+  `Pyjo.Collection.join` makes is escaped.
+- A callback that Mojo calls with `$_` gets the element as its first
   argument. A method name in a string, as in `$collection->map('text')`, can
   name a property, which is how a Mojo attribute is ported.
 - A method of `Mojo::Collection` that has the name of a `list` method, like
@@ -703,7 +708,10 @@ Mojo modules list `Mojo::*` before core modules.
 New code targets Python 3.12 and newer: no compatibility shims for older
 versions. The ruff `UP` rules and `target-version` keep it that way; with a
 newer target, the formatter would use syntax such as `except A, B:` (PEP 758,
-Python 3.14), which also looks like Python 2's `except A, e:`.
+Python 3.14), which also looks like Python 2's `except A, e:`. A test of
+t-strings, which only Python 3.14 compiles, is listed under
+`per-file-target-version` of ruff and `executionEnvironments` of pyright in
+`pyproject.toml`, with `pythonVersion = "3.14"`.
 
 ## Type Hints
 
