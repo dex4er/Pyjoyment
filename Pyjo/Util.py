@@ -12,6 +12,22 @@ Pyjo.Util - Portable utility functions
 
 :mod:`Pyjo.Util` provides portable utility functions for :mod:`Pyjo`.
 
+Next to the functions of Mojolicious, it has functions of its own that turn
+statements into expressions, so that they can be used in a lambda, a callback
+or a chain: :func:`die`, :func:`getenv`, :func:`isalive`, :func:`notnone`,
+:func:`setenv`, :func:`slurp`, :func:`spurt` and :func:`warn`. ::
+
+    home = getenv('HOME') or die('HOME is not defined')
+
+See also
+--------
+
+:mod:`Pyjoyment`, https://mojolicious.org.
+
+Ported from `Mojo::Util <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/Util.pm>`_
+and `Mojo::BaseUtil <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/BaseUtil.pm>`_
+of Mojolicious 9.49.
+
 Functions
 ---------
 """
@@ -59,7 +75,7 @@ def b64_decode(b64: str | bytes) -> bytes:
         data = b64_decode(b64)
 
     Base64 decode bytes, ignoring the characters that are not Base64 and the
-    ones after the padding, as :mod:`MIME::Base64` does.
+    ones after the padding, as ``MIME::Base64`` of Perl does.
     """
     if isinstance(b64, str):
         b64 = b64.encode('latin-1', 'ignore')

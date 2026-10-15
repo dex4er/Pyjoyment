@@ -288,13 +288,14 @@ the helpers in `Pyjo.Util` that turn statements into expressions. These extras f
 helps, without porting it, and their tests are written for them rather than
 ported.
 
-`Pyjo.Util` is not ported anew as a whole: next to the functions of
-`Mojo::Util` it has helpers of its own, for Python. A function of it is
-brought to the target when a ported module needs it, without changing what
-the modules that are not ported yet get from it: typed signatures, and a
-variant for `str` next to the one for `bytes` where Mojo works on
-characters, like `url_unescape`.
-Its subtests from `t/mojo/util.t` come to `t/Pyjo/Util.py` with it.
+`Pyjo.Util` is the port of `Mojo::Util` and of `Mojo::BaseUtil`, which
+`Mojo::Util` exports again; the subtests of `t/mojo/base_util.t` are those
+of `t/mojo/util.t`, so it has no test file of its own. Next to them,
+`Pyjo.Util` has helpers of its own, for Python. A function of Mojo that waits
+for a module that is not ported yet, as `getopt` for the commands, has a
+`# TODO:` comment in its place. A function that works on characters in Mojo
+takes a `str`, and also `bytes` where a ported module needs them, like
+`url_unescape`.
 
 A module is ported anew from Mojolicious, not migrated from the existing
 Python code. The existing Python module is a reference for how Perl idioms
