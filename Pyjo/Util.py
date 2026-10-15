@@ -22,43 +22,31 @@ import functools
 import hashlib
 import hmac
 import os
-import random
 import re
-import select
 import socket
 import sys
 import time
 import unicodedata
 import zlib
 
+from collections.abc import Callable
 from gzip import compress as _gzip_compress
 from gzip import decompress as _gzip_decompress
-from typing import Any, Protocol, overload
+from typing import NoReturn, Protocol, cast, overload
 
 
-class Error(Exception):
-    pass
+# "Sun, 06 Nov 1994 08:49:37 GMT" and "Sunday, 06-Nov-94 08:49:37 GMT"
+_RE_EXPIRES = re.compile(r'=\s*(\w+\W+\d+\W+\w+\W+\d+\W+\d+:\d+:\d+\W*\w+)')
 
-
-DEFAULT_CHARSET = 'utf-8'
+# Header key/value pairs
+_RE_HEADER_NAME = re.compile(r'[,;\s]*([^=;, ]+)\s*')
+_RE_HEADER_SEPARATOR = re.compile(r'[;\s]*,\s*')
+_RE_PARAM_NAME = re.compile(r'[;\s]*([^=;, ]+)\s*')
+_RE_QUOTED_VALUE = re.compile(r'=\s*("(?:\\\\|\\"|[^"])*")')
+_RE_UNQUOTED_VALUE = re.compile(r'=\s*([^;, ]*)')
 
 # HTML entities
 _RE_ENTITY = re.compile(r'&(?:\#((?:[0-9]{1,7}|x[0-9a-fA-F]{1,6}));|(\w+[;=]?))')
-
-
-def b(unicodestring, charset=DEFAULT_CHARSET, errors='strict'):
-    """::
-
-        bytestring = b(unicodestring)
-        bytestring = b(unicodestring, 'utf-8')
-        bytestring = b(unicodestring, 'utf-8', 'strict')
-
-    Encode unicodestring into bytestring.
-    """
-    if isbytes(unicodestring):
-        return bytes(unicodestring)
-    else:
-        return bytes(str(unicodestring), charset, errors)
 
 
 def b64_decode(b64: str | bytes) -> bytes:
@@ -112,23 +100,6 @@ def camelize(string: str) -> str:
     return '::'.join(''.join(_ucfirst(w.lower()) for w in _split('_', part)) for part in _split('-', string))
 
 
-def convert(value, newtype, default=None):
-    """::
-
-        converted = convert(value, newtype)
-        converted = convert(value, newtype, default)
-
-    Convert value to new type, ignoring errors. Return default value (or None) if
-    error occurred. ::
-
-        port = convert(os.environ.get('HTTP_PORT', ''), int, 80)
-    """
-    try:
-        return newtype(value)
-    except (TypeError, ValueError):
-        return default
-
-
 def decamelize(string: str) -> str:
     """::
 
@@ -174,68 +145,7 @@ def decode(charset: str, data: str | bytes) -> str | None:
         return None
 
 
-def decorator(func):
-    """::
-
-        @decorator
-        def function(cb, param):
-            print("function cb='{0}' param='{1}'".format(cb(), param))
-
-        function(lambda: 'callback 1', 'as function')
-
-        @function('as decorator')
-        def cb():
-            return 'callback 2'
-
-    Make decorator from function with callback as a first argument.
-    """
-
-    @functools.wraps(func)
-    def wrap(*args):
-        if not callable(args[0]):
-
-            def wrap2(func2):
-                return func(func2, *args)
-
-            return wrap2
-        return func(*args)
-
-    return wrap
-
-
-def decoratormethod(func):
-    """::
-
-        class MyClass(object):
-            @decoratormethod
-            def method(self, cb, param):
-                print("method cb='{0}' param='{1}'".format(cb(), param))
-
-        obj = MyClass()
-
-        obj.method(lambda: 'callback 1', 'as method')
-
-        @obj.method('as decorator')
-        def cb():
-            return 'callback 2'
-
-    Make decorator from method with callback as a first argument.
-    """
-
-    @functools.wraps(func)
-    def wrap(self, *args):
-        if not callable(args[0]):
-
-            def wrap2(func2):
-                return func(self, func2, *args)
-
-            return wrap2
-        return func(self, *args)
-
-    return wrap
-
-
-def die(e):
+def die(e: BaseException | str) -> NoReturn:
     """::
 
         die(Exception('Something went wrong'))
@@ -265,6 +175,14 @@ def encode(charset: str, chars: str) -> bytes:
     except LookupError:
         raise LookupError(f"Unknown encoding '{charset}'") from None
     return chars.encode(charset, 'replace')
+
+
+@overload
+def getenv(name: str) -> str | None: ...
+
+
+@overload
+def getenv(name: str, default: str) -> str: ...
 
 
 def getenv(name: str, default: str | None = None) -> str | None:
@@ -302,11 +220,6 @@ def gzip(uncompressed: bytes) -> bytes:
     return _gzip_compress(uncompressed)
 
 
-re_param_name = re.compile(r'[;\s]*([^=;, ]+)\s*')
-re_param_quoted = re.compile(r'=\s*("(?:\\\\|\\"|[^"])*")')
-re_param_unquoted = re.compile(r'=\s*([^;, ]*)')
-
-
 def header_params(value: str) -> tuple[dict[str, str], str]:
     """::
 
@@ -317,16 +230,16 @@ def header_params(value: str) -> tuple[dict[str, str], str]:
     """
     params: dict[str, str] = {}
     pos = 0
-    while m := re_param_name.match(value, pos):
+    while m := _RE_PARAM_NAME.match(value, pos):
         name, pos = m[1], m.end()
 
         # Quoted value
-        if quoted := re_param_quoted.match(value, pos):
+        if quoted := _RE_QUOTED_VALUE.match(value, pos):
             params.setdefault(name, unquote(quoted[1]))
             pos = quoted.end()
 
         # Unquoted value
-        elif unquoted := re_param_unquoted.match(value, pos):
+        elif unquoted := _RE_UNQUOTED_VALUE.match(value, pos):
             params.setdefault(name, unquoted[1])
             pos = unquoted.end()
 
@@ -409,17 +322,7 @@ def humanize_bytes(size: int | float) -> str:
     return f'{prefix}{_round(size / 1024)}TiB'
 
 
-def isbytes(obj):
-    """::
-
-        boolean = isbytes(obj)
-
-    Check if object is ``bytearray`` or ``bytes``.
-    """
-    return isinstance(obj, (bytearray, bytes))
-
-
-def isalive(obj):
+def isalive(obj: object) -> bool:
     """::
 
         boolean = isalive(weakref.proxy(obj))
@@ -431,36 +334,6 @@ def isalive(obj):
         return True
     except ReferenceError:
         return False
-
-
-def isiterable(obj):
-    """::
-
-        boolean = isiterable(obj)
-
-    Check if object is iterable and not simple string.
-    """
-    return hasattr(obj, '__iter__') and not isstring(obj)
-
-
-def isstring(obj):
-    """::
-
-        boolean = isstring(obj)
-
-    Check if object is string (``bytes`` or ``str``).
-    """
-    return isinstance(obj, (bytes, str))
-
-
-def isunicode(obj):
-    """::
-
-        boolean = isunicode(obj)
-
-    Check if object is ``str``.
-    """
-    return isinstance(obj, str)
 
 
 def md5_bytes(data: bytes) -> bytes:
@@ -531,48 +404,26 @@ def network_contains(cidr: str, addr: str) -> bool:
     return int.from_bytes(net_bytes) ^ addr_int == 0
 
 
-def not_implemented(method):
-    """::
-
-        class BaseClass(object):
-            @not_implemented
-            def method(self):
-                pass
-
-    Raise the exception with "Method ``name`` not implemented by subclass"
-    message.
-    """
-
-    @functools.wraps(method)
-    def stub(*args, **kwargs):
-        raise Error(f'Method "{method.__name__}" not implemented by subclass')
-
-    return stub
-
-
-def notnone(*args):
+def notnone[T](*args: T | Callable[[], T] | None) -> T | None:
     """::
 
         value = notnone(value, another_value, default_value)
-        value = notnone(callable, callable_default)
+        value = notnone(value, lambda: default_value)
 
-    Return the first not ``None`` value from arguments list. If the argument
-    is callable, then check the value which this callable returns (lazy
-    evaluation). ::
+    Return the first argument that is not ``None``. An argument that is
+    callable is called, and its value is returned (lazy evaluation). ::
 
-        from Pyjo.Util import convert, getenv
+        from Pyjo.Util import getenv
 
         def print_log(msg, **kwargs):
-            level = notnone(kwargs.get('log_level'),
-                            lambda: convert(getenv('LOG_LEVEL'), int, 3))
+            level = notnone(kwargs.get('log_level'), lambda: int(getenv('LOG_LEVEL', '3')))
             ...
     """
     for a in args:
         if a is not None:
-            if callable(a):
-                return a()
-            else:
-                return a
+            # cast: a T that is callable itself is called too
+            return cast(Callable[[], T], a)() if callable(a) else a
+    return None
 
 
 def punycode_decode(punycode: str) -> str:
@@ -620,22 +471,12 @@ def quote(string: str | bytes) -> str | bytes:
 
     Quote string.
     """
-    if isbytes(string):
-        string = re_b_quote.sub(rb'\\\1', bytes(string))
+    if isinstance(string, bytes):
+        string = re_b_quote.sub(rb'\\\1', string)
         return b'"' + string + b'"'
     else:
         string = re_u_quote.sub(r'\\\1', string)
         return '"' + string + '"'
-
-
-def rand(value=1):
-    """::
-
-        value = rand(range)
-
-    Return random value from ``0`` to ``range``.
-    """
-    return random.random() * value
 
 
 def secure_compare(one: str | bytes, two: str | bytes) -> bool:
@@ -652,7 +493,7 @@ def secure_compare(one: str | bytes, two: str | bytes) -> bool:
     )
 
 
-def setenv(name, value):
+def setenv(name: str, value: str | None) -> None:
     """::
 
         setenv(name, value)
@@ -660,10 +501,9 @@ def setenv(name, value):
     Set the environment variable or remove it if value is ``None``.
     """
     if value is None:
-        if name in os.environ:
-            del os.environ[name]
+        os.environ.pop(name, None)
     else:
-        os.environ.update({name: value})
+        os.environ[name] = value
 
 
 def sha1_bytes(data: bytes) -> bytes:
@@ -689,27 +529,16 @@ def sha1_sum(data: bytes) -> str:
     return hashlib.sha1(data).hexdigest()
 
 
-def slurp(path, charset=DEFAULT_CHARSET):
+def slurp(path: str | os.PathLike[str], charset: str = 'utf-8') -> str:
     """::
 
         string = slurp('/etc/passwd')
         string = slurp('/etc/passwd', 'utf-8')
 
-    Read all data at once from file as unicode string.
+    Read all data at once from file as characters.
     """
     with open(path, 'rb') as f:
-        return u(f.read(), charset)
-
-
-def slurpb(path):
-    """::
-
-        bytestring = slurpb('/etc/passwd')
-
-    Read all data at once from file as binary string.
-    """
-    with open(path, 'rb') as f:
-        return b(f.read())
+        return f.read().decode(charset)
 
 
 def slugify(value: str | int, allow_unicode: bool = False) -> str:
@@ -746,8 +575,7 @@ def slugify(value: str | int, allow_unicode: bool = False) -> str:
     return re.sub(r'[-\s]+', '-', trim(value).lower())
 
 
-# Any: the tokens are str or bytes, like the string
-def split_cookie_header(string: str | bytes) -> list[list[list[Any]]]:
+def split_cookie_header(string: str) -> list[list[tuple[str, str | None]]]:
     """::
 
         tree = split_cookie_header('a=b; expires=Thu, 07 Aug 2008 07:07:59 GMT')
@@ -758,14 +586,14 @@ def split_cookie_header(string: str | bytes) -> list[list[list[Any]]]:
     return _header(string, True)
 
 
-# Any: the tokens are str or bytes, like the string
-def split_header(string: str | bytes) -> list[list[list[Any]]]:
+def split_header(string: str) -> list[list[tuple[str, str | None]]]:
     """::
 
         tree = split_header('foo="bar baz"; test=123, yada')
 
     Split HTTP header value into key/value pairs, each comma separated part gets
-    its own list, and keys without a value get ``None`` assigned. ::
+    its own list of ``(key, value)`` tuples, and keys without a value get
+    ``None`` assigned. ::
 
         # 'one'
         split_header('one; two="three four", five=six')[0][0][0]
@@ -785,47 +613,29 @@ def split_header(string: str | bytes) -> list[list[list[Any]]]:
     return _header(string, False)
 
 
-def spurt(content, path, charset=DEFAULT_CHARSET):
+def spurt(content: str, path: str | os.PathLike[str], charset: str = 'utf-8') -> int:
     """::
 
         written = spurt(string, '/etc/passwd')
         written = spurt(string, '/etc/passwd', 'utf-8')
 
-    Write all data from unicode string at once to file.
+    Write all characters at once to file, and return the number of bytes
+    written.
     """
     with open(path, 'wb') as f:
-        return f.write(b(content, charset))
+        return f.write(content.encode(charset))
 
 
-def spurtb(content, path):
+def steady_time() -> float:
     """::
 
-        written = spurt(bytestring, '/etc/passwd')
+        time = steady_time()
 
-    Write all data from binary string at once to file.
+    High resolution time elapsed from an arbitrary fixed point in the past,
+    resilient to time jumps if a monotonic clock is available through
+    :func:`time.monotonic`.
     """
-    with open(path, 'wb') as f:
-        return f.write(content)
-
-
-re_whitespaces = re.compile(r'\s+')
-
-
-def squish(string):
-    """::
-
-        squished = squish(string)
-
-    Trim whitespace characters from both ends of string and then change all
-    consecutive groups of whitespace into one space each. ::
-
-        # 'foo bar'
-        squish('  foo  bar  ')
-    """
-    return re_whitespaces.sub(' ', trim(string))
-
-
-steady_time = time.time
+    return time.monotonic()
 
 
 def term_escape(string: str) -> str:
@@ -852,20 +662,6 @@ def trim(string: str) -> str:
         trim('  foo bar  ')
     """
     return re.sub(r'\s+\Z', '', re.sub(r'\A\s+', '', string))
-
-
-def u(string, charset=DEFAULT_CHARSET):
-    """::
-
-        unicodestring = u(bytestring)
-        unicodestring = u(bytestring, 'utf-8')
-
-    Decode bytestring into unicodestring.
-    """
-    if isbytes(string):
-        return bytes(string).decode(charset)
-    else:
-        return str(string)
 
 
 def unindent(string: str) -> str:
@@ -958,13 +754,16 @@ def url_unescape(string: str | bytes) -> str | bytes:
     return re.sub(rb'%([0-9a-fA-F]{2})', lambda m: bytes([int(m[1], 16)]), string)
 
 
-def warn(msg: str, *args: object) -> None:
+def warn(*args: object) -> None:
     """::
 
         warn(string)
+        warn(string, value)
 
-    Output message to ``sys.stderr``.
+    Output the arguments to ``sys.stderr``, joined as Perl's ``warn`` joins a
+    list, with a newline at the end unless there is one already.
     """
+    msg = ''.join(map(str, args))
     if not msg.endswith('\n'):
         msg += '\n'
     print(msg, end='', file=sys.stderr)
@@ -3271,68 +3070,38 @@ def _entity(point: str | None, name: str | None, attr: bool) -> str:
     return '&' + rest[::-1]
 
 
-re_header = re.compile(rb'^[,;\s]*([^=;, ]+)\s*')
-re_expires = re.compile(rb'^=\s*(\w+\W+\d+\W+\w+\W+\d+\W+\d+:\d+:\d+\W*\w+)')
-re_quoted = re.compile(rb'^=\s*("(?:\\\\|\\"|[^"])*")')
-re_unquoted = re.compile(rb'^=\s*([^;, ]*)')
-re_separator = re.compile(rb'^[;\s]*,\s*')
+def _header(string: str, cookie: bool) -> list[list[tuple[str, str | None]]]:
+    tree: list[list[tuple[str, str | None]]] = []
+    part: list[tuple[str, str | None]] = []
+    pos = 0
+    while m := _RE_HEADER_NAME.match(string, pos):
+        name, value, pos = m[1], None, m.end()
+        expires = cookie and len(part) > 0 and name.lower() == 'expires'
 
+        # Special "expires" value
+        if expires and (v := _RE_EXPIRES.match(string, pos)):
+            value, pos = v[1], v.end()
 
-def _header(string, cookie):
-    decode = not isbytes(string)
-    buf = bytearray(b(string, 'ascii'))
-    tree = []
-    tokens = []
+        # Quoted value
+        elif v := _RE_QUOTED_VALUE.match(string, pos):
+            value, pos = unquote(v[1]), v.end()
 
-    while buf:
-        m = re_header.search(buf)
-        if not m:
-            break
+        # Unquoted value
+        elif v := _RE_UNQUOTED_VALUE.match(string, pos):
+            value, pos = v[1], v.end()
 
-        token = bytes(m.group(1))
-        if decode:
-            token = token.decode('ascii')
-        tokens.append([token, None])
-        del buf[: m.end()]
+        part.append((name, value))
 
-        while True:
-            if cookie and len(tokens) and token.lower() == 'expires':
-                m = re_expires.search(buf)
-                if m:
-                    tokens[-1][1] = bytes(m.group(1))
-                    if decode:
-                        tokens[-1][1] = tokens[-1][1].decode('ascii')
-                    del buf[: m.end()]
-                    break
+        # Separator
+        if not (m := _RE_HEADER_SEPARATOR.match(string, pos)):
+            continue
+        pos = m.end()
+        tree.append(part)
+        part = []
 
-            m = re_quoted.search(buf)
-            if m:
-                tokens[-1][1] = unquote(bytes(m.group(1)))
-                if decode:
-                    tokens[-1][1] = tokens[-1][1].decode('ascii')
-                del buf[: m.end()]
-                break
-
-            m = re_unquoted.search(buf)
-            if m:
-                tokens[-1][1] = bytes(m.group(1))
-                if decode:
-                    tokens[-1][1] = tokens[-1][1].decode('ascii')
-                del buf[: m.end()]
-                break
-
-            break
-
-        m = re_separator.search(buf)
-        if m:
-            del buf[: m.end()]
-            tree.append(tokens)
-            tokens = []
-
-    # Take care of final token
-    if len(tokens):
-        tree.append(tokens)
-
+    # Take care of final part
+    if part:
+        tree.append(part)
     return tree
 
 
@@ -3340,25 +3109,8 @@ def _html(string: str, attr: bool) -> str:
     return _RE_ENTITY.sub(lambda m: _entity(m[1], m[2], attr), string)
 
 
-def _readable(fd):
-    readable, _, _ = select.select([fd], [], [], 0)
-    return fd in readable
-
-
 def _round(number: float) -> str:
     return f'{int(number * 10 + 0.5) / 10 if number < 10 else int(number + 0.5):.15g}'
-
-
-def _stash(obj, stash, *args, **kwargs):
-    if kwargs:
-        stash.update(kwargs)
-        return obj
-    elif len(args) == 1:
-        return stash[args[0]]
-    elif len(args) > 1:
-        return tuple(map(lambda k: stash[k], args))
-    else:
-        return stash
 
 
 # Perl's split, which drops the empty fields at the end

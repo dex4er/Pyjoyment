@@ -7,7 +7,9 @@ from Pyjo.Util import (
     camelize,
     decamelize,
     decode,
+    die,
     encode,
+    getenv,
     gunzip,
     gzip,
     header_params,
@@ -15,27 +17,43 @@ from Pyjo.Util import (
     html_attr_unescape,
     html_unescape,
     humanize_bytes,
+    isalive,
     md5_bytes,
     md5_sum,
     network_contains,
+    notnone,
     punycode_decode,
     punycode_encode,
     quote,
     secure_compare,
+    setenv,
     sha1_bytes,
     sha1_sum,
     slugify,
+    slurp,
+    split_cookie_header,
+    split_header,
+    spurt,
+    steady_time,
     term_escape,
     trim,
     unindent,
     unquote,
     url_escape,
     url_unescape,
+    warn,
     xml_escape,
     xor_encode,
 )
 
+import contextlib
+import gc
+import io
+import os
+import pathlib
 import re
+import tempfile
+import weakref
 
 
 # Pyjo.Util is brought to Mojolicious 9.49 one function at a time, so only the
@@ -54,6 +72,76 @@ with subtest('decamelize'):
     is_ok(decamelize('foo_bar_baz'), 'foo_bar_baz', 'right decamelized result')
     is_ok(decamelize('FooBB'), 'foo_b_b', 'right decamelized result')
     is_ok(decamelize('Foo::BB'), 'foo-b_b', 'right decamelized result')
+
+# Left out from Mojolicious: the subtests "class_to_file" and "class_to_path"
+# TODO: the subtests "class_to_file" and "class_to_path", with the functions
+
+with subtest('split_header'):
+    is_deeply_ok(split_header(''), [], 'right result')
+    is_deeply_ok(split_header('foo=b=a=r'), [[('foo', 'b=a=r')]], 'right result')
+    is_deeply_ok(
+        split_header('a=b ,, , c=d ;; ; e=f g h=i'),
+        [[('a', 'b')], [('c', 'd'), ('e', 'f'), ('g', None), ('h', 'i')]],
+        'right result',
+    )
+    is_deeply_ok(split_header(',,foo,, ,bar'), [[('foo', None)], [('bar', None)]], 'right result')
+    is_deeply_ok(split_header(';;foo; ; ;bar'), [[('foo', None), ('bar', None)]], 'right result')
+    is_deeply_ok(split_header('foo=;bar=""'), [[('foo', ''), ('bar', '')]], 'right result')
+    is_deeply_ok(split_header('foo=bar baz=yada'), [[('foo', 'bar'), ('baz', 'yada')]], 'right result')
+    is_deeply_ok(split_header('foo,bar,baz'), [[('foo', None)], [('bar', None)], [('baz', None)]], 'right result')
+    is_deeply_ok(
+        split_header('f "o" o , ba  r'),
+        [[('f', None), ('"o"', None), ('o', None)], [('ba', None), ('r', None)]],
+        'right result',
+    )
+    is_deeply_ok(split_header(r'foo="b,; a\" r\"\\"'), [[('foo', 'b,; a" r"\\')]], 'right result')
+    is_deeply_ok(
+        split_header(r'foo = "b a\" r\"\\"; bar="ba z"'), [[('foo', 'b a" r"\\'), ('bar', 'ba z')]], 'right result'
+    )
+    header = '</foo/bar>; rel="x"; t*=UTF-8\'de\'a%20b'
+    tree = [[('</foo/bar>', None), ('rel', 'x'), ('t*', "UTF-8'de'a%20b")]]
+    is_deeply_ok(split_header(header), tree, 'right result')
+    header = 'a=b c; A=b.c; D=/E; a-b=3; expires=Thu, 07 Aug 2008 07:07:59 GMT; Ab;'
+    tree = [
+        [('a', 'b'), ('c', None), ('A', 'b.c'), ('D', '/E'), ('a-b', '3'), ('expires', 'Thu')],
+        [('07', None), ('Aug', None), ('2008', None), ('07:07:59', None), ('GMT', None), ('Ab', None)],
+    ]
+    is_deeply_ok(split_header(header), tree, 'right result')
+
+with subtest('split_cookie_header'):
+    is_deeply_ok(split_cookie_header(''), [], 'right result')
+    is_deeply_ok(
+        split_cookie_header('a=b; expires=Thu, 07 Aug 2008 07:07:59 GMT,c=d'),
+        [[('a', 'b'), ('expires', 'Thu, 07 Aug 2008 07:07:59 GMT')], [('c', 'd')]],
+        'right result',
+    )
+    is_deeply_ok(
+        split_cookie_header('a=b; expires=Tuesday, 09-Nov-1999 23:12:40 GMT, c=d'),
+        [[('a', 'b'), ('expires', 'Tuesday, 09-Nov-1999 23:12:40 GMT')], [('c', 'd')]],
+        'right result',
+    )
+    is_deeply_ok(
+        split_cookie_header('a=b; expires=Tuesday, 09-Nov-1999 23:12:40 GMT;, c=d;'),
+        [[('a', 'b'), ('expires', 'Tuesday, 09-Nov-1999 23:12:40 GMT')], [('c', 'd')]],
+        'right result',
+    )
+    is_deeply_ok(
+        split_cookie_header('a=b; expires=Sun,06  Nov  1994  08:49:37  UTC; path=/'),
+        [[('a', 'b'), ('expires', 'Sun,06  Nov  1994  08:49:37  UTC'), ('path', '/')]],
+        'right result',
+    )
+    is_deeply_ok(
+        split_cookie_header('a=b ; expires = Sunday 06 Nov 94 08:49:37UTC ; path=/'),
+        [[('a', 'b'), ('expires', 'Sunday 06 Nov 94 08:49:37UTC'), ('path', '/')]],
+        'right result',
+    )
+    header = 'expires=Thu, 07 Aug 2008 07:07:59 GMT, a=b'
+    tree = [
+        [('expires', 'Thu')],
+        [('07', None), ('Aug', None), ('2008', None), ('07:07:59', None), ('GMT', None)],
+        [('a', 'b')],
+    ]
+    is_deeply_ok(split_cookie_header(header), tree, 'right result')
 
 with subtest('header_params'):
     is_deeply_ok(header_params(''), ({}, ''), 'right result')
@@ -331,6 +419,12 @@ with subtest('xor_encode'):
     is_ok(xor_encode(b'hello', b'123456789'), b'\x59\x57\x5f\x58\x5a', 'right result')
     is_ok(xor_encode(b'\x59\x57\x5f\x58\x5a', b'123456789'), b'hello', 'right result')
 
+with subtest('steady_time'):
+    like_ok(str(steady_time()), r'^[\d.]+$', 'high resolution time')
+
+# Left out from Mojolicious: the subtests "monkey_patch" and "monkey_patch (with name)"
+# TODO: the subtests "monkey_patch" and "monkey_patch (with name)", with the function
+
 with subtest('network_contains'):
     ok(not network_contains('10.0.0.0/8', ''), 'empty address')
     ok(not network_contains('', '10.10.10.10'), 'empty network')
@@ -459,5 +553,63 @@ with subtest('humanize_bytes'):
     is_ok(humanize_bytes(717946880), '685MiB', 'large MiB')
     is_ok(humanize_bytes(-717946880), '-685MiB', 'large negative MiB')
     is_ok(humanize_bytes(245760), '240KiB', 'less than a MiB')
+
+# Not in Mojolicious: the helpers that turn statements into expressions
+with subtest('die'):
+    throws_ok(lambda: die(ValueError('Something went wrong')), ValueError, 'exception raised')
+    throws_ok(lambda: die(ValueError('Something went wrong')), 'Something went wrong', 'right message')
+    throws_ok(lambda: die('Exit immediately'), SystemExit, 'exit')
+    try:
+        die('Exit immediately')
+    except SystemExit as e:
+        is_ok(e.code, 'Exit immediately', 'right message')
+
+with subtest('warn'):
+    stderr = io.StringIO()
+    with contextlib.redirect_stderr(stderr):
+        warn('foo')
+        warn('bar\n')
+        warn('baz', 23)
+    is_ok(stderr.getvalue(), 'foo\nbar\nbaz23\n', 'right output')
+
+with subtest('getenv/setenv'):
+    setenv('PYJO_UTIL_TEST', 'foo')
+    is_ok(getenv('PYJO_UTIL_TEST'), 'foo', 'right value')
+    is_ok(getenv('PYJO_UTIL_TEST', 'bar'), 'foo', 'right value')
+    setenv('PYJO_UTIL_TEST', None)
+    ok('PYJO_UTIL_TEST' not in os.environ, 'removed')
+    is_ok(getenv('PYJO_UTIL_TEST'), None, 'no value')
+    is_ok(getenv('PYJO_UTIL_TEST', 'bar'), 'bar', 'default value')
+    setenv('PYJO_UTIL_TEST', None)
+    ok('PYJO_UTIL_TEST' not in os.environ, 'nothing to remove')
+
+with subtest('slurp/spurt'):
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, 'test.txt')
+        is_ok(spurt('zażółć\r\n', path), 12, 'bytes written')
+        is_ok(slurp(path), 'zażółć\r\n', 'characters read, line ending kept')
+        is_ok(spurt('zażółć', pathlib.Path(path), 'iso-8859-2'), 6, 'bytes written in another charset')
+        is_ok(slurp(pathlib.Path(path), 'iso-8859-2'), 'zażółć', 'characters read in another charset')
+        throws_ok(lambda: slurp(path), UnicodeDecodeError, 'invalid UTF-8')
+
+with subtest('notnone'):
+    is_ok(notnone(None, 0, 1), 0, 'first value that is not None')
+    is_ok(notnone(None, lambda: 'default'), 'default', 'callable called')
+    is_ok(notnone(None, None), None, 'nothing')
+    calls = []
+    is_ok(notnone('value', lambda: calls.append(1)), 'value', 'value')
+    is_deeply_ok(calls, [], 'callable not called')
+
+with subtest('isalive'):
+
+    class Obj:
+        pass
+
+    obj = Obj()
+    proxy = weakref.proxy(obj)
+    ok(isalive(proxy), 'alive')
+    del obj
+    gc.collect()
+    ok(not isalive(proxy), 'dead')
 
 done_testing()

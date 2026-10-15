@@ -171,14 +171,14 @@ class Pyjo_Cookie_Response(Pyjo.Cookie.object):
             return [cls.new(morsel) for morsel in string.values()]
 
         cookies: list[C] = []
-        tree: list[list[list[str | None]]] = split_cookie_header(string or '')
+        tree = split_cookie_header(string or '')
         for pairs in tree:
             (name, value), *attrs = pairs
             cookie = cls.new(name=name, value=value or '')
             cookies.append(cookie)
 
             for name, value in attrs:
-                if (attr := (name or '').lower()) not in ATTRS:
+                if (attr := name.lower()) not in ATTRS:
                     continue
                 if attr == 'domain':
                     cookie.domain = value.removeprefix('.') if value is not None else None
