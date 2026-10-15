@@ -80,6 +80,7 @@ class _Timer(TypedDict):
     after: float
     recurring: bool
     handle: asyncio.Handle
+    deadline: float
 
 
 class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
@@ -175,12 +176,11 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
         old, self._loop = self._loop, new
         alive = old is not None and not old.is_closed()
         for id, timer in self._timers.items():
-            handle = timer['handle']
             after = timer['after']
-            if old is not None and alive and isinstance(handle, asyncio.TimerHandle):
-                after = max(0.0, handle.when() - old.time())
-            handle.cancel()
-            timer['handle'] = self._schedule(new, after, id)
+            if old is not None and alive and after > 0:
+                after = max(0.0, timer['deadline'] - old.time())
+            timer['handle'].cancel()
+            timer['handle'], timer['deadline'] = self._schedule(new, after, id)
         for fd, io in self._io.items():
             if old is not None and alive:
                 if io['read']:
@@ -205,8 +205,23 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
             Pyjo.Exception.object.throw('Timer not active')
         if after is not None:
             timer['after'] = after
-        timer['handle'].cancel()
-        timer['handle'] = self._schedule(self.loop, timer['after'], id)
+
+        # Not in Mojolicious: a later time only moves the deadline, which the timer checks when it is due, as a stream
+        # restarts its timer on every read and write, and a handle of asyncio cancelled and scheduled again each time
+        # is what costs, where Mojo sets the time of the timer
+        loop = self.loop
+        after, handle = timer['after'], timer['handle']
+        deadline = loop.time() + after
+        if (
+            after > 0
+            and isinstance(handle, asyncio.TimerHandle)
+            and not handle.cancelled()
+            and handle.when() <= deadline
+        ):
+            timer['deadline'] = deadline
+            return
+        handle.cancel()
+        timer['handle'], timer['deadline'] = self._schedule(loop, after, id)
 
     # Not in Mojolicious: a future of the loop
     def awaitable(self, promise: Any) -> Awaitable[None]:
@@ -480,10 +495,11 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
 
     # A timer of no time runs before the I/O of the next iteration of the loop, as the timers of Mojo's reactor run in
     # the same tick, after its I/O; call_later would run it after the I/O of the next iteration
-    def _schedule(self, loop: asyncio.AbstractEventLoop, after: float, id: str) -> asyncio.Handle:
+    def _schedule(self, loop: asyncio.AbstractEventLoop, after: float, id: str) -> tuple[asyncio.Handle, float]:
         if after <= 0:
-            return loop.call_soon(Pyjo_Reactor_Asyncio._weak_alarm, weakref.ref(self), id)
-        return loop.call_later(after, Pyjo_Reactor_Asyncio._weak_alarm, weakref.ref(self), id)
+            return loop.call_soon(Pyjo_Reactor_Asyncio._weak_alarm, weakref.ref(self), id), loop.time()
+        handle = loop.call_later(after, Pyjo_Reactor_Asyncio._weak_alarm, weakref.ref(self), id)
+        return handle, handle.when()
 
     # The loop refers to the reactor weakly, so that the reactor and its loop do not make a cycle
     @staticmethod
@@ -501,9 +517,15 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
         if (timer := self._timers.get(id)) is None:
             return
 
+        # Not in Mojolicious: a timer that again moved to a later time waits for it
+        loop = self.loop
+        if (left := timer['deadline'] - loop.time()) > 0:
+            timer['handle'] = loop.call_later(left, Pyjo_Reactor_Asyncio._weak_alarm, weakref.ref(self), id)
+            return
+
         # Recurring timer
         if timer['recurring']:
-            timer['handle'] = self._schedule(self.loop, timer['after'], id)
+            timer['handle'], timer['deadline'] = self._schedule(loop, timer['after'], id)
 
         # Normal timer
         else:
@@ -547,8 +569,8 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
 
     def _timer(self, recurring: bool, after: float, cb: TimerCallback) -> str:
         id = self._id()
-        handle = self._schedule(self.loop, after, id)
-        self._timers[id] = {'cb': cb, 'after': after, 'recurring': recurring, 'handle': handle}
+        handle, deadline = self._schedule(self.loop, after, id)
+        self._timers[id] = {'cb': cb, 'after': after, 'recurring': recurring, 'handle': handle, 'deadline': deadline}
         return id
 
     def _try(self, what: str, cb: Any, *args: Any) -> None:
