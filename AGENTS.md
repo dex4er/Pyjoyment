@@ -282,9 +282,9 @@ ported before it, and the module names the release that will have it. An edit
 of a module that ports nothing from upstream leaves its release as it is.
 
 Some modules have no counterpart in Mojolicious: `Pyjo.Test` (inspired by
-Perl's `Test::More`), `Pyjo.String.*`, `Pyjo.Regexp`, `Pyjo.IOLoop.Datagram`
-(inspired by `dgram` of Node.js) and the helpers in `Pyjo.Util` that turn
-statements into expressions. These extras follow their inspiration where it
+Perl's `Test::More`), `Pyjo.Prove` (inspired by Perl's `prove`),
+`Pyjo.String.*`, `Pyjo.IOLoop.Datagram` (inspired by `dgram` of Node.js) and
+the helpers in `Pyjo.Util` that turn statements into expressions. These extras follow their inspiration where it
 helps, without porting it, and their tests are written for them rather than
 ported.
 
