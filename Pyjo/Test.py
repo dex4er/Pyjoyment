@@ -638,9 +638,11 @@ def throws_ok(
     got = None
     check = False
 
+    # The expected class, also one that is not an Exception, as SystemExit, but no other BaseException
+    catch = (Exception, expected) if isinstance(expected, type) else Exception
     try:
         cb()
-    except Exception as e:
+    except catch as e:
         if isinstance(expected, type):
             got = type(e).__name__
             check = isinstance(e, expected)

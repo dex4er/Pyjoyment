@@ -246,6 +246,7 @@ with subtest('Test names'):
 with subtest('Assertions'):
     out, err, code = run("""
         import re
+        import sys
         from Pyjo.Test import *
         like_ok('Hello', ('hello', 'i'), 'like with flags')
         unlike_ok('Hello', r'bye', 'unlike')
@@ -258,6 +259,7 @@ with subtest('Assertions'):
         throws_ok(lambda: int('x'), ValueError, 'throws_ok class')
         throws_ok(lambda: int('x'), re.compile(r'invalid literal'), 'throws_ok regex')
         throws_ok(lambda: [][0], 'list index out of range', 'throws_ok message')
+        throws_ok(lambda: sys.exit('bye'), SystemExit, 'throws_ok class that is not an Exception')
         isnt_ok(1, 2, 'isnt_ok')
         done_testing()
     """)

@@ -55,9 +55,9 @@ class Pyjo_Cookie_Request(Pyjo.Cookie.object):
             return [cls.new(morsel) for morsel in string.values()]
 
         cookies: list[C] = []
-        tree: list[list[list[str | None]]] = split_header(string or '')
+        tree = split_header(string or '')
         for name, value in (pair for pairs in tree for pair in pairs):
-            if name is None or name.startswith('$'):
+            if name.startswith('$'):
                 continue
             cookies.append(cls.new(name=name, value=value or ''))
         return cookies

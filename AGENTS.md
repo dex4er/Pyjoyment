@@ -759,10 +759,9 @@ A class method that returns instances of the class, like `parse`, is generic
 (`def parse[C: Pyjo_Cookie](cls: type[C], ...) -> list[C]`): with `list[Self]`,
 pyright rejects the method of a subclass as an incompatible override. A
 ported module that uses one that is not ported yet gets annotations on the
-signatures it uses (`Pyjo.Base.new`, `Pyjo.Util.split_header`), while the
-module itself stays off the strict list. Where Mojo-style magic cannot be
-typed, `Any` is fine, with a comment that says why. `Pyjo/py.typed` (PEP 561)
-tells type checkers that the package is typed.
+signatures it uses, while the module itself stays off the strict list. Where
+Mojo-style magic cannot be typed, `Any` is fine, with a comment that says why.
+`Pyjo/py.typed` (PEP 561) tells type checkers that the package is typed.
 
 ## Session and Temporary Files
 
