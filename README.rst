@@ -43,7 +43,7 @@ Status
 .. begin-status
 
 Pyjoyment was written against Mojolicious 6 and is being revived as a port of
-Mojolicious 9.49 to Python 3.12 and newer, with ``asyncio`` as its event loop.
+Mojolicious 9 to Python 3.12 and newer, with ``asyncio`` as its event loop.
 The toolkit, the ``Pyjo`` package, is ported: URLs, DOM and CSS selectors,
 JSON, HTTP messages and cookies, the event loop with promises, the user agent,
 and the servers, on their own, preforking, with hot deployment or reloading,
