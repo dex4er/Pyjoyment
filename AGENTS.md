@@ -238,6 +238,18 @@ goes, so code must not rely on that: resizing a `bytearray` that a regex
 iterator still scans raises `BufferError`, and `__del__` may not run at all
 before the interpreter exits.
 
+## Benchmarks
+
+`benchmarks/` measures hello world servers with one connection and one
+request at a time: Pyjoyment on its own servers, through ASGI and WSGI, and
+other Python servers next to it. `benchmarks/README.md` says how to run them
+and how to measure well; it is also the recipe for a measurement of another
+kind. A change made for speed is measured with `benchmarks/ab.sh`, the
+version before and after interleaved on a machine that is otherwise quiet,
+and a gain below the noise with the function calls per request of
+`benchmarks/profile.sh`. The results, with the machine, the versions and the
+load average, go to the issue or the pull request, not to the repository.
+
 ## Porting from Mojolicious
 
 The target is **Mojolicious 9.49**: every module is ported from the `v9.49`

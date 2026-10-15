@@ -3,6 +3,7 @@
 .DS_Store
 .vscode
 .venv
+benchmarks/venv/
 .ruff_cache
 __pycache__
 *.egg-info

@@ -130,9 +130,10 @@ ignore = [
 ]
 # TID251 "`asyncio` is banned: ...": the reactor is the one that uses the
 # event loop, the test harness runs the scripts with asyncio, and the examples
-# are the code of a user.
+# and the benchmarks are the code of a user.
 "Pyjo/Reactor/**" = ["TID251"]
 "Pyjo/Prove.py" = ["TID251"]
+"benchmarks/**" = ["TID251"]
 "examples/**" = ["TID251"]
 
 [tool.ruff.lint.flake8-tidy-imports.banned-api]

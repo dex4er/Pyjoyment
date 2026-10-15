@@ -63,6 +63,7 @@ lint:
     - linters:
         - pyright
       paths:
+        - benchmarks/**
         - examples/microhttpd_ev.py
         - examples/microhttpd_gevent.py
         - examples/microhttpd_twisted.py
