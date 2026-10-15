@@ -109,6 +109,7 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
         self._next_tick: list[TimerCallback] = []
         self._next_timer: str | None = None
         self._one = 0
+        self._run = 0
         self._running = 0
         self._tasks: set[asyncio.Task[Any]] = set()
         self._timers: dict[str, _Timer] = {}
@@ -338,7 +339,7 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
 
         try:
             # Stop automatically if there is nothing to watch
-            if not len(self._timers) and not len(self._io) and not len(self._tasks):
+            if not self._watching():
                 return self.stop()
 
             # Unlike Mojolicious: asyncio does not nest event loops, the one that runs already watches the events
@@ -426,8 +427,23 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
         self._running = running + 1
         try:
             # Unlike Mojolicious: asyncio does not nest event loops, the one that runs already watches the events
-            while self._running and not self.loop.is_running():
-                self.one_tick()
+            while self._running and not (loop := self.loop).is_running():
+                # Stop automatically if there is nothing to watch
+                if not self._watching():
+                    return self.stop()
+
+                # Not in Mojolicious: the loop runs until the reactor stops, where Mojo runs one tick after another, as
+                # an asyncio loop that stops and runs again for every event is what costs
+                self._run += 1
+                try:
+                    loop.run_forever()
+                finally:
+                    self._run -= 1
+
+                # An exception of an unhandled error event
+                if (error := self._error) is not None:
+                    self._error = None
+                    raise error
         finally:
             self._running = running
 
@@ -534,17 +550,18 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
         if (cb := timer['cb']) is not None:
             self._event('Timer', cb)
 
-    # An event of a watcher or a timer, which ends one_tick
+    # An event of a watcher or a timer, which ends one_tick, and start once the reactor stops or watches nothing
     def _event(self, what: str, cb: Any, *args: Any) -> None:
         try:
             self._try(what, cb, *args)
         except Exception as e:
             # Not in Mojolicious: asyncio logs an exception of a callback, Perl dies out of one_tick, so it is kept and
-            # raised by one_tick, unless the loop runs without it
-            if not self._one:
+            # raised by one_tick or start, unless the loop runs without them
+            if not self._one and not self._run:
                 raise
             self._error = e
-        if self._one:
+            return self._stop()
+        if self._one or (self._run and (not self._running or not self._watching())):
             self._stop()
 
     def _id(self) -> str:
@@ -564,7 +581,7 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
             self._event('I/O watcher', io['cb'], writable)
 
     def _stop(self) -> None:
-        if self._one and self.loop.is_running():
+        if (self._one or self._run) and self.loop.is_running():
             self.loop.stop()
 
     def _timer(self, recurring: bool, after: float, cb: TimerCallback) -> str:
@@ -582,6 +599,9 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
             err.message = f'{what} failed: {err.message}'
             err.__cause__ = e
             self.emit('error', err)
+
+    def _watching(self) -> bool:
+        return bool(len(self._timers) or len(self._io) or len(self._tasks))
 
     def _unwatch(self, fd: int, io: _IO) -> None:
         if io['read']:
