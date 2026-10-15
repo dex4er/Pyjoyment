@@ -76,9 +76,10 @@ class Pyjo_Server_Reload_Backend(Pyjo.Base.object):
         current working directory.
         """
 
-        self.watch_timeout: float = (
-            watch_timeout if watch_timeout is not None else float(os.environ.get('PYJO_RELOAD_TIMEOUT') or 1)
-        )
+        self._watch_timeout: float | None = watch_timeout
+
+    @property
+    def watch_timeout(self) -> float:
         """::
 
             timeout = backend.watch_timeout
@@ -88,6 +89,13 @@ class Pyjo_Server_Reload_Backend(Pyjo.Base.object):
         files to change, defaults to the value of the ``PYJO_RELOAD_TIMEOUT``
         environment variable or ``1``.
         """
+        if self._watch_timeout is None:
+            self._watch_timeout = float(os.environ.get('PYJO_RELOAD_TIMEOUT') or 1)
+        return self._watch_timeout
+
+    @watch_timeout.setter
+    def watch_timeout(self, value: float) -> None:
+        self._watch_timeout = value
 
     def modified_files(self) -> list[str]:
         """::

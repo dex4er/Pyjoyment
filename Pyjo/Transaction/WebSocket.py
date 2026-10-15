@@ -197,20 +197,7 @@ class Pyjo_Transaction_WebSocket(Pyjo.Transaction.object):
         Mask outgoing frames with XOR cipher and a random 32-bit key.
         """
 
-        self.max_websocket_size = (
-            max_websocket_size
-            if max_websocket_size is not None
-            else int(os.environ.get('PYJO_MAX_WEBSOCKET_SIZE') or 262144)
-        )
-        """::
-
-            size = ws.max_websocket_size
-            ws.max_websocket_size = 1024
-
-        Maximum WebSocket message size in bytes, defaults to the value of the
-        ``PYJO_MAX_WEBSOCKET_SIZE`` environment variable or ``262144``
-        (256KiB).
-        """
+        self._max_websocket_size: int | None = max_websocket_size
 
         # The state of the transaction, as the keys of Mojo's hash
         self._close: list[Any] | None = None
@@ -221,6 +208,25 @@ class Pyjo_Transaction_WebSocket(Pyjo.Transaction.object):
         self._pmc = False
         self._read = bytearray()
         self._write: bytes | None = None
+
+    @property
+    def max_websocket_size(self) -> int:
+        """::
+
+            size = ws.max_websocket_size
+            ws.max_websocket_size = 1024
+
+        Maximum WebSocket message size in bytes, defaults to the value of the
+        ``PYJO_MAX_WEBSOCKET_SIZE`` environment variable or ``262144``
+        (256KiB).
+        """
+        if self._max_websocket_size is None:
+            self._max_websocket_size = int(os.environ.get('PYJO_MAX_WEBSOCKET_SIZE') or 262144)
+        return self._max_websocket_size
+
+    @max_websocket_size.setter
+    def max_websocket_size(self, value: int) -> None:
+        self._max_websocket_size = value
 
     def build_message(self, frame: str | Mapping[str, Any]) -> Frame:
         """::

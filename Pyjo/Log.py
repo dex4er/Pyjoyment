@@ -124,16 +124,7 @@ class Pyjo_Log(Pyjo.EventEmitter.object):
         """
         super().__init__()
 
-        self.color = color if color is not None else bool(os.environ.get('PYJO_LOG_COLOR'))
-        """::
-
-            boolean = log.color
-            log.color = boolean
-
-        Colorize log messages with the levels ``warn``, ``error`` and
-        ``fatal`` using ANSI escape sequences, defaults to the value of the
-        ``PYJO_LOG_COLOR`` environment variable.
-        """
+        self._color: bool | None = color
 
         self.history: list[list[Any]] = history if history is not None else []
         """::
@@ -174,7 +165,37 @@ class Pyjo_Log(Pyjo.EventEmitter.object):
         Log file path used by :attr:`handle`.
         """
 
-        self.short = short if short is not None else bool(os.environ.get('PYJO_LOG_SHORT'))
+        self._short: bool | None = short
+
+        self._capturing = False
+        self._context: list[Any] = []
+        self._format = format
+        self._handle = handle
+        self._parent: Pyjo_Log | None = None
+
+        self.on('message', _message)
+
+    @property
+    def color(self) -> bool:
+        """::
+
+            boolean = log.color
+            log.color = boolean
+
+        Colorize log messages with the levels ``warn``, ``error`` and
+        ``fatal`` using ANSI escape sequences, defaults to the value of the
+        ``PYJO_LOG_COLOR`` environment variable.
+        """
+        if self._color is None:
+            self._color = bool(os.environ.get('PYJO_LOG_COLOR'))
+        return self._color
+
+    @color.setter
+    def color(self, value: bool) -> None:
+        self._color = value
+
+    @property
+    def short(self) -> bool:
         """::
 
             boolean = log.short
@@ -184,14 +205,13 @@ class Pyjo_Log(Pyjo.EventEmitter.object):
         level prefix, suitable for systemd environments, defaults to the value
         of the ``PYJO_LOG_SHORT`` environment variable.
         """
+        if self._short is None:
+            self._short = bool(os.environ.get('PYJO_LOG_SHORT'))
+        return self._short
 
-        self._capturing = False
-        self._context: list[Any] = []
-        self._format = format
-        self._handle = handle
-        self._parent: Pyjo_Log | None = None
-
-        self.on('message', _message)
+    @short.setter
+    def short(self, value: bool) -> None:
+        self._short = value
 
     @property
     def format(self) -> Format:

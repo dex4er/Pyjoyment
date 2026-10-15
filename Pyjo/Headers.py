@@ -149,25 +149,8 @@ class Pyjo_Headers(Pyjo.Base.object, Pyjo.String.Mixin.object):
         :class:`http.client.HTTPMessage`, a ``dict``, as :meth:`from_dict` takes,
         or a list of pairs.
         """
-        self.max_line_size = max_line_size or int(os.environ.get('PYJO_MAX_LINE_SIZE') or 8192)
-        """::
-
-            size = headers.max_line_size
-            headers.max_line_size = 1024
-
-        Maximum header line size in bytes, defaults to the value of the
-        ``PYJO_MAX_LINE_SIZE`` environment variable or ``8192`` (8KiB).
-        """
-
-        self.max_lines = max_lines or int(os.environ.get('PYJO_MAX_LINES') or 100)
-        """::
-
-            num = headers.max_lines
-            headers.max_lines = 200
-
-        Maximum number of header lines, defaults to the value of the
-        ``PYJO_MAX_LINES`` environment variable or ``100``.
-        """
+        self._max_line_size: int | None = max_line_size or None
+        self._max_lines: int | None = max_lines or None
 
         self._headers: dict[str, list[str]] = {}
         self._names: dict[str, str] = {}
@@ -189,6 +172,42 @@ class Pyjo_Headers(Pyjo.Base.object, Pyjo.String.Mixin.object):
                 self.add(name, value)
         elif isinstance(headers, dict):
             self.from_dict(headers)
+
+    @property
+    def max_line_size(self) -> int:
+        """::
+
+            size = headers.max_line_size
+            headers.max_line_size = 1024
+
+        Maximum header line size in bytes, defaults to the value of the
+        ``PYJO_MAX_LINE_SIZE`` environment variable or ``8192`` (8KiB).
+        """
+        if self._max_line_size is None:
+            self._max_line_size = int(os.environ.get('PYJO_MAX_LINE_SIZE') or 8192)
+        return self._max_line_size
+
+    @max_line_size.setter
+    def max_line_size(self, value: int) -> None:
+        self._max_line_size = value
+
+    @property
+    def max_lines(self) -> int:
+        """::
+
+            num = headers.max_lines
+            headers.max_lines = 200
+
+        Maximum number of header lines, defaults to the value of the
+        ``PYJO_MAX_LINES`` environment variable or ``100``.
+        """
+        if self._max_lines is None:
+            self._max_lines = int(os.environ.get('PYJO_MAX_LINES') or 100)
+        return self._max_lines
+
+    @max_lines.setter
+    def max_lines(self, value: int) -> None:
+        self._max_lines = value
 
     def __bool__(self) -> bool:
         """::

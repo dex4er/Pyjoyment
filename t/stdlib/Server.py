@@ -61,7 +61,7 @@ with subtest('A class of build_app by name or as a class'):
 with subtest('The trusted proxies of the environment'):
     with patch.dict(os.environ, {'PYJO_TRUSTED_PROXIES': ' 10.0.0.0/8 , 127.0.0.1,fc00::/7'}):
         server = Pyjo.Server.new()
-    is_deeply_ok(server.trusted_proxies, [' 10.0.0.0/8', '127.0.0.1', 'fc00::/7'], 'split on commas')
-    ok(server.reverse_proxy, 'behind a reverse proxy')
+        is_deeply_ok(server.trusted_proxies, [' 10.0.0.0/8', '127.0.0.1', 'fc00::/7'], 'split on commas')
+        ok(server.reverse_proxy, 'behind a reverse proxy')
 
 done_testing()

@@ -121,16 +121,7 @@ class Pyjo_UserAgent_Transactor(Pyjo.Base.object):
 
         Construct a new :mod:`Pyjo.UserAgent.Transactor` object.
         """
-        self.compressed = compressed if compressed is not None else os.environ.get('PYJO_GZIP', '1') not in ('', '0')
-        """::
-
-            boolean = t.compressed
-            t.compressed = boolean
-
-        Try to negotiate compression for the response content and decompress it
-        automatically, defaults to the value of the ``PYJO_GZIP`` environment
-        variable or true.
-        """
+        self._compressed: bool | None = compressed
 
         self.generators: dict[str, Generator] = (
             generators if generators is not None else {'form': _form, 'json': _json, 'multipart': _multipart}
@@ -153,6 +144,25 @@ class Pyjo_UserAgent_Transactor(Pyjo.Base.object):
         Value for ``User-Agent`` request header of generated transactions,
         defaults to ``Pyjoyment (Python)``.
         """
+
+    @property
+    def compressed(self) -> bool:
+        """::
+
+            boolean = t.compressed
+            t.compressed = boolean
+
+        Try to negotiate compression for the response content and decompress it
+        automatically, defaults to the value of the ``PYJO_GZIP`` environment
+        variable or true.
+        """
+        if self._compressed is None:
+            self._compressed = os.environ.get('PYJO_GZIP', '1') not in ('', '0')
+        return self._compressed
+
+    @compressed.setter
+    def compressed(self, value: bool) -> None:
+        self._compressed = value
 
     def add_generator(self, name: str, cb: Generator) -> Self:
         """::

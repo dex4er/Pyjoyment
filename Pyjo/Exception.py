@@ -137,16 +137,7 @@ class Pyjo_Exception(Exception, Pyjo.Base.object, Pyjo.String.Mixin.object):
         Exception message, defaults to ``Exception!``.
         """
 
-        self.verbose: bool = bool(os.environ.get('PYJO_EXCEPTION_VERBOSE'))
-        """::
-
-            boolean = e.verbose
-            e.verbose = boolean
-
-        Show more information with :meth:`to_str`, such as :attr:`frames`,
-        defaults to the value of the ``PYJO_EXCEPTION_VERBOSE`` environment
-        variable.
-        """
+        self._verbose: bool | None = None
 
         # Not in Mojolicious: an exception of Python
         if isinstance(message, BaseException):
@@ -157,6 +148,25 @@ class Pyjo_Exception(Exception, Pyjo.Base.object, Pyjo.String.Mixin.object):
             self.message = str(message)
 
         super().__init__(self.message)
+
+    @property
+    def verbose(self) -> bool:
+        """::
+
+            boolean = e.verbose
+            e.verbose = boolean
+
+        Show more information with :meth:`to_str`, such as :attr:`frames`,
+        defaults to the value of the ``PYJO_EXCEPTION_VERBOSE`` environment
+        variable.
+        """
+        if self._verbose is None:
+            self._verbose = bool(os.environ.get('PYJO_EXCEPTION_VERBOSE'))
+        return self._verbose
+
+    @verbose.setter
+    def verbose(self, value: bool) -> None:
+        self._verbose = value
 
     def __bool__(self) -> bool:
         """::
