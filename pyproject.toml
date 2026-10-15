@@ -178,6 +178,7 @@ strict = [
   "Pyjo/Asset/__init__.py",
   "Pyjo/Asset/File.py",
   "Pyjo/Asset/Memory.py",
+  "Pyjo/Base.py",
   "Pyjo/Cache.py",
   "Pyjo/Collection.py",
   "Pyjo/Content/__init__.py",

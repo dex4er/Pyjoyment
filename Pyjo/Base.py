@@ -1,86 +1,178 @@
-"""
-Pyjo.Base - Minimal base class
-==============================
+r"""
+Pyjo.Base - Minimal base class for Pyjo projects
+================================================
 ::
 
     import Pyjo.Base
-    from Pyjo.Util import notnone
 
+    from dataclasses import dataclass, field
+
+    @dataclass
     class Cat(Pyjo.Base.object):
-        def __init__(self, **kwargs):
-            self.name = kwargs.get('name', 'Nyan')
-            self.birds = kwargs.get('birds', 2)
-            self.mice = kwargs.get('mice', 2)
+        name: str = 'Nyan'
+        age: int = 4
+        weight: int = 4
 
+    @dataclass
     class Tiger(Cat):
-        def __init__(self, **kwargs):
-            super(Tiger, self).__init__(**kwargs)
-            self.friend = notnone(kwargs.get('friend'), lambda: Cat())
-            self.stripes = kwargs.get('stripes', 42)
+        friend: Cat = field(default_factory=Cat)
+        stripes: int = 42
 
     mew = Cat.new(name='Longcat')
-    print(mew.mice)
-    print(mew.set(mice=3, birds=4).mice)
+    print(mew.age)
+    print(mew.set(age=3, weight=5).age)
 
-    rawr = Tiger.new(stripes=23, mice=0)
-    print(rawr.tap(lambda self: self.friend.set(name='Tacgnol').mice))
+    rawr = Tiger.new(stripes=38, weight=250)
+    print(rawr.tap(lambda rawr: rawr.friend.set(name='Tacgnol')).weight)
 
-:mod:`Pyjo.Base` is a simple base class for :mod:`Pyjo` projects.
+:mod:`Pyjo.Base` is a simple base class for :mod:`Pyjo` projects with fluent
+interfaces.
+
+The attributes of an object are the attributes of Python. A dataclass, as
+above, or ``__init__`` gives them their default values, and a property builds
+a default value the first time it is read, as a callback of ``has`` does in
+Mojolicious. ::
+
+    class Lion(Cat):
+        @property
+        def pride(self):
+            if not hasattr(self, '_pride'):
+                self._pride = [Cat.new(), Cat.new()]
+            return self._pride
+
+Fluent interfaces
+-----------------
+
+Fluent interfaces are a way to design object-oriented APIs around method
+chaining to create domain-specific languages, with the goal of making the
+readability of the source code close to written prose. ::
+
+    @dataclass
+    class Duck(Pyjo.Base.object):
+        name: str | None = None
+
+        def quack(self):
+            print(f'{self.name}: Quack!')
+
+:mod:`Pyjo.Base` will help you with this by having :meth:`~Pyjo_Base.set`
+return its invocant (``self``) when it is used to assign new attribute values. ::
+
+    Duck.new().set(name='Donald').quack()
+
+In this case :meth:`~Pyjo_Base.set` is called on the object created by
+``Duck.new()``. It assigns a new attribute value and then returns the ``Duck``
+object, so the ``quack`` method can be called on it afterwards. These method
+chains can continue until one of the methods called does not return the
+``Duck`` object.
+
+See also
+--------
+
+:mod:`Pyjoyment`, https://mojolicious.org.
+
+Ported from `Mojo::Base <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/Base.pm>`_
+of Mojolicious 9.49.
+
+Classes
+-------
 """
 
+from collections.abc import Callable
 from typing import Any, Self
 
 
+# Left out from Mojolicious: the flags of import, -strict, -base, -role, -signatures and -async_await, as Python has
+# them on its own, and has, as the attributes of Python take its place
+
+
 class Pyjo_Base:
-    """::
-
-        obj = SubClass.new()
-        obj = SubClass.new(name='value')
-
-    This base class provides a standard constructor for :mod:`Pyjo` objects. You can
-    pass it a dict with attribute values.
     """
+    :mod:`Pyjo.Base` implements the following methods.
+    """
+
+    # Not in Mojolicious: no __dict__ of its own, so that a subclass with __slots__ has none either
+    __slots__ = ()
+
+    # Left out from Mojolicious: attr, as the attributes of Python, the properties and weakref.proxy take its place
 
     @classmethod
     def new(cls, *args: Any, **kwargs: Any) -> Self:
-        """
-        Factory method for :mod:`Pyjo.Base` class.
+        """::
+
+            obj = SubClass.new()
+            obj = SubClass.new(name='value')
+            obj = SubClass.new(**{'name': 'value'})
+
+        This base class provides a basic constructor, which passes its
+        arguments to the constructor of the class: the attribute values are
+        keyword arguments.
         """
         return cls(*args, **kwargs)
 
+    # Not in Mojolicious: the expression form of an assignment, as the accessors of Mojo chain when they set a value
     def set(self, **kwargs: Any) -> Self:
         """::
 
             obj = obj.set(name='value')
+            obj = obj.set(name='value', other='value')
 
-        Sets each attribute from a dict.
+        Assign attribute values and return the object, so that a chain of
+        method calls can continue. ::
+
+            # Longer version
+            obj.name = 'value'
         """
         for k, v in sorted(kwargs.items()):
             setattr(self, k, v)
         return self
 
-    def tap(self, *args: Any, **kwargs: Any) -> Self:
+    def tap(self, cb: Callable[..., Any] | str, *args: Any, **kwargs: Any) -> Self:
         """::
 
-            obj = obj.tap(lambda obj: expression)
-            obj = obj.tap(method)
-            obj = obj.tap(method, *args, **kwargs)
+            obj = obj.tap(lambda obj: ...)
+            obj = obj.tap('some_method')
+            obj = obj.tap('some_method', *args, **kwargs)
 
-        K combinator, tap into a method chain to perform operations on an object
-        within the chain. The object will be the first argument passed to the callback. ::
+        Tap into a method chain to perform operations on an object within the
+        chain (also known as a K combinator or Kestrel). The object will be
+        the first argument passed to the callback. The callback's return value
+        will be ignored; instead, the object (the callback's first argument)
+        will be the return value. In this way, arbitrary code can be used
+        within (i.e., spliced or tapped into) a chained set of object method
+        calls. A name of an attribute that is not a method is read, which
+        builds the default value of a property. ::
 
             # Longer version
-            obj = obj.tap(lambda obj: obj.method(args))
+            obj = obj.tap(lambda obj: obj.some_method(*args))
 
             # Inject side effects into a method chain
-            obj.foo('A').tap(lambda obj: print(obj.foo)).set(foo='B')
+            obj.set(foo='A').tap(lambda obj: print(obj.foo)).set(foo='B')
         """
-        method = args[0]
-        if callable(method):
-            method(self, *args[1:], **kwargs)
-        else:
-            getattr(self, method)(*args[1:], **kwargs)
+        tap(self, cb, *args, **kwargs)
         return self
+
+    # Left out from Mojolicious: with_roles, as Pyjoyment has no roles
+
+
+# Not in Mojolicious: a function of its own, for the classes that are not Pyjo.Base, as a list and a string
+def tap(obj: Any, cb: Callable[..., Any] | str, *args: Any, **kwargs: Any) -> None:
+    """::
+
+        tap(obj, lambda obj: ...)
+        tap(obj, 'some_method', *args, **kwargs)
+
+    Call the callback with the object, or its method of the name with the
+    arguments, or read its attribute of the name, as :meth:`Pyjo_Base.tap` and
+    the ``tap`` of the classes that are not :mod:`Pyjo.Base` do.
+    """
+    if callable(cb):
+        cb(obj, *args, **kwargs)
+        return
+    value = getattr(obj, cb)
+    if callable(value):
+        value(*args, **kwargs)
+    elif args or kwargs:
+        raise TypeError(f'{cb!r} of {type(obj).__name__} is not callable')
 
 
 new = Pyjo_Base.new

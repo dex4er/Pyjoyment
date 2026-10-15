@@ -41,6 +41,7 @@ Functions
 ---------
 """
 
+import Pyjo.Base
 import Pyjo.String.Unicode
 
 import builtins
@@ -390,10 +391,7 @@ class Pyjo_Collection[T](list[T]):
 
         Alias for :meth:`Pyjo.Base.tap`.
         """
-        if callable(cb):
-            cb(self, *args, **kwargs)
-        else:
-            getattr(self, cb)(*args, **kwargs)
+        Pyjo.Base.tap(self, cb, *args, **kwargs)
         return self
 
     # Not in Mojolicious: a conversion to a type of the standard library
