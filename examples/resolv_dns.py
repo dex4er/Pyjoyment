@@ -15,25 +15,29 @@ rtype = c(*sys.argv).get(2, 'A')
 ns = c(*sys.argv).get(3, '8.8.8.8')
 
 
-# DNS over TCP, where a message has its length in front of it
-@Pyjo.IOLoop.client(address=ns, port=53)
-def client(loop, err, stream):
-    if err:
-        print(f'Connection error: {err}', file=sys.stderr)
-        return
+@Pyjo.IOLoop.timer(5)
+def timeout(loop):
+    print('Timeout', file=sys.stderr)
+    loop.stop()
 
-    buffer = bytearray()
 
-    @stream.on
-    def read(stream, chunk):
-        buffer.extend(chunk)
-        if len(buffer) >= 2 and len(buffer) >= 2 + int.from_bytes(buffer[:2]):
-            for rr in dns.message.from_wire(bytes(buffer[2:])).answer:
-                print(rr.to_text())
-            stream.close()
+@Pyjo.IOLoop.datagram
+def client(loop, datagram, id):
 
-    query = dns.message.make_query(name, dns.rdatatype.from_text(rtype), dns.rdataclass.from_text('IN')).to_wire()
-    stream.write(len(query).to_bytes(2) + query)
+    @datagram.on
+    def message(datagram, data, peer):
+        for rr in dns.message.from_wire(data).answer:
+            print(rr.to_text())
+        loop.remove(timeout)
+        datagram.close()
+
+    @datagram.on
+    def error(datagram, err):
+        print(f'Error: {err}', file=sys.stderr)
+        loop.stop()
+
+    query = dns.message.make_query(name, dns.rdatatype.from_text(rtype), dns.rdataclass.from_text('IN'))
+    datagram.send(query.to_wire(), (ns, 53))
 
 
 Pyjo.IOLoop.start()
