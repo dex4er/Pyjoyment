@@ -41,6 +41,7 @@ for _ in range(n):
             size = 0
 
         if err:
+            print(f'Connection error: {err}', file=sys.stderr)
             return
 
         def on_read_cb(stream, chunk):
@@ -65,7 +66,7 @@ for _ in range(n):
             f'GET {url.path} HTTP/1.1\x0d\x0aHost: {url.host}:{url.port or 80}\x0d\x0a\x0d\x0a'.encode('ascii')
         )
 
-    Pyjo.IOLoop.client(address=url.host, port=(url.port or 80), cb=on_connect_cb)
+    Pyjo.IOLoop.client(on_connect_cb, address=url.host, port=(url.port or 80))
 
 
 Pyjo.IOLoop.start()

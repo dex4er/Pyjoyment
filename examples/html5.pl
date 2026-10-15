@@ -1,6 +1,4 @@
-use Mojolicious::Lite;
-use 5.20.0;
-use experimental 'signatures';
+use Mojolicious::Lite -signatures;
 
 # Render template "index.html.ep" from the DATA section
 get '/' => {template => 'index'};
@@ -21,5 +19,5 @@ __DATA__
 <script>
   var ws = new WebSocket('<%= $url->to_abs %>');
   ws.onmessage = function (event) { document.body.innerHTML += event.data };
-  ws.onopen    = function (event) { ws.send('http://mojolicio.us') };
+  ws.onopen    = function (event) { ws.send('https://mojolicious.org') };
 </script>

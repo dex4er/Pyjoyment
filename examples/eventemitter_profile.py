@@ -5,7 +5,7 @@ from Pyjo.Collection import c
 import sys
 
 
-n = int(c(sys.argv).get(1) or 1000000)
+n = int(c(*sys.argv).get(1) or 1000000)
 
 
 class EV(Pyjo.EventEmitter.object):

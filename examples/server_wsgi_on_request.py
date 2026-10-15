@@ -1,11 +1,9 @@
 import Pyjo.Server.WSGI
 
-from Pyjo.Util import b
-
 from wsgiref.simple_server import make_server
 
 
-wsgi = Pyjo.Server.WSGI.new(listen=['http://*:3000'])
+wsgi = Pyjo.Server.WSGI.new()
 wsgi.unsubscribe('request')
 
 
@@ -18,7 +16,7 @@ def request(wsgi, tx):
     # Response
     tx.res.code = 200
     tx.res.headers.content_type = 'text/plain'
-    tx.res.body = b(f'{method} request for {path}\n')
+    tx.res.body = f'{method} request for {path}\n'.encode()
 
     # Resume transaction
     tx.resume()
