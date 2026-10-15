@@ -163,6 +163,32 @@ with subtest('client and server'):
     loop.start()
     isa_ok(id2, str, 'decorator')
 
+with subtest('datagram'):
+    loop = Pyjo.IOLoop.new()
+    got = []
+
+    def cb(loop, datagram, id):
+        got.append(id)
+
+    id = loop.datagram(cb, address='127.0.0.1')
+    id = loop.datagram(cb=cb)
+    is_ok(len(got), 2, 'callback')
+    isa_ok(id, str, 'id')
+
+    # Echo server
+    @loop.datagram(address='127.0.0.1')
+    def id(loop, datagram, id):
+        datagram.on('message', lambda datagram, data, peer: datagram.send(data, peer))
+
+    isa_ok(id, str, 'decorator')
+    port = loop.stream(id).port
+    client = loop.stream(loop.datagram(cb=cb))
+    client.on('message', lambda client, data, peer: [got.append(data), loop.stop()])
+    client.send(b'echo', ('127.0.0.1', port))
+    loop.start()
+    is_ok(got[-1], b'echo', 'echo')
+    loop.reset()
+
 with subtest('is_running'):
     boolean = Pyjo.IOLoop.is_running()
     ok(not boolean, 'module')

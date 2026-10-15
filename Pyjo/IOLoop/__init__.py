@@ -100,6 +100,7 @@ of Mojolicious 9.49.
 import Pyjo.EventEmitter
 import Pyjo.Exception
 import Pyjo.IOLoop.Client
+import Pyjo.IOLoop.Datagram
 import Pyjo.IOLoop.Server
 import Pyjo.IOLoop.Stream
 import Pyjo.Reactor
@@ -135,6 +136,9 @@ type ServerCallback = Callable[[Any, Any, str], Anything]
 
 # A callback of a client gets the loop, an error and the stream
 type ClientCallback = Callable[[Any, Any, Any], Anything]
+
+# A callback of a datagram socket gets the loop, the socket and its id
+type DatagramCallback = Callable[[Any, Any, str], Anything]
 
 DEBUG = bool(os.environ.get('PYJO_IOLOOP_DEBUG'))
 
@@ -317,6 +321,52 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
         client.on('connect', connect)
         client.on('error', error)
         client.connect(**options)
+
+        return id
+
+    # Not in Mojolicious: datagram sockets
+    @overload
+    def datagram(self, cb: DatagramCallback, **options: Any) -> str: ...
+
+    @overload
+    def datagram(self, **options: Any) -> Callable[[DatagramCallback], str]: ...
+
+    def datagram(self, cb: DatagramCallback | None = None, **options: Any) -> Any:
+        """::
+
+            id = Pyjo.IOLoop.datagram(cb, port=9999)
+            id = loop.datagram(cb, address='127.0.0.1', port=9999)
+            id = loop.datagram(cb=cb)
+
+            @loop.datagram(port=9999)
+            def id(loop, datagram, id):
+                ...
+
+        Open a datagram socket with :mod:`Pyjo.IOLoop.Datagram`, bound with the
+        options of :meth:`Pyjo.IOLoop.Datagram.Pyjo_IOLoop_Datagram.bind` if
+        any are given, which the event loop watches until it is closed. The
+        callback gets the loop, the datagram socket and its id, which
+        :meth:`remove` takes. ::
+
+            # Echo server
+            @Pyjo.IOLoop.datagram(address='127.0.0.1', port=9999)
+            def id(loop, datagram, id):
+                datagram.on('message', lambda datagram, data, peer: datagram.send(data, peer))
+        """
+        # Not in Mojolicious: a decorator
+        if cb is None:
+
+            def decorator(cb: DatagramCallback) -> str:
+                return self.datagram(cb, **options)
+
+            return decorator
+
+        datagram = Pyjo.IOLoop.Datagram.new()
+        datagram.reactor = self.reactor
+        if options:
+            datagram.bind(**options)
+        id = self._stream(datagram, self._id())
+        cb(self, datagram, id)
 
         return id
 
@@ -807,6 +857,7 @@ def _cleanup() -> None:
 # What Mojo calls on the class works with the singleton
 acceptor = singleton.acceptor
 client = singleton.client
+datagram = singleton.datagram
 next_tick = singleton.next_tick
 one_tick = singleton.one_tick
 recurring = singleton.recurring

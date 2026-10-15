@@ -182,6 +182,7 @@ strict = [
   "Pyjo/Home.py",
   "Pyjo/IOLoop/__init__.py",
   "Pyjo/IOLoop/Client.py",
+  "Pyjo/IOLoop/Datagram.py",
   "Pyjo/IOLoop/Server.py",
   "Pyjo/IOLoop/Stream.py",
   "Pyjo/IOLoop/Subprocess.py",
