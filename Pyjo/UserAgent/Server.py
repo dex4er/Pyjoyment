@@ -70,6 +70,7 @@ class Pyjo_UserAgent_Server(Pyjo.Base.object):
         self._nb_port: int | None = None
         self._server: Pyjo.Server.Daemon.object | None = None
         self._nb_server: Pyjo.Server.Daemon.object | None = None
+        self._previous: set[int] = set()
 
     def __del__(self) -> None:
         if sys.is_finalizing():
@@ -114,12 +115,30 @@ class Pyjo_UserAgent_Server(Pyjo.Base.object):
 
         Restart server with new port.
         """
+        self._previous = {port for port in (self._port, self._nb_port) if port is not None}
         self._nb_port = self._port = None
         self._close()
 
     def _close(self) -> None:
         _close_servers(self._server, self._nb_server)
         self._nb_server = self._server = None
+
+    # Unlike Mojolicious: a server on a new port gets another one than before the restart, as the system may give the
+    # port that the restart freed again, and Mojo takes what it gives
+    def _listen(self, proto: str, port: int | None, ioloop: Pyjo.IOLoop.object | None) -> Pyjo.Server.Daemon.object:
+        while True:
+            server = (
+                Pyjo.Server.Daemon.new(silent=True)
+                if ioloop is None
+                else Pyjo.Server.Daemon.new(ioloop=ioloop, silent=True)
+            )
+            if (app := self.app) is not None:
+                server.app = _weak(app)
+            server.listen = [f'{proto}://127.0.0.1' + (f':{port}' if port else '')]
+            server.start()
+            if port or server.ports()[0] not in self._previous:
+                return server
+            _close_servers(server)
 
     def url(self, proto: str | None = None) -> Pyjo.URL.object:
         """::
@@ -139,20 +158,12 @@ class Pyjo_UserAgent_Server(Pyjo.Base.object):
             self._close()
 
             # Blocking
-            server = self._server = Pyjo.Server.Daemon.new(ioloop=self.ioloop, silent=True)
-            if (app := self.app) is not None:
-                server.app = _weak(app)
-            port = f':{self._port}' if self._port else ''
-            server.listen = [f'{proto}://127.0.0.1{port}']
-            self._port = server.start().ports()[0]
+            server = self._server = self._listen(proto, self._port, self.ioloop)
+            self._port = server.ports()[0]
 
             # Non-blocking
-            server = self._nb_server = Pyjo.Server.Daemon.new(silent=True)
-            if app is not None:
-                server.app = _weak(app)
-            port = f':{self._nb_port}' if self._nb_port else ''
-            server.listen = [f'{proto}://127.0.0.1{port}']
-            self._nb_port = server.start().ports()[0]
+            server = self._nb_server = self._listen(proto, self._nb_port, None)
+            self._nb_port = server.ports()[0]
 
         port = self._nb_port if nb else self._port
         return Pyjo.URL.new(f'{self._proto}://127.0.0.1:{port}/')

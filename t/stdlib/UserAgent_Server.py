@@ -46,4 +46,30 @@ with subtest('Restart'):
     ok(server.url().port != url.port, 'new port')
     is_deeply_ok(get(server.ioloop, server.url()), (200, b'Your Pyjo is working!'), 'right response')
 
+with subtest('Restart when the system gives the same port again'):
+    import Pyjo.Server.Daemon
+
+    url, nb_url = server.url(), server.nb_url()
+    server.restart()
+
+    # The first server after the restart gets the port of the old one
+    ports = Pyjo.Server.Daemon.object.ports
+    calls = []
+
+    def same_port(self):
+        calls.append(True)
+        return [url.port] if len(calls) == 1 else ports(self)
+
+    Pyjo.Server.Daemon.object.ports = same_port
+    try:
+        new = server.url()
+    finally:
+        Pyjo.Server.Daemon.object.ports = ports
+    gc.collect()
+    ok(new.port not in (url.port, nb_url.port), 'not an old port')
+    ok(server.nb_url().port not in (url.port, nb_url.port), 'not an old port for non-blocking requests')
+    is_deeply_ok(get(server.ioloop, server.url()), (200, b'Your Pyjo is working!'), 'right response')
+
+    is_deeply_ok(get(server.ioloop, server.url()), (200, b'Your Pyjo is working!'), 'right response')
+
 done_testing()
