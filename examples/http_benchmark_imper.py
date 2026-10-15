@@ -1,7 +1,6 @@
 import Pyjo.IOLoop
 import Pyjo.URL
 
-from Pyjo.Regexp import r
 from Pyjo.Util import steady_time
 
 import sys
@@ -72,7 +71,4 @@ for _ in range(n):
 Pyjo.IOLoop.start()
 
 
-speed = str(sum(speeds))
-while r(r'(?<=\d)(\d{3})(,|$)').search(speed):
-    speed = r(r'(?<=\d)(\d{3})(,|$)').sub(r',\1', speed)
-print(f'{speed} Mb/s')
+print(f'{sum(speeds):,} Mb/s')

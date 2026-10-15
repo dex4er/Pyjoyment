@@ -16,8 +16,6 @@ Functions
 ---------
 """
 
-from Pyjo.Regexp import r
-
 import base64
 import codecs
 import functools
@@ -603,8 +601,8 @@ def punycode_encode(string: str) -> str:
     return string.encode('punycode').decode('ascii')
 
 
-re_b_quote = r(rb'(["\\])')
-re_u_quote = r(r'(["\\])')
+re_b_quote = re.compile(rb'(["\\])')
+re_u_quote = re.compile(r'(["\\])')
 
 
 @overload
@@ -810,7 +808,7 @@ def spurtb(content, path):
         return f.write(content)
 
 
-re_whitespaces = r(r'\s+')
+re_whitespaces = re.compile(r'\s+')
 
 
 def squish(string):
@@ -3273,11 +3271,11 @@ def _entity(point: str | None, name: str | None, attr: bool) -> str:
     return '&' + rest[::-1]
 
 
-re_header = r(rb'^[,;\s]*([^=;, ]+)\s*')
-re_expires = r(rb'^=\s*(\w+\W+\d+\W+\w+\W+\d+\W+\d+:\d+:\d+\W*\w+)')
-re_quoted = r(rb'^=\s*("(?:\\\\|\\"|[^"])*")')
-re_unquoted = r(rb'^=\s*([^;, ]*)')
-re_separator = r(rb'^[;\s]*,\s*')
+re_header = re.compile(rb'^[,;\s]*([^=;, ]+)\s*')
+re_expires = re.compile(rb'^=\s*(\w+\W+\d+\W+\w+\W+\d+\W+\d+:\d+:\d+\W*\w+)')
+re_quoted = re.compile(rb'^=\s*("(?:\\\\|\\"|[^"])*")')
+re_unquoted = re.compile(rb'^=\s*([^;, ]*)')
+re_separator = re.compile(rb'^[;\s]*,\s*')
 
 
 def _header(string, cookie):

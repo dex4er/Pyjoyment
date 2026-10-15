@@ -1,2 +1,0 @@
-.. automodule:: Pyjo.Regexp
-    :members:
