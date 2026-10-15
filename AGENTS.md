@@ -444,6 +444,11 @@ copy:
   script of Mojolicious, as `script/morbo`, is a `main` function of the module
   with `argparse`, a `pyjo-` command in `[project.scripts]` of
   `pyproject.toml` (`pyjo-reload`) and `python -m` of the module.
+- `ojo` is the functions of the package `Pyjo`, which `from Pyjo import *`
+  imports, and `perl -Mojo -E` is `python -m Pyjo`. A function imports the
+  modules it uses when it is called, as every `import Pyjo.X` runs
+  `Pyjo/__init__.py`. Its `u`, PUT, is `w`, as `u` is for characters, as in
+  `Pyjo.String.Unicode`.
 - Where Mojo uses an optional XS module for speed, as `Mojo::JSON` uses
   `Cpanel::JSON::XS`, the port uses the module of the standard library in its
   place and keeps the port of the pure-Perl code behind a `PYJO_NO_*`
