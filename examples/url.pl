@@ -2,7 +2,9 @@ use v5.14;
 
 use Mojo::URL;
 
-my $url = Mojo::URL->new('https://github.com/dex4er/Pyjo');
-say $url->scheme('ssh+git')->userinfo('git')->path($url->path . '.git');
+# 'ssh+git://git@github.com/dex4er/Pyjoyment.git'
+my $url = Mojo::URL->new('https://github.com/dex4er/Pyjoyment');
+say $url->scheme('ssh+git')->userinfo('git')->path($url->path . '.git')->to_unsafe_string;
 
-say Mojo::URL->new('https://metacpan.org/search')->query(q => 'Mojo::URL', size => 20);
+# 'https://pypi.org/search/?q=Pyjoyment&o=&c=Programming+Language+%3A%3A+Python'
+say Mojo::URL->new('https://pypi.org/search/')->query(q => 'Pyjoyment', o => '', c => 'Programming Language :: Python');

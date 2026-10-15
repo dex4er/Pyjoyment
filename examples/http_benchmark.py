@@ -42,6 +42,7 @@ for _ in range(n):
             size = 0
 
         if err:
+            print(f'Connection error: {err}', file=sys.stderr)
             return
 
         @stream.on

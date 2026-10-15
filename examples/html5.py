@@ -1,3 +1,5 @@
+# TODO: runs once Pyjoyment.Lite and Pyjo.Template are ported; Pyjoyment.Lite is a stub until then
+
 from Pyjoyment.Lite import app, get, path
 
 
@@ -23,6 +25,6 @@ DATA = """
 <script>
   var ws = new WebSocket('<%= url.to_abs() %>');
   ws.onmessage = function (event) { document.body.innerHTML += event.data };
-  ws.onopen    = function (event) { ws.send('http://pyjoyment.net') };
+  ws.onopen    = function (event) { ws.send('https://mojolicious.org') };
 </script>
 """

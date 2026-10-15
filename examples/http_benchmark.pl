@@ -23,6 +23,7 @@ for (1 .. $n) {
 
     my $id = Mojo::IOLoop->client({address => $url->host, port => $url->port || 80} => sub {
         my ($loop, $err, $stream) = @_;
+        return warn "Connection error: $err\n" if $err;
 
         my $size = 0;
 

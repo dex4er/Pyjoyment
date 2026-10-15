@@ -42,11 +42,13 @@ Status
 .. begin-status
 
 Pyjoyment was written against Mojolicious 6 and is being revived as a port of
-Mojolicious 9.49, with ``asyncio`` as its event loop. The modules are ported
-anew one by one, and a ported module names the Mojolicious version it was
-ported from in its documentation. The other modules still follow Mojolicious
-6, with an event loop of their own based on ``select(2)`` and ``poll(2)``, and
-the web framework is not there yet.
+Mojolicious 9.49 to Python 3.12 and newer, with ``asyncio`` as its event loop.
+The toolkit, the ``Pyjo`` package, is ported: URLs, DOM and CSS selectors,
+JSON, HTTP messages and cookies, the event loop with promises, the user agent,
+and the servers, on their own, preforking, with hot deployment or reloading,
+and through ASGI, WSGI and CGI. A ported module names the Mojolicious version
+it was ported from in its documentation. Templates and the web framework, the
+``Pyjoyment`` package with routes, controllers and plugins, are not there yet.
 
 The progress is tracked in `GitHub Issues <https://github.com/dex4er/Pyjoyment/issues>`_.
 
@@ -131,13 +133,14 @@ Web scraping
 .. code-block:: python
 
    import Pyjo.UserAgent
+
    from Pyjo.String.Unicode import u
 
+
+   # Extract named character references from HTML spec
    tx = Pyjo.UserAgent.new().get('https://html.spec.whatwg.org')
    for n in tx.res.dom('#named-character-references-table tbody > tr').each():
        u(n.at('td > code').text + ' ' + n.children('td')[1].text).trim().say()
-
-
 
 URL manipulation
 ----------------
@@ -146,6 +149,7 @@ URL manipulation
 
    import Pyjo.URL
 
+
    # 'ssh+git://git@github.com/dex4er/Pyjoyment.git'
    url = Pyjo.URL.new('https://github.com/dex4er/Pyjoyment')
    print(url.set(scheme='ssh+git', userinfo='git', path=f'{url.path}.git').to_unsafe_str())
@@ -153,7 +157,6 @@ URL manipulation
    # 'https://pypi.org/search/?q=Pyjoyment&o=&c=Programming+Language+%3A%3A+Python'
    url = Pyjo.URL.new('https://pypi.org/search/')
    print(url.set(query=[('q', 'Pyjoyment'), ('o', ''), ('c', 'Programming Language :: Python')]))
-
 
 Non-blocking TCP client/server
 ------------------------------
@@ -170,10 +173,10 @@ Non-blocking TCP client/server
        @stream.on
        def read(stream, chunk):
            # Process input chunk
-           print("Server: {0}".format(chunk.decode('utf-8')))
+           print(f'Server: {chunk.decode("utf-8")}')
 
            # Write response
-           stream.write(b"HTTP/1.1 200 OK\x0d\x0a\x0d\x0a")
+           stream.write(b'HTTP/1.1 200 OK\x0d\x0a\x0d\x0a')
 
            # Disconnect client
            stream.close_gracefully()
@@ -186,16 +189,16 @@ Non-blocking TCP client/server
        @stream.on
        def read(stream, chunk):
            # Process input
-           print("Client: {0}".format(chunk.decode('utf-8')))
+           print(f'Client: {chunk.decode("utf-8")}')
 
        # Write request
-       stream.write(b"GET / HTTP/1.1\x0d\x0a\x0d\x0a")
+       stream.write(b'GET / HTTP/1.1\x0d\x0a\x0d\x0a')
 
 
    # Add a timer
    @Pyjo.IOLoop.timer(3)
    def timeouter(loop):
-       print("Timeout")
+       print('Timeout')
        # Shutdown server
        loop.remove(server)
 
@@ -203,32 +206,30 @@ Non-blocking TCP client/server
    # Start event loop
    Pyjo.IOLoop.start()
 
-
 Standalone HTTP server serving embedded template file
 ------------------------------------------------------
 
 .. code-block:: python
 
-   # -*- coding: utf-8 -*-
-
    import Pyjo.Server.Daemon
    import Pyjo.URL
 
-   from Pyjo.Loader import embedded_file
-   from Pyjo.Util import b, u
+   from Pyjo.Loader import data_section
+   from Pyjo.Util import xml_escape
 
    import sys
 
 
-   opts = dict([['address', '0.0.0.0'], ['port', 3000]] + list(map(lambda a: a.split('='), sys.argv[1:])))
-   listen = str(Pyjo.URL.new(scheme='http', host=opts['address'], port=opts['port']))
+   opts = {'address': '0.0.0.0', 'port': '3000'} | dict(a.split('=', 1) for a in sys.argv[1:])
+
+   listen = str(Pyjo.URL.new().set(scheme='http', host=opts['address'], port=opts['port']))
 
    daemon = Pyjo.Server.Daemon.new(listen=[listen])
    daemon.unsubscribe('request')
 
 
    # Embedded template file
-   DATA = u(r'''
+   DATA = r"""
    @@ index.html.tpl
    <!DOCTYPE html>
    <html>
@@ -242,7 +243,7 @@ Standalone HTTP server serving embedded template file
    <p>{method} request for {path}</p>
    </body>
    </html>
-   ''')
+   """
 
 
    @daemon.on
@@ -252,12 +253,12 @@ Standalone HTTP server serving embedded template file
        path = tx.req.url.path
 
        # Template
-       template = embedded_file(sys.modules[__name__], 'index.html.tpl')
+       template = data_section(__name__, 'index.html.tpl')
 
        # Response
        tx.res.code = 200
        tx.res.headers.content_type = 'text/html; charset=utf-8'
-       tx.res.body = b(template.format(**locals()))
+       tx.res.body = template.format(method=xml_escape(method), path=xml_escape(str(path))).encode()
 
        # Resume transaction
        tx.resume()

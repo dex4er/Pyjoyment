@@ -1,19 +1,34 @@
 #!/usr/bin/env perl
 
+use v5.14;
+
 use Mojo::IOLoop;
 use Net::DNS::Packet;
 
-my $address = $ARGV[0] || 'mojolicio.us';
+my ($name, $type, $ns) = @ARGV;
+die "Usage: resolv_dns.pl name [type] [nameserver]\n" unless $name;
+$type //= 'A';
+$ns   //= '8.8.8.8';
 
-Mojo::IOLoop->client({address => '8.8.8.8', port => 53, proto => 'udp'} => sub {
+# DNS over TCP, where a message has its length in front of it
+Mojo::IOLoop->client({address => $ns, port => 53} => sub {
     my ($loop, $err, $stream) = @_;
-    $stream->on('read' => sub {
-      my ($stream, $bytes) = @_;
-      my $ans = Net::DNS::Packet->new(\$bytes, 1);
-      $stream->close;
+    return warn "Connection error: $err\n" if $err;
+
+    my $buffer = '';
+    $stream->on(read => sub {
+        my ($stream, $bytes) = @_;
+        $buffer .= $bytes;
+        return unless length $buffer >= 2 and length $buffer >= 2 + unpack 'n', $buffer;
+        my $data = substr $buffer, 2;
+        say $_->string for Net::DNS::Packet->new(\$data)->answer;
+        $stream->close;
     });
-    my $packet = Net::DNS::Packet->new($address);
-    $stream->write($packet->data);
+
+    my $packet = Net::DNS::Packet->new($name, $type, 'IN');
+    $packet->header->rd(1);
+    my $query = $packet->data;
+    $stream->write(pack('n', length $query) . $query);
 });
 
-Mojo::IOLoop->start unless Mojo::IOLoop->is_running;
+Mojo::IOLoop->start;

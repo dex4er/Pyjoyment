@@ -8,6 +8,9 @@ port = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
 
 @Pyjo.IOLoop.client(address='127.0.0.1', port=port)
 def client(loop, err, stream):
+    if err:
+        print(f'Connection error: {err}', file=sys.stderr)
+        return
 
     @stream.on
     def read(stream, chunk):

@@ -140,7 +140,11 @@ takes a few seconds.
   script of its own, and the test checks its output and exit status.
 - `t/stdlib/` checks the interaction with the Python standard library,
   written for Pyjoyment, as Mojolicious has no counterpart.
-- `t/examples/` runs the scripts from `examples/`.
+- `t/examples/` checks the code of some scripts of `examples/` with assertions,
+  in versions of its own. The scripts themselves are not run by the tests, as
+  some need the network or libraries the project does not install; they are
+  reviewed by hand, the Perl ones, the Mojolicious counterparts of the Python
+  ones, against the target Mojolicious.
 - `t/servers/` runs `Pyjo.Server.ASGI`, `Pyjo.Server.WSGI` and
   `Pyjo.Server.CGI` on real ASGI, WSGI and CGI servers, and the examples of
   the quick start in `README.rst`, each in a process of its own, as the ASGI server of the tests in `t/lib` and the validator of
