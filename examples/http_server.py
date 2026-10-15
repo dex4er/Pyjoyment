@@ -1,8 +1,8 @@
 import Pyjo.Server.Daemon
+import Pyjo.Template
 import Pyjo.URL
 
 from Pyjo.Loader import data_section
-from Pyjo.Util import xml_escape
 
 import sys
 
@@ -17,7 +17,7 @@ daemon.unsubscribe('request')
 
 # Embedded template file
 DATA = r"""
-@@ index.html.tpl
+@@ index.html.ep
 <!DOCTYPE html>
 <html>
 <head>
@@ -27,10 +27,12 @@ DATA = r"""
 <body>
 <h1>♥ Pyjoyment ♥</h1>
 <h2>This page is served by Pyjoyment framework.</h2>
-<p>{method} request for {path}</p>
+<p><%= method %> request for <%= path %></p>
 </body>
 </html>
 """
+
+template = Pyjo.Template.new(auto_escape=True, vars=True).parse(data_section(__name__, 'index.html.ep'))
 
 
 @daemon.on
@@ -39,13 +41,10 @@ def request(daemon, tx):
     method = tx.req.method
     path = tx.req.url.path
 
-    # Template
-    template = data_section(__name__, 'index.html.tpl')
-
     # Response
     tx.res.code = 200
     tx.res.headers.content_type = 'text/html; charset=utf-8'
-    tx.res.body = template.format(method=xml_escape(method), path=xml_escape(str(path))).encode()
+    tx.res.body = template.process({'method': method, 'path': path}).encode()
 
     # Resume transaction
     tx.resume()

@@ -119,6 +119,25 @@ with subtest('values'):
     values = template.values
     is_ok(values, ('<script>',), 'values')
 
+with subtest('escape'):
+    from Pyjo.String.HTML import html
+    from Pyjo.String.Template import escape
+
+    string = escape('<b>')
+    is_ok(string, '&lt;b&gt;', 'string')
+
+    # "&lt;b&gt;<i>"
+    is_ok(escape(['<b>', html('<i>')]), '&lt;b&gt;<i>', 'escaped')
+
+with subtest('raw'):
+    from Pyjo.String.Template import raw
+
+    string = raw('<b>')
+    is_ok(string, '<b>', 'string')
+
+    # "<b><i>"
+    is_ok(raw(['<b>', html('<i>')]), '<b><i>', 'not escaped')
+
 with subtest('t'):
     template = t(t'<p>{name}</p>')
     is_ok(template, '<p>&lt;script&gt;</p>', 't-string')

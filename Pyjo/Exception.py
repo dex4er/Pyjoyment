@@ -298,19 +298,19 @@ class Pyjo_Exception(Exception, Pyjo.Base.object, Pyjo.String.Mixin.object):
             return
         self.line = [num]
         for s in sources:
-            self.line.append(_line(s[num - 1]))
+            self.line.append(_line(s, num - 1))
 
         # Before
         for i in range(2, 7):
             if (previous := num - i) < 0:
                 break
-            self.lines_before.insert(0, [previous + 1, *(_line(s[previous]) for s in sources)])
+            self.lines_before.insert(0, [previous + 1, *(_line(s, previous) for s in sources)])
 
         # After
         for i in range(5):
             if (following := num + i) < 0 or following >= len(sources[0]):
                 continue
-            self.lines_after.append([following + 1, *(_line(s[following]) for s in sources)])
+            self.lines_after.append([following + 1, *(_line(s, following) for s in sources)])
 
 
 def check(
@@ -465,7 +465,11 @@ def _isa(err: Anything, cls: Pattern) -> bool:
     return any(cls in (c.__qualname__, f'{c.__module__}.{c.__qualname__}') for c in type(err).__mro__)
 
 
-def _line(line: bytes | str) -> str:
+# A line of a source, which is empty where an additional source is shorter, as Perl reads undef there
+def _line(source: list[bytes] | list[str], i: int) -> str:
+    if i >= len(source):
+        return ''
+    line = source[i]
     if isinstance(line, bytes):
         decoded = decode('UTF-8', line)
         line = decoded if decoded is not None else line.decode('latin-1')

@@ -279,6 +279,33 @@ class Pyjo_String_Template(Pyjo.Base.object, Pyjo.String.Mixin.object):
         return tuple(i.value for i in self._interpolations)
 
 
+def escape(value: Anything) -> str:
+    """::
+
+        string = escape(value)
+
+    Render a value as an interpolation without a conversion and a format
+    specification, escaping it unless it is markup. ::
+
+        # "&lt;b&gt;<i>"
+        escape(['<b>', html('<i>')])
+    """
+    return _value(value, None, '')
+
+
+def raw(value: Anything) -> str:
+    """::
+
+        string = raw(value)
+
+    Render a value as :func:`escape` does, but without escaping it. ::
+
+        # "<b><i>"
+        raw(['<b>', html('<i>')])
+    """
+    return _value(value, None, '', False)
+
+
 def t(template: Anything, /, **values: Anything) -> Pyjo_String_Template:
     """::
 
@@ -409,20 +436,21 @@ def _spec(format_spec: str, values: Mapping[str, Anything], frame: FrameType | N
             yield format(_convert(_lookup(field, values, frame), conversion), spec)
 
 
-def _value(value: Any, conversion: str | None, format_spec: str) -> str:
+def _value(value: Any, conversion: str | None, format_spec: str, escaped: bool = True) -> str:
     if conversion or format_spec:
-        return Pyjo.Util.xml_escape(format(_convert(value, conversion), format_spec))
+        string = format(_convert(value, conversion), format_spec)
+        return Pyjo.Util.xml_escape(string) if escaped else string
     if isinstance(value, Pyjo_String_Template):
         return _render(value.strings, value.interpolations)
     if sys.version_info >= (3, 14) and isinstance(value, Template):
         return _render(value.strings, value.interpolations)
     if (markup := getattr(value, '__html__', None)) is not None:
-        return markup()
+        return str(markup())
     if value is None:
         return ''
     if _iterable(value):
-        return ''.join(_value(v, None, '') for v in value)
-    return Pyjo.Util.xml_escape(format(value, ''))
+        return ''.join(_value(v, None, '', escaped) for v in value)
+    return Pyjo.Util.xml_escape(format(value, '')) if escaped else format(value, '')
 
 
 new = Pyjo_String_Template.new

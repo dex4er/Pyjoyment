@@ -136,6 +136,13 @@ with subtest('Inspect (UTF-8)'):
     is_deeply_ok(e.line, [4, ''], 'right line')
     is_deeply_ok(e.lines_after[0], [5, "my $s = '\xdcber\x95r\xe9sum\xe9';"], 'right line')
 
+# Not in Mojolicious: an additional source that is shorter, whose missing lines are empty, as undef is in Perl
+with subtest('Context of a shorter source'):
+    e = Pyjo.Exception.new('Died at template line 2.').inspect('a\nb\nc', 'x')
+    is_deeply_ok(e.lines_before, [[1, 'a', 'x']], 'right lines')
+    is_deeply_ok(e.line, [2, 'b', ''], 'right line')
+    is_deeply_ok(e.lines_after, [[3, 'c', '']], 'right lines')
+
 with subtest('Context'):
     e = Pyjo.Exception.new()
     is_ok(e, 'Exception!\n', 'right result')

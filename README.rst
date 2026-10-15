@@ -21,6 +21,7 @@ web framework:
 * Non-blocking I/O web server, which also runs as an ASGI, WSGI or CGI
   application.
 * HTML/XML parser with CSS selector support, and JSON with JSON Pointers.
+* Python-ish templates and template strings, with automatic escaping.
 * Containers for URLs, paths, query strings, headers, cookies and HTTP
   messages.
 * Event emitter, event loop with TCP, UDP and UNIX domain sockets, logger
@@ -45,11 +46,12 @@ Status
 Pyjoyment was written against Mojolicious 6 and is being revived as a port of
 Mojolicious 9 to Python 3.12 and newer, with ``asyncio`` as its event loop.
 The toolkit, the ``Pyjo`` package, is ported: URLs, DOM and CSS selectors,
-JSON, HTTP messages and cookies, the event loop with promises, the user agent,
-and the servers, on their own, preforking, with hot deployment or reloading,
-and through ASGI, WSGI and CGI. A ported module names the Mojolicious version
-it was ported from in its documentation. Templates and the web framework, the
-``Pyjoyment`` package with routes, controllers and plugins, are not there yet.
+JSON, templates, HTTP messages and cookies, the event loop with promises, the
+user agent, and the servers, on their own, preforking, with hot deployment or
+reloading, and through ASGI, WSGI and CGI. A ported module names the
+Mojolicious version it was ported from in its documentation. The web
+framework, the ``Pyjoyment`` package with routes, controllers and plugins, is
+not there yet.
 
 The progress is tracked in `GitHub Issues <https://github.com/dex4er/Pyjoyment/issues>`_.
 
@@ -213,10 +215,10 @@ Standalone HTTP server serving embedded template file
 .. code-block:: python
 
    import Pyjo.Server.Daemon
+   import Pyjo.Template
    import Pyjo.URL
 
    from Pyjo.Loader import data_section
-   from Pyjo.Util import xml_escape
 
    import sys
 
@@ -231,7 +233,7 @@ Standalone HTTP server serving embedded template file
 
    # Embedded template file
    DATA = r"""
-   @@ index.html.tpl
+   @@ index.html.ep
    <!DOCTYPE html>
    <html>
    <head>
@@ -241,10 +243,12 @@ Standalone HTTP server serving embedded template file
    <body>
    <h1>♥ Pyjoyment ♥</h1>
    <h2>This page is served by Pyjoyment framework.</h2>
-   <p>{method} request for {path}</p>
+   <p><%= method %> request for <%= path %></p>
    </body>
    </html>
    """
+
+   template = Pyjo.Template.new(auto_escape=True, vars=True).parse(data_section(__name__, 'index.html.ep'))
 
 
    @daemon.on
@@ -253,13 +257,10 @@ Standalone HTTP server serving embedded template file
        method = tx.req.method
        path = tx.req.url.path
 
-       # Template
-       template = data_section(__name__, 'index.html.tpl')
-
        # Response
        tx.res.code = 200
        tx.res.headers.content_type = 'text/html; charset=utf-8'
-       tx.res.body = template.format(method=xml_escape(method), path=xml_escape(str(path))).encode()
+       tx.res.body = template.process({'method': method, 'path': path}).encode()
 
        # Resume transaction
        tx.resume()

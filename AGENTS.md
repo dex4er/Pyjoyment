@@ -446,6 +446,14 @@ copy:
   helper returns it, is `Pyjo.String.HTML`, `html(...)`: escaping leaves only
   what has the method `__html__`, so a string that `u()` or
   `Pyjo.Collection.join` makes is escaped.
+- Perl code in a template of `Mojo::Template` is Python code in
+  `Pyjo.Template`, and the templates of a Mojo test are translated with it:
+  `@_` is `args`, a block of Perl in braces is a block of Python, with braces
+  or with `:` and `end`, a statement modifier is a block of its own, and
+  `begin` and `end` compile to a nested `def` that is defined before the
+  statement that uses it, as a lambda cannot hold statements. The compiled
+  code is not line for line the template, as the one of Mojo is, so a map
+  gives the template lines of a traceback.
 - A callback that Mojo calls with `$_` gets the element as its first
   argument. A method name in a string, as in `$collection->map('text')`, can
   name a property, which is how a Mojo attribute is ported.
