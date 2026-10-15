@@ -2,11 +2,9 @@ from Pyjo.Test import *
 
 import contextlib
 import io
+import os
 import warnings
 
-
-# Pyjo.Util is brought to Mojolicious 9.49 one function at a time, so only the
-# documented code of those functions is here
 
 with subtest('Synopsis'):
     from Pyjo.Util import b64_encode, url_escape, url_unescape
@@ -15,6 +13,13 @@ with subtest('Synopsis'):
     escaped = url_escape(string)
     is_ok(url_unescape(escaped), 'test=23', 'url_unescape')
     is_ok(b64_encode(escaped.encode(), ''), 'dGVzdCUzRDIz', 'b64_encode')
+
+with subtest('Description'):
+    from Pyjo.Util import die, getenv
+
+    home = getenv('HOME') or die('HOME is not defined')
+    is_ok(home, os.environ['HOME'], 'defined')
+    throws_ok(lambda: getenv('PYJO_DOCS_UNDEFINED') or die('HOME is not defined'), SystemExit, 'not defined')
 
 with subtest('camelize'):
     from Pyjo.Util import camelize
@@ -73,6 +78,13 @@ with subtest('deprecated'):
     is_ok(str(caught[0].message), 'foo is DEPRECATED in favor of bar', 'warning')
     is_ok(caught[0].category, DeprecationWarning, 'category')
 
+with subtest('die'):
+    from Pyjo.Util import die
+
+    throws_ok(lambda: die(Exception('Something went wrong')), 'Something went wrong', 'exception')
+    throws_ok(lambda: die('Exit immediately'), SystemExit, 'exit')
+    throws_ok(lambda: os.environ.get('PYJO_DOCS_UNDEFINED') or die('HOME is not defined'), SystemExit, 'expression')
+
 with subtest('dumper'):
     from Pyjo.Util import dumper
 
@@ -82,6 +94,13 @@ with subtest('generate_secret'):
     from Pyjo.Util import generate_secret
 
     like_ok(generate_secret(), r'^[A-Za-z0-9_-]{171}$', 'random secret')
+
+with subtest('header_params'):
+    from Pyjo.Util import header_params
+
+    params, remainder = header_params('one=foo; two="bar", three=baz')
+    is_deeply_ok(params, {'one': 'foo', 'two': 'bar'}, 'params')
+    is_ok(remainder, ', three=baz', 'remainder')
 
 with subtest('hmac_sha1_sum'):
     from Pyjo.Util import hmac_sha1_sum
@@ -152,6 +171,18 @@ with subtest('network_contains'):
     ok(not network_contains('10.10.10.12', '10.10.10.10'), 'other address')
     ok(not network_contains('fc00::/7', '::1'), 'outside the IPv6 network')
 
+with subtest('notnone'):
+    from Pyjo.Util import getenv, notnone
+
+    def print_log(msg, **kwargs):
+        level = notnone(kwargs.get('log_level'), lambda: int(getenv('LOG_LEVEL', '3')))
+        return level
+
+    is_ok(print_log('x', log_level=1), 1, 'value')
+    is_ok(print_log('x', log_level=0), 0, 'false value')
+    if 'LOG_LEVEL' not in os.environ:
+        is_ok(print_log('x'), 3, 'default value')
+
 with subtest('punycode_decode'):
     from Pyjo.Util import punycode_decode
 
@@ -196,6 +227,33 @@ with subtest('slugify'):
 
     # "this-is-my-résumé"
     is_ok(slugify('This is: my - résumé! ☃ ', True), 'this-is-my-résumé', 'unicode')
+
+with subtest('split_cookie_header'):
+    from Pyjo.Util import split_cookie_header
+
+    tree = split_cookie_header('a=b; expires=Thu, 07 Aug 2008 07:07:59 GMT')
+    is_deeply_ok(tree, [[('a', 'b'), ('expires', 'Thu, 07 Aug 2008 07:07:59 GMT')]], 'tree')
+
+with subtest('split_header'):
+    from Pyjo.Util import split_header
+
+    tree = split_header('foo="bar baz"; test=123, yada')
+    is_deeply_ok(tree, [[('foo', 'bar baz'), ('test', '123')], [('yada', None)]], 'tree')
+
+    # 'one'
+    is_ok(split_header('one; two="three four", five=six')[0][0][0], 'one', 'one')
+
+    # 'two'
+    is_ok(split_header('one; two="three four", five=six')[0][1][0], 'two', 'two')
+
+    # 'three four'
+    is_ok(split_header('one; two="three four", five=six')[0][1][1], 'three four', 'three four')
+
+    # 'five'
+    is_ok(split_header('one; two="three four", five=six')[1][0][0], 'five', 'five')
+
+    # 'six'
+    is_ok(split_header('one; two="three four", five=six')[1][0][1], 'six', 'six')
 
 with subtest('tablify'):
     from Pyjo.Util import tablify
