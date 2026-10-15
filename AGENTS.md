@@ -242,6 +242,18 @@ goes, so code must not rely on that: resizing a `bytearray` that a regex
 iterator still scans raises `BufferError`, and `__del__` may not run at all
 before the interpreter exits.
 
+A test script with the syntax of a newer Python, as the t-strings of Python
+3.14, cannot skip itself on an older one with `plan(skip_all=...)`, as that
+Python does not compile it. It names the version in the inline metadata of
+PEP 723, and `Pyjo.Prove` skips it without running it; Perl's `prove` does
+not read it.
+
+```python
+# /// script
+# requires-python = ">=3.14"
+# ///
+```
+
 ## Benchmarks
 
 `benchmarks/` measures hello world servers with one connection and one

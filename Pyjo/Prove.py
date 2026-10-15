@@ -21,6 +21,16 @@ plan of ``1..0 # SKIP reason`` skips the whole script. ``Bail out!`` stops the
 whole run. Indented lines belong to subtests and are not parsed: the parent
 test point stands for the whole subtest.
 
+A script with the inline metadata of
+`PEP 723 <https://peps.python.org/pep-0723/>`_ is skipped without running when
+the Python that runs it does not satisfy its ``requires-python``, as a script
+with the syntax of a newer Python, which an older one cannot compile, so that
+the script cannot skip itself. ::
+
+    # /// script
+    # requires-python = ">=3.14"
+    # ///
+
 The exit status is ``0`` when every test script passed and ``1`` otherwise.
 Ctrl-C (``SIGINT``) stops the run: the test scripts that are running are
 killed, with the processes they started, and the harness dies of the signal,
@@ -61,14 +71,16 @@ Functions
 
 import argparse
 import asyncio
+import operator
 import os
 import re
 import shlex
 import signal
 import sys
 import time
+import tomllib
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 
 
@@ -83,6 +95,8 @@ RE_TEST = re.compile(
 )
 RE_BAIL_OUT = re.compile(r'Bail out!\s*(.*?)\s*$')
 RE_SKIP = re.compile(r'skip\b\s*(.*)', re.IGNORECASE)
+RE_METADATA = re.compile(r'(?m)^# /// (?P<type>[a-zA-Z0-9-]+)$\s(?P<content>(^#(| .*)$\s)+)^# ///$')
+RE_SPECIFIER = re.compile(r'\s*(~=|===|==|!=|<=|>=|<|>)\s*v?(\d+(?:\.\d+)*)(\.\*)?\s*')
 
 
 @dataclass
@@ -198,8 +212,21 @@ async def run_script(
     Run a test script and parse its TAP output. The standard error of the
     script goes to the standard error of this process. A script that runs
     longer than ``timeout`` seconds is killed, with the processes it started.
+    A script whose ``requires-python`` the Python of the command does not
+    satisfy is skipped without running.
     """
     result = Result(path)
+    try:
+        requires = _requires_python(path)
+        if requires is not None and (version := await _python(command)) is not None:
+            if not _satisfies(version, requires):
+                result.planned = 0
+                result.skip_all = f'requires Python {requires}'
+                return result
+    except ValueError as e:
+        result.errors.append(f'Invalid script metadata: {e}')
+        return result
+
     # The script leads a process group of its own, so that the processes it starts are killed with it
     process = await asyncio.create_subprocess_exec(
         *command,
@@ -361,6 +388,89 @@ def main(argv: Sequence[str] | None = None) -> int:
         os.kill(os.getpid(), signal.SIGINT)
         raise
     return 0 if len(results) == len(scripts) and all(r.passed for r in results) else 1
+
+
+# The version of the Python that a command runs, asked once for a command other than this Python
+_PYTHONS: dict[tuple[str, ...], tuple[int, ...] | None] = {}
+
+_OPERATORS: dict[str, Callable[[tuple[int, ...], tuple[int, ...]], bool]] = {
+    '===': operator.eq,
+    '==': operator.eq,
+    '!=': operator.ne,
+    '<=': operator.le,
+    '>=': operator.ge,
+    '<': operator.lt,
+    '>': operator.gt,
+}
+
+
+async def _python(command: Sequence[str]) -> tuple[int, ...] | None:
+    key = tuple(command)
+    if key not in _PYTHONS:
+        if list(command) == [sys.executable]:
+            _PYTHONS[key] = tuple(sys.version_info[:3])
+        else:
+            _PYTHONS[key] = None
+            try:
+                process = await asyncio.create_subprocess_exec(
+                    *command,
+                    '-c',
+                    'import sys; print(*sys.version_info[:3])',
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.DEVNULL,
+                )
+                out, _ = await process.communicate()
+                if process.returncode == 0 and len(version := tuple(int(n) for n in out.split())) == 3:
+                    _PYTHONS[key] = version
+            except (OSError, ValueError):
+                pass
+    return _PYTHONS[key]
+
+
+# The requires-python of the inline metadata of PEP 723, as its reference implementation reads it
+def _requires_python(path: str) -> str | None:
+    try:
+        with open(path, encoding='utf-8', errors='replace') as f:
+            source = f.read()
+    except OSError:
+        return None
+    blocks = [m for m in RE_METADATA.finditer(source) if m.group('type') == 'script']
+    if not blocks:
+        return None
+    if len(blocks) > 1:
+        raise ValueError('Multiple script blocks found')
+    content = ''.join(
+        line[2:] if line.startswith('# ') else line[1:] for line in blocks[0].group('content').splitlines(keepends=True)
+    )
+    requires = tomllib.loads(content).get('requires-python')
+    if requires is not None and not isinstance(requires, str):
+        raise ValueError('requires-python is not a string')
+    return requires
+
+
+# The version specifiers of PEP 440 for a release, without pre-, post- and development releases
+def _satisfies(version: tuple[int, ...], specifier: str) -> bool:
+    satisfied = True
+    for clause in specifier.split(','):
+        if (m := RE_SPECIFIER.fullmatch(clause)) is None or (m.group(3) and m.group(1) not in ('==', '!=')):
+            raise ValueError(f'Invalid requires-python: {specifier}')
+        op, release, wildcard = m.groups()
+        want = tuple(int(n) for n in release.split('.'))
+        if wildcard:
+            satisfied = satisfied and (version[: len(want)] == want) == (op == '==')
+        elif op == '~=':
+            if len(want) < 2:
+                raise ValueError(f'Invalid requires-python: {specifier}')
+            satisfied = (
+                satisfied and _pad(version, want) >= _pad(want, version) and version[: len(want) - 1] == want[:-1]
+            )
+        else:
+            satisfied = satisfied and _OPERATORS[op](_pad(version, want), _pad(want, version))
+    return satisfied
+
+
+def _pad(version: tuple[int, ...], other: tuple[int, ...]) -> tuple[int, ...]:
+    return version + (0,) * (len(other) - len(version))
 
 
 def _status_line(result: Result, width: int) -> str:

@@ -202,6 +202,78 @@ with subtest('Run passing and skipped scripts'):
     like_ok(out, r'(?m)^Result: PASS$', 'result')
     is_ok(code, 0, 'right exit status')
 
+with subtest('Scripts that require a version of Python'):
+
+    def requires(specifier):
+        return f"""
+            # /// script
+            # requires-python = "{specifier}"
+            # ///
+            from Pyjo.Test import *
+            ok(True)
+            done_testing()
+        """
+
+    version = '.'.join(map(str, sys.version_info[:3]))
+    minor = '.'.join(map(str, sys.version_info[:2]))
+    scripts = {
+        'newer.py': requires('>=99'),
+        'older.py': requires('<3'),
+        'this.py': requires(f'=={version}'),
+        'wildcard.py': requires(f'=={minor}.*'),
+        'not_wildcard.py': requires(f'!={minor}.*'),
+        'compatible.py': requires(f'~={minor}'),
+        'range.py': requires(f'>={minor}, <99'),
+        'out_of_range.py': requires(f'>={minor}, <3'),
+        'syntax.py': """
+            # /// script
+            # requires-python = ">=99"
+            # ///
+            this is not Python
+        """,
+        'other_block.py': """
+            # /// pyproject
+            # requires-python = ">=99"
+            # ///
+            from Pyjo.Test import *
+            ok(True)
+            done_testing()
+        """,
+        'invalid.py': requires('3.12'),
+        'invalid_wildcard.py': requires('>=3.*'),
+        'invalid_toml.py': """
+            # /// script
+            # requires-python = >=3
+            # ///
+        """,
+    }
+    out, code = prove(*scripts, scripts=scripts)
+    like_ok(out, r'(?m)^newer\.py \.+ skipped: requires Python >=99$', 'newer Python')
+    like_ok(out, r'(?m)^older\.py \.+ skipped: requires Python <3$', 'older Python')
+    like_ok(out, r'(?m)^this\.py \.+ ok$', 'this version')
+    like_ok(out, r'(?m)^wildcard\.py \.+ ok$', 'wildcard')
+    like_ok(out, r'(?m)^not_wildcard\.py \.+ skipped: ', 'excluded wildcard')
+    like_ok(out, r'(?m)^compatible\.py \.+ ok$', 'compatible release')
+    like_ok(out, r'(?m)^range\.py \.+ ok$', 'range')
+    like_ok(out, r'(?m)^out_of_range\.py \.+ skipped: ', 'out of range')
+    like_ok(out, r'(?m)^syntax\.py \.+ skipped: requires Python >=99$', 'not compiled')
+    like_ok(out, r'(?m)^other_block\.py \.+ ok$', 'other block')
+    like_ok(out, r'(?m)^invalid\.py \.+ Dubious$', 'invalid specifier')
+    like_ok(out, r'(?m)^  Invalid script metadata: Invalid requires-python: 3\.12$', 'invalid specifier reported')
+    like_ok(out, r'(?m)^invalid_wildcard\.py \.+ Dubious$', 'invalid wildcard')
+    like_ok(out, r'(?m)^invalid_toml\.py \.+ Dubious$', 'invalid TOML')
+    is_ok(code, 1, 'right exit status')
+
+    scripts = {'newer.py': requires('>=99'), 'this.py': requires(f'=={version}')}
+    out, code = prove('--exec', f'{sys.executable} -X utf8', *scripts, scripts=scripts)
+    like_ok(out, r'(?m)^newer\.py \.+ skipped: requires Python >=99$', 'newer Python of the command')
+    like_ok(out, r'(?m)^this\.py \.+ ok$', 'this version of the command')
+    is_ok(code, 0, 'right exit status')
+
+    scripts = {'unknown.py': requires('>=99')}
+    out, code = prove('--exec', 'sh', *scripts, scripts=scripts)
+    like_ok(out, r'(?m)^unknown\.py \.+ Dubious$', 'run when the version of the command is unknown')
+
 with subtest('Run failing scripts'):
     out, code = prove('fail.py', 'noplan.py', 'badplan.py', 'die.py')
     like_ok(out, r'(?m)^fail\.py \.+ Failed 2/3 subtests$', 'failures')
