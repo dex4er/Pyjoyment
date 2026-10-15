@@ -130,6 +130,48 @@ with subtest('A recurring timer that again restarts'):
     ok(len(fired) >= 1, 'fired')
     ok(fired[0] >= 0.14, 'not before the time from the restart')
 
+with subtest('Start runs the loop once for many events'):
+    reactor = Pyjo.Reactor.Asyncio.new()
+    loop = reactor.loop
+    runs = []
+    run_forever = loop.run_forever
+
+    def counted():
+        runs.append(1)
+        return run_forever()
+
+    loop.run_forever = counted
+    ticks = []
+
+    def tick(reactor):
+        ticks.append(1)
+        if len(ticks) == 5:
+            reactor.stop()
+
+    reactor.recurring(0, tick)
+    reactor.start()
+    del loop.run_forever
+    is_ok(len(ticks), 5, 'five events')
+    is_ok(len(runs), 1, 'one run of the loop')
+    ok(not reactor.is_running, 'not running')
+
+with subtest('Start stops once nothing is left to watch'):
+    reactor = Pyjo.Reactor.Asyncio.new()
+    fired = []
+    reactor.timer(0.01, lambda reactor: fired.append('first'))
+    reactor.timer(0.02, lambda reactor: fired.append('second'))
+    reactor.start()
+    is_deeply_ok(fired, ['first', 'second'], 'both timers')
+    ok(not reactor.is_running, 'not running')
+
+with subtest('Start stops from a callback of asyncio'):
+    reactor = Pyjo.Reactor.Asyncio.new()
+    reactor.recurring(0.01, lambda reactor: None)
+    reactor.loop.call_later(0.05, reactor.stop)
+    reactor.start()
+    ok(not reactor.is_running, 'stopped')
+    reactor.reset()
+
 with subtest('Handles'):
     reactor = Pyjo.Reactor.Asyncio.new()
     a, b = socket.socketpair()
