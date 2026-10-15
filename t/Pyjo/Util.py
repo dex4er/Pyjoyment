@@ -1,3 +1,4 @@
+from Pyjo.String.HTML import html
 from Pyjo.String.Unicode import u
 from Pyjo.Test import *
 from Pyjo.Util import (
@@ -182,7 +183,9 @@ with subtest('xml_escape (nothing to escape)'):
 
 with subtest('xml_escape (XSS)'):
     is_ok(xml_escape('<p>'), '&lt;p&gt;', 'right XSS escaped result')
-    is_ok(xml_escape(u('<p>')), '<p>', 'right XSS escaped result')
+    # Unlike Mojolicious: markup is Pyjo.String.HTML, not every Pyjo.String.Unicode, as Mojo::ByteStream is
+    is_ok(xml_escape(html('<p>')), '<p>', 'right XSS escaped result')
+    is_ok(xml_escape(u('<p>')), '&lt;p&gt;', 'right XSS escaped result')
 
 with subtest('punycode_encode'):
     is_ok(punycode_encode('bücher'), 'bcher-kva', 'right punycode encoded result')

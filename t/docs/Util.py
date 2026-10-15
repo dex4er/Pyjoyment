@@ -158,8 +158,8 @@ with subtest('xml_escape'):
     is_ok(xml_escape('<div>'), '&lt;div&gt;', '<div>')
 
     # "<div>"
-    from Pyjo.String.Unicode import u
+    from Pyjo.String.HTML import html
 
-    is_ok(xml_escape(u('<div>')), '<div>', "u('<div>')")
+    is_ok(xml_escape(html('<div>')), '<div>', "html('<div>')")
 
 done_testing()
