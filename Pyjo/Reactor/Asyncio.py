@@ -460,13 +460,21 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
         if (io := self._io.get(fd)) is None:
             Pyjo.Exception.object.throw('I/O watcher not active')
 
-        self._unwatch(fd, io)
+        # Not in Mojolicious: only the events that change are added or removed, as each is a call of the selector of
+        # asyncio, where Mojo sets the mask of the handle
         loop = self.loop
-        if read:
-            loop.add_reader(fd, Pyjo_Reactor_Asyncio._weak_ready, weakref.ref(self), fd, False)
-        if write:
-            loop.add_writer(fd, Pyjo_Reactor_Asyncio._weak_ready, weakref.ref(self), fd, True)
-        io['read'], io['write'] = bool(read), bool(write)
+        read, write = bool(read), bool(write)
+        if read != io['read']:
+            if read:
+                loop.add_reader(fd, Pyjo_Reactor_Asyncio._weak_ready, weakref.ref(self), fd, False)
+            else:
+                loop.remove_reader(fd)
+        if write != io['write']:
+            if write:
+                loop.add_writer(fd, Pyjo_Reactor_Asyncio._weak_ready, weakref.ref(self), fd, True)
+            else:
+                loop.remove_writer(fd)
+        io['read'], io['write'] = read, write
 
         return self
 
