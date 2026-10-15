@@ -22,17 +22,21 @@ import functools
 import hashlib
 import hmac
 import os
+import pprint
 import re
+import secrets
 import socket
 import sys
 import time
 import unicodedata
+import warnings
 import zlib
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from gzip import compress as _gzip_compress
 from gzip import decompress as _gzip_decompress
-from typing import NoReturn, Protocol, cast, overload
+from types import FunctionType, ModuleType, TracebackType
+from typing import Any, NoReturn, Protocol, cast, overload
 
 
 # "Sun, 06 Nov 1994 08:49:37 GMT" and "Sunday, 06-Nov-94 08:49:37 GMT"
@@ -100,6 +104,49 @@ def camelize(string: str) -> str:
     return '::'.join(''.join(_ucfirst(w.lower()) for w in _split('_', part)) for part in _split('-', string))
 
 
+def class_to_file(class_: str) -> str:
+    """::
+
+        file = class_to_file('Foo.Bar')
+
+    Convert a class name to a file. ::
+
+        # "foo_bar"
+        class_to_file('Foo.Bar')
+
+        # "foobar"
+        class_to_file('FOO.Bar')
+
+        # "foo_bar"
+        class_to_file('FooBar')
+
+        # "foobar"
+        class_to_file('FOOBar')
+    """
+    # Left out from Mojolicious: the deprecated package separator "'", which Python has never had
+    class_ = class_.replace('.', '')
+    class_ = re.sub(r'([A-Z])([A-Z]*)', lambda m: m[1] + m[2].lower(), class_)
+    return decamelize(class_)
+
+
+def class_to_path(class_: str) -> str:
+    """::
+
+        path = class_to_path('Foo.Bar')
+
+    Convert class name to path, as a module is found in a directory of
+    :data:`sys.path`. ::
+
+        # "Foo/Bar.py"
+        class_to_path('Foo.Bar')
+
+        # "FooBar.py"
+        class_to_path('FooBar')
+    """
+    # Left out from Mojolicious: the deprecated package separator "'", which Python has never had
+    return '/'.join(class_.split('.')) + '.py'
+
+
 def decamelize(string: str) -> str:
     """::
 
@@ -145,6 +192,26 @@ def decode(charset: str, data: str | bytes) -> str | None:
         return None
 
 
+# TODO: decrypt_cookie, with the sessions of Pyjoyment, which needs ChaCha20-Poly1305, not in the standard library
+
+
+def deprecated(*args: object) -> None:
+    """::
+
+        deprecated('foo is DEPRECATED in favor of bar')
+
+    Warn about deprecated feature from perspective of caller, with a
+    :exc:`DeprecationWarning`. You can also set the ``PYJO_FATAL_DEPRECATIONS``
+    environment variable to make them raise it instead.
+    """
+    msg = ''.join(map(str, args))
+    if os.environ.get('PYJO_FATAL_DEPRECATIONS'):
+        raise DeprecationWarning(msg)
+    # Unlike Mojolicious: the filters of warnings decide whether the warning is shown, as Python shows a
+    # DeprecationWarning by default only where __main__ triggers it, where Mojo always warns
+    warnings.warn(msg, DeprecationWarning, stacklevel=3)
+
+
 def die(e: BaseException | str) -> NoReturn:
     """::
 
@@ -162,6 +229,16 @@ def die(e: BaseException | str) -> NoReturn:
         raise SystemExit(e)
 
 
+def dumper(*values: object) -> str:
+    """::
+
+        python = dumper({'some': 'data'})
+
+    Dump a Python data structure with :mod:`pprint`.
+    """
+    return ''.join(pprint.pformat(value) + '\n' for value in values)
+
+
 def encode(charset: str, chars: str) -> bytes:
     """::
 
@@ -175,6 +252,22 @@ def encode(charset: str, chars: str) -> bytes:
     except LookupError:
         raise LookupError(f"Unknown encoding '{charset}'") from None
     return chars.encode(charset, 'replace')
+
+
+# TODO: encrypt_cookie, with the sessions of Pyjoyment, which needs ChaCha20-Poly1305, not in the standard library
+
+# TODO: extract_usage, with the commands of Pyjoyment
+
+
+def generate_secret() -> str:
+    """::
+
+        secret = generate_secret()
+
+    Generate a random secret with a cryptographically secure random number
+    generator.
+    """
+    return secrets.token_urlsafe(128)
 
 
 @overload
@@ -195,6 +288,9 @@ def getenv(name: str, default: str | None = None) -> str | None:
     if variable is not defined.
     """
     return os.environ.get(name, default)
+
+
+# TODO: getopt, with the commands of Pyjoyment
 
 
 def gunzip(compressed: bytes) -> bytes:
@@ -359,6 +455,32 @@ def md5_sum(data: bytes) -> str:
     return hashlib.md5(data).hexdigest()
 
 
+def monkey_patch(target: type | ModuleType, **patch: Callable[..., Any]) -> None:
+    """::
+
+        monkey_patch(cls, foo=lambda: ...)
+        monkey_patch(module, foo=lambda: ...)
+        monkey_patch(cls, foo=lambda: ..., bar=lambda: ...)
+
+    Monkey patch functions into a class or a module, with names of their
+    own. ::
+
+        monkey_patch(MyApp,
+                     one=lambda: print('One!'),
+                     two=lambda: print('Two!'),
+                     three=lambda: print('Three!'))
+    """
+    # Unlike Mojolicious: a class or a module, not the name of a package, which Mojo creates when it does not exist
+    if isinstance(target, type):
+        module, prefix = target.__module__, target.__qualname__ + '.'
+    else:
+        module, prefix = target.__name__, ''
+    for name, cb in patch.items():
+        if isinstance(cb, FunctionType):
+            cb.__module__, cb.__name__, cb.__qualname__ = module, name, prefix + name
+        setattr(target, name, cb)
+
+
 def network_contains(cidr: str, addr: str) -> bool:
     """::
 
@@ -477,6 +599,38 @@ def quote(string: str | bytes) -> str | bytes:
     else:
         string = re_u_quote.sub(r'\\\1', string)
         return '"' + string + '"'
+
+
+def random_bytes(count: int) -> bytes:
+    """::
+
+        random = random_bytes(count)
+
+    Generate ``count`` bytes worth of high entropy randomness.
+    """
+    if not isinstance(count, int) or count < 0:  # pyright: ignore[reportUnnecessaryIsInstance]
+        import Pyjo.Exception
+
+        raise Pyjo.Exception.new('Byte count must be a defined, non-negative integer')
+    return secrets.token_bytes(count)
+
+
+def scope_guard(cb: Callable[[], object]) -> '_Guard':
+    """::
+
+        with scope_guard(lambda: ...):
+            ...
+
+    Create anonymous scope guard object that will execute the passed callback
+    when the ``with`` block ends. ::
+
+        # Execute callback at end of block
+        with scope_guard(lambda: print('Mojo!')):
+            print('Hello')
+    """
+    # Unlike Mojolicious: a context manager, not an object that calls back when it is destroyed, as PyPy frees an
+    # object only when its garbage collector runs
+    return _Guard(cb)
 
 
 def secure_compare(one: str | bytes, two: str | bytes) -> bool:
@@ -636,6 +790,31 @@ def steady_time() -> float:
     :func:`time.monotonic`.
     """
     return time.monotonic()
+
+
+def tablify(rows: Sequence[Sequence[object]]) -> str:
+    r"""::
+
+        table = tablify([['foo', 'bar'], ['baz', 'yada']])
+
+    Row-oriented generator for text tables. ::
+
+        # "foo   bar\nyada  yada\nbaz   yada\n"
+        tablify([['foo', 'bar'], ['yada', 'yada'], ['baz', 'yada']])
+    """
+    table = [[re.sub(r'[\r\n]', '', str(v) if v is not None else '') for v in row] for row in rows]
+
+    spec: list[int] = []
+    for row in table:
+        for i, v in enumerate(row):
+            if i >= len(spec):
+                spec.append(len(v))
+            elif len(v) >= spec[i]:
+                spec[i] = len(v)
+
+    return ''.join(
+        '  '.join(v.ljust(spec[i]) if i < len(spec) - 1 else v for i, v in enumerate(row)) + '\n' for row in table
+    )
 
 
 def term_escape(string: str) -> str:
@@ -3070,6 +3249,19 @@ def _entity(point: str | None, name: str | None, attr: bool) -> str:
     return '&' + rest[::-1]
 
 
+class _Guard:
+    def __init__(self, cb: Callable[[], object]) -> None:
+        self.cb = cb
+
+    def __enter__(self) -> None:
+        pass
+
+    def __exit__(
+        self, exc_type: type[BaseException] | None, exc: BaseException | None, tb: TracebackType | None
+    ) -> None:
+        self.cb()
+
+
 def _header(string: str, cookie: bool) -> list[list[tuple[str, str | None]]]:
     tree: list[list[tuple[str, str | None]]] = []
     part: list[tuple[str, str | None]] = []
@@ -3111,6 +3303,9 @@ def _html(string: str, attr: bool) -> str:
 
 def _round(number: float) -> str:
     return f'{int(number * 10 + 0.5) / 10 if number < 10 else int(number + 0.5):.15g}'
+
+
+# TODO: _stash, with the controller of Pyjoyment
 
 
 # Perl's split, which drops the empty fields at the end
