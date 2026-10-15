@@ -42,6 +42,7 @@ Functions
 ---------
 """
 
+import Pyjo.Base
 import Pyjo.Collection
 import Pyjo.String.Bytes
 import Pyjo.Util
@@ -353,10 +354,7 @@ class Pyjo_String_Unicode(str):
 
         Alias for :meth:`Pyjo.Base.tap`.
         """
-        if callable(cb):
-            cb(self, *args, **kwargs)
-        else:
-            getattr(self, cb)(*args, **kwargs)
+        Pyjo.Base.tap(self, cb, *args, **kwargs)
         return self
 
     def term_escape(self) -> Self:

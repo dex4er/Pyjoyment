@@ -1,56 +1,116 @@
-if __name__ == '__main__':
-    from Pyjo.Test import *  # noqa
+from Pyjo.Test import *
 
-    import Pyjo.Base
+import contextlib
+import io
 
-    from Pyjo.Util import notnone
 
-    class Cat(Pyjo.Base.object):
-        def __init__(self, **kwargs):
-            self.name = kwargs.get('name', 'Nyan')
-            self.birds = kwargs.get('birds', 2)
-            self.mice = kwargs.get('mice', 2)
+with subtest('Synopsis'):
+    output = io.StringIO()
+    with contextlib.redirect_stdout(output):
+        import Pyjo.Base
 
-    class Tiger(Cat):
-        def __init__(self, **kwargs):
-            super().__init__(**kwargs)
-            self.friend = notnone(kwargs.get('friend'), lambda: Cat())
-            self.stripes = kwargs.get('stripes', 42)
+        from dataclasses import dataclass, field
 
-    mew = Cat.new(name='Longcat')
-    is_ok(mew.mice, 2, 'mew.mice')
-    is_ok(mew.set(mice=3, birds=4).mice, 3, 'mew.set(...).mice')
+        @dataclass
+        class Cat(Pyjo.Base.object):
+            name: str = 'Nyan'
+            age: int = 4
+            weight: int = 4
 
-    rawr = Tiger.new(stripes=23, mice=0)
-    is_ok(rawr.tap(lambda rawr: rawr.friend.set(name='Tacgnol')).mice, 0, 'rawr.tap(...).mice')
+        @dataclass
+        class Tiger(Cat):
+            friend: Cat = field(default_factory=Cat)
+            stripes: int = 42
 
+        mew = Cat.new(name='Longcat')
+        print(mew.age)
+        print(mew.set(age=3, weight=5).age)
+
+        rawr = Tiger.new(stripes=38, weight=250)
+        print(rawr.tap(lambda rawr: rawr.friend.set(name='Tacgnol')).weight)
+    is_ok(output.getvalue(), '4\n3\n250\n', 'output')
+    is_ok(rawr.friend.name, 'Tacgnol', 'friend')
+
+with subtest('Description'):
+
+    class Lion(Cat):
+        @property
+        def pride(self):
+            if not hasattr(self, '_pride'):
+                self._pride = [Cat.new(), Cat.new()]
+            return self._pride
+
+    lion = Lion.new()
+    is_ok(len(lion.pride), 2, 'built')
+    ok(lion.pride is lion.pride, 'built once')
+
+with subtest('Fluent interfaces'):
+
+    @dataclass
+    class Duck(Pyjo.Base.object):
+        name: str | None = None
+
+        def quack(self):
+            print(f'{self.name}: Quack!')
+
+    output = io.StringIO()
+    with contextlib.redirect_stdout(output):
+        Duck.new().set(name='Donald').quack()
+    is_ok(output.getvalue(), 'Donald: Quack!\n', 'output')
+
+with subtest('new'):
+
+    @dataclass
     class SubClass(Pyjo.Base.object):
-        def __init__(self, **kwargs):
-            self.name = kwargs.get('name')
+        name: str | None = None
+        other: str | None = None
 
-    # new
+        def some_method(self, *args):
+            self.other = ' '.join(args) or 'called'
+
     obj = SubClass.new()
-    isa_ok(obj, SubClass, 'obj')
-    none_ok(obj.name, 'obj.name')
-
+    is_ok(obj.name, None, 'no name')
     obj = SubClass.new(name='value')
-    is_ok(obj.name, 'value', 'obj.name')
+    is_ok(obj.name, 'value', 'name')
+    obj = SubClass.new(**{'name': 'value'})
+    is_ok(obj.name, 'value', 'name from a dict')
 
-    # set
-    obj = SubClass.new()
+with subtest('set'):
     obj = obj.set(name='value')
-    isa_ok(obj, SubClass, 'obj')
-    is_ok(obj.name, 'value', 'obj.name')
+    is_ok(obj.name, 'value', 'name')
+    obj = obj.set(name='value', other='value')
+    is_ok(obj.other, 'value', 'other')
 
-    # tap
-    obj = SubClass.new()
-    obj = obj.tap(lambda obj: obj.set(name='value'))
-    isa_ok(obj, SubClass, 'obj')
-    is_ok(obj.name, 'value', 'obj.name')
+    # Longer version
+    obj.name = 'value'
+    is_ok(obj.name, 'value', 'name')
 
-    obj = SubClass.new()
-    obj = obj.tap('set', name='value')
-    isa_ok(obj, SubClass, 'obj')
-    is_ok(obj.name, 'value', 'obj.name')
+with subtest('tap'):
+    obj = obj.tap(lambda obj: obj.set(name='tapped'))
+    is_ok(obj.name, 'tapped', 'callback')
+    obj = obj.tap('some_method')
+    is_ok(obj.other, 'called', 'method')
+    args = ('a', 'b')
+    obj = obj.tap('some_method', *args)
+    is_ok(obj.other, 'a b', 'method with arguments')
 
-    done_testing()
+    # Longer version
+    obj = obj.tap(lambda obj: obj.some_method(*args))
+    is_ok(obj.other, 'a b', 'longer version')
+
+    # Inject side effects into a method chain
+    output = io.StringIO()
+    with contextlib.redirect_stdout(output):
+        obj.set(foo='A').tap(lambda obj: print(obj.foo)).set(foo='B')
+    is_ok(output.getvalue(), 'A\n', 'side effect')
+    is_ok(obj.foo, 'B', 'chain continues')
+
+with subtest('tap function'):
+    from Pyjo.Base import tap
+
+    tap(obj, lambda obj: obj.set(name='function'))
+    is_ok(obj.name, 'function', 'callback')
+    tap(obj, 'some_method', *args)
+    is_ok(obj.other, 'a b', 'method')
+
+done_testing()
