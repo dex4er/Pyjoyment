@@ -73,9 +73,9 @@ class Pyjo_UserAgent_Server(Pyjo.Base.object):
         self._previous: set[int] = set()
 
     def __del__(self) -> None:
-        if sys.is_finalizing():
-            return
         try:
+            if sys.is_finalizing():
+                return
             self.restart()
         except Exception:
             pass

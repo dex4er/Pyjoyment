@@ -382,9 +382,9 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
         self._locations = value
 
     def __del__(self) -> None:
-        if sys.is_finalizing():
-            return
         try:
+            if sys.is_finalizing():
+                return
             self._cleanup()
         except Exception:
             pass
