@@ -8,9 +8,9 @@ agent, servers, event loop), and the `Pyjoyment` package is reserved for the
 `Mojolicious::*` framework layer (routes, controllers, renderer, `Lite`).
 
 The code was written against Mojo 6.x. The project is being revived: the
-target is Mojolicious 9.49 on Python 3.12+, with asyncio as the only I/O
-core. The plan, its order and its progress live in GitHub Issues, starting from
-the open umbrella issue about the revival; this file describes how the project
+target is Mojolicious 9 on Python 3.12+, with asyncio as the only I/O core.
+The plan, its order and its progress live in GitHub Issues, starting from the
+open umbrella issue about the revival; this file describes how the project
 works and why, not what is left to do.
 
 ## Design Principles
@@ -256,9 +256,14 @@ load average, go to the issue or the pull request, not to the repository.
 
 ## Porting from Mojolicious
 
-The target is **Mojolicious 9.49**: every module is ported from the `v9.49`
-tag, so the ported modules match each other. Moving to a newer Mojolicious is a
-step of its own, which changes this version and updates every ported module.
+The target is **Mojolicious 9**. A module is ported from a release of it, the
+newest one when the port starts, and its documentation names that release
+("Ported from ... of Mojolicious 9.49"); the first ports are from 9.49. The
+changes of newer releases are followed in the issue that tracks upstream, and a
+change is ported to the modules it touches, whose documentation then names the
+newer release. A fix that cannot wait for a release, as a security one, is
+ported before it, and the module names the release that will have it. An edit
+of a module that ports nothing from upstream leaves its release as it is.
 
 Some modules have no counterpart in Mojolicious: `Pyjo.Test` (inspired by
 Perl's `Test::More`), `Pyjo.String.*`, `Pyjo.Regexp`, `Pyjo.IOLoop.Datagram`
@@ -275,10 +280,10 @@ variant for `str` next to the one for `bytes` where Mojo works on
 characters, like `url_unescape`.
 Its subtests from `t/mojo/util.t` come to `t/Pyjo/Util.py` with it.
 
-A module is ported anew from the target Mojolicious, not migrated from the
-existing Python code. The existing Python module is a reference for how
-Perl idioms were translated before, not a base to patch: it follows an older
-Mojo and carries compromises that a fresh port does not need.
+A module is ported anew from Mojolicious, not migrated from the existing
+Python code. The existing Python module is a reference for how Perl idioms
+were translated before, not a base to patch: it follows an older Mojo and
+carries compromises that a fresh port does not need.
 
 ```sh
 git clone https://github.com/mojolicious/mojo.git
@@ -298,8 +303,8 @@ For each module:
    the Python documentation. Sphinx lists the classes after the module
    docstring, so "See also" ends the module docstring, before them. A test in
    `t/docs/` runs the examples.
-4. Name the source at the end of "See also", as a link to the file at the
-   tag (`https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/Date.pm`),
+4. Name the source at the end of "See also", as a link to the file at the tag
+   of the release (`https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/Date.pm`),
    annotate the module and put it on pyright's strict list.
 5. Check the module off in the porting inventory issue, which lists every
    module of the target Mojolicious with its Pyjoyment counterpart.
@@ -353,7 +358,7 @@ A bug or a quirk of Mojolicious itself, found while porting, goes to the issue
 that collects them, with a Perl command that reproduces it at the tag and what
 the port does about it. Reporting it upstream is a decision of its own.
 
-Moving a ported module to a newer target is the difference between the two
+Moving a ported module to a newer release is the difference between the two
 versions, applied to code, tests and docstrings alike:
 
 ```sh
