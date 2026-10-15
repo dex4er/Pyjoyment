@@ -63,4 +63,54 @@ with subtest('Inside asyncio.run'):
     asyncio.run(main())
     is_deeply_ok(got, [True, 'timer', False], 'the reactor watches in the running loop')
 
+with subtest('A callback as a keyword argument'):
+    loop = Pyjo.IOLoop.new()
+    got = []
+
+    def accept(loop, stream, id):
+        got.append('accepted')
+        stream.on('close', lambda stream: loop.stop())
+
+    def connect(loop, err, stream):
+        got.append('connected')
+        stream.close()
+
+    id = loop.server(cb=accept, address='127.0.0.1')
+    isa_ok(id, str, 'server')
+    port = loop.acceptor(id).port
+    isa_ok(loop.client(cb=connect, address='127.0.0.1', port=port), str, 'client')
+    timer = loop.timer(cb=lambda loop: got.append('timer'), after=0)
+    isa_ok(timer, str, 'timer')
+    loop.start()
+    is_deeply_ok(sorted(got), ['accepted', 'connected', 'timer'], 'all called')
+    loop.reset()
+
+with subtest('Decorators with and without parentheses'):
+    loop = Pyjo.IOLoop.new()
+    got = []
+
+    @loop.server
+    def server(loop, stream, id):
+        got.append('accepted')
+        stream.on('close', lambda stream: loop.stop())
+
+    isa_ok(server, str, 'the name of the server is its id')
+    port = loop.acceptor(server).port
+
+    @loop.client(address='127.0.0.1', port=port)
+    def client(loop, err, stream):
+        got.append('connected')
+        stream.close()
+
+    isa_ok(client, str, 'the name of the client is its id')
+
+    @loop.timer(0)
+    def timer(loop):
+        got.append('timer')
+
+    isa_ok(timer, str, 'the name of the timer is its id')
+    loop.start()
+    is_deeply_ok(sorted(got), ['accepted', 'connected', 'timer'], 'all called')
+    loop.reset()
+
 done_testing()

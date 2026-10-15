@@ -48,8 +48,9 @@ as easy as possible.
 
 What Mojo calls on the class, as ``Mojo::IOLoop->timer``, is a function of
 the module that works with the :data:`singleton`, as ``Pyjo.IOLoop.timer``.
-A method that takes a callback is a decorator without it, and the decorated
-name is what the method returns. ::
+A method that takes a callback takes it also as the keyword argument ``cb``,
+and is a decorator without it, and the decorated name is what the method
+returns. ::
 
     @Pyjo.IOLoop.timer(3)
     def id(loop):
@@ -261,17 +262,20 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
 
         return id
 
+    # Unlike Mojolicious: the callback comes before the options, which are keyword arguments, or is the keyword
+    # argument cb
     @overload
-    def client(self, cb: ClientCallback, /, **options: Any) -> str: ...
+    def client(self, cb: ClientCallback, **options: Any) -> str: ...
 
     @overload
-    def client(self, /, **options: Any) -> Callable[[ClientCallback], str]: ...
+    def client(self, **options: Any) -> Callable[[ClientCallback], str]: ...
 
-    def client(self, cb: ClientCallback | None = None, /, **options: Any) -> Any:
+    def client(self, cb: ClientCallback | None = None, **options: Any) -> Any:
         """::
 
             id = Pyjo.IOLoop.client(cb, address='127.0.0.1', port=3000)
             id = loop.client(cb, address='127.0.0.1', port=3000)
+            id = loop.client(cb=cb, address='127.0.0.1', port=3000)
 
             @loop.client(address='127.0.0.1', port=3000)
             def id(loop, err, stream):
@@ -461,17 +465,20 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
                 for value in connection.values():
                     value.close()
 
+    # Unlike Mojolicious: the callback comes before the options, which are keyword arguments, or is the keyword
+    # argument cb
     @overload
-    def server(self, cb: ServerCallback, /, **options: Any) -> str: ...
+    def server(self, cb: ServerCallback, **options: Any) -> str: ...
 
     @overload
-    def server(self, /, **options: Any) -> Callable[[ServerCallback], str]: ...
+    def server(self, **options: Any) -> Callable[[ServerCallback], str]: ...
 
-    def server(self, cb: ServerCallback | None = None, /, **options: Any) -> Any:
+    def server(self, cb: ServerCallback | None = None, **options: Any) -> Any:
         """::
 
             id = Pyjo.IOLoop.server(cb, port=3000)
             id = loop.server(cb, port=3000)
+            id = loop.server(cb=cb, port=3000)
 
             @loop.server(port=3000)
             def id(loop, stream, id):
