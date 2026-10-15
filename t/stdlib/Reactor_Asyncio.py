@@ -9,6 +9,7 @@ import re
 import socket
 import subprocess
 import sys
+import time
 
 
 with subtest('Coroutines run in the loop of the reactor'):
@@ -97,6 +98,37 @@ with subtest('Handles and timers move to the loop that is running'):
     reactor.start()
     is_ok(got[-1], 'back', 'and back in a loop of its own')
     ok(reactor.loop is own, 'the same loop of its own')
+
+with subtest('A timer that again restarts waits for its new time'):
+    reactor = Pyjo.Reactor.Asyncio.new()
+    fired = []
+    start = time.monotonic()
+    id = reactor.timer(0.2, lambda reactor: fired.append(time.monotonic() - start))
+    reactor.timer(0.1, lambda reactor: reactor.again(id))
+    reactor.timer(0.5, lambda reactor: reactor.stop())
+    reactor.start()
+    is_ok(len(fired), 1, 'fired once')
+    ok(fired[0] >= 0.29, 'not before the time from the restart')
+
+with subtest('A shorter time of again comes first'):
+    reactor = Pyjo.Reactor.Asyncio.new()
+    fired = []
+    id = reactor.timer(1, lambda reactor: fired.append('timer'))
+    reactor.again(id, 0.05)
+    reactor.timer(0.5, lambda reactor: reactor.stop())
+    reactor.start()
+    is_deeply_ok(fired, ['timer'], 'fired before the old time')
+
+with subtest('A recurring timer that again restarts'):
+    reactor = Pyjo.Reactor.Asyncio.new()
+    fired = []
+    start = time.monotonic()
+    id = reactor.recurring(0.1, lambda reactor: fired.append(time.monotonic() - start))
+    reactor.timer(0.05, lambda reactor: reactor.again(id))
+    reactor.timer(0.4, lambda reactor: reactor.stop())
+    reactor.start()
+    ok(len(fired) >= 1, 'fired')
+    ok(fired[0] >= 0.14, 'not before the time from the restart')
 
 with subtest('Handles'):
     reactor = Pyjo.Reactor.Asyncio.new()
