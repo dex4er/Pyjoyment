@@ -2,6 +2,7 @@ from Pyjo.Test import *
 
 import atexit
 import http.client
+import importlib
 import os
 import pathlib
 import signal
@@ -25,6 +26,9 @@ import Pyjo.IOLoop.Server
 ROOT = os.path.join(os.path.dirname(__file__), '..', '..')
 LIB = os.path.join(os.path.dirname(__file__), '..', 'lib')
 ENV = dict(os.environ, PYTHONPATH=ROOT)
+
+sys.path.insert(0, LIB)
+ServerStart = importlib.import_module('ServerStart')
 
 
 def application(dir, port):
@@ -70,18 +74,23 @@ def closed(port):
 
 
 with subtest('pathlib, http.client and the options of the interpreter'), tempfile.TemporaryDirectory() as dir:
-    port = Pyjo.IOLoop.Server.object.generate_port()
-    app = application(dir, port)
-    pid = app.with_name('hot.pid')
-    code = f"""
+    # The server is started again on a new port when it is taken
+    def start():
+        port = Pyjo.IOLoop.Server.object.generate_port()
+        app = application(dir, port)
+        code = f"""
 import pathlib
 import Pyjo.Server.Hot
 
 Pyjo.Server.Hot.new().run(pathlib.Path({str(app)!r}))
 """
-    result = subprocess.run(
-        [sys.executable, '-X', 'int_max_str_digits=1234', '-c', code], env=ENV, capture_output=True, text=True
-    )
+        result = subprocess.run(
+            [sys.executable, '-X', 'int_max_str_digits=1234', '-c', code], env=ENV, capture_output=True, text=True
+        )
+        return None if ServerStart.in_use(result) else (port, app, result)
+
+    port, app, result = ServerStart.retry(start)
+    pid = app.with_name('hot.pid')
     is_ok(result.returncode, 0, 'daemonized')
     atexit.register(lambda: pid.exists() and os.kill(int(pid.read_text()), signal.SIGTERM))
     is_ok(get(port), b'int_max_str_digits=1234', 'the command line of the process with -X, run again')
@@ -105,12 +114,17 @@ with subtest('-t and -s'), tempfile.TemporaryDirectory() as dir:
     is_ok(result.stdout, 'Hot server not running.\n', 'not running')
 
 with subtest('Foreground and TERM'), tempfile.TemporaryDirectory() as dir:
-    port = Pyjo.IOLoop.Server.object.generate_port()
-    app = application(dir, port)
-    process = subprocess.Popen(
-        [sys.executable, '-m', 'Pyjo.Server.Hot', '-f', str(app)], env=ENV, stdout=subprocess.DEVNULL
-    )
-    atexit.register(lambda: process.poll() is None and process.kill())
+    # The server is started again on a new port when it is taken
+    def start():
+        port = Pyjo.IOLoop.Server.object.generate_port()
+        app = application(dir, port)
+        process = subprocess.Popen(
+            [sys.executable, '-m', 'Pyjo.Server.Hot', '-f', str(app)], env=ENV, stdout=subprocess.DEVNULL
+        )
+        atexit.register(lambda: process.poll() is None and process.kill())
+        return (port, app, process) if ServerStart.listening(port, process) else None
+
+    port, app, process = ServerStart.retry(start)
     like_ok(get(port), rb'^int_max_str_digits=', 'serving')
     process.send_signal(signal.SIGTERM)
     is_ok(process.wait(30), 0, 'stopped')

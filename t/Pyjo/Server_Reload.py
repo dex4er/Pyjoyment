@@ -1,12 +1,12 @@
 from Pyjo.Test import *
 
 import atexit
+import importlib
 import os
 import signal
 import socket
 import subprocess
 import sys
-import time
 import warnings
 
 
@@ -30,6 +30,9 @@ from Pyjo.File import curfile, tempdir
 
 ROOT = curfile().dirname().dirname().dirname().to_str()
 LIB = curfile().dirname().sibling('lib').to_str()
+
+sys.path.insert(0, LIB)
+ServerStart = importlib.import_module('ServerStart')
 
 
 def _port(port):
@@ -66,16 +69,22 @@ get('/hello', {{'text': 'Hello Reload!'}})
 app.start()
 """.encode()
 )
-port = Pyjo.IOLoop.Server.object.generate_port()
-server = subprocess.Popen(
-    [sys.executable, '-m', 'Pyjo.Server.Reload', '-l', f'http://127.0.0.1:{port}', script.to_str()],
-    env=dict(os.environ, PYTHONPATH=ROOT),
-    stdout=subprocess.DEVNULL,
-)
-# Not in Mojolicious: the server is killed when the test ends before it stops it
-atexit.register(lambda: server.poll() is None and server.kill())
-while not _port(port):
-    time.sleep(0.1)
+
+
+# Not in Mojolicious: the server is started again on a new port when it is taken, and killed when the test ends before
+# it stops it
+def start():
+    port = Pyjo.IOLoop.Server.object.generate_port()
+    server = subprocess.Popen(
+        [sys.executable, '-m', 'Pyjo.Server.Reload', '-l', f'http://127.0.0.1:{port}', script.to_str()],
+        env=dict(os.environ, PYTHONPATH=ROOT),
+        stdout=subprocess.DEVNULL,
+    )
+    atexit.register(lambda: server.poll() is None and server.kill())
+    return (port, server) if ServerStart.listening(port, server) else None
+
+
+port, server = ServerStart.retry(start)
 ua = Pyjo.UserAgent.new()
 
 with subtest('Basics'):
@@ -113,8 +122,7 @@ app.start()
     is_deeply_ok(reload.backend.modified_files(), [script.to_str()], 'file has changed')
     ok(os.stat(script).st_mtime > mtime, 'modify time has changed')
     is_ok(os.stat(script).st_size, size, 'still equal size')
-    while not os.path.exists(started):
-        time.sleep(0.1)
+    ServerStart.wait_for(lambda: os.path.exists(started), 'the application')
 
     # Application has been reloaded
     tx = ua.get(f'http://127.0.0.1:{port}/hello')
@@ -164,8 +172,7 @@ app.start()
     is_deeply_ok(reload.backend.modified_files(), [script.to_str()], 'file has changed')
     ok(os.stat(script).st_mtime == mtime, 'modify time has not changed')
     isnt_ok(os.stat(script).st_size, size, 'size has changed')
-    while not os.path.exists(started):
-        time.sleep(0.1)
+    ServerStart.wait_for(lambda: os.path.exists(started), 'the application')
 
     # Application has been reloaded again
     tx = ua.get(f'http://127.0.0.1:{port}/hello')
@@ -216,8 +223,7 @@ with subtest('Broken symlink'):
 
 # Stop
 server.send_signal(signal.SIGINT)
-while _port(port):
-    time.sleep(0.1)
+ServerStart.wait_for(lambda: not _port(port), 'the server to stop')
 server.wait(30)
 
 with subtest('Custom backend'):

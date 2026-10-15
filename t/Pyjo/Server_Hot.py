@@ -1,6 +1,7 @@
 from Pyjo.Test import *
 
 import atexit
+import importlib
 import os
 import signal
 import socket
@@ -28,6 +29,9 @@ from Pyjo.File import curfile, tempdir
 
 ROOT = curfile().dirname().dirname().dirname().to_str()
 LIB = curfile().dirname().sibling('lib').to_str()
+
+sys.path.insert(0, LIB)
+ServerStart = importlib.import_module('ServerStart')
 
 with subtest('Configure'):
     hot = Pyjo.Server.Hot.new()
@@ -88,24 +92,41 @@ def _port(port):
 
 
 # Not in Mojolicious: script/hypnotoad is python -m Pyjo.Server.Hot, waited for, as Python warns about a process that
-# nothing waits for
+# nothing waits for, with its result, and its standard error captured and shown
 def _hot(*args):
-    subprocess.run(
+    result = subprocess.run(
         [sys.executable, '-m', 'Pyjo.Server.Hot', *args],
         env=dict(os.environ, PYTHONPATH=ROOT),
         stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True,
         check=False,
     )
+    sys.stderr.write(result.stderr)
+    return result
 
 
 with subtest('Hot deployment'):
     dir = tempdir()
     script = dir.child('myapp.py')
     log = dir.child('mojo.log')
-    port1 = Pyjo.IOLoop.Server.object.generate_port()
-    port2 = Pyjo.IOLoop.Server.object.generate_port()
-    script.spew(
-        f"""
+
+    # Not in Mojolicious: the server is stopped when the test ends before it stops it
+    def stop():
+        if pid := _pid(dir.child('hot.pid')):
+            try:
+                os.kill(int(pid), signal.SIGTERM)
+            except OSError:
+                pass
+
+    atexit.register(stop)
+
+    # Not in Mojolicious: the server is started again on new ports when one of them is taken
+    def start():
+        port1 = Pyjo.IOLoop.Server.object.generate_port()
+        port2 = Pyjo.IOLoop.Server.object.generate_port()
+        script.spew(
+            f"""
 import sys
 sys.path.insert(0, {LIB!r})
 from Lite import app, get
@@ -149,22 +170,12 @@ get('/graceful', wait)
 
 app.start()
 """.encode()
-    )
+        )
+        return None if ServerStart.in_use(_hot(script.to_str())) else (port1, port2)
 
-    # Not in Mojolicious: the server is stopped when the test ends before it stops it
-    def stop():
-        if pid := _pid(dir.child('hot.pid')):
-            try:
-                os.kill(int(pid), signal.SIGTERM)
-            except OSError:
-                pass
-
-    atexit.register(stop)
-
-    _hot(script.to_str())
+    port1, port2 = ServerStart.retry(start)
     time.sleep(3)
-    while not _port(port2):
-        time.sleep(1)
+    ServerStart.wait_for(lambda: _port(port2), 'the server', interval=1)
     old = _pid(dir.child('hot.pid'))
     ua = Pyjo.UserAgent.new()
 
@@ -212,10 +223,9 @@ app.start()
     )
     _hot(script.to_str())
 
-    while True:
-        if 'Zero downtime software upgrade failed' in log.slurp().decode():
-            break
-        time.sleep(1)
+    ServerStart.wait_for(
+        lambda: 'Zero downtime software upgrade failed' in log.slurp().decode(), 'the failed upgrade', interval=1
+    )
 
     with subtest('Connection did not get lost'):
         tx = ua.get(f'http://127.0.0.1:{port1}/hello')
@@ -266,12 +276,8 @@ app.start()
         )
         _hot(script.to_str())
 
-        while True:
-            time.sleep(1)
-            if not (new := _pid(dir.child('hot.pid'))):
-                continue
-            if new != old:
-                break
+        time.sleep(1)
+        ServerStart.wait_for(lambda: _pid(dir.child('hot.pid')) not in (None, old), 'the new manager', interval=1)
 
         while not tx.is_finished:
             Pyjo.IOLoop.one_tick()
@@ -319,8 +325,7 @@ app.start()
         is_ok(tx.res.body, second, 'same content')
 
     _hot(script.to_str(), '-s')
-    while _port(port2):
-        time.sleep(1)
+    ServerStart.wait_for(lambda: not _port(port2), 'the server to stop', interval=1)
 
     with subtest('Check log'):
         log = log.slurp().decode()

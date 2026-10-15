@@ -1,12 +1,11 @@
 from Pyjo.Test import *
 
 import atexit
+import importlib
 import os
 import signal
-import socket
 import subprocess
 import sys
-import time
 
 
 if not hasattr(os, 'fork'):
@@ -27,6 +26,9 @@ from Pyjo.File import curfile, tempdir
 ROOT = curfile().dirname().dirname().dirname().to_str()
 LIB = curfile().dirname().sibling('lib').to_str()
 
+sys.path.insert(0, LIB)
+ServerStart = importlib.import_module('ServerStart')
+
 dir = tempdir()
 myapp = dir.child('myapp.py').spew(
     f"""
@@ -40,20 +42,25 @@ app.start()
 )
 
 
-# A server in a process of its own, until its port accepts connections, killed when the test ends before it stops it
-def server(args, port):
-    process = subprocess.Popen(
-        [sys.executable, *args], env=dict(os.environ, PYTHONPATH=ROOT), stdout=subprocess.PIPE, text=True
-    )
-    atexit.register(lambda: process.poll() is None and process.kill())
-    deadline = time.monotonic() + 20
-    while time.monotonic() < deadline:
-        try:
-            socket.create_connection(('127.0.0.1', port), 0.2).close()
-            break
-        except OSError:
-            time.sleep(0.1)
-    return process
+# A server in a process of its own, on a port that the arguments name as {port}, until the port accepts connections,
+# started again on a new port when it is taken, and killed when the test ends before it stops it
+def server(*args, **kwargs):
+    def start():
+        port = Pyjo.IOLoop.Server.object.generate_port()
+        process = subprocess.Popen(
+            [sys.executable, *(arg.format(port=port) for arg in args)],
+            env=dict(os.environ, PYTHONPATH=ROOT),
+            stdout=subprocess.PIPE,
+            text=True,
+            **kwargs,
+        )
+        atexit.register(lambda: process.poll() is None and process.kill())
+        if ServerStart.listening(port, process):
+            return port, process
+        process.stdout.close()
+        return None
+
+    return ServerStart.retry(start)
 
 
 def stop(process):
@@ -65,21 +72,20 @@ def stop(process):
 
 
 with subtest('Synopsis'):
-    port = Pyjo.IOLoop.Server.object.generate_port()
     code = f"""
 import Pyjo.Server.Reload
 
 reload = Pyjo.Server.Reload.new()
-reload.daemon.listen = ['http://127.0.0.1:{port}']
+reload.daemon.listen = ['http://127.0.0.1:{{port}}']
 reload.run({myapp.to_str()!r})
 """
-    status, output = stop(server(['-c', code], port))
+    port, process = server('-c', code)
+    status, output = stop(process)
     is_ok(status, 0, 'stopped')
     like_ok(output, rf'Web application available at http://127.0.0.1:{port}', 'listening')
 
 with subtest('Description'):
-    port = Pyjo.IOLoop.Server.object.generate_port()
-    process = server(['-m', 'Pyjo.Server.Reload', '-l', f'http://127.0.0.1:{port}', myapp.to_str()], port)
+    port, process = server('-m', 'Pyjo.Server.Reload', '-l', 'http://127.0.0.1:{port}', myapp.to_str())
     status, output = stop(process)
     is_ok(status, 0, 'python -m Pyjo.Server.Reload')
     like_ok(output, rf'Web application available at http://127.0.0.1:{port}', 'listening')
@@ -121,40 +127,25 @@ with subtest('silent'):
     is_ok(reload.silent, False, 'set')
 
 with subtest('run'):
-    port = Pyjo.IOLoop.Server.object.generate_port()
-    code = f"""
+    code = """
 import Pyjo.Server.Reload
 
 reload = Pyjo.Server.Reload.new()
 reload.daemon.listen = ['http://127.0.0.1:{port}']
 reload.run('myapp.py')
 """
-    process = subprocess.Popen(
-        [sys.executable, '-c', code],
-        cwd=dir.to_str(),
-        env=dict(os.environ, PYTHONPATH=ROOT),
-        stdout=subprocess.PIPE,
-        text=True,
-    )
-    atexit.register(lambda: process.poll() is None and process.kill())
-    deadline = time.monotonic() + 20
-    while time.monotonic() < deadline:
-        try:
-            socket.create_connection(('127.0.0.1', port), 0.2).close()
-            break
-        except OSError:
-            time.sleep(0.1)
+    port, process = server('-c', code, cwd=dir.to_str())
     status, output = stop(process)
     is_ok(status, 0, 'relative path of the application')
 
 with subtest('main'):
-    port = Pyjo.IOLoop.Server.object.generate_port()
     code = f"""
 import Pyjo.Server.Reload
 
-Pyjo.Server.Reload.main(['-l', 'http://127.0.0.1:{port}', {myapp.to_str()!r}])
+Pyjo.Server.Reload.main(['-l', 'http://127.0.0.1:{{port}}', {myapp.to_str()!r}])
 """
-    status, output = stop(server(['-c', code], port))
+    port, process = server('-c', code)
+    status, output = stop(process)
     is_ok(status, 0, 'command line interface')
 
 done_testing()

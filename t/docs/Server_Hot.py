@@ -1,6 +1,7 @@
 from Pyjo.Test import *
 
 import atexit
+import importlib
 import os
 import signal
 import socket
@@ -26,6 +27,9 @@ from Pyjo.File import curfile, tempdir
 ROOT = curfile().dirname().dirname().dirname().to_str()
 LIB = curfile().dirname().sibling('lib').to_str()
 ENV = dict(os.environ, PYTHONPATH=ROOT)
+
+sys.path.insert(0, LIB)
+ServerStart = importlib.import_module('ServerStart')
 
 
 # An application in a directory of its own, for its hot.pid
@@ -97,26 +101,33 @@ def command(*args, **kwargs):
     return subprocess.run([sys.executable, *args], env=ENV, capture_output=True, text=True, **kwargs)
 
 
+# A server started in the background, again on a new port when it is taken
+def daemonized(*args, **kwargs):
+    def start():
+        port = Pyjo.IOLoop.Server.object.generate_port()
+        myapp = application(port)
+        atexit.register(kill, myapp)
+        names = {'myapp': myapp.to_str(), 'dir': myapp.dirname().to_str()}
+        result = command(*(arg.format(**names) for arg in args), **{k: v.format(**names) for k, v in kwargs.items()})
+        return None if ServerStart.in_use(result) else (port, myapp, result)
+
+    return ServerStart.retry(start)
+
+
 with subtest('Synopsis'):
-    port = Pyjo.IOLoop.Server.object.generate_port()
-    myapp = application(port)
-    atexit.register(kill, myapp)
-    code = f"""
+    code = """
 import Pyjo.Server.Hot
 
 hot = Pyjo.Server.Hot.new()
-hot.run({myapp.to_str()!r})
+hot.run({myapp!r})
 """
-    result = command('-c', code)
+    port, myapp, result = daemonized('-c', code)
     is_ok(result.returncode, 0, 'daemonized')
     ok(wait_for(lambda: listening(port) and pid(myapp)), 'listening')
     ok(stop(myapp, port), 'stopped')
 
 with subtest('Description'):
-    port = Pyjo.IOLoop.Server.object.generate_port()
-    myapp = application(port)
-    atexit.register(kill, myapp)
-    result = command('-m', 'Pyjo.Server.Hot', myapp.to_str())
+    port, myapp, result = daemonized('-m', 'Pyjo.Server.Hot', '{myapp}')
     is_ok(result.returncode, 0, 'python -m Pyjo.Server.Hot')
     ok(wait_for(lambda: listening(port) and pid(myapp)), 'listening')
     old = pid(myapp)
@@ -169,30 +180,32 @@ with subtest('configure'):
     is_ok(hot.upgrade_timeout, 45, 'from the application')
 
 with subtest('run'):
-    port = Pyjo.IOLoop.Server.object.generate_port()
-    myapp = application(port)
-    atexit.register(kill, myapp)
     code = """
 import Pyjo.Server.Hot
 
 hot = Pyjo.Server.Hot.new()
 hot.run('myapp.py')
 """
-    result = command('-c', code, cwd=myapp.dirname().to_str())
+    port, myapp, result = daemonized('-c', code, cwd='{dir}')
     is_ok(result.returncode, 0, 'relative path of the application')
     ok(wait_for(lambda: listening(port) and pid(myapp)), 'listening')
     ok(stop(myapp, port), 'stopped')
 
 with subtest('main'):
-    port = Pyjo.IOLoop.Server.object.generate_port()
-    myapp = application(port)
-    code = f"""
+    # The server is started again on a new port when it is taken
+    def start():
+        port = Pyjo.IOLoop.Server.object.generate_port()
+        myapp = application(port)
+        code = f"""
 import Pyjo.Server.Hot
 
 Pyjo.Server.Hot.main(['-f', {myapp.to_str()!r}])
 """
-    process = subprocess.Popen([sys.executable, '-c', code], env=ENV, stdout=subprocess.DEVNULL)
-    atexit.register(lambda: process.poll() is None and process.kill())
+        process = subprocess.Popen([sys.executable, '-c', code], env=ENV, stdout=subprocess.DEVNULL)
+        atexit.register(lambda: process.poll() is None and process.kill())
+        return (port, myapp, process) if ServerStart.listening(port, process) else None
+
+    port, myapp, process = ServerStart.retry(start)
     ok(wait_for(lambda: listening(port) and pid(myapp)), 'listening')
     process.send_signal(signal.SIGTERM)
     is_ok(process.wait(30), 0, 'command line interface in the foreground')
