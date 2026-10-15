@@ -1,0 +1,123 @@
+import os
+
+
+# Left out from Mojolicious: MOJO_MODE, as the application is the one of the tests; MOJO_REACTOR, as the tests run on
+# the reactor of Pyjo.Reactor.detect()
+os.environ['PYJO_PROXY'] = '0'
+
+import Pyjo.UserAgent.Server
+
+from Pyjo import *
+from Pyjo.Test import *
+
+import contextlib
+import importlib
+import io
+import subprocess
+import sys
+
+
+ROOT = os.path.join(os.path.dirname(__file__), '..', '..')
+
+# TODO: a and its application, when Pyjoyment.Lite is ported: the minimal Mojolicious::Lite of the tests answers the
+# requests until then
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
+Lite = importlib.import_module('Lite')
+Lite.app.log.level = 'fatal'
+Lite.app.routes.any('/', lambda c: c.render(data=c.req.method.encode() + c.req.body))
+Pyjo.UserAgent.Server.app(Lite.app)
+
+# TODO: the subtest "Application", with a
+
+with subtest('Requests'):
+    is_ok(g('/').body, b'GET', 'right content')
+    is_ok(h('/').body, b'', 'no content')
+    is_ok(o('/').body, b'OPTIONS', 'right content')
+    is_ok(t('/').body, b'PATCH', 'right content')
+    is_ok(p('/').body, b'POST', 'right content')
+    # Renamed from Mojolicious: u, which is w
+    is_ok(w('/').body, b'PUT', 'right content')
+    is_ok(d('/').body, b'DELETE', 'right content')
+    is_ok(p('/', form={'foo': 'bar'}).body, b'POSTfoo=bar', 'right content')
+    is_ok(p('/', json={'foo': 'bar'}).body, b'POST{"foo":"bar"}', 'right content')
+
+# TODO: the subtest "Mojolicious::Lite", with a
+
+with subtest('Parse XML'):
+    is_ok(x('<title>works</title>').at('title').text, 'works', 'right text')
+
+with subtest('JSON'):
+    is_ok(j([1, 2]), b'[1,2]', 'right result')
+    is_deeply_ok(j(b'[1,2]'), [1, 2], 'right structure')
+    is_ok(j({'foo': 'bar'}), b'{"foo":"bar"}', 'right result')
+    is_deeply_ok(j(b'{"foo":"bar"}'), {'foo': 'bar'}, 'right structure')
+
+with subtest('ByteStream'):
+    is_ok(u('<foo>').url_escape(), '%3Cfoo%3E', 'right result')
+
+with subtest('Collection'):
+    is_ok(c(1, 2, 3).join('-'), '1-2-3', 'right result')
+
+with subtest('File'):
+    is_ok(f(__file__).basename(), os.path.basename(__file__), 'right result')
+
+with subtest('Dumper'):
+    is_ok(r([1, 2]), '[1, 2]\n', 'right result')
+
+with subtest('Benchmark'):
+    calls = []
+    buffer = io.StringIO()
+    with contextlib.redirect_stderr(buffer):
+        n(lambda: calls.append(1))
+    is_ok(len(calls), 1, 'block has been executed once')
+    like_ok(buffer.getvalue(), r'wallclock', 'right output')
+    with contextlib.redirect_stderr(buffer):
+        n(lambda: calls.append(1), 10)
+    is_ok(len(calls), 11, 'block has been executed ten times')
+    like_ok(buffer.getvalue(), r'(?s)wallclock.*wallclock', 'right output')
+
+with subtest('Link'):
+    is_ok(l('http://mojolicious.org/').path.to_str(), '/', 'right result')
+
+
+# Not in Mojolicious: b for bytes, next to u for characters
+with subtest('Bytes'):
+    is_ok(b(b'<foo>').url_escape(), b'%3Cfoo%3E', 'right result')
+
+
+# Not in Mojolicious: python -m Pyjo, in the place of perl -Mojo -E
+def one_liner(*args, **kwargs):
+    env = {k: v for k, v in os.environ.items() if k != 'PYJO_LOG_LEVEL'} | {'PYTHONPATH': ROOT} | kwargs
+    return subprocess.run([sys.executable, '-m', 'Pyjo', *args], env=env, capture_output=True, text=True)
+
+
+with subtest('python -m Pyjo'):
+    result = one_liner('x("<title>works</title>").at("title").text')
+    is_ok(result.stdout, 'works\n', 'value of an expression printed')
+    is_ok(result.returncode, 0, 'right exit status')
+    is_ok(one_liner('None').stdout, '', 'nothing printed for None')
+    is_ok(one_liner('print(c(1, 2, 3).join("-"))').stdout, '1-2-3\n', 'statement')
+    is_ok(one_liner('import sys; print(sys.argv)', 'a', 'b').stdout, "['-c', 'a', 'b']\n", 'arguments')
+    is_ok(one_liner('import os; print(os.environ["PYJO_LOG_LEVEL"])').stdout, 'fatal\n', 'silent')
+    is_ok(
+        one_liner('import os; print(os.environ["PYJO_LOG_LEVEL"])', PYJO_LOG_LEVEL='debug').stdout,
+        'debug\n',
+        'log level',
+    )
+    result = one_liner()
+    like_ok(result.stderr, r'^usage: python -m Pyjo CODE', 'usage')
+    is_ok(result.returncode, 1, 'right exit status')
+    result = one_liner('die("Exit")')
+    like_ok(result.stderr, r"NameError: name 'die' is not defined", 'only the functions of ojo')
+
+# Not in Mojolicious: the modules that a function uses are imported when it is called
+with subtest('Lazy imports'):
+    result = subprocess.run(
+        [sys.executable, '-c', 'import sys, Pyjo.URL; print("Pyjo.UserAgent" in sys.modules)'],
+        env=dict(os.environ, PYTHONPATH=ROOT),
+        capture_output=True,
+        text=True,
+    )
+    is_ok(result.stdout, 'False\n', 'no user agent for a module of Pyjo')
+
+done_testing()

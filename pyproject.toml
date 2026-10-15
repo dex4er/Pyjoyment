@@ -176,6 +176,7 @@ executionEnvironments = [
 typeCheckingMode = "off"
 strict = [
   "Pyjo/__init__.py",
+  "Pyjo/__main__.py",
   "Pyjo/Asset/__init__.py",
   "Pyjo/Asset/File.py",
   "Pyjo/Asset/Memory.py",

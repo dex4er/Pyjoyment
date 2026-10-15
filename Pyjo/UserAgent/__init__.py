@@ -540,9 +540,9 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
     query_p = _Request('QUERY', True)
 
     def __del__(self) -> None:
-        if sys.is_finalizing():
-            return
         try:
+            if sys.is_finalizing():
+                return
             self._cleanup()
             # Not in Mojolicious: the server that the user agent made is closed here, as Perl closes it when it frees
             # it, and PyPy frees it only when its garbage collector runs

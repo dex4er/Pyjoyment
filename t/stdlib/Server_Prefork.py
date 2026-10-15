@@ -83,8 +83,9 @@ print('stopped', flush=True)
     spawned = until(process, 'spawn') + until(process, 'spawn')
     is_ok(len(spawned), 2, 'two workers')
 
+    # The manager writes the file after it listens, so it can exist and be empty for a moment
     deadline = time.monotonic() + 10
-    while not pid_file.exists() and time.monotonic() < deadline:
+    while not (pid_file.exists() and pid_file.read_text().strip()) and time.monotonic() < deadline:
         time.sleep(0.05)
     is_ok(int(pid_file.read_text()), process.pid, 'process id file of the manager')
 
