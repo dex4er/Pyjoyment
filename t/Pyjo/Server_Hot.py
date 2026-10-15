@@ -277,7 +277,7 @@ app.start()
         _hot(script.to_str())
 
         time.sleep(1)
-        ServerStart.wait_for(lambda: _pid(dir.child('hot.pid')) not in (None, old), 'the new manager', interval=1)
+        ServerStart.wait_for(lambda: _pid(dir.child('hot.pid')) not in (None, '', old), 'the new manager', interval=1)
 
         while not tx.is_finished:
             Pyjo.IOLoop.one_tick()
