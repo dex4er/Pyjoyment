@@ -20,7 +20,7 @@ if __name__ == '__main__':
 
         stream.on('read', on_read_cb)
 
-    server_id = Pyjo.IOLoop.server(server_cb)
+    server_id = Pyjo.IOLoop.server(cb=server_cb)
 
     port = Pyjo.IOLoop.acceptor(server_id).port
 
@@ -36,7 +36,7 @@ if __name__ == '__main__':
 
         stream.on('read', on_read_cb)
 
-    Pyjo.IOLoop.client(client_cb, port=port)
+    Pyjo.IOLoop.client(port=port, cb=client_cb)
 
     # Add a timer
     def timeouter_cb(loop):
