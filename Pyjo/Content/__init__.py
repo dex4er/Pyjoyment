@@ -144,33 +144,8 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
         Try to detect when relaxed parsing is necessary.
         """
 
-        self.max_buffer_size = (
-            max_buffer_size if max_buffer_size is not None else int(os.environ.get('PYJO_MAX_BUFFER_SIZE') or 262144)
-        )
-        """::
-
-            size = content.max_buffer_size
-            content.max_buffer_size = 1024
-
-        Maximum size in bytes of buffer for content parser, defaults to the
-        value of the ``PYJO_MAX_BUFFER_SIZE`` environment variable or
-        ``262144`` (256KiB).
-        """
-
-        self.max_leftover_size = (
-            max_leftover_size
-            if max_leftover_size is not None
-            else int(os.environ.get('PYJO_MAX_LEFTOVER_SIZE') or 262144)
-        )
-        """::
-
-            size = content.max_leftover_size
-            content.max_leftover_size = 1024
-
-        Maximum size in bytes of buffer for pipelined HTTP requests, defaults
-        to the value of the ``PYJO_MAX_LEFTOVER_SIZE`` environment variable or
-        ``262144`` (256KiB).
-        """
+        self._max_buffer_size: int | None = max_buffer_size
+        self._max_leftover_size: int | None = max_leftover_size
 
         self.relaxed = relaxed
         """::
@@ -215,6 +190,44 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
         self._size = 0
         self._sse = False
         self._state: str | None = None
+
+    @property
+    def max_buffer_size(self) -> int:
+        """::
+
+            size = content.max_buffer_size
+            content.max_buffer_size = 1024
+
+        Maximum size in bytes of buffer for content parser, defaults to the
+        value of the ``PYJO_MAX_BUFFER_SIZE`` environment variable or
+        ``262144`` (256KiB).
+        """
+        if self._max_buffer_size is None:
+            self._max_buffer_size = int(os.environ.get('PYJO_MAX_BUFFER_SIZE') or 262144)
+        return self._max_buffer_size
+
+    @max_buffer_size.setter
+    def max_buffer_size(self, value: int) -> None:
+        self._max_buffer_size = value
+
+    @property
+    def max_leftover_size(self) -> int:
+        """::
+
+            size = content.max_leftover_size
+            content.max_leftover_size = 1024
+
+        Maximum size in bytes of buffer for pipelined HTTP requests, defaults
+        to the value of the ``PYJO_MAX_LEFTOVER_SIZE`` environment variable or
+        ``262144`` (256KiB).
+        """
+        if self._max_leftover_size is None:
+            self._max_leftover_size = int(os.environ.get('PYJO_MAX_LEFTOVER_SIZE') or 262144)
+        return self._max_leftover_size
+
+    @max_leftover_size.setter
+    def max_leftover_size(self, value: int) -> None:
+        self._max_leftover_size = value
 
     @property
     def headers(self) -> Pyjo.Headers.object:

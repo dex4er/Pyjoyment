@@ -162,22 +162,7 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
         Listen backlog size, defaults to :data:`socket.SOMAXCONN`.
         """
 
-        self.inactivity_timeout: float = (
-            inactivity_timeout
-            if inactivity_timeout is not None
-            else _number(os.environ.get('PYJO_INACTIVITY_TIMEOUT'), 30)
-        )
-        """::
-
-            timeout = daemon.inactivity_timeout
-            daemon.inactivity_timeout = 5
-
-        Maximum amount of time in seconds a connection with an active request
-        can be inactive before getting closed, defaults to the value of the
-        ``PYJO_INACTIVITY_TIMEOUT`` environment variable or ``30``. Setting
-        the value to ``0`` will allow connections to be inactive
-        indefinitely.
-        """
+        self._inactivity_timeout: float | None = inactivity_timeout
 
         self.ioloop: Pyjo.IOLoop.object = ioloop if ioloop is not None else Pyjo.IOLoop.object.singleton()
         """::
@@ -189,11 +174,66 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
         :mod:`Pyjo.IOLoop` singleton.
         """
 
-        self.keep_alive_timeout: float = (
-            keep_alive_timeout
-            if keep_alive_timeout is not None
-            else _number(os.environ.get('PYJO_KEEP_ALIVE_TIMEOUT'), 5)
-        )
+        self._keep_alive_timeout: float | None = keep_alive_timeout
+        self._locations: list[str] | None = listen
+
+        self.max_clients = max_clients
+        """::
+
+            max = daemon.max_clients
+            daemon.max_clients = 100
+
+        Maximum number of accepted connections this server is allowed to
+        handle concurrently, before stopping to accept new incoming
+        connections, passed along to :attr:`Pyjo.IOLoop.Pyjo_IOLoop.max_connections`.
+        """
+
+        self.max_requests = max_requests
+        """::
+
+            max = daemon.max_requests
+            daemon.max_requests = 250
+
+        Maximum number of keep-alive requests per connection, defaults to
+        ``100``.
+        """
+
+        self.silent = silent
+        """::
+
+            boolean = daemon.silent
+            daemon.silent = boolean
+
+        Disable console messages.
+        """
+
+        self._connections: dict[str, dict[str, Any]] = {}
+        self._servers: dict[str, Any] = {}
+        _DAEMONS.add(self)
+
+    @property
+    def inactivity_timeout(self) -> float:
+        """::
+
+            timeout = daemon.inactivity_timeout
+            daemon.inactivity_timeout = 5
+
+        Maximum amount of time in seconds a connection with an active request
+        can be inactive before getting closed, defaults to the value of the
+        ``PYJO_INACTIVITY_TIMEOUT`` environment variable or ``30``. Setting
+        the value to ``0`` will allow connections to be inactive
+        indefinitely.
+        """
+        if self._inactivity_timeout is None:
+            self._inactivity_timeout = _number(os.environ.get('PYJO_INACTIVITY_TIMEOUT'), 30)
+        return self._inactivity_timeout
+
+    @inactivity_timeout.setter
+    def inactivity_timeout(self, value: float) -> None:
+        self._inactivity_timeout = value
+
+    @property
+    def keep_alive_timeout(self) -> float:
         """::
 
             timeout = daemon.keep_alive_timeout
@@ -205,12 +245,16 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
         Setting the value to ``0`` will allow connections to be inactive
         indefinitely.
         """
+        if self._keep_alive_timeout is None:
+            self._keep_alive_timeout = _number(os.environ.get('PYJO_KEEP_ALIVE_TIMEOUT'), 5)
+        return self._keep_alive_timeout
 
-        self.listen: list[str] = (
-            listen
-            if listen is not None
-            else [location or '' for location in split(',', os.environ.get('PYJO_LISTEN') or 'http://*:3000')]
-        )
+    @keep_alive_timeout.setter
+    def keep_alive_timeout(self, value: float) -> None:
+        self._keep_alive_timeout = value
+
+    @property
+    def listen(self) -> list[str]:
         """::
 
             listen = daemon.listen
@@ -327,40 +371,15 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
 
             TLS protocol version.
         """
+        if self._locations is None:
+            self._locations = [
+                location or '' for location in split(',', os.environ.get('PYJO_LISTEN') or 'http://*:3000')
+            ]
+        return self._locations
 
-        self.max_clients = max_clients
-        """::
-
-            max = daemon.max_clients
-            daemon.max_clients = 100
-
-        Maximum number of accepted connections this server is allowed to
-        handle concurrently, before stopping to accept new incoming
-        connections, passed along to :attr:`Pyjo.IOLoop.Pyjo_IOLoop.max_connections`.
-        """
-
-        self.max_requests = max_requests
-        """::
-
-            max = daemon.max_requests
-            daemon.max_requests = 250
-
-        Maximum number of keep-alive requests per connection, defaults to
-        ``100``.
-        """
-
-        self.silent = silent
-        """::
-
-            boolean = daemon.silent
-            daemon.silent = boolean
-
-        Disable console messages.
-        """
-
-        self._connections: dict[str, dict[str, Any]] = {}
-        self._servers: dict[str, Any] = {}
-        _DAEMONS.add(self)
+    @listen.setter
+    def listen(self, value: list[str]) -> None:
+        self._locations = value
 
     def __del__(self) -> None:
         if sys.is_finalizing():

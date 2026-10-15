@@ -4,11 +4,13 @@ from Pyjo.Test import *
 
 import http.client
 import io
+import os
 import re
 import urllib.request
 import wsgiref.headers
 
 from email.message import Message
+from unittest.mock import patch
 
 
 RAW = b'Content-Type: text/plain\r\nSet-Cookie: a=1\r\nSet-Cookie: b=2\r\nX-Name: caf\xe9\r\n\r\n'
@@ -58,5 +60,13 @@ with subtest('Roundtrip'):
     headers = Pyjo.Headers.new(http.client.parse_headers(io.BytesIO(RAW)))
     is_deeply_ok(Pyjo.Headers.new(headers.to_message()).to_list(), headers.to_list(), 'through Message')
     is_deeply_ok(Pyjo.Headers.new(headers.to_list()).to_list(), headers.to_list(), 'through a list of pairs')
+
+with subtest('The limits of the environment are read on first use'):
+    headers = Pyjo.Headers.new()
+    with patch.dict(os.environ, {'PYJO_MAX_LINE_SIZE': '1024', 'PYJO_MAX_LINES': '10'}):
+        is_ok(headers.max_line_size, 1024, 'max_line_size')
+        is_ok(headers.max_lines, 10, 'max_lines')
+    is_ok(headers.max_line_size, 1024, 'kept')
+    is_ok(Pyjo.Headers.new(max_line_size=2048).max_line_size, 2048, 'given')
 
 done_testing()

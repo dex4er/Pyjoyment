@@ -88,9 +88,14 @@ class Pyjo_Asset_Memory(Pyjo.Asset.object):
         and automatically upgrade to a :mod:`Pyjo.Asset.File` object.
         """
 
-        self.max_memory_size = (
-            max_memory_size if max_memory_size is not None else int(os.environ.get('PYJO_MAX_MEMORY_SIZE') or 262144)
-        )
+        self._max_memory_size: int | None = max_memory_size
+
+        self._content = b''
+        self._frozen = False
+        self._mtime = mtime if mtime is not None else MTIME
+
+    @property
+    def max_memory_size(self) -> int:
         """::
 
             size = mem.max_memory_size
@@ -101,10 +106,13 @@ class Pyjo_Asset_Memory(Pyjo.Asset.object):
         of the ``PYJO_MAX_MEMORY_SIZE`` environment variable or ``262144``
         (256KiB).
         """
+        if self._max_memory_size is None:
+            self._max_memory_size = int(os.environ.get('PYJO_MAX_MEMORY_SIZE') or 262144)
+        return self._max_memory_size
 
-        self._content = b''
-        self._frozen = False
-        self._mtime = mtime if mtime is not None else MTIME
+    @max_memory_size.setter
+    def max_memory_size(self, value: int) -> None:
+        self._max_memory_size = value
 
     @property
     def mtime(self) -> float:

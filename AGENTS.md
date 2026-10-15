@@ -530,8 +530,12 @@ copy:
   `capture` of `Mojo::Log` returns, is a context manager: PyPy does not free
   it when the last reference goes, and `with` says where it ends.
 - An attribute with a default that Mojo builds on first use, like `format`
-  and `handle` of `Mojo::Log`, is a property that builds and keeps it; a
-  default that only reads the environment is set by the constructor.
+  and `handle` of `Mojo::Log`, or that comes from a call, like the limits
+  that `Pyjo.Headers` and `Pyjo.Message` read from `PYJO_MAX_*`, is a
+  property that builds and keeps it the first time it is read, as Mojo
+  does: an object that never reads it, like most of those of a request,
+  does not pay for the call. A default that is a constant is set by the
+  constructor.
 - `die` or `croak` with a message raises a `Pyjo.Exception`. An error of the
   system, `$!`, is the `OSError` itself, with the message of Mojo in front of
   its `strerror`.

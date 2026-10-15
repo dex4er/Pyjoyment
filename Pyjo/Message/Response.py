@@ -240,7 +240,7 @@ class Pyjo_Message_Response(Pyjo.Message.object):
         (2GiB). Setting the value to ``0`` will allow messages of indefinite
         size.
         """
-        return self._max_message_size
+        return super().max_message_size
 
     @max_message_size.setter
     def max_message_size(self, value: int) -> None:

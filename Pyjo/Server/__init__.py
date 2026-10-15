@@ -138,11 +138,13 @@ class Pyjo_Server(Pyjo.EventEmitter.object):
 
         self._app = app
 
-        self.trusted_proxies: list[str] = (
-            trusted_proxies
-            if trusted_proxies is not None
-            else [proxy or '' for proxy in split(r'\s*,\s*', os.environ.get('PYJO_TRUSTED_PROXIES') or '')]
-        )
+        self._trusted_proxies: list[str] | None = trusted_proxies
+        self._reverse_proxy: bool | None = reverse_proxy
+
+        self.on('request', _request)
+
+    @property
+    def trusted_proxies(self) -> list[str]:
         """::
 
             proxies = server.trusted_proxies
@@ -153,12 +155,18 @@ class Pyjo_Server(Pyjo.EventEmitter.object):
         on commas with optional whitespace. These proxies should be addresses
         or networks in CIDR form.
         """
+        if self._trusted_proxies is None:
+            self._trusted_proxies = [
+                proxy or '' for proxy in split(r'\s*,\s*', os.environ.get('PYJO_TRUSTED_PROXIES') or '')
+            ]
+        return self._trusted_proxies
 
-        self.reverse_proxy: bool = (
-            reverse_proxy
-            if reverse_proxy is not None
-            else bool(os.environ.get('PYJO_REVERSE_PROXY')) or bool(self.trusted_proxies)
-        )
+    @trusted_proxies.setter
+    def trusted_proxies(self, value: list[str]) -> None:
+        self._trusted_proxies = value
+
+    @property
+    def reverse_proxy(self) -> bool:
         """::
 
             boolean = server.reverse_proxy
@@ -168,8 +176,13 @@ class Pyjo_Server(Pyjo.EventEmitter.object):
         the ``PYJO_REVERSE_PROXY`` environment variable or true if
         :attr:`trusted_proxies` is not empty.
         """
+        if self._reverse_proxy is None:
+            self._reverse_proxy = bool(os.environ.get('PYJO_REVERSE_PROXY')) or bool(self.trusted_proxies)
+        return self._reverse_proxy
 
-        self.on('request', _request)
+    @reverse_proxy.setter
+    def reverse_proxy(self, value: bool) -> None:
+        self._reverse_proxy = value
 
     @property
     def app(self) -> Application:

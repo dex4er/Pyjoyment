@@ -141,35 +141,8 @@ class Pyjo_Message(Pyjo.EventEmitter.object):
         message body, defaults to ``UTF-8``.
         """
 
-        self.max_line_size = (
-            max_line_size if max_line_size is not None else int(os.environ.get('PYJO_MAX_LINE_SIZE') or 8192)
-        )
-        """::
-
-            size = msg.max_line_size
-            msg.max_line_size = 1024
-
-        Maximum start-line size in bytes, defaults to the value of the
-        ``PYJO_MAX_LINE_SIZE`` environment variable or ``8192`` (8KiB).
-        """
-
-        self.max_message_size = (
-            max_message_size
-            if max_message_size is not None
-            else int(size)
-            if (size := os.environ.get('PYJO_MAX_MESSAGE_SIZE')) is not None
-            else self._MAX_MESSAGE_SIZE
-        )
-        """::
-
-            size = msg.max_message_size
-            msg.max_message_size = 1024
-
-        Maximum message size in bytes, defaults to the value of the
-        ``PYJO_MAX_MESSAGE_SIZE`` environment variable or ``16777216``
-        (16MiB). Setting the value to ``0`` will allow messages of indefinite
-        size.
-        """
+        self._max_line_size: int | None = max_line_size
+        self._max_message_size: int | None = max_message_size
 
         self.version = version
         """::
@@ -194,6 +167,46 @@ class Pyjo_Message(Pyjo.EventEmitter.object):
         self._limit = False
         self._raw_size = 0
         self._state: str | None = None
+
+    @property
+    def max_line_size(self) -> int:
+        """::
+
+            size = msg.max_line_size
+            msg.max_line_size = 1024
+
+        Maximum start-line size in bytes, defaults to the value of the
+        ``PYJO_MAX_LINE_SIZE`` environment variable or ``8192`` (8KiB).
+        """
+        if self._max_line_size is None:
+            self._max_line_size = int(os.environ.get('PYJO_MAX_LINE_SIZE') or 8192)
+        return self._max_line_size
+
+    @max_line_size.setter
+    def max_line_size(self, value: int) -> None:
+        self._max_line_size = value
+
+    @property
+    def max_message_size(self) -> int:
+        """::
+
+            size = msg.max_message_size
+            msg.max_message_size = 1024
+
+        Maximum message size in bytes, defaults to the value of the
+        ``PYJO_MAX_MESSAGE_SIZE`` environment variable or ``16777216``
+        (16MiB). Setting the value to ``0`` will allow messages of indefinite
+        size.
+        """
+        if self._max_message_size is None:
+            self._max_message_size = (
+                int(size) if (size := os.environ.get('PYJO_MAX_MESSAGE_SIZE')) is not None else self._MAX_MESSAGE_SIZE
+            )
+        return self._max_message_size
+
+    @max_message_size.setter
+    def max_message_size(self, value: int) -> None:
+        self._max_message_size = value
 
     @property
     def content(self) -> Pyjo.Content.object:
