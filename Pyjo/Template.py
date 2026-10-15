@@ -79,11 +79,11 @@ block opens it, and ``}`` at the start of a line closes it, as in ``} else
 {``. Any other brace is the one of Python, so a ``dict`` or a ``set`` that
 starts at the end of such a line is put in parentheses. ::
 
-    % for i in range(3):
-      % if i:
-    , <%= i %>
+    % for name in ['Baerbel', 'Wolfgang']:
+      % if name.startswith('B'):
+    <b><%= name %></b>
       % else:
-    <%= i %>
+    <i><%= name %></i>
       % end
     % end
     <% for i in range(3) { %><%= i %><% } %>
@@ -518,7 +518,7 @@ class Pyjo_Template(Pyjo.Base.object):
         """::
 
             name = mt.name
-            mt.name = 'foo.mt'
+            mt.name = 'foo.ep'
 
         Name of template currently being processed, defaults to ``template``.
         """
@@ -741,9 +741,9 @@ class Pyjo_Template(Pyjo.Base.object):
     def render_file(self, path: Anything, *args: Anything) -> Any:
         """::
 
-            output = mt.render_file('/tmp/foo.mt')
-            output = mt.render_file('/tmp/foo.mt', *args)
-            output = mt.render_file('/tmp/bar.mt', {'foo': 'bar'})
+            output = mt.render_file('/tmp/foo.ep')
+            output = mt.render_file('/tmp/foo.ep', *args)
+            output = mt.render_file('/tmp/bar.ep', {'foo': 'bar'})
 
         Same as :meth:`render`, but renders a template file.
         """

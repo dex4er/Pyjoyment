@@ -71,16 +71,16 @@ with subtest('Syntax'):
         'markup',
     )
     is_ok(
-        mt.render("""% for i in range(3):
-  % if i:
-, <%= i %>
+        mt.render("""% for name in ['Baerbel', 'Wolfgang']:
+  % if name.startswith('B'):
+<b><%= name %></b>
   % else:
-<%= i %>
+<i><%= name %></i>
   % end
 % end
 <% for i in range(3) { %><%= i %><% } %>
 """),
-        '0\n, 1\n, 2\n012\n',
+        '<b>Baerbel</b>\n<i>Wolfgang</i>\n012\n',
         'blocks',
     )
     is_ok(
@@ -242,8 +242,8 @@ with subtest('line_start'):
 with subtest('name'):
     name = mt.name
     is_ok(name, 'template', 'name')
-    mt.name = 'foo.mt'
-    is_ok(mt.name, 'foo.mt', 'name')
+    mt.name = 'foo.ep'
+    is_ok(mt.name, 'foo.ep', 'name')
 
 with subtest('namespace'):
     namespace = mt.namespace
@@ -347,14 +347,14 @@ with subtest('render'):
 
 with subtest('render_file'):
     with tempfile.TemporaryDirectory() as tmp:
-        for name, content in {'foo.mt': '<%= 1 + 1 %>', 'bar.mt': '<%= foo %>'}.items():
+        for name, content in {'foo.ep': '<%= 1 + 1 %>', 'bar.ep': '<%= foo %>'}.items():
             with open(os.path.join(tmp, name), 'w') as f:
                 f.write(content)
-        output = Pyjo.Template.new().render_file(os.path.join(tmp, 'foo.mt'))
+        output = Pyjo.Template.new().render_file(os.path.join(tmp, 'foo.ep'))
         is_ok(output, '2\n', 'output')
-        output = Pyjo.Template.new().render_file(os.path.join(tmp, 'foo.mt'), 'a')
+        output = Pyjo.Template.new().render_file(os.path.join(tmp, 'foo.ep'), 'a')
         is_ok(output, '2\n', 'output with arguments')
-        output = Pyjo.Template.new(vars=True).render_file(os.path.join(tmp, 'bar.mt'), {'foo': 'bar'})
+        output = Pyjo.Template.new(vars=True).render_file(os.path.join(tmp, 'bar.ep'), {'foo': 'bar'})
         is_ok(output, 'bar\n', 'output with named variables')
 
 done_testing()

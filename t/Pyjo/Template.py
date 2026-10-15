@@ -31,9 +31,9 @@ with subtest('Empty template'):
 
 with subtest('Named template'):
     mt = Pyjo.Template.new()
-    mt.name = 'foo/bar.mt'
+    mt.name = 'foo/bar.ep'
     output = mt.render('% import inspect\n<%= inspect.currentframe().f_code.co_filename %>')
-    is_ok(output, 'foo/bar.mt\n', 'template name')
+    is_ok(output, 'foo/bar.ep\n', 'template name')
 
 with subtest('Consistent scalar context'):
     # Unlike Mojolicious: a list is rendered item by item, not as its length in the scalar context of Perl
@@ -1073,43 +1073,43 @@ test bar
 
 with subtest('File'):
     mt = Pyjo.Template.new()
-    file = os.path.join(TEMPLATES, 'test.mt')
+    file = os.path.join(TEMPLATES, 'test.ep')
     output = mt.render_file(file, 3)
     like_ok(output, re.compile(r'23\nHello World!'), 'file')
 
 with subtest('Exception in file'):
     mt = Pyjo.Template.new()
-    file = os.path.join(TEMPLATES, 'exception.mt')
+    file = os.path.join(TEMPLATES, 'exception.ep')
     output = mt.render_file(file)
     isa_ok(output, Pyjo.Exception.object, 'right exception')
     # Unlike Mojolicious: the message of Python has no location, which the string of the exception adds
-    like_ok(str(output), r'exception\.mt line 2', 'message contains filename')
+    like_ok(str(output), r'exception\.ep line 2', 'message contains filename')
     is_ok(output.lines_before[0][0], 1, 'right number')
     is_ok(output.lines_before[0][1], 'test', 'right line')
     is_ok(output.line[0], 2, 'right number')
     is_ok(output.line[1], '% raise Exception()', 'right line')
     is_ok(output.lines_after[0][0], 3, 'right number')
     is_ok(output.lines_after[0][1], '123', 'right line')
-    like_ok(str(output), r'exception\.mt line 2', 'right result')
+    like_ok(str(output), r'exception\.ep line 2', 'right result')
 
 with subtest('Exception in file (different name)'):
     mt = Pyjo.Template.new()
-    mt.name = '"foo.mt" from DATA section'
+    mt.name = '"foo.ep" from DATA section'
     output = mt.render_file(file)
     isa_ok(output, Pyjo.Exception.object, 'right exception')
     # Unlike Mojolicious: the message of Python has no location, which the string of the exception adds
-    like_ok(str(output), r'foo\.mt from DATA section line 2', 'message contains filename')
+    like_ok(str(output), r'foo\.ep from DATA section line 2', 'message contains filename')
     is_ok(output.lines_before[0][0], 1, 'right number')
     is_ok(output.lines_before[0][1], 'test', 'right line')
     is_ok(output.line[0], 2, 'right number')
     is_ok(output.line[1], '% raise Exception()', 'right line')
     is_ok(output.lines_after[0][0], 3, 'right number')
     is_ok(output.lines_after[0][1], '123', 'right line')
-    like_ok(str(output), r'foo\.mt from DATA section line 2', 'right result')
+    like_ok(str(output), r'foo\.ep from DATA section line 2', 'right result')
 
 with subtest('Exception with UTF-8 context'):
     mt = Pyjo.Template.new()
-    file = os.path.join(TEMPLATES, 'utf8_exception.mt')
+    file = os.path.join(TEMPLATES, 'utf8_exception.ep')
     output = mt.render_file(file)
     isa_ok(output, Pyjo.Exception.object, 'right exception')
     is_ok(output.lines_before[0][1], '☃', 'right line')
@@ -1128,7 +1128,7 @@ with subtest('Exception in first line with bad message'):
 
 with subtest('Different encodings'):
     mt = Pyjo.Template.new(encoding='shift_jis')
-    file = os.path.join(TEMPLATES, 'utf8_exception.mt')
+    file = os.path.join(TEMPLATES, 'utf8_exception.ep')
     throws_ok(lambda: mt.render_file(file), Pyjo.Exception.object, re.compile('invalid encoding'))
 
 with subtest('Custom escape function'):
