@@ -442,7 +442,10 @@ with subtest('delete, get, head, options, patch, post, put and query'):
         ua.get('http://example.com', lambda ua, tx: [print(tx.result.code), Pyjo.IOLoop.stop()], json={'a': 'b'})
         if not Pyjo.IOLoop.is_running():
             Pyjo.IOLoop.start()
-    is_ok(stdout.getvalue(), '200\n', 'print(tx.result.body)')
+        ua.get('http://example.com', json={'a': 'b'}, cb=lambda ua, tx: [print(tx.result.code), Pyjo.IOLoop.stop()])
+        if not Pyjo.IOLoop.is_running():
+            Pyjo.IOLoop.start()
+    is_ok(stdout.getvalue(), '200\n200\n', 'print(tx.result.body)')
 
 with subtest('delete_p, get_p, head_p, options_p, patch_p, post_p, put_p and query_p'):
     promise = ua.get_p('http://example.com')
@@ -498,6 +501,7 @@ with subtest('websocket'):
         if not Pyjo.IOLoop.is_running():
             Pyjo.IOLoop.start()
     is_ok(stdout.getvalue(), 'Subprotocol negotiation failed!\n', 'print(...)')
+    isa_ok(echo_protocol, str, 'the decorated name is the id of the connection')
 
     with output() as stdout:
 
