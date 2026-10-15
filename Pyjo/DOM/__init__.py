@@ -52,7 +52,7 @@ nodes of the type ``tag``. ::
     +- tag (html)
        |- tag (head)
        |  +- tag (title)
-       |     +- raw (Hello)
+       |     +- text (Hello)
        +- tag (body)
           +- text (World!)
 
@@ -997,7 +997,7 @@ class Pyjo_DOM(Pyjo.Base.object, Pyjo.String.Mixin.object):
             dom.parse('<?xml version="1.0"?>').child_nodes.first().type
 
             # "raw"
-            dom.parse('<title>Test</title>').at('title').child_nodes.first().type
+            dom.parse('<script>Test</script>').at('script').child_nodes.first().type
 
             # "root"
             dom.parse('<p>Test</p>').type

@@ -2634,12 +2634,22 @@ with subtest('"image"'):
 with subtest('"title"'):
     dom = Pyjo.DOM.new('<title> <p>test&lt;</title>')
     is_ok(dom.at('title').text, ' <p>test<', 'right text')
-    is_ok(str(dom), '<title> <p>test<</title>', 'right result')
+    is_ok(str(dom), '<title> &lt;p&gt;test&lt;</title>', 'right result')
+
+    dom = Pyjo.DOM.new('<title>&lt;/title&gt;&lt;img src=x onerror=alert(1)&gt;</title>')
+    is_ok(dom.at('title').text, '</title><img src=x onerror=alert(1)>', 'right text')
+    is_ok(str(dom), '<title>&lt;/title&gt;&lt;img src=x onerror=alert(1)&gt;</title>', 'end tag stays escaped')
 
 with subtest('"textarea"'):
     dom = Pyjo.DOM.new('<textarea id="a"> <p>test&lt;</textarea>')
     is_ok(dom.at('textarea#a').text, ' <p>test<', 'right text')
-    is_ok(str(dom), '<textarea id="a"> <p>test<</textarea>', 'right result')
+    is_ok(str(dom), '<textarea id="a"> &lt;p&gt;test&lt;</textarea>', 'right result')
+
+    dom = Pyjo.DOM.new('<textarea>&lt;/textarea&gt;&lt;script&gt;alert(1)&lt;/script&gt;</textarea>')
+    is_ok(dom.at('textarea').text, '</textarea><script>alert(1)</script>', 'right text')
+    is_ok(
+        str(dom), '<textarea>&lt;/textarea&gt;&lt;script&gt;alert(1)&lt;/script&gt;</textarea>', 'end tag stays escaped'
+    )
 
 with subtest('Comments'):
     dom = Pyjo.DOM.new("""\

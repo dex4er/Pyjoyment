@@ -19,8 +19,8 @@ See also
 
 :mod:`Pyjoyment`, https://mojolicious.org.
 
-Ported from `Mojo::DOM::HTML <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/DOM/HTML.pm>`_
-of Mojolicious 9.49.
+Ported from `Mojo::DOM::HTML <https://github.com/mojolicious/mojo/blob/v9.50/lib/Mojo/DOM/HTML.pm>`_
+of Mojolicious 9.50.
 
 Functions
 ---------
@@ -261,7 +261,10 @@ class Pyjo_DOM_HTML(Pyjo.Base.object):
                     ):
                         continue
                     pos = raw.end()
-                    _node(current[0], 'raw', html_unescape(raw[1]) if start in RCDATA else raw[1])
+                    if start in RCDATA:
+                        _node(current[0], 'text', html_unescape(raw[1]))
+                    else:
+                        _node(current[0], 'raw', raw[1])
                     _end(start, False, current)
 
             # DOCTYPE

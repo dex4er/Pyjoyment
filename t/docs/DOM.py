@@ -514,7 +514,7 @@ with subtest('type'):
     dom = Pyjo.DOM.new()
 
     # "raw"
-    is_ok(dom.parse('<title>Test</title>').at('title').child_nodes.first().type, 'raw', 'type')
+    is_ok(dom.parse('<script>Test</script>').at('script').child_nodes.first().type, 'raw', 'type')
 
     # "root"
     is_ok(dom.parse('<p>Test</p>').type, 'root', 'type')
