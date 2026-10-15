@@ -81,6 +81,25 @@ with subtest('Synopsis'):
         else:
             skip('pyjo-prove is not installed', 2)
 
+with subtest('Description'):
+    with tempfile.TemporaryDirectory() as tmp:
+        os.makedirs(os.path.join(tmp, 't'))
+        with open(os.path.join(tmp, 't', 'new.py'), 'w') as f:
+            f.write(
+                textwrap.dedent("""\
+                    # /// script
+                    # requires-python = ">=3.14"
+                    # ///
+                """)
+                + PASS
+            )
+        out, code = shell('python -m Pyjo.Prove t/new.py', tmp)
+        if sys.version_info >= (3, 14):
+            like_ok(out, r'(?m)^t/new\.py \.+ ok$', 'runs on Python 3.14')
+        else:
+            like_ok(out, r'(?m)^t/new\.py \.+ skipped: requires Python >=3\.14$', 'skipped before Python 3.14')
+        is_ok(code, 0, 'right exit status')
+
 with tempfile.TemporaryDirectory() as tmp:
     scripts(tmp)
     cwd = os.getcwd()
