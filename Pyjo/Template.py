@@ -1106,8 +1106,11 @@ def _code_objects(code: types.CodeType) -> Iterator[types.CodeType]:
 
 
 def _sandbox(name: str) -> dict[str, Any]:
-    if (module := sys.modules.get(name)) is None:
-        module = _SANDBOXES.setdefault(name, types.ModuleType(name))
+    if (module := sys.modules.get(name)) is None and (module := _SANDBOXES.get(name)) is None:
+        module = _SANDBOXES[name] = types.ModuleType(name)
+
+        # No spec, as the module has no source that linecache could read, which warns of a spec without a loader
+        del module.__spec__
     return module.__dict__
 
 

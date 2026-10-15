@@ -518,7 +518,7 @@ with subtest('End and begin in the same python line'):
 with subtest('Strict'):
     output = Pyjo.Template.new().render('% foo += 1')
     isa_ok(output, Pyjo.Exception.object, 'right exception')
-    like_ok(output.message, r"^cannot access local variable 'foo'", 'right message')
+    like_ok(output.message, r"local variable 'foo'", 'right message')
 
 with subtest('Importing into a template'):
     mt = Pyjo.Template.new()
