@@ -1,17 +1,17 @@
 import os
 
 
-# Left out from Mojolicious: MOJO_MODE, as the application is the one of the tests; MOJO_REACTOR, as the tests run on
-# the reactor of Pyjo.Reactor.detect()
+# Left out from Mojolicious: MOJO_REACTOR, as the tests run on the reactor of Pyjo.Reactor.detect()
+os.environ['PYJO_MODE'] = 'development'
 os.environ['PYJO_PROXY'] = '0'
 
-import Pyjo.UserAgent.Server
+# Not in Mojolicious: the level of the log, which ojo sets when it is loaded, and Pyjo when it runs as python -m Pyjo
+os.environ.setdefault('PYJO_LOG_LEVEL', 'fatal')
 
 from Pyjo import *
 from Pyjo.Test import *
 
 import contextlib
-import importlib
 import io
 import subprocess
 import sys
@@ -19,15 +19,9 @@ import sys
 
 ROOT = os.path.join(os.path.dirname(__file__), '..', '..')
 
-# TODO: a and its application, when Pyjoyment.Lite is ported: the minimal Mojolicious::Lite of the tests answers the
-# requests until then
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
-Lite = importlib.import_module('Lite')
-Lite.app.log.level = 'fatal'
-Lite.app.routes.any('/', lambda c: c.render(data=c.req.method.encode() + c.req.body))
-Pyjo.UserAgent.Server.app(Lite.app)
-
-# TODO: the subtest "Application", with a
+with subtest('Application'):
+    a('/', lambda c: c.render(data=c.req.method.encode() + c.req.body)).secrets = ['foobarbaz']
+    is_ok(a().secrets[0], 'foobarbaz', 'right secret')
 
 with subtest('Requests'):
     is_ok(g('/').body, b'GET', 'right content')
@@ -41,7 +35,13 @@ with subtest('Requests'):
     is_ok(p('/', form={'foo': 'bar'}).body, b'POSTfoo=bar', 'right content')
     is_ok(p('/', json={'foo': 'bar'}).body, b'POST{"foo":"bar"}', 'right content')
 
-# TODO: the subtest "Mojolicious::Lite", with a
+with subtest('Mojolicious::Lite'):
+    # Unlike Mojolicious: from Pyjo import * does not import the functions of Pyjoyment.Lite, which give the application
+    # of a
+    from Pyjoyment.Lite import app, get
+
+    get('/test', {'text': 'pass'})
+    is_ok(app.ua.get('/test').res.body, b'pass', 'right content')
 
 with subtest('Parse XML'):
     is_ok(x('<title>works</title>').at('title').text, 'works', 'right text')
