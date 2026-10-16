@@ -42,6 +42,8 @@ already, :meth:`start` and :meth:`one_tick` return right away, as asyncio
 does not nest event loops, and the handles and timers are watched by that
 loop.
 
+The end of a ``with`` block closes the event loop that the reactor made.
+
 See also
 --------
 
@@ -66,6 +68,7 @@ import time
 import weakref
 
 from collections.abc import Awaitable, Callable, Coroutine
+from types import TracebackType
 from typing import Any, Self, TypedDict
 
 
@@ -119,11 +122,25 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
         # Not in Mojolicious: the event loop of the reactor is closed with it, unless the interpreter is finishing
         # Module globals may be gone at the end of the interpreter
         try:
-            loop = getattr(self, '_own', None)
-            if loop is not None and not sys.is_finalizing() and not loop.is_running() and not loop.is_closed():
-                loop.close()
+            if not sys.is_finalizing():
+                self._close_loop()
         except Exception:
             pass
+
+    # Not in Mojolicious: a context manager, which closes the event loop that the reactor made where the block ends, as
+    # PyPy frees the object only when its garbage collector runs
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+        self, type: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None
+    ) -> None:
+        self._close_loop()
+
+    def _close_loop(self) -> None:
+        loop = getattr(self, '_own', None)
+        if loop is not None and not loop.is_running() and not loop.is_closed():
+            loop.close()
 
     # Not in Mojolicious: the asyncio event loop
     @property

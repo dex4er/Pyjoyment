@@ -56,6 +56,9 @@ returns. ::
     def id(loop):
         print('Timeout!')
 
+The end of a ``with`` block removes everything, as :meth:`~Pyjo_IOLoop.reset`
+does.
+
 Events
 ------
 
@@ -117,6 +120,7 @@ import time
 import weakref
 
 from collections.abc import Callable, Iterator
+from types import TracebackType
 from typing import TYPE_CHECKING, Any, Self, overload
 
 
@@ -203,6 +207,16 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
         self._out: dict[str, dict[str, Any]] = {}
         self._reactor = reactor
         self._stop = 0
+
+    # Not in Mojolicious: a context manager, which removes everything, as reset does, where the block ends, as PyPy
+    # frees the object only when its garbage collector runs
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+        self, type: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None
+    ) -> None:
+        self.reset()
 
     @property
     def reactor(self) -> Pyjo.Reactor.object:
