@@ -1,3 +1,4 @@
+import Pyjoyment
 import Pyjoyment.Routes
 import Pyjoyment.Routes.Match
 import Pyjoyment.Routes.Pattern
@@ -374,7 +375,11 @@ with subtest('to'):
     r = r.to('controller#action', foo='bar')
     r = r.to('controller#action', {'foo': 'bar'})
     is_ok(r.to()['foo'], 'bar', 'with defaults')
-    # TODO: the examples of Pyjoyment.new(), when Pyjoyment is ported
+    app = Pyjoyment.new()
+    r = r.to(app)
+    is_ok(r.to()['app'], app, 'application object')
+    r = r.to(Pyjoyment.new(), foo='bar')
+    r = r.to(Pyjoyment.new(), {'foo': 'bar'})
     r = r.to('MyApp')
     r = r.to('MyApp', foo='bar')
     r = r.to('MyApp', {'foo': 'bar'})

@@ -304,3 +304,25 @@ def _module(cls: Class) -> ModuleType | None:
 # The name of the module of a class, the key of the cache
 def _key(cls: Class) -> str | None:
     return module.__name__ if (module := _module(cls)) is not None else None
+
+
+# Not in Mojolicious: the class of a dotted name, which a Perl package is, for the modules of Pyjoyment that load
+# plugins and controllers by name: the class that a module names its object, or an attribute of the longest prefix of
+# the name that is a module
+def _class(name: str) -> type | None:  # pyright: ignore[reportUnusedFunction]
+    if (module := sys.modules.get(name)) is not None:
+        found: object = getattr(module, 'object', None)
+        return found if isinstance(found, type) else None
+    parts = name.split('.')
+    for i in range(len(parts) - 1, 0, -1):
+        try:
+            found = importlib.import_module('.'.join(parts[:i]))
+        except ImportError:
+            continue
+        try:
+            for attr in parts[i:]:
+                found = getattr(found, attr)
+        except AttributeError:
+            return None
+        return found if isinstance(found, type) else None
+    return None

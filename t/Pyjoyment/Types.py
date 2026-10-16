@@ -1,9 +1,7 @@
-import Pyjo.Message.Response
+import Pyjoyment
 import Pyjoyment.Types
 
 from Pyjo.Test import *
-
-from types import SimpleNamespace
 
 
 t = Pyjoyment.Types.new()
@@ -93,8 +91,7 @@ with subtest('File types'):
     is_ok(t.file_type('.test.js'), 'application/javascript', 'right type')
 
 with subtest('Content types'):
-    # TODO: Pyjoyment.new().build_controller(), when Pyjoyment is ported; until then a controller with a response
-    c = SimpleNamespace(res=Pyjo.Message.Response.new())
+    c = Pyjoyment.new().build_controller()
     t.content_type(c, ext='json')
     is_ok(c.res.headers.content_type, 'application/json', 'right type')
     t.content_type(c, ext='txt')

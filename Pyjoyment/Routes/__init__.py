@@ -39,15 +39,23 @@ of Mojolicious 9.49.
 """
 
 import Pyjo.Cache
+import Pyjo.Exception
+import Pyjo.Loader
 import Pyjoyment.Routes.Pattern
 import Pyjoyment.Routes.Route
 
+from Pyjo.Util import camelize
 from Pyjoyment.Routes.Route import Pyjoyment_Routes_Route
 
 import re
 
 from collections.abc import Callable
-from typing import Any, Self
+from typing import TYPE_CHECKING, Any, Self, cast
+
+
+if TYPE_CHECKING:
+    import Pyjoyment
+    import Pyjoyment.Controller
 
 
 # A condition gets the route, the controller, the captures and the value that the route requires
@@ -129,6 +137,7 @@ class Pyjoyment_Routes(Pyjoyment_Routes_Route):
         defined.
         """
 
+        self._loaded: dict[str, type] = {}
         self._reverse: dict[str, Pyjoyment.Routes.Route.object] | None = None
 
     def add_condition(self, name: str, cb: Condition) -> Self:
@@ -172,9 +181,52 @@ class Pyjoyment_Routes(Pyjoyment_Routes_Route):
         self.types[name] = type
         return self
 
-    # TODO: continue, with dispatch.t, when Pyjoyment.Controller and Pyjoyment are ported
+    # Renamed from Mojolicious: continue, which is a keyword of Python
+    def proceed(self, c: 'Pyjoyment.Controller.object') -> None:
+        """::
 
-    # TODO: dispatch, with dispatch.t, when Pyjoyment.Controller and Pyjoyment are ported
+            r.proceed(Pyjoyment.Controller.new())
+
+        Continue dispatch chain and emit the hook ``around_action`` of
+        :mod:`Pyjoyment` for every action.
+        """
+        match = c.match
+        stack = match.stack
+        position = match.position
+        if position >= len(stack):
+            return _render(c)
+        field = stack[position]
+
+        # Merge captures into stash
+        stash = c.stash()
+        stash.setdefault('mojo.captures', {}).update(field)
+        stash.update(field)
+
+        position += 1
+        last = position >= len(stack)
+        if cb := field.get('cb'):
+            proceed = self._callback(c, cb, last)
+        else:
+            proceed = self._controller(c, field, last)
+        match.position = position
+        if last or proceed:
+            self.proceed(c)
+
+    # The name of Mojolicious, with an underscore as continue is a keyword of Python
+    continue_ = proceed
+
+    def dispatch(self, c: 'Pyjoyment.Controller.object') -> bool:
+        """::
+
+            boolean = r.dispatch(Pyjoyment.Controller.new())
+
+        Match routes with :meth:`match` and dispatch with :meth:`proceed`.
+        """
+        self.match(c)
+        if not c.match.stack:
+            return False
+        self.proceed(c)
+        return True
 
     def lookup(self, name: str) -> 'Pyjoyment.Routes.Route.object | None':
         """::
@@ -189,7 +241,155 @@ class Pyjoyment_Routes(Pyjoyment_Routes_Route):
             self._reverse = self._index()
         return self._reverse.get(name)
 
-    # TODO: match, with dispatch.t, when Pyjoyment.Controller and Pyjoyment are ported
+    def match(self, c: 'Pyjoyment.Controller.object') -> None:
+        """::
+
+            r.match(Pyjoyment.Controller.new())
+
+        Match routes with :mod:`Pyjoyment.Routes.Match`.
+        """
+        # Path (partial path gets priority)
+        req = c.req
+        path = c.stash().get('path')
+        if path is not None:
+            if not path.startswith('/'):
+                path = f'/{path}'
+        else:
+            path = req.url.path.to_route()
+
+        # Method (HEAD will be treated as GET)
+        method = req.method.upper()
+        override = req.url.query.clone().param('_method')
+        if override and method == 'POST':
+            method = override.upper()
+        if method == 'HEAD':
+            method = 'GET'
+
+        # Check cache
+        tx: Any = c.tx
+        ws = 1 if tx.is_websocket else 0
+        match = c.match
+        match.root = self
+        cache = self.cache
+        if result := cache.get(f'{method}:{path}:{ws}'):
+            match.endpoint, match.stack = result['endpoint'], result['stack']
+            return
+
+        # Check routes
+        match.find(c, method=method, path=path, websocket=bool(ws))
+        if (route := match.endpoint) is None:
+            return
+        cache.set(f'{method}:{path}:{ws}', {'endpoint': route, 'stack': match.stack})
+
+    def _callback(self, c: 'Pyjoyment.Controller.object', cb: Callable[..., Any], last: bool) -> Any:
+        if last:
+            c.stash()['mojo.routed'] = True
+        c.helpers.log().trace('Routing to a callback')
+        return _action(c.app, c, cb, last)
+
+    def _class(self, c: 'Pyjoyment.Controller.object', field: dict[str, Any]) -> Any:
+        # Application instance
+        if field.get('app') is not None and not isinstance(field['app'], str):
+            return field['app']
+
+        # Application class
+        classes: list[str] = []
+        cls = camelize(field['controller']).replace('::', '.') if field.get('controller') else ''
+        if field.get('app'):
+            classes.append(field['app'])
+
+        # Specific namespace
+        elif (namespace := field.get('namespace')) is not None:
+            if not cls:
+                raise Pyjo.Exception.new(f'Namespace "{namespace}" requires a controller')
+            classes.append(f'{namespace}.{cls}' if namespace else cls)
+
+        # All namespaces
+        elif cls:
+            classes.extend(f'{namespace}.{cls}' for namespace in self.namespaces)
+
+        # Try to load all classes
+        for name in classes:
+            # Failed
+            if (found := self._load(name)) is None:
+                continue
+            if not found:
+                raise Pyjo.Exception.new(f'Class "{name}" is not a controller')
+
+            # Success
+            return cast(type[Any], found).new(app=c.app, match=c.match, stash=c.stash(), tx=c.tx)
+
+        # Nothing found
+        if classes:
+            raise Pyjo.Exception.new(f'Controller "{classes[-1]}" does not exist')
+        return False
+
+    def _controller(self, old: 'Pyjoyment.Controller.object', field: dict[str, Any], last: bool) -> bool:
+        import Pyjoyment
+
+        # Load and instantiate controller/application
+        new: Any = self._class(old, field)
+        if not new:
+            return new is not None
+
+        # Application
+        controller = cast(type[Any], type(new))
+        cls = f'{controller.__module__}.{controller.__qualname__}'
+        log = old.helpers.log()
+        if isinstance(new, Pyjoyment.object):
+            log.trace(f'Routing to application "{cls}"')
+
+            # Try to connect routes
+            if (r := getattr(new, 'routes', None)) is not None and r.parent is None:
+                r.parent = old.match.endpoint
+            new.handler(old)
+            old.stash()['mojo.routed'] = True
+
+        # Action
+        elif method := field.get('action'):
+            log.trace(f'Routing to controller "{cls}" and action "{method}"')
+
+            if callable(sub := getattr(controller, method, None)):
+                if last:
+                    old.stash()['mojo.routed'] = True
+                if _action(old.app, new, sub, last):
+                    return True
+
+            else:
+                log.trace('Action not found in controller')
+
+        else:
+            raise Pyjo.Exception.new(f'Controller "{cls}" requires an action')
+
+        return False
+
+    def _load(self, name: str) -> type | bool | None:
+        # Load unless already loaded
+        if (loaded := self._loaded.get(name)) is not None:
+            return loaded
+        if isinstance(e := Pyjo.Loader.load_class(name), Exception):
+            raise e
+        if (cls := Pyjo.Loader._class(name)) is None:  # pyright: ignore[reportPrivateUsage]
+            return None
+
+        # Check base classes
+        bases = [Pyjo.Loader._class(base) for base in self.base_classes]  # pyright: ignore[reportPrivateUsage]
+        if not any(base is not None and issubclass(cls, base) for base in bases):
+            return False
+        self._loaded[name] = cls
+        return cls
+
+
+def _action(app: Any, *args: Any) -> Any:
+    return app.plugins.emit_chain('around_action', *args)
+
+
+def _render(c: 'Pyjoyment.Controller.object') -> None:
+    stash = c.stash()
+    if stash.get('mojo.rendered'):
+        return
+    if not c.render_maybe() and not stash.get('mojo.routed'):
+        raise Pyjo.Exception.new('Route without action and nothing to render')
 
 
 new = Pyjoyment_Routes.new

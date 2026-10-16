@@ -526,12 +526,21 @@ copy:
   underscore is its alias, which the ported tests use, so that the diff of a
   newer Mojolicious applies to them: `raise` of `Mojo::Exception` is `throw`
   and `raise_`, and `finally` of `Mojo::Promise` is `lastly`, as Bluebird
-  names it, and `finally_`. An attribute only gets the other name, as `not`
+  names it, and `finally_`; `continue` of `Mojolicious::Routes` and
+  `Mojolicious::Controller` is `proceed` and `continue_`. An attribute only
+  gets the other name, as `not`
   of `Mojo::UserAgent::Proxy` is `no`, after `NO_PROXY`. The functions of
   `Pyjo.Test` are the exception: they have an `_ok` suffix, as `is_ok`.
 - A name of a Perl package, as `Mojo::Exception` takes them, is a dotted name
   of a class in Python (`'MyApp.X.Foo'`), resolved by importing the longest
   prefix that is a module.
+  A plugin or a controller that Mojolicious loads by its package name is the
+  class that a module names `object`, as `Pyjoyment.Plugin.HeaderCondition`,
+  or a class in a module, as `MyApp.Controller.Foo`.
+- A helper of Mojolicious, which `Mojo::DynamicMethods` makes a method of the
+  controller and the application, is a callable that `__getattr__` finds in
+  the renderer, and a prefix of nested helpers is an attribute: `c.title('x')`,
+  `c.log().debug(...)` and `c.reply.not_found()`.
 - Perl's `@INC` is `sys.path`, and `%INC`, the files of the modules that
   are loaded, and the symbol table of packages are `sys.modules` and the
   `__file__` of a module, as `Pyjo.Home` and `Pyjo.Loader` use them; a module

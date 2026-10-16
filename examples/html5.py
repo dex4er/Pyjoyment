@@ -1,4 +1,4 @@
-# TODO: runs once Pyjoyment.Lite and Pyjo.Template are ported; Pyjoyment.Lite is a stub until then
+# TODO: runs once Pyjoyment.Lite is ported
 
 from Pyjoyment.Lite import app, get, path
 

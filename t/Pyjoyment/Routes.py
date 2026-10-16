@@ -1,16 +1,10 @@
+import Pyjoyment.Controller
 import Pyjoyment.Routes
 import Pyjoyment.Routes.Match
 
 from Pyjo.Test import *
 
 import re
-
-
-# TODO: Pyjoyment.Controller, when it is ported; until then a controller that only the conditions get, as here none
-class Controller:
-    @classmethod
-    def new(cls) -> 'Controller':
-        return cls()
 
 
 # /clean
@@ -245,7 +239,7 @@ with subtest('Cached lookup'):
     is_ok(r.lookup('fast'), fast, 'fast route found')
 
 with subtest('Make sure stash stays clean'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/clean')
     is_ok(m.root, r, 'right root')
@@ -259,7 +253,7 @@ with subtest('Make sure stash stays clean'):
     is_ok(m.path_for()['path'], '/clean/too', 'right path')
 
 with subtest('No match'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/does_not_exist')
     is_ok(m.root, r, 'right root')
@@ -275,14 +269,14 @@ with subtest('Introspect'):
     is_ok(r.find('nodetect').to()['controller'], 'foo', 'right testcase')
 
 with subtest('Null route'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/0')
     is_deeply_ok(m.stack, [{'null': 1}], 'right strucutre')
     is_ok(m.path_for()['path'], '/0', 'right path')
 
 with subtest('Alternatives with default'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/alternatives')
     is_deeply_ok(m.stack, [{'foo': 11}], 'right strucutre')
@@ -315,7 +309,7 @@ with subtest('Alternatives with default'):
     is_ok(m.path_for('alternativesfoo', foo=12, format='txt')['path'], '/alternatives/12.txt', 'right path')
 
 with subtest('Alternatives without default'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/alternatives/2')
     is_deeply_ok(m.stack, [], 'empty stack')
@@ -344,7 +338,7 @@ with subtest('Alternatives without default'):
     is_ok(m.path_for('alternatives2foo', foo=0)['path'], '/alternatives2/0', 'right path')
 
 with subtest('Alternatives with similar start'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/alternatives3/foo')
     is_deeply_ok(m.stack, [{'foo': 'foo'}], 'right structure')
@@ -355,7 +349,7 @@ with subtest('Alternatives with similar start'):
     is_ok(m.path_for()['path'], '/alternatives3/foobar', 'right path')
 
 with subtest('Alternatives with special characters'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/alternatives4/foo')
     is_deeply_ok(m.stack, [{'foo': 'foo'}], 'right structure')
@@ -375,7 +369,7 @@ with subtest('Alternatives with special characters'):
     is_deeply_ok(m.stack, [], 'empty stack')
 
 with subtest('Optional placeholder'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/optional/23')
     is_deeply_ok(m.stack, [{'foo': '23', 'bar': 'test'}], 'right structure')
@@ -392,7 +386,7 @@ with subtest('Optional placeholder'):
     is_ok(m.path_for('optionalfoobar', foo=0)['path'], '/optional/0/24', 'right path')
 
 with subtest('Optional placeholders in nested routes'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/optional2')
     is_deeply_ok(m.stack, [{'foo': 'one', 'bar': 'two'}], 'right structure')
@@ -415,7 +409,7 @@ with subtest('Optional placeholders in nested routes'):
     is_ok(m.path_for()['path'], '/optional2/three/four', 'right path')
 
 with subtest('Real world example using most features at once'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/articles/1/edit')
     stack = [
@@ -446,14 +440,14 @@ with subtest('Real world example using most features at once'):
     is_ok(m.path_for()['path'], '/articles/1/delete.json', 'right path')
 
 with subtest('Root'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/')
     is_deeply_ok(m.stack, [{'testcase': 'hello', 'action': 'world'}], 'right structure')
     is_ok(m.path_for()['path'], '/', 'right path')
 
 with subtest('Path and captures'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/foo/test/edit')
     is_deeply_ok(m.stack, [{'testcase': 'foo', 'action': 'edit'}], 'right structure')
@@ -465,21 +459,21 @@ with subtest('Path and captures'):
     is_ok(m.endpoint.suggested_method, 'GET', 'right method')
 
 with subtest('Optional captures in sub route with requirement'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/bar/test/delete/22')
     is_deeply_ok(m.stack, [{'testcase': 'bar', 'action': 'delete', 'id': '22'}], 'right structure')
     is_ok(m.path_for()['path'], '/bar/test/delete/22', 'right path')
 
 with subtest('Defaults in sub route'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/bar/test/delete')
     is_deeply_ok(m.stack, [{'testcase': 'bar', 'action': 'delete', 'id': 23}], 'right structure')
     is_ok(m.path_for()['path'], '/bar/test/delete', 'right path')
 
 with subtest('Chained routes'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/test2/foo')
     stack = [{'testcase': 'test2'}, {'testcase': 'index'}, {'testcase': 'baz'}]
@@ -500,7 +494,7 @@ with subtest('Chained routes'):
     is_deeply_ok(m.stack, [], 'empty stack')
 
 with subtest('Named path_for'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/alternatives/test')
     is_ok(m.path_for()['path'], '/alternatives/test', 'right path')
@@ -508,7 +502,7 @@ with subtest('Named path_for'):
     is_ok(m.path_for('test_edit', {'testcase': 'foo'})['path'], '/foo/test/edit', 'right path')
 
 with subtest('Wildcards'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/wildcards/1/hello/there')
     is_deeply_ok(m.stack, [{'testcase': 'wild', 'action': 'card', 'wildcard': 'hello/there'}], 'right structure')
@@ -530,7 +524,7 @@ with subtest('Wildcards'):
     is_ok(m.path_for()['path'], '/wildcards/4/hello/there/foo', 'right path')
 
 with subtest('Special characters'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/wildcards/1/♥')
     is_deeply_ok(m.stack, [{'testcase': 'wild', 'action': 'card', 'wildcard': '♥'}], 'right structure')
@@ -546,7 +540,7 @@ with subtest('Special characters'):
     is_ok(m.path_for()['path'], '/wildcards/1/%foo%bar%', 'right path')
 
 with subtest('Format'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/format')
     is_deeply_ok(m.stack, [{'testcase': 'hello', 'action': 'you', 'format': 'html'}], 'right structure')
@@ -563,7 +557,7 @@ with subtest('Format'):
     is_ok(m.path_for(format='txt')['path'], '/format.txt', 'right path')
 
 with subtest('Format with regex constraint'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/format2')
     is_deeply_ok(m.stack, [], 'empty stack')
@@ -580,7 +574,7 @@ with subtest('Format with regex constraint'):
     is_ok(m.path_for('format2', format='txt')['path'], '/format2.txt', 'right path')
 
 with subtest('Format with constraint alternatives'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/format3')
     is_deeply_ok(m.stack, [], 'empty stack')
@@ -600,7 +594,7 @@ with subtest('Format with constraint alternatives'):
     is_deeply_ok(m.stack, [], 'empty stack')
 
 with subtest('Format with constraint and default'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/format4')
     is_deeply_ok(m.stack, [{'testcase': 'us', 'action': 'yay', 'format': 'html'}], 'right structure')
@@ -617,7 +611,7 @@ with subtest('Format with constraint and default'):
     is_deeply_ok(m.stack, [], 'empty stack')
 
 with subtest('Forbidden format'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/format5')
     is_deeply_ok(m.stack, [{'testcase': 'us', 'action': 'wow'}], 'right structure')
@@ -627,7 +621,7 @@ with subtest('Forbidden format'):
     is_deeply_ok(m.stack, [], 'empty stack')
 
 with subtest('Forbidden format and default'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/format6')
     is_deeply_ok(m.stack, [{'testcase': 'us', 'action': 'doh', 'format': 'xml'}], 'right structure')
@@ -637,7 +631,7 @@ with subtest('Forbidden format and default'):
     is_deeply_ok(m.stack, [], 'empty stack')
 
 with subtest('Formats with similar start'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/format7.foo')
     is_deeply_ok(m.stack, [{'controller': 'perl', 'action': 'rocks', 'format': 'foo'}], 'right structure')
@@ -651,7 +645,7 @@ with subtest('Formats with similar start'):
     is_deeply_ok(m.stack, [], 'empty stack')
 
 with subtest('Placeholder types'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/type/23')
     is_deeply_ok(m.stack, [{'controller': 'foo', 'action': 'bar', 'id': '23'}], 'right structure')
@@ -665,7 +659,7 @@ with subtest('Placeholder types'):
     is_deeply_ok(m.stack, [], 'empty stack')
 
 with subtest('Format inheritance'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/inherit/first.html')
     is_deeply_ok(m.stack, [{'controller': 'inherit', 'action': 'first', 'format': 'html'}], 'right structure')
@@ -729,7 +723,7 @@ with subtest('Format inheritance'):
     is_deeply_ok(m.stack, [], 'empty stack')
 
 with subtest('Request methods'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/method/get.html')
     is_deeply_ok(m.stack, [{'testcase': 'method', 'action': 'get', 'format': 'html'}], 'right structure')
@@ -755,14 +749,14 @@ with subtest('Request methods'):
     is_ok(m.path_for().get('path'), None, 'no path')
 
 with subtest('Not found'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/not_found')
     is_ok(m.path_for('test_edit', testcase='foo')['path'], '/foo/test/edit', 'right path')
     is_deeply_ok(m.stack, [], 'empty stack')
 
 with subtest('Simplified form'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/simple/form')
     is_deeply_ok(m.stack, [{'controller': 'test-test', 'action': 'test'}], 'right structure')
@@ -770,7 +764,7 @@ with subtest('Simplified form'):
     is_ok(m.path_for('current')['path'], '/simple/form', 'right path')
 
 with subtest('Special edge case with intermediate destinations (regex)'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/regex/alternatives/foo')
     is_deeply_ok(m.stack, [{'testcase': 'regex', 'action': 'alternatives', 'alternatives': 'foo'}], 'right structure')
@@ -788,7 +782,7 @@ with subtest('Special edge case with intermediate destinations (regex)'):
     is_deeply_ok(m.stack, [], 'empty stack')
 
 with subtest('Route with version'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/versioned/1.0/test')
     is_deeply_ok(m.stack, [{'testcase': 'bar', 'action': 'baz', 'format': None}], 'right structure')
@@ -816,7 +810,7 @@ with subtest('Route with version'):
     is_deeply_ok(m.stack, [], 'empty stack')
 
 with subtest('Route with version at the end'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/versioned/too/1.0')
     is_deeply_ok(m.stack, [{'controller': 'too', 'action': 'foo'}], 'right structure')
@@ -827,7 +821,7 @@ with subtest('Route with version at the end'):
     is_ok(m.path_for()['path'], '/versioned/too/2.0', 'right path')
 
 with subtest('Multiple extensions'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/multi/foo.bar')
     is_deeply_ok(m.stack, [{'controller': 'just', 'action': 'works'}], 'right structure')
@@ -841,7 +835,7 @@ with subtest('Multiple extensions'):
     is_ok(m.path_for()['path'], '/multi/bar.baz', 'right path')
 
 with subtest('Disabled format detection inheritance'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/nodetect')
     is_deeply_ok(m.stack, [{'controller': 'foo', 'action': 'none'}], 'right structure')
@@ -865,7 +859,7 @@ with subtest('Disabled format detection inheritance'):
     is_deeply_ok(m.stack, [], 'empty stack')
 
 with subtest('Removed routes'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/target/first')
     is_deeply_ok(m.stack, [{'controller': 'target', 'action': 'first'}], 'right structure')
@@ -900,7 +894,7 @@ with subtest('Removed routes'):
     is_deeply_ok(m.stack, [], 'empty stack')
 
 with subtest('WebSocket'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/websocket')
     is_deeply_ok(m.stack, [], 'empty stack')
@@ -910,7 +904,7 @@ with subtest('WebSocket'):
     ok(m.path_for()['websocket'], 'is a websocket')
 
 with subtest('Just a slash with a format after a path'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/slash.txt')
     is_deeply_ok(m.stack, [{'testcase': 'just', 'action': 'slash', 'format': 'txt'}], 'right structure')
@@ -919,7 +913,7 @@ with subtest('Just a slash with a format after a path'):
     is_ok(m.path_for(format='html')['path'], '/slash.html', 'right path')
 
 with subtest('Nameless placeholder'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/missing/foo/name')
     is_deeply_ok(m.stack, [{'controller': 'missing', 'action': 'placeholder', '': 'foo'}], 'right structure')
@@ -944,7 +938,7 @@ with subtest('Nameless placeholder'):
     is_ok(m.path_for()['path'], '/missing/too', 'right path')
 
 with subtest('Partial route'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/partial/test')
     is_deeply_ok(m.stack, [{'controller': 'foo', 'action': 'bar', 'path': '/test'}], 'right structure')
@@ -953,7 +947,7 @@ with subtest('Partial route'):
     is_deeply_ok(m.stack, [{'controller': 'foo', 'action': 'bar', 'path': '.test'}], 'right structure')
 
 with subtest('Similar routes with placeholders'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/similar/too')
     is_deeply_ok(m.stack, [{}, {'controller': 'similar', 'action': 'get', 'something': 'too'}], 'right structure')
@@ -967,7 +961,7 @@ with subtest('Similar routes with placeholders'):
     is_deeply_ok(m.stack, [], 'empty stack')
 
 with subtest('Custom pattern'):
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/custom_pattern/a_123_b/c.123/d/123')
     is_deeply_ok(m.stack, [{'one': '123', 'two': 'c.123', 'three': 'd/123', 'four': 4}], 'right structure')
@@ -976,7 +970,7 @@ with subtest('Custom pattern'):
 with subtest('Unknown placeholder type (matches nothing)'):
     r = Pyjoyment.Routes.new()
     r.get('/<foo:does_not_exist>')
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     m = Pyjoyment.Routes.Match.new(root=r)
     m.find(c, method='GET', path='/')
     is_deeply_ok(m.stack, [], 'empty stack')
