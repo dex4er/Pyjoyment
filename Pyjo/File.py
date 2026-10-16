@@ -59,6 +59,7 @@ import tempfile as _tempfile
 import weakref
 
 from collections.abc import Callable, Iterator
+from types import TracebackType
 from typing import IO, TYPE_CHECKING, Any, NoReturn, Self, cast
 
 
@@ -91,7 +92,7 @@ class Pyjo_File(Pyjo.Base.object, Pyjo.String.Mixin.object):
 
         Construct a new :mod:`Pyjo.File` object, defaults to using the current
         working directory. A temporary file or directory is kept as long as the
-        object is. ::
+        object is, or until the end of a ``with`` block. ::
 
             # "foo/bar/baz.txt" (on UNIX)
             Pyjo.File.new('foo', 'bar', 'baz.txt')
@@ -109,6 +110,17 @@ class Pyjo_File(Pyjo.Base.object, Pyjo.String.Mixin.object):
             if len(parts)
             else _canonpath(os.getcwd())
         )
+
+    # Not in Mojolicious: a context manager, which removes the temporary file or directory that the object keeps where the
+    # block ends, as PyPy frees the object only when its garbage collector runs
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+        self, type: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None
+    ) -> None:
+        if (temp := self._temp) is not None:
+            _release(temp)
 
     def __bool__(self) -> bool:
         """::
@@ -688,9 +700,10 @@ def tempdir(template: str | None = None, **kwargs: Any) -> Pyjo_File:
 
     Construct a new :mod:`Pyjo.File` object for a temporary directory, made
     with :func:`tempfile.mkdtemp` and its keyword arguments, which is removed
-    with the object, as Perl's ``File::Temp`` removes it, without the
-    :exc:`ResourceWarning` that :class:`tempfile.TemporaryDirectory` gives when
-    it is not cleaned up explicitly. The ``X`` characters at the end of a
+    with the object or at the end of a ``with`` block, as Perl's
+    ``File::Temp`` removes it, without the :exc:`ResourceWarning` that
+    :class:`tempfile.TemporaryDirectory` gives when it is not cleaned up
+    explicitly. The ``X`` characters at the end of a
     template are random, and a directory with a template is made in the
     current working directory, as ``File::Temp`` makes it. ::
 
@@ -710,9 +723,10 @@ def tempfile(**kwargs: Any) -> Pyjo_File:
 
     Construct a new :mod:`Pyjo.File` object for a temporary file, made with
     :func:`tempfile.mkstemp` and its keyword arguments, which is removed with
-    the object, as Perl's ``File::Temp`` removes it, without the
-    :exc:`ResourceWarning` that :func:`tempfile.NamedTemporaryFile` gives when
-    it is not closed explicitly. ::
+    the object or at the end of a ``with`` block, as Perl's ``File::Temp``
+    removes it, without the :exc:`ResourceWarning` that
+    :func:`tempfile.NamedTemporaryFile` gives when it is not closed
+    explicitly. ::
 
         # Longer version, which warns when the file is removed with the object
         path = path(tempfile.NamedTemporaryFile(dir='/tmp'))
@@ -726,7 +740,17 @@ def tempfile(**kwargs: Any) -> Pyjo_File:
 class _Temp:
     def __init__(self, name: str, remove: Callable[[str], Anything]) -> None:
         self.name = name
-        weakref.finalize(self, remove, name)
+        self.remove = weakref.finalize(self, remove, name)
+
+
+# Remove a temporary file or directory now, once, where the object would remove it when it goes
+def _release(temp: Anything) -> None:
+    if isinstance(temp, _Temp):
+        temp.remove()
+    elif isinstance(temp, _tempfile.TemporaryDirectory):
+        cast(_tempfile.TemporaryDirectory[str], temp).cleanup()
+    else:
+        cast(Any, temp).close()
 
 
 # File::Temp's newdir with a template
