@@ -336,6 +336,10 @@ def _run(path: str, name: str) -> None:
     loader = importlib.machinery.SourceFileLoader(name, path)
     module = importlib.util.module_from_spec(importlib.machinery.ModuleSpec(name, loader, origin=path))
     module.__file__ = path
+
+    # The sandbox is a module that is loaded, as the package of Mojo is global, where the classes of the script find
+    # it, as the DATA section of an application of Pyjoyment.Lite
+    sys.modules[name] = module
     exec(compile(loader.get_source(name) or '', path, 'exec'), module.__dict__)
 
 
