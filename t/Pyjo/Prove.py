@@ -100,7 +100,7 @@ SCRIPTS = {
     'verbose.py': """
         from Pyjo.Test import *
         import os
-        diag(f"HARNESS_IS_VERBOSE={os.environ.get('HARNESS_IS_VERBOSE')}")
+        diag(f"PYJO_HARNESS_IS_VERBOSE={os.environ.get('PYJO_HARNESS_IS_VERBOSE')}")
         ok(True)
         done_testing()
     """,
@@ -585,9 +585,9 @@ with subtest('Verbose'):
     out, code = prove('-v', 'pass.py')
     like_ok(out, r'(?m)^ok 1 - first$', 'TAP output shown')
     like_ok(out, r'(?m)^    ok 1 - deep$', 'subtest output shown')
-    out, err, code = prove_stderr('-v', 'verbose.py', env={'HARNESS_IS_VERBOSE': ''})
-    like_ok(err, r'HARNESS_IS_VERBOSE=1$', 'HARNESS_IS_VERBOSE for the test scripts')
-    out, err, code = prove_stderr('verbose.py', env={'HARNESS_IS_VERBOSE': ''})
-    like_ok(err, r'HARNESS_IS_VERBOSE=\n', 'no HARNESS_IS_VERBOSE without -v')
+    out, err, code = prove_stderr('-v', 'verbose.py', env={'PYJO_HARNESS_IS_VERBOSE': ''})
+    like_ok(err, r'PYJO_HARNESS_IS_VERBOSE=1$', 'PYJO_HARNESS_IS_VERBOSE for the test scripts')
+    out, err, code = prove_stderr('verbose.py', env={'PYJO_HARNESS_IS_VERBOSE': ''})
+    like_ok(err, r'PYJO_HARNESS_IS_VERBOSE=\n', 'no PYJO_HARNESS_IS_VERBOSE without -v')
 
 done_testing()

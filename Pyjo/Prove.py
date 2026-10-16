@@ -49,8 +49,9 @@ Options
 
 ``-v``, ``--verbose``
     Print the TAP output of each test script, and set the environment
-    variable ``HARNESS_IS_VERBOSE`` of the test scripts to ``1``, as
-    ``prove`` does, which tells :mod:`Pyjo.Test.Pyjo` to log everything.
+    variable ``PYJO_HARNESS_IS_VERBOSE`` of the test scripts to ``1``, as
+    ``prove`` sets ``HARNESS_IS_VERBOSE``, which tells :mod:`Pyjo.Test.Pyjo`
+    to log everything.
 
 ``-I DIR``, ``--include DIR``
     Add the directory to ``PYTHONPATH`` of the test scripts. Can be repeated.
@@ -405,8 +406,9 @@ async def run(
     """
     command = list(command or [sys.executable])
     env = dict(os.environ if env is None else env)
+    # Not in prove: PYJO_HARNESS_IS_VERBOSE, where prove sets HARNESS_IS_VERBOSE
     if verbose:
-        env['HARNESS_IS_VERBOSE'] = '1'
+        env['PYJO_HARNESS_IS_VERBOSE'] = '1'
     width = max((len(s) for s in scripts), default=0) + 3
     semaphore = asyncio.Semaphore(max(jobs, 1))
     bailed_out = asyncio.Event()

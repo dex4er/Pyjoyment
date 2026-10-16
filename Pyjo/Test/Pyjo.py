@@ -46,9 +46,11 @@ applications. Just run your tests with :mod:`Pyjo.Prove`. ::
 
 If it is not already defined, the ``PYJO_LOG_LEVEL`` environment variable
 will be set to ``trace`` or ``fatal``, depending on the value of the
-``HARNESS_IS_VERBOSE`` environment variable. And to make it easier to test
-HTTPS/WSS web services :attr:`Pyjo.UserAgent.Pyjo_UserAgent.insecure` will be
-activated by default for :attr:`~Pyjo_Test_Pyjo.ua`.
+``PYJO_HARNESS_IS_VERBOSE`` environment variable, which
+``python -m Pyjo.Prove -v`` sets, or without it of ``HARNESS_IS_VERBOSE``,
+which Perl's ``prove -v`` sets. And to make it easier to test HTTPS/WSS web
+services :attr:`Pyjo.UserAgent.Pyjo_UserAgent.insecure` will be activated by
+default for :attr:`~Pyjo_Test_Pyjo.ua`.
 
 See also
 --------
@@ -83,8 +85,10 @@ if TYPE_CHECKING:
 
 
 # Silent or loud tests
+# Unlike Mojolicious: PYJO_HARNESS_IS_VERBOSE of Pyjo.Prove, and HARNESS_IS_VERBOSE of prove without it
 if not os.environ.get('PYJO_LOG_LEVEL'):
-    os.environ['PYJO_LOG_LEVEL'] = 'trace' if os.environ.get('HARNESS_IS_VERBOSE') else 'fatal'
+    verbose = os.environ.get('PYJO_HARNESS_IS_VERBOSE', os.environ.get('HARNESS_IS_VERBOSE'))
+    os.environ['PYJO_LOG_LEVEL'] = 'trace' if verbose else 'fatal'
 
 
 class Pyjo_Test_Pyjo(Pyjo.Base.object):
