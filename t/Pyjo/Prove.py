@@ -66,6 +66,14 @@ SCRIPTS = {
         time.sleep(60)
         done_testing()
     """,
+    'stderr.py': """
+        from Pyjo.Test import *
+        import sys
+        print('first warning', file=sys.stderr)
+        ok(True)
+        print('second warning', file=sys.stderr)
+        done_testing()
+    """,
     'child.py': """
         from Pyjo.Test import *
         import subprocess, sys
@@ -77,6 +85,11 @@ SCRIPTS = {
 
 
 def prove(*args, scripts=SCRIPTS):
+    out, err, code = prove_stderr(*args, scripts=scripts)
+    return out, code
+
+
+def prove_stderr(*args, scripts=SCRIPTS):
     with tempfile.TemporaryDirectory() as tmp:
         for name, code in scripts.items():
             path = os.path.join(tmp, *name.split('/'))
@@ -87,7 +100,7 @@ def prove(*args, scripts=SCRIPTS):
         p = subprocess.run(
             [sys.executable, '-m', 'Pyjo.Prove', *args], cwd=tmp, env=env, capture_output=True, text=True
         )
-    return p.stdout, p.returncode
+    return p.stdout, p.stderr, p.returncode
 
 
 def interrupt(*args):
@@ -330,6 +343,19 @@ with subtest('Ctrl-C'):
     like_ok(out, r'(?m)^Result: FAIL$', 'result')
     is_ok(code, 1, 'right exit status')
     ok(not alive, 'the running script is killed')
+
+with subtest('Capture the standard error'):
+    out, err, code = prove_stderr('stderr.py', 'pass.py')
+    like_ok(err, r'(?m)^first warning$', 'standard error passes through by default')
+    unlike_ok(err, r'stderr\.py: ', 'without the name of the script')
+
+    out, err, code = prove_stderr('-j', '2', '--capture-stderr', 'stderr.py', 'pass.py')
+    like_ok(out, r'(?m)^stderr\.py \.+ ok$', 'script passes')
+    is_ok(err, 'stderr.py: first warning\nstderr.py: second warning\n', 'after the name of the script, in order')
+    is_ok(code, 0, 'right exit status')
+
+    out, err, code = prove_stderr('--capture-stderr', '--timeout', '2', 'child.py')
+    like_ok(out, r'(?m)^child\.py \.+ Timed out$', 'a process of the script keeps its output open')
 
 with subtest('Verbose'):
     out, code = prove('-v', 'pass.py')

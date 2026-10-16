@@ -65,6 +65,18 @@ Options
     Print the summary of the test scripts that have finished when Ctrl-C
     interrupts the run.
 
+``--capture-stderr``
+    Keep the standard error of each test script and print it after the line of
+    its result, each line after the name of the script, instead of letting it
+    through as the script writes it, where the scripts that run at the same
+    time with ``-j`` mix it. ::
+
+        t/Pyjo/URL.py ........ ok
+        t/Pyjo/URL.py: ResourceWarning: unclosed <socket.socket ...>
+
+    ``prove`` has no such option: its ``--merge`` puts the standard error into
+    the TAP output, which shows it with ``-v`` only.
+
 Functions
 ---------
 """
@@ -117,6 +129,7 @@ class Result:
     timed_out: float | None = None
     errors: list[str] = field(default_factory=lambda: [])
     output: list[str] = field(default_factory=lambda: [])
+    stderr: list[str] = field(default_factory=lambda: [])
 
     @property
     def passed(self) -> bool:
@@ -203,14 +216,17 @@ async def run_script(
     verbose: bool = False,
     stream: bool = False,
     timeout: float | None = None,
+    capture_stderr: bool = False,
 ) -> Result:
     """::
 
         result = await run_script('t/test.py', [sys.executable], dict(os.environ))
         result = await run_script('t/test.py', [sys.executable], dict(os.environ), timeout=60)
+        result = await run_script('t/test.py', [sys.executable], dict(os.environ), capture_stderr=True)
 
     Run a test script and parse its TAP output. The standard error of the
-    script goes to the standard error of this process. A script that runs
+    script goes to the standard error of this process, or with
+    ``capture_stderr`` to the lines of :attr:`Result.stderr`. A script that runs
     longer than ``timeout`` seconds is killed, with the processes it started.
     A script whose ``requires-python`` the Python of the command does not
     satisfy is skipped without running.
@@ -232,10 +248,12 @@ async def run_script(
         *command,
         path,
         stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE if capture_stderr else None,
         env=env,
         process_group=0 if hasattr(os, 'killpg') else None,
     )
     assert process.stdout is not None
+    stderr = asyncio.create_task(_read_lines(process.stderr, result.stderr)) if process.stderr is not None else None
     try:
         async with asyncio.timeout(timeout):
             while raw := await process.stdout.readline():
@@ -254,6 +272,12 @@ async def run_script(
         if process.returncode is None:
             _kill(process)
             await process.wait()
+        # A process that the script started may keep the standard error open after the script exits
+        if stderr is not None:
+            try:
+                await asyncio.wait_for(stderr, 5)
+            except TimeoutError:
+                pass
     finish(result)
     return result
 
@@ -289,11 +313,13 @@ async def run(
     verbose: bool = False,
     timeout: float | None = None,
     trap: bool = False,
+    capture_stderr: bool = False,
 ) -> list[Result]:
     """::
 
         results = asyncio.run(run(['t/a.py', 't/b.py'], jobs=2))
         results = asyncio.run(run(['t/a.py', 't/b.py'], timeout=60, trap=True))
+        results = asyncio.run(run(['t/a.py', 't/b.py'], jobs=2, capture_stderr=True))
 
     Run the test scripts, print a line for each of them and a summary, and
     return the results in the order of the scripts. With ``trap``, a run that
@@ -317,10 +343,14 @@ async def run(
             stream = jobs <= 1
             if stream and verbose:
                 print(f'{path} ..', flush=True)
-            result = await run_script(path, command, env, verbose=verbose, stream=stream, timeout=timeout)
+            result = await run_script(
+                path, command, env, verbose=verbose, stream=stream, timeout=timeout, capture_stderr=capture_stderr
+            )
             if verbose and not stream:
                 print(f'{path} ..', *result.output, sep='\n', flush=True)
             print(_status_line(result, width), flush=True)
+            for line in result.stderr:
+                print(f'{path}: {line}', file=sys.stderr, flush=True)
             if result.bail_out is not None:
                 bailed_out.set()
             finished[i] = result
@@ -364,6 +394,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         '--timeout', type=float, metavar='SECONDS', help='the most time a test script may run, no limit by default'
     )
     parser.add_argument('--trap', action='store_true', help='print the summary when Ctrl-C interrupts the run')
+    # Not in prove: --capture-stderr, as --merge of prove shows the standard error with -v only, among the TAP output
+    parser.add_argument(
+        '--capture-stderr', action='store_true', help='print the standard error of a test script after its result'
+    )
     parser.add_argument('paths', nargs='*', default=['t'], help='test scripts and directories, t by default')
     args = parser.parse_args(argv)
 
@@ -380,7 +414,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     command = shlex.split(args.command) if args.command else [sys.executable]
     try:
         results = asyncio.run(
-            run(scripts, command, env, jobs=args.jobs, verbose=args.verbose, timeout=args.timeout, trap=args.trap)
+            run(
+                scripts,
+                command,
+                env,
+                jobs=args.jobs,
+                verbose=args.verbose,
+                timeout=args.timeout,
+                trap=args.trap,
+                capture_stderr=args.capture_stderr,
+            )
         )
     except KeyboardInterrupt:
         # Die of the signal, as a process that does not handle it does, without a traceback
@@ -486,6 +529,11 @@ def _status_line(result: Result, width: int) -> str:
     if result.failed:
         return f'{name} Failed {len(result.failed)}/{result.tests} subtests'
     return f'{name} Dubious'
+
+
+async def _read_lines(stream: asyncio.StreamReader, lines: list[str]) -> None:
+    while raw := await stream.readline():
+        lines.append(raw.decode('utf-8', 'replace').rstrip('\r\n'))
 
 
 def _kill(process: asyncio.subprocess.Process) -> None:
