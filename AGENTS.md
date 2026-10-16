@@ -248,7 +248,10 @@ fails when `ResourceWarning:` appears in the output. CI runs the scripts at
 the same time, whose standard error would mix, so it passes
 `--capture-stderr`: the standard error of a script follows the line of its
 result, each line after the name of the script, which tells the script that
-leaked. A test closes what it
+leaked. It passes `--color` too, as the log of GitHub Actions shows colors
+while the output goes to a pipe, not to a terminal; the color of a line of
+the standard error is around the whole line, so `ResourceWarning:` is still
+in it. A test closes what it
 gets, as the handle of an `accept` or `connect` event or a connection of
 `http.client`, where Perl closes it with the last reference. To find where a
 leaked object was made:
