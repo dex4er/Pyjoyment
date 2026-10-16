@@ -70,6 +70,11 @@ lint:
         - examples/server_asgi_on_request.py
         - t/lib/ServerProcess.py
         - t/servers/**
+    # TODO: examples/html5.py, which imports Pyjoyment.Lite, when it is ported
+    - linters:
+        - pyright
+      paths:
+        - examples/html5.py
 actions:
   enabled:
     - git-blame-ignore-revs
