@@ -52,6 +52,9 @@ which Perl's ``prove -v`` sets. And to make it easier to test HTTPS/WSS web
 services :attr:`Pyjo.UserAgent.Pyjo_UserAgent.insecure` will be activated by
 default for :attr:`~Pyjo_Test_Pyjo.ua`.
 
+The end of a ``with`` block closes the connections and the servers of its
+:attr:`~Pyjo_Test_Pyjo.ua`.
+
 See also
 --------
 
@@ -77,6 +80,7 @@ from Pyjo.Util import decode
 import os
 
 from collections.abc import Callable
+from types import TracebackType
 from typing import TYPE_CHECKING, Any, Self, cast
 
 
@@ -221,6 +225,17 @@ class Pyjo_Test_Pyjo(Pyjo.Base.object):
             if cfg:
                 app.config(cfg['config'])
             self.app = app
+
+    # Not in Mojolicious: a context manager, which closes the connections and the servers of its user agent where the
+    # block ends, as PyPy frees the object only when its garbage collector runs
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+        self, type: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None
+    ) -> None:
+        if self._ua is not None:
+            self._ua.__exit__(type, value, traceback)
 
     @property
     def ua(self) -> Pyjo.UserAgent.object:
