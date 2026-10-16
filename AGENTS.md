@@ -776,14 +776,17 @@ pattern.match_partial(path)`.
   lines that use it are taken from the target Mojolicious, and so is the
   expectation of a test of them that the target changed.
 - The files that Mojolicious bundles in `lib/Mojolicious/resources` are in
-  `Pyjoyment/resources`, under the same names. The artwork of Mojolicious, as
-  its logo, the raptors, the favicon and the pinstripes, is not copied: it is
-  under CC-BY-SA, and the license of Mojolicious does not grant its logo. Its
-  place is taken by the artwork of Pyjoyment, in the same formats and sizes,
-  so that the paths that the templates and the tests of Mojo use, as
-  `/mojo/logo-white.png`, serve a file: a joystick for the logo, and a unicat,
-  a cat with the horn of a unicorn and a rainbow, for the raptor. Each image has its source
-  next to it, an SVG of the same name, which is edited and rendered again with
+  `Pyjoyment/resources`, with `pyjo` in the place of `mojo` in their paths, as
+  `pyjo/logo-white.png` for `mojo/logo-white.png`. The artwork of Mojolicious,
+  as its logo, the raptors, the favicon and the pinstripes, is not copied: it
+  is under CC-BY-SA, and the license of Mojolicious does not grant its logo.
+  Its place is taken by the artwork of Pyjoyment, in the same formats and
+  sizes: a joystick for the logo, and a unicat, a cat with the horn of a
+  unicorn and a rainbow, for the raptor, whose images are named after it,
+  `failunicat.png` and `nounicat.png` for `failraptor.png` and `noraptor.png`.
+  The code, templates and tests that use these paths have a
+  `# Renamed from Mojolicious:` comment. Each image has its source next to it,
+  an SVG of the same name, which is edited and rendered again with
   `rsvg-convert logo.svg -o logo.png`; `favicon.ico` holds the renders of
   `favicon.svg` at 48, 32 and 16 pixels. The text in them is set in Fredoka,
   under the SIL Open Font License, and converted to paths, so that the SVG

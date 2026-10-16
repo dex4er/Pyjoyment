@@ -709,7 +709,8 @@ def _development(page: str, c: 'Controller', e: Any = None) -> 'Controller':
         'status': 500 if page == 'exception' else 404,
         'template': f'{page}.{mode}',
     }
-    bundled = 'mojo/' + ('debug' if mode == 'development' else page)
+    # Renamed from Mojolicious: the bundled templates are in pyjo/, where Mojo has them in mojo/
+    bundled = 'pyjo/' + ('debug' if mode == 'development' else page)
     if _fallbacks(c, options, page, bundled):
         return c
     if _fallbacks(c, {**options, 'format': 'html'}, page, bundled):

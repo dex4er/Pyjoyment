@@ -364,8 +364,9 @@ t.ua.cookie_jar.ignore = lambda cookie: False
 t.get_ok('/bridge2stash', {'X-Flash': 1}).status_is(200).content_is('stash too!!!!!!!!\n')
 
 # Random static requests
-t.get_ok('/mojo/logo-white.png').status_is(200)
-t.get_ok('/mojo/logo-white.png').status_is(200)
+# Renamed from Mojolicious: the bundled files are in /pyjo, where Mojo has them in /mojo
+t.get_ok('/pyjo/logo-white.png').status_is(200)
+t.get_ok('/pyjo/logo-white.png').status_is(200)
 
 # With cookies, session and flash again
 (

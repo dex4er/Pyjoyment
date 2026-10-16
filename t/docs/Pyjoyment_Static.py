@@ -41,7 +41,7 @@ with subtest('extra'):
     static = Pyjoyment.Static.new()
     extra = static.extra
     ok(os.path.isfile(extra['favicon.ico']), 'bundled favicon')
-    ok(os.path.isfile(extra['mojo/logo.png']), 'bundled logo')
+    ok(os.path.isfile(extra['pyjo/logo.png']), 'bundled logo')
     static.extra = {'foo/bar.txt': '/home/sri/myapp/bar.txt'}
 
     # Remove built-in favicon
@@ -119,7 +119,7 @@ with subtest('serve'):
     static = Pyjoyment.Static.new()
     app = Pyjoyment.new()
     c = app.build_controller()
-    boolean = static.serve(c, 'mojo/logo.png')
+    boolean = static.serve(c, 'pyjo/logo.png')
     ok(boolean, 'served')
     is_ok(c.res.headers.content_type, 'image/png', 'right "Content-Type" value')
     c = app.build_controller()

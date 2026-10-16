@@ -415,7 +415,7 @@ with subtest('reply.txt_not_found'):
 
 with subtest('reply.static'):
     c = controller()
-    c.reply.static('mojo/logo.png')
+    c.reply.static('pyjo/logo.png')
     is_ok(c.res.code, 200, 'served')
     throws_ok(
         lambda: c.reply.static('../lib/MyApp.py'),
