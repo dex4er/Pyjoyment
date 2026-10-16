@@ -91,9 +91,8 @@ class Pyjo_IOLoop_TLS(Pyjo.EventEmitter.object):
     def __del__(self) -> None:
         # Module globals may be gone at the end of the interpreter
         try:
-            if not sys.is_finalizing():
-                self._cleanup()
-                self._close()
+            if not sys.is_finalizing() and getattr(self, '_handle', None) is not None:
+                Pyjo.Reactor._finalize(self._release)  # pyright: ignore[reportPrivateUsage]
         except Exception:
             pass
 
@@ -105,6 +104,9 @@ class Pyjo_IOLoop_TLS(Pyjo.EventEmitter.object):
     def __exit__(
         self, type: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None
     ) -> None:
+        self._release()
+
+    def _release(self) -> None:
         self._cleanup()
         self._close()
 

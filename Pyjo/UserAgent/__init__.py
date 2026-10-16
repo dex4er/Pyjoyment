@@ -167,6 +167,7 @@ import Pyjo.IOLoop
 import Pyjo.IOLoop.Stream
 import Pyjo.IOLoop.TLS
 import Pyjo.Promise
+import Pyjo.Reactor
 import Pyjo.Transaction
 import Pyjo.Transaction.HTTP
 import Pyjo.UserAgent.CookieJar
@@ -547,7 +548,7 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
         try:
             if sys.is_finalizing():
                 return
-            self._release()
+            Pyjo.Reactor._finalize(self._release)  # pyright: ignore[reportPrivateUsage]
         except Exception:
             pass
 

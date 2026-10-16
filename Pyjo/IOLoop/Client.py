@@ -263,7 +263,7 @@ class Pyjo_IOLoop_Client(Pyjo.EventEmitter.object):
         # Module globals may be gone at the end of the interpreter
         try:
             if not sys.is_finalizing():
-                self.close()
+                Pyjo.Reactor._finalize(self.close)  # pyright: ignore[reportPrivateUsage]
         except Exception:
             pass
 

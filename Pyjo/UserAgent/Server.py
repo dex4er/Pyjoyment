@@ -27,6 +27,7 @@ Classes
 
 import Pyjo.Base
 import Pyjo.IOLoop
+import Pyjo.Reactor
 import Pyjo.Server
 import Pyjo.Server.Daemon
 import Pyjo.URL
@@ -79,7 +80,7 @@ class Pyjo_UserAgent_Server(Pyjo.Base.object):
         try:
             if sys.is_finalizing():
                 return
-            self.restart()
+            Pyjo.Reactor._finalize(self.restart)  # pyright: ignore[reportPrivateUsage]
         except Exception:
             pass
 

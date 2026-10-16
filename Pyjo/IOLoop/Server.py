@@ -86,8 +86,8 @@ class Pyjo_IOLoop_Server(Pyjo.EventEmitter.object):
     def __del__(self) -> None:
         # Module globals may be gone at the end of the interpreter
         try:
-            if not sys.is_finalizing():
-                self.close()
+            if not sys.is_finalizing() and getattr(self, '_handle', None) is not None:
+                Pyjo.Reactor._finalize(self.close)  # pyright: ignore[reportPrivateUsage]
         except Exception:
             pass
 

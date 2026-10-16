@@ -158,7 +158,7 @@ class Pyjo_IOLoop_Datagram(Pyjo.EventEmitter.object):
         # Module globals may be gone at the end of the interpreter
         try:
             if not sys.is_finalizing() and getattr(self, '_handle', None) is not None:
-                self.close()
+                Pyjo.Reactor._finalize(self.close)  # pyright: ignore[reportPrivateUsage]
         except Exception:
             pass
 
