@@ -112,12 +112,15 @@ __path__ = extend_path(__path__, __name__)
 
 # The functions of ojo, which the modules they use are imported for when they are called, so that a module of Pyjo
 # does not import them
-__all__ = ['b', 'c', 'd', 'f', 'g', 'h', 'j', 'l', 'n', 'o', 'p', 'r', 't', 'u', 'w', 'x']
+__all__ = ['a', 'b', 'c', 'd', 'f', 'g', 'h', 'j', 'l', 'n', 'o', 'p', 'r', 't', 'u', 'w', 'x']
 
 _agent: 'Pyjo.UserAgent.object | None' = None
 
 
-# TODO: the Pyjoyment.Lite application of ojo, with its user agent, a and around_action, when Pyjoyment.Lite is ported
+# Unlike Mojolicious: the user agent of the functions is one of their own, whose server gets the application of
+# Pyjoyment.Lite when a makes it, where ojo makes the application for the package that uses it and takes its user agent,
+# as a module of Pyjo imports Pyjoyment only when a function needs it
+# Left out from Mojolicious: the hook around_action that sets $_ to the controller, as an action gets it as its argument
 def _ua() -> 'Pyjo.UserAgent.object':
     global _agent
     if _agent is None:
@@ -131,7 +134,24 @@ def _ua() -> 'Pyjo.UserAgent.object':
     return _agent
 
 
-# TODO: a, with Pyjoyment.Lite
+def a(*args: Any, **constraints: Any) -> Any:
+    """::
+
+        app = a('/hello', lambda c: c.render(json={'hello': 'world'}))
+
+    Create a route with ``any`` of :mod:`Pyjoyment.Lite` and return the
+    current :mod:`Pyjoyment.Lite` object, the application of the module that
+    calls it. ::
+
+        $ python -m Pyjo 'a("/hello", {"text": "Hello Pyjo!"}).start()' daemon
+    """
+    import Pyjoyment.Lite
+
+    functions = Pyjoyment.Lite._functions(sys._getframe(1))  # pyright: ignore[reportPrivateUsage]
+    ua = _ua()
+    ua.server.app = functions['app']
+    functions['any'](*args, **constraints)
+    return ua.server.app
 
 
 def b(*parts: object) -> 'Pyjo.String.Bytes.object':

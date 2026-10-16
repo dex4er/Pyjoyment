@@ -116,7 +116,7 @@ import sys
 import time
 import weakref
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from typing import TYPE_CHECKING, Any, Self, overload
 
 
@@ -727,10 +727,17 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
     def _limit(self) -> bool:
         return True if self._stop else len(self._in) >= self.max_connections
 
+    # Not in Mojolicious: the acceptors of a copy that are still there, as the garbage collector may free another server
+    # meanwhile, whose finalizer removes its acceptor and closes its socket, which a new one may then reuse
+    def _each_acceptor(self) -> Iterator[Any]:
+        for id, acceptor in list(self._acceptors.items()):
+            if self._acceptors.get(id) is acceptor:
+                yield acceptor
+
     def _maybe_accepting(self) -> None:
         if self._accepting or self._limit():
             return
-        for acceptor in self._acceptors.values():
+        for acceptor in self._each_acceptor():
             acceptor.start()
         self._accepting = True
 
@@ -738,7 +745,7 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
         if not self._accepting:
             return self
         self._accepting = False
-        for acceptor in self._acceptors.values():
+        for acceptor in self._each_acceptor():
             acceptor.stop()
         return self
 

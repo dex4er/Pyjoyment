@@ -12,9 +12,7 @@ import Pyjo.UserAgent
 
 from Pyjo.Test import *
 
-import importlib
 import socket
-import sys
 
 
 if not (os.environ.get('TEST_ONLINE') or os.environ.get('TEST_ALL')):
@@ -23,10 +21,9 @@ if not Pyjo.IOLoop.TLS.object.can_tls():
     plan(skip_all='TLS support required for this test!')
 # Left out from Mojolicious: Mozilla::CA, as ssl takes the certificate authorities of the system
 
-# The minimal Mojolicious::Lite of the tests
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
-Lite = importlib.import_module('Lite')
-app, get = Lite.app, Lite.get
+from Pyjoyment.Lite import app, get
+
+
 # TODO: the functions of ojo, when it is ported
 
 

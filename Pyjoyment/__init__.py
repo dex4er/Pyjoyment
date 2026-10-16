@@ -213,6 +213,8 @@ class Pyjoyment_App(Pyjo.App.object):
     and implements the following new ones.
     """
 
+    _stashes = ('config', 'defaults')
+
     # Left out from Mojolicious: $CODENAME and $VERSION, as the version of the distribution is in its metadata
 
     def __init__(self, attrs: dict[str, Any] | None = None, /, **kwargs: Any) -> None:

@@ -7,6 +7,7 @@ import Pyjo.UserAgent
 from Pyjo.File import tempdir
 from Pyjo.Test import *
 from Pyjo.Util import url_escape
+from Pyjoyment.Lite import app, get, websocket
 
 import gc
 import importlib
@@ -27,11 +28,10 @@ try:
 except (AttributeError, OSError):
     plan(skip_all='UNIX domain socket support required for this test!')
 
-# The minimal Mojolicious::Lite and the CONNECT proxy of the tests
+# The CONNECT proxy of the tests
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
-Lite = importlib.import_module('Lite')
 TestConnectProxy = importlib.import_module('TestConnectProxy')
-app, get, websocket = Lite.app, Lite.get, Lite.websocket
+
 
 # Silence
 app.log.level = 'fatal'

@@ -129,7 +129,7 @@ with subtest('Hot deployment'):
             f"""
 import sys
 sys.path.insert(0, {LIB!r})
-from Lite import app, get
+from Pyjoyment.Lite import app, get
 import Pyjo.IOLoop
 
 app.log.path = {log.to_str()!r}
@@ -213,7 +213,7 @@ app.start()
 import os
 import sys
 sys.path.insert(0, {LIB!r})
-from Lite import app
+from Pyjoyment.Lite import app
 
 if os.environ.get('PYJO_HOT_PID'):
     raise RuntimeError('Died')
@@ -253,7 +253,7 @@ app.start()
 import os
 import sys
 sys.path.insert(0, {LIB!r})
-from Lite import app, get
+from Pyjoyment.Lite import app, get
 
 app.log.path = {log.to_str()!r}
 

@@ -4,17 +4,11 @@ import Pyjo.UserAgent
 
 from Pyjo.File import tempdir
 from Pyjo.Test import *
+from Pyjoyment.Lite import app, get
 
-import importlib
 import os
 import re
-import sys
 
-
-# The minimal Mojolicious::Lite of the tests
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
-Lite = importlib.import_module('Lite')
-app, get = Lite.app, Lite.get
 
 # Silence
 app.log.level = 'trace'

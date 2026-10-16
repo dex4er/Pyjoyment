@@ -1,13 +1,13 @@
 import Pyjo
 import Pyjo.IOLoop
 import Pyjo.Server.Daemon
+import Pyjoyment
 
 from Pyjo import *
 from Pyjo.Test import *
 
 import contextlib
 import http.client
-import importlib
 import io
 import os
 import subprocess
@@ -17,14 +17,12 @@ import threading
 
 ROOT = os.path.join(os.path.dirname(__file__), '..', '..')
 
-# The examples request a real host and listen on a fixed port, so a local daemon with the minimal Mojolicious::Lite of
-# the tests answers instead
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
-Lite = importlib.import_module('Lite')
-Lite.app.log.level = 'fatal'
+# The examples request a real host and listen on a fixed port, so a local daemon with an application answers instead
+app = Pyjoyment.new()
+app.log.level = 'fatal'
 HTML = '<html><head><title>Mojolicious</title></head><body><h1>One</h1><h1>Two &amp; Three</h1></body></html>'
-Lite.app.routes.any('/', {'text': HTML})
-local = Pyjo.Server.Daemon.new(app=Lite.app, ioloop=Pyjo.IOLoop.singleton, listen=['http://127.0.0.1'], silent=True)
+app.routes.any('/', {'text': HTML})
+local = Pyjo.Server.Daemon.new(app=app, ioloop=Pyjo.IOLoop.singleton, listen=['http://127.0.0.1'], silent=True)
 port = local.start().ports()[0]
 
 

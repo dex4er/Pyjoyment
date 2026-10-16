@@ -34,7 +34,7 @@ myapp = dir.child('myapp.py').spew(
     f"""
 import sys
 sys.path.insert(0, {LIB!r})
-from Lite import app, get
+from Pyjoyment.Lite import app, get
 app.log.level = 'fatal'
 get('/', {{'text': 'Hello!'}})
 app.start()

@@ -321,9 +321,10 @@ class Pyjoyment_Renderer(Pyjo.Base.object):
         if stash.get('data') is not None:
             return stash.pop('data'), options['format']
 
-        # Text
+        # Text, which is a string as Perl stringifies a number or an object
         if stash.get('text') is not None:
-            return _maybe(options['encoding'], stash.pop('text')), options['format']
+            text = stash.pop('text')
+            return _maybe(options.get('encoding'), text if isinstance(text, str) else str(text)), options['format']
 
         # JSON
         if 'json' in stash:
@@ -352,7 +353,7 @@ class Pyjoyment_Renderer(Pyjo.Base.object):
 
             if stash.get('mojo.string'):
                 return output, None
-            return _maybe(options['encoding'], output), options['format']
+            return _maybe(options.get('encoding'), output), options['format']
 
         finally:
             if local and saved is _MISSING:

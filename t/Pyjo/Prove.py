@@ -97,6 +97,13 @@ SCRIPTS = {
         is_ok(os.environ.get('PYJO_PROVE_OPTS'), None, 'no options of the harness')
         done_testing()
     """,
+    'verbose.py': """
+        from Pyjo.Test import *
+        import os
+        diag(f"PYJO_HARNESS_IS_VERBOSE={os.environ.get('PYJO_HARNESS_IS_VERBOSE')}")
+        ok(True)
+        done_testing()
+    """,
     'child.py': """
         from Pyjo.Test import *
         import subprocess, sys
@@ -578,5 +585,9 @@ with subtest('Verbose'):
     out, code = prove('-v', 'pass.py')
     like_ok(out, r'(?m)^ok 1 - first$', 'TAP output shown')
     like_ok(out, r'(?m)^    ok 1 - deep$', 'subtest output shown')
+    out, err, code = prove_stderr('-v', 'verbose.py', env={'PYJO_HARNESS_IS_VERBOSE': ''})
+    like_ok(err, r'PYJO_HARNESS_IS_VERBOSE=1$', 'PYJO_HARNESS_IS_VERBOSE for the test scripts')
+    out, err, code = prove_stderr('verbose.py', env={'PYJO_HARNESS_IS_VERBOSE': ''})
+    like_ok(err, r'PYJO_HARNESS_IS_VERBOSE=\n', 'no PYJO_HARNESS_IS_VERBOSE without -v')
 
 done_testing()

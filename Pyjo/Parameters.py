@@ -168,11 +168,11 @@ class Pyjo_Parameters(Pyjo.Base.object, Pyjo.String.Mixin.object):
         for name, value in _pairs(args, kwargs):
             # Multiple values
             if isinstance(value, (list, tuple)):
-                old.extend((name, '' if v is None else str(v)) for v in cast(list[Anything], value))
+                old.extend((name, '' if v is None else _str(v)) for v in cast(list[Anything], value))
 
             # Single value
             elif value is not None:
-                old.append((name, str(value)))
+                old.append((name, _str(value)))
 
         return self
 
@@ -429,6 +429,12 @@ class Pyjo_Parameters(Pyjo.Base.object, Pyjo.String.Mixin.object):
     def _encode(self, string: str | bytes) -> bytes:
         # Without a charset, a character is a byte, as in a Perl byte string
         return string if isinstance(string, bytes) else string.encode(self.charset or 'latin-1')
+
+
+# A value as a string, and bytes as the characters 0-255, as Perl has a byte string, which a charset encodes as
+# characters, as Mojo does
+def _str(value: Anything) -> str:
+    return value.decode('latin-1') if isinstance(value, (bytes, bytearray)) else str(value)
 
 
 def _pairs(args: tuple[Anything, ...], kwargs: dict[str, Anything]) -> Iterator[tuple[str, Anything]]:

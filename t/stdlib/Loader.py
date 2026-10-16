@@ -10,7 +10,7 @@ import sys
 lib = tempdir()
 files = {
     'stdlib_data/__init__.py': '',
-    'stdlib_data/variable.py': "'''Docstring.\n\n__DATA__\n@@ doc.txt\nDoc\n'''\n\nDATA = '@@ var.txt\\nVar\\n'\n",
+    'stdlib_data/variable.py': "'''Docstring.\n\n__DATA__\n@@ doc.txt\nDoc\n'''\n\n__DATA__ = '@@ var.txt\\nVar\\n'\n",
     'stdlib_data/docstring.py': "'''Docstring.\n\n__DATA__\n@@ doc.txt\nDoc\n__END__\nNot a file\n'''\n\n\nclass App:\n    pass\n",
     'stdlib_data/plain.py': "'''Docstring without data.'''\n",
     'stdlib_pkg/__init__.py': '',
@@ -26,7 +26,7 @@ for name, content in files.items():
     lib.child(*name.split('/')).spew(content)
 sys.path.insert(0, lib.to_str())
 
-with subtest('DATA variable and docstring'):
+with subtest('__DATA__ variable and docstring'):
     is_ok(load_class('stdlib_data.variable'), None, 'loaded')
     is_deeply_ok(data_section('stdlib_data.variable'), {'var.txt': 'Var\n'}, 'variable comes first')
     load_class('stdlib_data.docstring')

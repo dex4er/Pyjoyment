@@ -6,11 +6,10 @@ import Pyjo.Server.Daemon
 import Pyjo.UserAgent
 
 from Pyjo.Test import *
+from Pyjoyment.Lite import app, get
 
-import importlib
 import os
 import ssl
-import sys
 
 from unittest.mock import patch
 
@@ -26,11 +25,6 @@ certs = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'certs')
 def cert(name):
     return os.path.join(certs, name)
 
-
-# The minimal Mojolicious::Lite of the tests
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
-Lite = importlib.import_module('Lite')
-app, get = Lite.app, Lite.get
 
 # Silence
 app.log.level = 'fatal'

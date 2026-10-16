@@ -53,7 +53,7 @@ with subtest('http.client and TERM'), tempfile.TemporaryDirectory() as dir:
         f"""
 import sys
 sys.path.insert(0, {os.path.abspath(LIB)!r})
-from Lite import app, get
+from Pyjoyment.Lite import app, get
 app.log.level = 'fatal'
 get('/', {{'text': 'version 1'}})
 app.start()
