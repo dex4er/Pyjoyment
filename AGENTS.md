@@ -117,7 +117,7 @@ with `Pyjo.Test`, which is inspired by Perl's `Test::More`. They run with
 `Pyjo.Prove`, a TAP harness inspired by Perl's `prove`:
 
 ```sh
-PYTHONPATH=. mise exec -- python -m Pyjo.Prove -j 4 -r t
+mise exec -- python -m Pyjo.Prove -l -j 4 -r t
 ```
 
 A single file runs on its own as well:
@@ -202,7 +202,7 @@ the most of its I/O, a second time on `Pyjo.Reactor.Poll`, as a reactor
 without asyncio has to pass them too:
 
 ```sh
-PYJO_REACTOR=Pyjo.Reactor.Poll PYTHONPATH=. mise exec -- python -m Pyjo.Prove -j 4 --capture-stderr \
+PYJO_REACTOR=Pyjo.Reactor.Poll mise exec -- python -m Pyjo.Prove -l -j 4 --capture-stderr \
   t/Pyjo/IOLoop*.py t/Pyjo/TLS.py t/Pyjo/Promise*.py t/Pyjo/Subprocess.py t/stdlib/IOLoop*.py \
   t/Pyjo/UserAgent*.py t/stdlib/UserAgent*.py t/Pyjo/Server_Daemon.py t/stdlib/Server_Daemon.py \
   t/Pyjo/Server_Hot.py t/stdlib/Server_Hot.py t/Pyjo/Server_Prefork.py t/stdlib/Server_Prefork.py \
@@ -213,8 +213,8 @@ CI runs the tests in `t/servers` on the Python of `mise.toml` only, with the
 dependency group `servers` installed by uv in `.venv`:
 
 ```sh
-PYTHONPATH=. mise exec -- uv run --python "$(mise exec -- which python)" \
-  --only-group servers python -m Pyjo.Prove --timeout 120 -r t/servers
+mise exec -- uv run --python "$(mise exec -- which python)" \
+  --only-group servers python -m Pyjo.Prove -l --timeout 120 -r t/servers
 ```
 
 A server is a library of its own, so the known differences of a server are
