@@ -257,6 +257,16 @@ leaked object was made:
 PYTHONPATH=. mise exec -- python -W default::ResourceWarning -X tracemalloc=50 t/Pyjo/IOLoop.py
 ```
 
+PyPy has no `_tracemalloc`: it ignores `-X tracemalloc` without a word, and its
+`ResourceWarning` names no place. A leak of PyPy alone, as of an object that
+CPython closes with its last reference, is found with `gc.collect()` and a
+line to the standard error after each subtest, which puts the warning next to
+the subtest that leaked it. PyPy skips some tests on macOS, as the one of
+`Pyjo.Server.Prefork`, so such a leak may show on Linux only, as in a
+container of the image `pypy:3.12-slim`. An object that a forked process
+inherits is freed by the garbage collector of the child too, so a leak of one
+test can show in the workers of the next one.
+
 CI runs the tests on every supported CPython version and on PyPy. PyPy frees
 objects only when its garbage collector runs, not when the last reference
 goes, so code must not rely on that: resizing a `bytearray` that a regex

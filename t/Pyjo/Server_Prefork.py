@@ -93,7 +93,11 @@ with subtest('Multiple workers and graceful shutdown'):
         worker = pid
         if prefork.healthy < 4:
             return
-        tx = Pyjo.UserAgent.new().get(f'http://127.0.0.1:{port}')
+        # The user agent closes its connection, as PyPy frees it only when its garbage collector runs, which
+        # the workers of a later server, forked with it, may do
+        ua = Pyjo.UserAgent.new()
+        tx = ua.get(f'http://127.0.0.1:{port}')
+        ua.ioloop.reset()
         os.kill(os.getpid(), signal.SIGQUIT)
 
     prefork.on('reap', lambda prefork, pid: reap.append(pid))
@@ -165,7 +169,9 @@ with subtest('Multiple workers and graceful shutdown (Pyjo.HelloWorld)'):
         worker = pid
         if prefork.healthy < 4:
             return
-        tx = Pyjo.UserAgent.new().get(f'http://127.0.0.1:{port}')
+        ua = Pyjo.UserAgent.new()
+        tx = ua.get(f'http://127.0.0.1:{port}')
+        ua.ioloop.reset()
         os.kill(os.getpid(), signal.SIGQUIT)
 
     prefork.on('reap', lambda prefork, pid: reap.append(pid))
@@ -201,7 +207,9 @@ with subtest('One worker and immediate shutdown'):
     @prefork.once('heartbeat')
     def heartbeat(prefork, pid):
         global tx
-        tx = Pyjo.UserAgent.new().get(f'http://127.0.0.1:{port}')
+        ua = Pyjo.UserAgent.new()
+        tx = ua.get(f'http://127.0.0.1:{port}')
+        ua.ioloop.reset()
         os.kill(os.getpid(), signal.SIGTERM)
 
     prefork.on('reap', lambda prefork, pid: reap.append(pid))
