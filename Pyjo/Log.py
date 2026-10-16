@@ -21,6 +21,9 @@ Pyjo.Log - Simple logger
 
 :mod:`Pyjo.Log` is a simple logger for :mod:`Pyjo` projects.
 
+The end of a ``with`` block closes the file that the log opened for
+:attr:`~Pyjo_Log.path`.
+
 Events
 ------
 
@@ -171,9 +174,20 @@ class Pyjo_Log(Pyjo.EventEmitter.object):
         self._context: list[Any] = []
         self._format = format
         self._handle = handle
+        self._finalizer: weakref.finalize[[], Any] | None = None
         self._parent: Pyjo_Log | None = None
 
         self.on('message', _message)
+
+    # Not in Mojolicious: a context manager, which closes the file that the log opened for path where the block ends, as
+    # PyPy frees the object only when its garbage collector runs
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+        self, type: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None
+    ) -> None:
+        self._release()
 
     @property
     def color(self) -> bool:
@@ -251,12 +265,19 @@ class Pyjo_Log(Pyjo.EventEmitter.object):
                 handle = self._handle = Pyjo.File.new(path).open('a', encoding='UTF-8')
 
                 # Not in Mojolicious: the file is closed with the object, as Perl closes it with the last reference
-                weakref.finalize(self, handle.close)
+                self._finalizer = weakref.finalize(self, handle.close)
         return self._handle
 
     @handle.setter
     def handle(self, value: IO[str] | None) -> None:
         self._handle = value
+
+    def _release(self) -> None:
+        # The file that the log opened for path, which it opens again when it is used again
+        if (finalizer := self._finalizer) is not None:
+            self._finalizer = None
+            self._handle = _UNSET
+            finalizer()
 
     def append(self, msg: str) -> None:
         """::

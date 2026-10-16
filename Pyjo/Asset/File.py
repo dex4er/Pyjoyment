@@ -19,6 +19,9 @@ Pyjo.Asset.File - File storage for HTTP content
 
 :mod:`Pyjo.Asset.File` is a file storage backend for HTTP content.
 
+The end of a ``with`` block closes the file, and deletes it with
+:attr:`~Pyjo_Asset_File.cleanup`.
+
 Events
 ------
 

@@ -105,6 +105,9 @@ Non-blocking name resolution, SOCKS5 and TLS support come with
 disabled with the ``PYJO_NO_NNR``, ``PYJO_NO_SOCKS`` and ``PYJO_NO_TLS``
 environment variables.
 
+The end of a ``with`` block closes the connections and the server that the user
+agent made.
+
 Events
 ------
 
@@ -182,6 +185,7 @@ import sys
 import weakref
 
 from collections.abc import Callable
+from types import TracebackType
 from typing import Any, Self, overload
 
 
@@ -543,13 +547,26 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
         try:
             if sys.is_finalizing():
                 return
-            self._cleanup()
-            # Not in Mojolicious: the server that the user agent made is closed here, as Perl closes it when it frees
-            # it, and PyPy frees it only when its garbage collector runs
-            if self._own_server and self._server is not None:
-                self._server.restart()
+            self._release()
         except Exception:
             pass
+
+    # Not in Mojolicious: a context manager, which closes the connections and the server that the user agent made where
+    # the block ends, as PyPy frees the object only when its garbage collector runs
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+        self, type: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None
+    ) -> None:
+        self._release()
+
+    def _release(self) -> None:
+        self._cleanup()
+        # Not in Mojolicious: the server that the user agent made is closed here, as Perl closes it when it frees it, and
+        # PyPy frees it only when its garbage collector runs
+        if self._own_server and self._server is not None:
+            self._server.restart()
 
     @property
     def ioloop(self) -> Pyjo.IOLoop.object:

@@ -52,6 +52,28 @@ with subtest('Temporary files of the standard library'):
     file = tempdir().child('test.txt').spew('works')
     is_ok(file.slurp(), b'works', 'a child keeps the temporary directory')
 
+with subtest('Context manager'):
+    with tempdir() as dir:
+        file = dir.child('test.txt').spew('works')
+        ok(os.path.isfile(file), 'temporary directory')
+    ok(not os.path.exists(dir), 'removed at the end of the block')
+    ok(not os.path.exists(file), 'with its files, which a child keeps no longer')
+    with Pyjo.File.tempfile() as file:
+        ok(os.path.isfile(file), 'temporary file')
+    ok(not os.path.exists(file), 'removed at the end of the block')
+    with path(tempfile.TemporaryDirectory()) as dir:
+        ok(os.path.isdir(dir), 'TemporaryDirectory')
+    ok(not os.path.exists(dir), 'cleaned up at the end of the block')
+    with warnings.catch_warnings(record=True) as warned:
+        warnings.simplefilter('always')
+        with path(tempfile.NamedTemporaryFile()) as file:
+            ok(os.path.isfile(file), 'NamedTemporaryFile')
+    ok(not os.path.exists(file), 'closed at the end of the block')
+    is_ok(len(warned), 0, 'without a ResourceWarning')
+    with path('/home/sri/.vimrc') as file:
+        is_ok(file, '/home/sri/.vimrc', 'a path without a temporary file')
+    is_ok(file, '/home/sri/.vimrc', 'kept')
+
 with subtest('stat'):
     file = tempdir().child('test.txt').spew('1234')
     isa_ok(file.stat(), os.stat_result, 'os.stat_result')

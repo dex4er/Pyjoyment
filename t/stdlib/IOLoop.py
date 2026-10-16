@@ -113,4 +113,11 @@ with subtest('Decorators with and without parentheses'):
     is_deeply_ok(sorted(got), ['accepted', 'connected', 'timer'], 'all called')
     loop.reset()
 
+with subtest('Context manager'):
+    with Pyjo.IOLoop.new() as loop:
+        id = loop.timer(10, lambda loop: None)
+        ok(loop.reactor.remove(id) or True, 'timer')
+        id = loop.timer(10, lambda loop: None)
+    ok(not loop.reactor.remove(id), 'everything removed at the end of the block')
+
 done_testing()

@@ -674,7 +674,15 @@ pattern.match_partial(path)`.
   a comment at the declaration says so.
 - An object that undoes something when it goes away, like the one that
   `capture` of `Mojo::Log` returns, is a context manager: PyPy does not free
-  it when the last reference goes, and `with` says where it ends.
+  it when the last reference goes, and `with` says where it ends. So is an
+  object that holds a resource, as a socket, a file, a server or an event
+  loop, whose `__exit__` does what its finalizer does, and the module
+  documentation says what the end of the block releases. It is an interface
+  for the code that uses Pyjoyment, its tests and examples: the modules call
+  `close` and the like themselves, as `with` costs more than a call. An
+  object in a cycle, as a user agent with its server, is freed by the
+  garbage collector at any point, even in the middle of what the event loop
+  does, so a test that makes many of them releases them with `with`.
 - An attribute with a default that Mojo builds on first use, like `format`
   and `handle` of `Mojo::Log`, or that comes from a call, like the limits
   that `Pyjo.Headers` and `Pyjo.Message` read from `PYJO_MAX_*`, is a

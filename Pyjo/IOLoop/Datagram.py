@@ -29,6 +29,8 @@ A socket that is neither bound with :meth:`bind` nor connected with
 :meth:`connect` is bound to a random port by the first :meth:`send`, as the
 family of the address of the peer needs it.
 
+The end of a ``with`` block closes the socket.
+
 Events
 ------
 
@@ -98,6 +100,7 @@ import weakref
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from types import TracebackType
 from typing import Any, Self
 
 
@@ -158,6 +161,16 @@ class Pyjo_IOLoop_Datagram(Pyjo.EventEmitter.object):
                 self.close()
         except Exception:
             pass
+
+    # Not in Mojolicious: a context manager, which closes the socket where the block ends, as PyPy frees the object only
+    # when its garbage collector runs
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+        self, type: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None
+    ) -> None:
+        self.close()
 
     @property
     def reactor(self) -> Pyjo.Reactor.object:

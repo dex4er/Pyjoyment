@@ -7,6 +7,7 @@ import gzip
 import http.server
 import json
 import os
+import socket
 import ssl
 import threading
 
@@ -184,5 +185,11 @@ with subtest('TLS of ssl'):
 
 server.shutdown()
 server.server_close()
+
+with subtest('Context manager'):
+    with Pyjo.UserAgent.new() as ua:
+        port = ua.server.url().port
+        socket.create_connection(('127.0.0.1', port)).close()
+    throws_ok(lambda: socket.create_connection(('127.0.0.1', port)), ConnectionRefusedError, 'server closed at the end')
 
 done_testing()

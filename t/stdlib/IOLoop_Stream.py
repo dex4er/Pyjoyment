@@ -86,4 +86,11 @@ with subtest('TLS'):
     stream.close()
     other.close()
 
+with subtest('Context manager'):
+    a, b = socket.socketpair()
+    with Pyjo.IOLoop.Stream.new(a) as stream:
+        is_ok(stream.handle, a, 'handle')
+    is_ok(a.fileno(), -1, 'stream closed at the end of the block')
+    b.close()
+
 done_testing()

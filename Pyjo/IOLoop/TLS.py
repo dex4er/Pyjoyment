@@ -18,6 +18,8 @@ Pyjo.IOLoop.TLS - Non-blocking TLS handshake
 :mod:`Pyjo.IOLoop.TLS` negotiates TLS for :mod:`Pyjo.IOLoop`, with the
 :mod:`ssl` module of the standard library.
 
+The end of a ``with`` block closes the connection of the handshake.
+
 Events
 ------
 
@@ -58,7 +60,8 @@ import ssl
 import sys
 import weakref
 
-from typing import Any, cast
+from types import TracebackType
+from typing import Any, Self, cast
 
 
 TLS = not os.environ.get('PYJO_NO_TLS')
@@ -93,6 +96,17 @@ class Pyjo_IOLoop_TLS(Pyjo.EventEmitter.object):
                 self._close()
         except Exception:
             pass
+
+    # Not in Mojolicious: a context manager, which closes the connection of the handshake where the block ends, as PyPy
+    # frees the object only when its garbage collector runs
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+        self, type: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None
+    ) -> None:
+        self._cleanup()
+        self._close()
 
     @property
     def reactor(self) -> Pyjo.Reactor.object:

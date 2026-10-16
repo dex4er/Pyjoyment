@@ -229,4 +229,10 @@ b.close()
         is_ok(process.stdout, "True [b'io'] True [b'io']\n", 'a new loop in the child, the loop of the parent in it')
         is_ok(process.stderr, '', 'no warning')
 
+with subtest('Context manager'):
+    with Pyjo.Reactor.Asyncio.new() as reactor:
+        loop = reactor.loop
+        ok(not loop.is_closed(), 'event loop')
+    ok(loop.is_closed(), 'event loop closed at the end of the block')
+
 done_testing()

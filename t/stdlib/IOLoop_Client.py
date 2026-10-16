@@ -212,4 +212,15 @@ with subtest('UNIX domain socket'):
         got['handle'].close()
         listening.close()
 
+with subtest('Context manager'):
+    listening = socket.create_server(('127.0.0.1', 0))
+    connected = []
+    with Pyjo.IOLoop.Client.new() as client:
+        client.on('connect', lambda client, handle: connected.append(handle))
+        client.connect(address='127.0.0.1', port=listening.getsockname()[1])
+    Pyjo.IOLoop.timer(0.2, lambda loop: loop.stop())
+    Pyjo.IOLoop.start()
+    is_ok(connected, [], 'connection closed at the end of the block')
+    listening.close()
+
 done_testing()

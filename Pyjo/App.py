@@ -28,6 +28,9 @@ runtime environment for real-time web frameworks, with all the basic tools and
 helpers needed to write simple web applications and higher level web
 frameworks, such as :mod:`Pyjoyment`.
 
+The end of a ``with`` block closes the connections and the servers of its
+:attr:`~Pyjo_App.ua`.
+
 See also
 --------
 
@@ -48,6 +51,7 @@ import Pyjo.Util
 import os
 import sys
 
+from types import TracebackType
 from typing import Any, Self, overload
 
 
@@ -81,6 +85,17 @@ class Pyjo_App(Pyjo.Base.object):
         # the hash of the object, which the arguments of new fill
         for name, value in {**(attrs or {}), **kwargs, **Pyjo.Server.args_override}.items():
             setattr(self, f'_{name}' if name in self._stashes else name, value)
+
+    # Not in Mojolicious: a context manager, which closes the connections and the servers of its user agent where the
+    # block ends, as PyPy frees the object only when its garbage collector runs
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+        self, type: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None
+    ) -> None:
+        if self._ua is not None:
+            self._ua.__exit__(type, value, traceback)
 
     @property
     def home(self) -> Pyjo.Home.object:

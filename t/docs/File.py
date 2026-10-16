@@ -1,7 +1,6 @@
 from Pyjo.Test import *
 
 import contextlib
-import gc
 import io
 import os
 import pathlib
@@ -330,13 +329,10 @@ with subtest('tempfile'):
     is_ok(p.dirname(), os.path.realpath(tmp.name) if p.dirname() != tmp.name else tmp.name, 'directory')
 
     # Longer version
-    p = path(tempfile.NamedTemporaryFile(dir=tmp.name))
-    ok(os.path.isfile(p), 'temporary file')
-
-    # Not in the docstring: the path keeps the temporary file, which is closed before the end of the interpreter, where
-    # the file object may go before its wrapper closes it
-    del p
-    gc.collect()
+    # Not in the docstring: a with block, which closes the temporary file that the path keeps where it ends
+    with path(tempfile.NamedTemporaryFile(dir=tmp.name)) as p:
+        ok(os.path.isfile(p), 'temporary file')
+    ok(not os.path.exists(p), 'closed')
 
 tmp.cleanup()
 
