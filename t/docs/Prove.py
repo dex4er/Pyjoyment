@@ -41,7 +41,11 @@ def shell(command, cwd):
     os.makedirs(bindir, exist_ok=True)
     if not os.path.exists(os.path.join(bindir, 'python')):
         os.symlink(sys.executable, os.path.join(bindir, 'python'))
-    env = dict(os.environ, PATH=os.pathsep.join([bindir, os.environ.get('PATH', '')]), PYTHONPATH=ROOT)
+    env = dict(
+        {k: v for k, v in os.environ.items() if k != 'PYJO_PROVE_OPTS'},
+        PATH=os.pathsep.join([bindir, os.environ.get('PATH', '')]),
+        PYTHONPATH=ROOT,
+    )
     p = subprocess.run(command, shell=True, cwd=cwd, capture_output=True, text=True, env=env)
     return p.stdout, p.returncode
 
@@ -80,6 +84,13 @@ with subtest('Synopsis'):
             is_ok(code, 0, 'right exit status')
         else:
             skip('pyjo-prove is not installed', 2)
+
+with subtest('Environment'):
+    with tempfile.TemporaryDirectory() as tmp:
+        scripts(tmp)
+        out, code = shell("PYJO_PROVE_OPTS='-l -j 4' python -m Pyjo.Prove -r t", tmp)
+        like_ok(out, r'(?m)^Files=5, Tests=5, ', "PYJO_PROVE_OPTS='-l -j 4' python -m Pyjo.Prove -r t")
+        is_ok(code, 0, 'right exit status')
 
 with subtest('Description'):
     with tempfile.TemporaryDirectory() as tmp:
@@ -160,6 +171,18 @@ with tempfile.TemporaryDirectory() as tmp:
             is_ok(names['result'].passed, True, 'result.passed with the standard error captured')
             is_deeply_ok(names['result'].stderr, [], 'result.stderr')
 
+            names, _ = run("""
+                result = await run_script('t/test.py', [sys.executable], dict(os.environ), capture_stderr=True, stderr_lines=100)
+            """)
+            is_ok(names['result'].passed, True, 'result.passed with a limit of the standard error')
+            is_ok(names['result'].stderr_left_out, 0, 'result.stderr_left_out')
+
+            names, out = run("""
+                result = await run_script('t/test.py', [sys.executable], dict(os.environ), progress=print)
+            """)
+            is_ok(names['result'].passed, True, 'result.passed with the progress')
+            is_ok(out.count("Result(path='t/test.py'"), 2, 'progress at the start and after the test')
+
         with subtest('find_scripts'):
             names, _ = run("""
                 scripts = find_scripts(['t'], '.py', recurse=True)
@@ -189,6 +212,26 @@ with tempfile.TemporaryDirectory() as tmp:
             """)
             is_ok([r.path for r in names['results']], ['t/a.py', 't/b.py'], 'results with the standard error captured')
             like_ok(out, r'(?m)^Result: PASS$', 'summary with the standard error captured')
+
+            names, out = run("""
+                results = asyncio.run(run(['t/a.py', 't/b.py'], jobs=2, capture_stderr=True, stderr_lines=1000))
+            """)
+            is_ok(
+                [r.path for r in names['results']], ['t/a.py', 't/b.py'], 'results with a limit of the standard error'
+            )
+            like_ok(out, r'(?m)^Result: PASS$', 'summary with a limit of the standard error')
+
+            names, out = run("""
+                results = asyncio.run(run(['t/a.py', 't/b.py'], color=False))
+            """)
+            is_ok([r.path for r in names['results']], ['t/a.py', 't/b.py'], 'results without colors')
+            unlike_ok(out, r'\033', 'no colors')
+
+            names, out = run("""
+                results = asyncio.run(run(['t/a.py', 't/b.py'], count=False))
+            """)
+            is_ok([r.path for r in names['results']], ['t/a.py', 't/b.py'], 'results without the count')
+            unlike_ok(out, r'\r', 'no count')
 
         with subtest('main'):
             names, out = run("""
