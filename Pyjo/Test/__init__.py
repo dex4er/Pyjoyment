@@ -63,6 +63,13 @@ A test script declares how many tests it runs, either up front with
 :func:`plan` or at the end with :func:`done_testing`. A script that runs tests
 without a plan fails.
 
+:func:`plan` is a context manager too, which issues the plan at the end of its
+block, as :func:`done_testing` does, unless the block raises an exception: ::
+
+    with plan():
+        ok(True, 'first')
+        ok(True, 'second')
+
 Subtests
 --------
 
@@ -456,7 +463,7 @@ def pass_ok(test_name: str | None = None) -> bool:
     return _ok(True, test_name)
 
 
-def plan(tests: int | None = None, skip_all: str | None = None) -> bool:
+def plan(tests: int | None = None, skip_all: str | None = None) -> 'Plan':
     """::
 
         plan(tests=3)
@@ -464,9 +471,19 @@ def plan(tests: int | None = None, skip_all: str | None = None) -> bool:
         if not os.getenv('TEST_ONLINE'):
             plan(skip_all='set TEST_ONLINE to enable this test')
 
+        with plan():
+            ok(True)
+
+        with plan(tests=1):
+            ok(True)
+
     Declare how many tests the script is going to run, which protects against
     a premature exit, or skip all of them with a reason. In a subtest,
     ``skip_all`` skips the rest of the subtest.
+
+    It returns a :class:`Plan`, a context manager which calls
+    :func:`done_testing` at the end of its block, so that the number of tests
+    can be left out.
     """
     _use()
     state = _current()
@@ -483,15 +500,13 @@ def plan(tests: int | None = None, skip_all: str | None = None) -> bool:
             raise SkipAll(skip_all)
         sys.exit(0)
 
-    if tests is None:
-        raise Error('plan() needs either tests or skip_all')
-
-    state.planned = tests
-    _print(f'1..{tests}')
-    return True
+    if tests is not None:
+        state.planned = tests
+        _print(f'1..{tests}')
+    return Plan()
 
 
-def plan_skip_all(why: str) -> bool:
+def plan_skip_all(why: str) -> 'Plan':
     """::
 
         plan_skip_all('set TEST_ONLINE to enable this test')
@@ -501,7 +516,7 @@ def plan_skip_all(why: str) -> bool:
     return plan(skip_all=why)
 
 
-def plan_tests(how_many: int) -> bool:
+def plan_tests(how_many: int) -> 'Plan':
     """::
 
         plan_tests(3)
@@ -527,6 +542,27 @@ def skip(why: str | None = None, how_many: int = 1) -> bool:
         state.count += 1
         _print(f'ok {state.count} # skip {why}' if why is not None else f'ok {state.count} # skip')
     return True
+
+
+class Plan:
+    """
+    The plan of :func:`plan`, which is true. It is a context manager: at the
+    end of its block, it calls :func:`done_testing`, unless the tests are done
+    already or the block raises an exception, which ends the script without a
+    plan.
+    """
+
+    def __bool__(self) -> bool:
+        return True
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+        self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None
+    ) -> None:
+        if exc_type is None and not _current().done:
+            done_testing()
 
 
 class Subtest:
