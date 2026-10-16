@@ -212,13 +212,7 @@ class Pyjo_EventEmitter(Pyjo.Base.object):
 
             return once_decorator
 
-        callback = cb
-        emitter = weakref.proxy(self)
-
-        def wrapper(*args: Any) -> Any:
-            emitter.unsubscribe(event, wrapper)
-            return callback(*args)
-
+        wrapper = _Once(weakref.proxy(self), event, cb)
         self.on(event, wrapper)
 
         return wrapper
@@ -257,6 +251,19 @@ class Pyjo_EventEmitter(Pyjo.Base.object):
             self._events.pop(name, None)
 
         return self
+
+
+# The wrapper of once, which unsubscribes itself as the argument of its call, as Mojo does with __SUB__: a closure that
+# refers to itself is a cycle, which keeps the callback, and the objects of its closure, until the garbage collector runs
+class _Once:
+    __slots__ = ('cb', 'emitter', 'event')
+
+    def __init__(self, emitter: Pyjo_EventEmitter, event: str, cb: Callback) -> None:
+        self.cb, self.emitter, self.event = cb, emitter, event
+
+    def __call__(self, *args: Any) -> Any:
+        self.emitter.unsubscribe(self.event, self)
+        return self.cb(*args)
 
 
 # The name of a class, as Perl's blessed gives the name of a package

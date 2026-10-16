@@ -328,9 +328,13 @@ class Pyjo_IOLoop_Datagram(Pyjo.EventEmitter.object):
         if self._connecting is not None and not isinstance(self._connecting, bool):
             self._cancel(self._connecting)
         self._connecting = None
-        if reactor is None or (handle := self._handle) is None:
+        if (handle := self._handle) is None:
             return
         self._handle = None
+        # Not in Mojolicious: the handle of a socket whose reactor is gone is closed, as Perl frees it with the socket
+        if reactor is None:
+            handle.close()
+            return
         reactor.remove(handle)
         handle.close()
         self.emit('close')

@@ -233,6 +233,11 @@ class Pyjo_IOLoop_Stream(Pyjo.EventEmitter.object):
         """
         reactor = self._reactor() if self._reactor is not None else Pyjo.IOLoop.singleton.reactor
         if reactor is None:
+            # Not in Mojolicious: the handle of a stream whose reactor is gone is closed, as Perl frees it with the
+            # stream
+            if (handle := self._handle) is not None:
+                self._handle = None
+                handle.close()
             return
         self.timeout = 0
         if (handle := self._handle) is None:

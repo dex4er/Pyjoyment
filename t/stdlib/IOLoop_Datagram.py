@@ -1,9 +1,11 @@
 import Pyjo.IOLoop
 import Pyjo.IOLoop.Datagram
+import Pyjo.Reactor.Poll
 
 from Pyjo.Test import *
 
 import asyncio
+import gc
 import os
 import socket
 import threading
@@ -95,5 +97,16 @@ with subtest('Context manager'):
         handle = datagram.handle
         ok(handle.fileno() >= 0, 'bound')
     is_ok(handle.fileno(), -1, 'socket closed at the end of the block')
+
+with subtest('Reactor that is gone'):
+    reactor = Pyjo.Reactor.Poll.new()
+    datagram = Pyjo.IOLoop.Datagram.new()
+    datagram.reactor = reactor
+    datagram.bind(address='127.0.0.1')
+    handle = datagram.handle
+    del reactor
+    gc.collect()
+    datagram.close()
+    is_ok(handle.fileno(), -1, 'socket closed')
 
 done_testing()

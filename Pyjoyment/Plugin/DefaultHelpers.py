@@ -564,7 +564,8 @@ def _content(append: bool, replace: bool, c: 'Controller', name: str | None = No
     hash = c.stash().setdefault('mojo.content', {})
     if content is not None:
         if append:
-            hash[name] = (hash.get(name) or '') + _block(content)
+            # Joined as strings, as Mojo does: the concatenation of markup would escape a string that is not markup
+            hash[name] = str(hash.get(name) or '') + str(_block(content))
         if replace:
             hash[name] = _block(content)
         elif hash.get(name) is None:
