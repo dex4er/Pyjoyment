@@ -138,6 +138,51 @@ with subtest('Multiple workers and graceful shutdown'):
     gc.collect()
     ok(not os.path.exists(pid), 'process id file has been removed')
 
+# Not in Mojolicious: the same on Pyjo.HelloWorld, the application of pure Pyjo, whose handler answers the request of a
+# worker, and whose server method the manager calls once before it starts, as Pyjoyment.HelloWorld emits its hook
+with subtest('Multiple workers and graceful shutdown (Pyjo.HelloWorld)'):
+    import Pyjo.HelloWorld
+
+    server = []
+
+    class HelloWorld(Pyjo.HelloWorld.object):
+        def server(self, server_):
+            server.append(server_.workers)
+
+    dir = tempdir()
+    file = dir.child('prefork.pid')
+    port = Pyjo.IOLoop.Server.object.generate_port()
+    prefork = Pyjo.Server.Prefork.new(
+        app=HelloWorld.new(), heartbeat_interval=0.5, listen=[f'http://*:{port}'], pid_file=file
+    )
+    spawn, reap = [], []
+    worker = tx = graceful = None
+    prefork.on('spawn', lambda prefork, pid: spawn.append(pid))
+
+    @prefork.on('heartbeat')
+    def heartbeat(prefork, pid):
+        global worker, tx
+        worker = pid
+        if prefork.healthy < 4:
+            return
+        tx = Pyjo.UserAgent.new().get(f'http://127.0.0.1:{port}')
+        os.kill(os.getpid(), signal.SIGQUIT)
+
+    prefork.on('reap', lambda prefork, pid: reap.append(pid))
+    prefork.on('finish', finish)
+    prefork.run()
+    is_deeply_ok(server, [4], 'server method has been called once')
+    is_ok(len(spawn), 4, 'four workers spawned')
+    is_ok(len(reap), 4, 'four workers reaped')
+    ok(worker in spawn, 'worker has a heartbeat')
+    ok(graceful, 'server has been stopped gracefully')
+    is_deeply_ok(sorted(spawn), sorted(reap), 'same process ids')
+    is_ok(tx.res.code, 200, 'right status')
+    is_ok(tx.res.body, b'Your Pyjo is working!', 'right content of the application')
+    del prefork
+    gc.collect()
+
+
 with subtest('One worker and immediate shutdown'):
     port = Pyjo.IOLoop.Server.object.generate_port()
     prefork = Pyjo.Server.Prefork.new(accepts=500, heartbeat_interval=0.5, listen=[f'http://*:{port}'], workers=1)
