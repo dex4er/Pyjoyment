@@ -495,6 +495,25 @@ with subtest('Count on a terminal'):
         out, code = prove_tty('--no-color', '-v', 'pass.py')
         unlike_ok(out, r'/\?', 'no count with -v')
 
+with subtest('Include directories'):
+    scripts = {
+        'mymod.py': 'NAME = "mine"\n',
+        't/import.py': """
+            from Pyjo.Test import *
+            import mymod
+            is_ok(mymod.NAME, 'mine')
+            done_testing()
+        """,
+    }
+    out, code = prove('t/import.py', scripts=scripts)
+    like_ok(out, r'(?m)^t/import\.py \.+ Dubious$', 'module not found')
+    out, code = prove('-I', '.', 't/import.py', scripts=scripts)
+    like_ok(out, r'(?m)^t/import\.py \.+ ok$', 'module found with -I')
+    out, code = prove('-l', 't/import.py', scripts=scripts)
+    like_ok(out, r'(?m)^t/import\.py \.+ ok$', 'module found with -l')
+    out, code = prove('--lib', 't/import.py', scripts=scripts)
+    like_ok(out, r'(?m)^t/import\.py \.+ ok$', 'module found with --lib')
+
 with subtest('Verbose'):
     out, code = prove('-v', 'pass.py')
     like_ok(out, r'(?m)^ok 1 - first$', 'TAP output shown')

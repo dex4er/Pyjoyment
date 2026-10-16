@@ -53,6 +53,10 @@ Options
 ``-I DIR``, ``--include DIR``
     Add the directory to ``PYTHONPATH`` of the test scripts. Can be repeated.
 
+``-l``, ``--lib``
+    Add the current directory to ``PYTHONPATH`` of the test scripts, as
+    ``-I .`` does, where ``prove`` adds ``lib``.
+
 ``--ext EXT``
     Extension of the test scripts in a directory, ``.py`` by default.
 
@@ -447,6 +451,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument('-v', '--verbose', action='store_true', help='print the TAP output of each test script')
     parser.add_argument(
         '-I', '--include', action='append', default=[], metavar='DIR', help='add the directory to PYTHONPATH'
+    )
+    # Unlike prove: the current directory, where the modules of a project of Python are, as prove adds lib
+    parser.add_argument(
+        '-l', '--lib', dest='include', action='append_const', const='.', help='add the current directory to PYTHONPATH'
     )
     parser.add_argument('--ext', default='.py', help='extension of the test scripts, .py by default')
     parser.add_argument('--exec', dest='command', metavar='CMD', help='command that runs a test script')
