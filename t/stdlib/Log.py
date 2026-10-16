@@ -116,4 +116,16 @@ with subtest('Capture is a container'):
     is_ok(len(list(messages)), 2, 'iterable')
     is_ok(len(log.subscribers('message')), 1, 'default logger restored')
 
+with subtest('Context manager'):
+    tmp = tempdir()
+    path = tmp.child('test.log')
+    with Pyjo.Log.new(path=path) as log:
+        log.error('First')
+        handle = log.handle
+    ok(handle.closed, 'file closed at the end of the block')
+    log.error('Second')
+    ok(not log.handle.closed, 'opened again when the log is used again')
+    log.handle.close()
+    like_ok(path.slurp().decode(), (r'First.*Second', 's'), 'messages')
+
 done_testing()
