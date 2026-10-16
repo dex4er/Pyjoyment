@@ -79,7 +79,7 @@ Options
     ``prove`` has no such option: its ``--merge`` puts the standard error into
     the TAP output, which shows it with ``-v`` only.
 
-``--color``, ``--no-color``
+``-c``, ``--color``, ``--no-color``, ``--nocolor``
     Color the output or not. By default it is colored when it goes to a
     terminal, unless ``NO_COLOR`` is set or ``TERM`` is ``dumb``: the result of
     a test script that passed and the summary of a run that passed are green,
@@ -425,8 +425,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         '--capture-stderr', action='store_true', help='print the standard error of a test script after its result'
     )
     parser.add_argument(
-        '--color', action=argparse.BooleanOptionalAction, help='color the output, by default on a terminal'
+        '-c', '--color', action='store_const', const=True, help='color the output, by default on a terminal'
     )
+    # Both forms, which Getopt::Long of prove accepts for its --nocolor
+    parser.add_argument('--no-color', '--nocolor', dest='color', action='store_const', const=False, help='do not color')
     parser.add_argument('paths', nargs='*', default=['t'], help='test scripts and directories, t by default')
     args = parser.parse_args(argv)
 

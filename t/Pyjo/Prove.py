@@ -440,6 +440,10 @@ with subtest('Colors'):
 
     out, code = prove('--color', '--no-color', 'pass.py')
     unlike_ok(out, r'\033', 'no colors with --no-color')
+    out, code = prove('-c', 'pass.py')
+    like_ok(out, rf'(?m)^pass\.py \.+ {colored(32, "ok")}$', 'colors with -c')
+    out, code = prove('--color', '--nocolor', 'pass.py')
+    unlike_ok(out, r'\033', 'no colors with --nocolor')
 
 with subtest('Colors on a terminal'):
     if not hasattr(os, 'openpty'):
