@@ -18,15 +18,9 @@ if sys.platform == 'darwin' and getattr(sys, 'pypy_translation_info', {}).get('t
 import Pyjo.IOLoop.Server
 import Pyjo.Server.Prefork
 import Pyjo.UserAgent
+import Pyjoyment.HelloWorld
 
 from Pyjo.File import curfile, path, tempdir
-
-import importlib
-
-
-# The minimal Mojolicious::Lite of the tests
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
-Lite = importlib.import_module('Lite')
 
 
 with subtest('Manage and clean up PID file'):
@@ -75,8 +69,11 @@ with subtest('Multiple workers and graceful shutdown'):
     dir = tempdir()
     file = dir.child('prefork.pid')
     port = Pyjo.IOLoop.Server.object.generate_port()
-    # TODO: the default application, when Pyjo.HelloWorld is an application of Pyjoyment with hooks
-    prefork = Pyjo.Server.Prefork.new(app=Lite.app, heartbeat_interval=0.5, listen=[f'http://*:{port}'], pid_file=file)
+    # Unlike Mojolicious: the default application of Pyjo.Server is Pyjo.HelloWorld, which has no hooks, so the test
+    # passes Pyjoyment.HelloWorld, the Mojo::HelloWorld of Mojo
+    prefork = Pyjo.Server.Prefork.new(
+        app=Pyjoyment.HelloWorld.new(), heartbeat_interval=0.5, listen=[f'http://*:{port}'], pid_file=file
+    )
     prefork.unsubscribe('request')
 
     @prefork.on('request')
