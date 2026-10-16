@@ -57,6 +57,9 @@ class Pyjo_App(Pyjo.Base.object):
     the following new ones.
     """
 
+    # The methods that keep a stash, whose values the arguments of the constructor are
+    _stashes: tuple[str, ...] = ('config',)
+
     def __init__(self, attrs: dict[str, Any] | None = None, /, **kwargs: Any) -> None:
         """::
 
@@ -66,15 +69,18 @@ class Pyjo_App(Pyjo.Base.object):
 
         Construct a new application, with the attributes as keyword arguments
         or a dict, and the arguments of
-        :meth:`Pyjo.Server.Pyjo_Server.load_app` for its script.
+        :meth:`Pyjo.Server.Pyjo_Server.load_app` for its script. The value of
+        ``config`` is the dict of :meth:`config`.
         """
         self._home: Pyjo.Home.object | None = None
         self._log: Pyjo.Log.object | None = None
         self._moniker: str | None = None
         self._ua: Pyjo.UserAgent.object | None = None
 
+        # Not in Mojolicious: the value of a method that keeps a stash, as config, is its dict, as Mojo keeps the stash in
+        # the hash of the object, which the arguments of new fill
         for name, value in {**(attrs or {}), **kwargs, **Pyjo.Server.args_override}.items():
-            setattr(self, name, value)
+            setattr(self, f'_{name}' if name in self._stashes else name, value)
 
     @property
     def home(self) -> Pyjo.Home.object:
