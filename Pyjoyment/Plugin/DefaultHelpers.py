@@ -47,35 +47,38 @@ returning the first extension if no preference could be detected. ::
 
 app ::
 
-    secret = c.helpers.app().secrets[0]
+    %= app().secrets[0]
 
 Alias for :attr:`Pyjoyment.Controller.Pyjoyment_Controller.app`.
 
 b ::
 
-    slug = c.b(b'Joel is a slug').slugify()
+    %= b(b'Joel is a slug').slugify()
 
 Turn bytes into a :mod:`Pyjo.String.Bytes` object.
 
 c ::
 
-    string = c.c('a', 'b', 'c').shuffle().join()
+    %= c.c('a', 'b', 'c').shuffle().join()
 
-Turn list into a :mod:`Pyjo.Collection` object.
+Turn list into a :mod:`Pyjo.Collection` object. In templates, the variable
+``c`` is the controller, which hides the helper.
 
 config ::
 
-    something = c.config('something')
+    %= config('something')
 
 Alias for :meth:`Pyjoyment.Pyjoyment_App.config`.
 
 content ::
 
-    c.content('foo', lambda: 'test')
-    c.content('bar', 'Hello World!')
-    foo = c.content('foo')
-    bar = c.content('bar')
-    content = c.content()
+    %= content('foo', begin
+      test
+    % end)
+    %= content('bar', 'Hello World!')
+    %= content('foo')
+    %= content('bar')
+    %= content()
 
 Store partial rendered content in a named buffer and retrieve it later,
 defaults to retrieving the named buffer ``content``, which is used by the
@@ -84,31 +87,43 @@ ignored if the named buffer is already in use.
 
 content_for ::
 
-    c.content_for('foo', lambda: 'test')
-    foo = c.content_for('foo')
+    % content_for('foo', begin
+      test
+    % end)
+    %= content_for('foo')
 
 Same as ``content``, but appends content to named buffers if they are already
 in use. ::
 
-    c.content_for('message', 'Hello ')
-    c.content_for('message', 'world!')
-    message = c.content('message')
+    % content_for('message', begin
+      Hello
+    % end)
+    % content_for('message', begin
+      world!
+    % end)
+    %= content('message')
 
 content_with ::
 
-    c.content_with('foo', lambda: 'test')
-    foo = c.content_with('foo')
+    % content_with('foo', begin
+      test
+    % end)
+    %= content_with('foo')
 
 Same as ``content``, but replaces content of named buffers if they are already
 in use. ::
 
-    c.content('message', 'world!')
-    c.content_with('message', lambda: f'Hello {c.content("message")}')
-    message = c.content('message')
+    % content('message', begin
+      world!
+    % end)
+    % content_with('message', begin
+      Hello <%= content('message') %>
+    % end)
+    %= content('message')
 
 csrf_token ::
 
-    token = c.csrf_token()
+    %= csrf_token()
 
 Get CSRF token from ``session``, and generate one if none exists. The token is
 masked with a fresh random value on every call to protect against BREACH
@@ -116,15 +131,16 @@ attacks.
 
 current_route ::
 
-    if c.current_route('login'):
-        ...
-    name = c.current_route()
+    % if current_route('login'):
+      Welcome to Pyjoyment!
+    % end
+    %= current_route()
 
 Check or get name of current route.
 
 dumper ::
 
-    dump = c.dumper({'some': 'data'})
+    %= dumper({'some': 'data'})
 
 Dump a Python data structure with :func:`Pyjo.Util.dumper`, very useful for
 debugging.
@@ -139,8 +155,8 @@ value of :attr:`Pyjoyment.Pyjoyment_App.exception_format`.
 
 extends ::
 
-    c.extends('blue')
-    c.extends('blue', title='Blue!')
+    % extends('blue')
+    % extends('blue', title='Blue!')
 
 Set ``extends`` stash value, all additional keyword arguments get merged into
 the ``stash``.
@@ -150,6 +166,7 @@ flash ::
     foo = c.flash('foo')
     c = c.flash({'foo': 'bar'})
     c = c.flash(foo='bar')
+    %= flash('foo')
 
 Data storage persistent only for the next request, stored in the ``session``. ::
 
@@ -169,15 +186,15 @@ timeout if possible. ::
 
 include ::
 
-    menubar = c.include('menubar')
-    menubar = c.include('menubar', format='txt')
+    %= include('menubar')
+    %= include('menubar', format='txt')
 
 Alias for :meth:`Pyjoyment.Controller.Pyjoyment_Controller.render_to_string`.
 
 layout ::
 
-    c.layout('green')
-    c.layout('green', title='Green!')
+    % layout('green')
+    % layout('green', title='Green!')
 
 Set ``layout`` stash value, all additional keyword arguments get merged into
 the ``stash``.
@@ -199,7 +216,7 @@ message. ::
 
 param ::
 
-    foo = c.helpers.param('foo')
+    %= param('foo')
 
 Alias for :meth:`Pyjoyment.Controller.Pyjoyment_Controller.param`.
 
@@ -304,18 +321,18 @@ For more advanced negotiation logic you can also use ``accepts``.
 
 session ::
 
-    foo = c.helpers.session('foo')
+    %= session('foo')
 
 Alias for :meth:`Pyjoyment.Controller.Pyjoyment_Controller.session`.
 
 stash ::
 
-    foo = c.helpers.stash('foo')
-    c.helpers.stash(foo='bar')
+    %= stash('foo')
+    % stash(foo='bar')
 
 Alias for :meth:`Pyjoyment.Controller.Pyjoyment_Controller.stash`. ::
 
-    name = c.helpers.stash('name') or 'Somebody'
+    %= stash('name') or 'Somebody'
 
 timing.begin ::
 
@@ -377,35 +394,35 @@ Create ``Server-Timing`` header with optional description and duration. ::
 
 title ::
 
-    title = c.title()
-    c.title('Welcome!')
-    c.title('Welcome!', foo='bar')
+    %= title()
+    % title('Welcome!')
+    % title('Welcome!', foo='bar')
 
 Get or set ``title`` stash value, all additional keyword arguments get merged
 into the ``stash``.
 
 ua ::
 
-    title = c.ua().get('mojolicious.org').result.dom.at('title').text
+    %= ua().get('mojolicious.org').result.dom.at('title').text
 
 Alias for :attr:`Pyjoyment.Pyjoyment_App.ua`.
 
 url_for ::
 
-    url = c.helpers.url_for('named', foo='bar', baz='yada')
+    %= url_for('named', foo='bar', baz='yada')
 
 Alias for :meth:`Pyjoyment.Controller.Pyjoyment_Controller.url_for`. ::
 
-    url = c.helpers.url_for('/index.html').set(query={'foo': 'bar'})
+    %= url_for('/index.html').set(query={'foo': 'bar'})
 
 url_with ::
 
-    url = c.url_with('named', foo='bar', baz='yada')
+    %= url_with('named', foo='bar', baz='yada')
 
 Does the same as ``url_for``, but inherits query parameters from the current
 request. ::
 
-    url = c.url_with().set(query={'page': 2})
+    %= url_with().set(query={'page': 2})
 
 See also
 --------
@@ -419,7 +436,6 @@ Ported from `Mojolicious::Plugin::DefaultHelpers
 # TODO: the helpers is_fresh, reply.asset, reply.file, reply.static, url_for_asset and url_for_file, when
 # Pyjoyment.Static is ported, and validation, when Pyjoyment.Validator is ported
 # TODO: the helpers proxy.get_p, proxy.post_p and proxy.start_p, with proxy_app.t, when Pyjo.Test.Pyjo is ported
-# TODO: the examples of the helpers in templates, when Pyjoyment.Plugin.EPRenderer is ported
 
 import Pyjo.Collection
 import Pyjo.Exception

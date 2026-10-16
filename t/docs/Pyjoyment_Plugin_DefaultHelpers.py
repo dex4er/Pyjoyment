@@ -4,9 +4,11 @@ import Pyjo.String.Bytes
 import Pyjo.Transaction.HTTP
 import Pyjoyment
 
+from Pyjo.File import tempdir
 from Pyjo.Test import *
 
 import re
+import textwrap
 
 
 # The applications are kept, as a controller refers to its application weakly
@@ -18,6 +20,11 @@ def controller():
     app.log.level = 'fatal'
     apps.append(app)
     return app.build_controller()
+
+
+def render(c, template):
+    # The documented template, inline
+    return str(c.render_to_string(inline=textwrap.dedent(template)))
 
 
 with subtest('Synopsis'):
@@ -55,79 +62,120 @@ with subtest('accepts'):
 
 with subtest('app'):
     c = controller()
-    secret = c.helpers.app().secrets[0]
-    is_ok(secret, 'works', 'application')
+    is_ok(render(c, '%= app().secrets[0]'), 'works\n', 'application')
 
 with subtest('b'):
     c = controller()
-    slug = c.b(b'Joel is a slug').slugify()
+    is_ok(render(c, "%= b(b'Joel is a slug').slugify()"), 'joel-is-a-slug\n', 'slug')
     isa_ok(c.b(b'test'), Pyjo.String.Bytes.object, 'bytes')
-    is_ok(slug, b'joel-is-a-slug', 'slug')
 
 with subtest('c'):
     c = controller()
-    string = c.c('a', 'b', 'c').shuffle().join()
+    like_ok(render(c, "%= c.c('a', 'b', 'c').shuffle().join()"), r'^[abc]{3}\n$', 'joined')
     isa_ok(c.c('a'), Pyjo.Collection.object, 'collection')
-    is_ok(len(string), 3, 'joined')
 
 with subtest('config'):
     c = controller()
     c.app.config(something='value')
-    something = c.config('something')
-    is_ok(something, 'value', 'config')
+    is_ok(render(c, "%= config('something')"), 'value\n', 'config')
 
 with subtest('content'):
     c = controller()
-    c.content('foo', lambda: 'test')
-    c.content('bar', 'Hello World!')
-    foo = c.content('foo')
-    bar = c.content('bar')
-    content = c.content()
-    is_deeply_ok([foo, bar, content], ['test', 'Hello World!', ''], 'named buffers')
+    output = render(
+        c,
+        """\
+        %= content('foo', begin
+          test
+        % end)
+        %= content('bar', 'Hello World!')
+        %= content('foo')
+        %= content('bar')
+        %= content()
+        """,
+    )
+    is_ok(output, '\n  test\nHello World!\n\n  test\n\nHello World!\n\n', 'named buffers')
 
 with subtest('content_for'):
     c = controller()
-    c.content_for('foo', lambda: 'test')
-    foo = c.content_for('foo')
-    is_ok(foo, 'test', 'content')
+    output = render(
+        c,
+        """\
+        % content_for('foo', begin
+          test
+        % end)
+        %= content_for('foo')
+        """,
+    )
+    is_ok(output, '  test\n\n', 'content')
 
-    c.content_for('message', 'Hello ')
-    c.content_for('message', 'world!')
-    message = c.content('message')
-    is_ok(message, 'Hello world!', 'appended')
+    c = controller()
+    output = render(
+        c,
+        """\
+        % content_for('message', begin
+          Hello
+        % end)
+        % content_for('message', begin
+          world!
+        % end)
+        %= content('message')
+        """,
+    )
+    is_ok(output, '  Hello\n  world!\n\n', 'appended')
 
 with subtest('content_with'):
     c = controller()
-    c.content_with('foo', lambda: 'test')
-    foo = c.content_with('foo')
-    is_ok(foo, 'test', 'content')
+    output = render(
+        c,
+        """\
+        % content_with('foo', begin
+          test
+        % end)
+        %= content_with('foo')
+        """,
+    )
+    is_ok(output, '  test\n\n', 'content')
 
-    c.content('message', 'world!')
-    c.content_with('message', lambda: f'Hello {c.content("message")}')
-    message = c.content('message')
-    is_ok(message, 'Hello world!', 'replaced')
+    c = controller()
+    output = render(
+        c,
+        """\
+        % content('message', begin
+          world!
+        % end)
+        % content_with('message', begin
+          Hello <%= content('message') %>
+        % end)
+        %= content('message')
+        """,
+    )
+    is_ok(output, '  Hello   world!\n\n\n', 'replaced')
 
 with subtest('csrf_token'):
     c = controller()
-    token = c.csrf_token()
-    like_ok(token, r'^[0-9a-f]{80}$', 'masked token')
-    isnt_ok(c.csrf_token(), token, 'masked again')
+    token = render(c, '%= csrf_token()')
+    like_ok(token, r'^[0-9a-f]{80}\n$', 'masked token')
+    isnt_ok(render(c, '%= csrf_token()'), token, 'masked again')
 
 with subtest('current_route'):
     c = controller()
     c.app.routes.get('/login').set(name='login')
     c.req.url.parse('/login')
     c.app.routes.match(c)
-    if c.current_route('login'):
-        pass
-    name = c.current_route()
-    is_ok(name, 'login', 'name')
-    ok(c.current_route('login'), 'check')
+    output = render(
+        c,
+        """\
+        % if current_route('login'):
+          Welcome to Pyjoyment!
+        % end
+        %= current_route()
+        """,
+    )
+    is_ok(output, '  Welcome to Pyjoyment!\nlogin\n', 'check and name')
 
 with subtest('dumper'):
     c = controller()
-    dump = c.dumper({'some': 'data'})
-    is_ok(dump, "{'some': 'data'}\n", 'dump')
+    is_ok(render(c, "%= dumper({'some': 'data'})"), '{&#39;some&#39;: &#39;data&#39;}\n\n', 'dump, escaped')
 
 with subtest('exception_format'):
     c = controller()
@@ -138,9 +186,16 @@ with subtest('exception_format'):
 
 with subtest('extends'):
     c = controller()
-    c.extends('blue')
-    c.extends('blue', title='Blue!')
-    is_deeply_ok([c.stash('extends'), c.stash('title')], ['blue', 'Blue!'], 'stash')
+    output = render(
+        c,
+        """\
+        % extends('blue')
+        % extends('blue', title='Blue!')
+        %= stash('extends')
+        """,
+    )
+    is_ok(output, 'blue\n', 'stash')
+    is_ok(c.stash('title'), 'Blue!', 'merged into the stash')
 
 with subtest('flash'):
     c = controller()
@@ -149,6 +204,7 @@ with subtest('flash'):
     is_ok(foo, None, 'no value')
     c = c.flash({'foo': 'bar'})
     c = c.flash(foo='bar')
+    is_ok(render(controller(), "%= flash('foo')"), '\n', 'no value in a template')
 
     # Show message after redirect
     c.flash(message='User created successfully!')
@@ -165,15 +221,25 @@ with subtest('inactivity_timeout'):
 
 with subtest('include'):
     c = controller()
-    menubar = c.include('menubar')
-    menubar = c.include('menubar', format='txt')
-    is_ok(menubar, None, 'no template')
+    tmp = tempdir()
+    tmp.child('menubar.html.ep').spew(b'<a href="/">Home</a>\n')
+    tmp.child('menubar.txt.ep').spew(b'Home\n')
+    c.app.renderer.paths.append(str(tmp))
+    is_ok(render(c, "%= include('menubar')"), '<a href="/">Home</a>\n\n', 'not escaped')
+    is_ok(render(c, "%= include('menubar', format='txt')"), 'Home\n\n', 'format')
 
 with subtest('layout'):
     c = controller()
-    c.layout('green')
-    c.layout('green', title='Green!')
-    is_deeply_ok([c.layout(), c.title()], ['green', 'Green!'], 'stash')
+    output = render(
+        c,
+        """\
+        % layout('green')
+        % layout('green', title='Green!')
+        %= stash('layout')
+        """,
+    )
+    is_ok(output, 'green\n', 'stash')
+    is_ok(c.stash('title'), 'Green!', 'merged into the stash')
 
 with subtest('log'):
     c = controller()
@@ -188,8 +254,7 @@ with subtest('log'):
 with subtest('param'):
     c = controller()
     c.param('foo', 'bar')
-    foo = c.helpers.param('foo')
-    is_ok(foo, 'bar', 'alias')
+    is_ok(render(c, "%= param('foo')"), 'bar\n', 'alias')
 
 with subtest('redirect_to'):
     c = controller()
@@ -236,13 +301,13 @@ with subtest('reply.html_exception'):
     c.reply.html_exception(Pyjo.Exception.new())
     isa_ok(c.stash('exception'), Pyjo.Exception.object, 'exception in the stash')
     ok('snapshot' in c.stash(), 'snapshot')
-    # TODO: the rendered exception page, when Pyjoyment.Plugin.EPRenderer is ported
+    # TODO: the rendered exception page, when the bundled templates are ported with Pyjoyment.Plugin.TagHelpers
 
 with subtest('reply.html_not_found'):
     c = controller()
     c.reply.html_not_found()
     ok('snapshot' in c.stash(), 'snapshot')
-    # TODO: the rendered not found page, when Pyjoyment.Plugin.EPRenderer is ported
+    # TODO: the rendered not found page, when the bundled templates are ported with Pyjoyment.Plugin.TagHelpers
 
 with subtest('reply.json_exception'):
     c = controller()
@@ -295,17 +360,21 @@ with subtest('respond_to'):
 with subtest('session'):
     c = controller()
     c.session(foo='bar')
-    foo = c.helpers.session('foo')
-    is_ok(foo, 'bar', 'alias')
+    is_ok(render(c, "%= session('foo')"), 'bar\n', 'alias')
 
 with subtest('stash'):
     c = controller()
-    foo = c.helpers.stash('foo')
-    c.helpers.stash(foo='bar')
+    output = render(
+        c,
+        """\
+        %= stash('foo')
+        % stash(foo='bar')
+        """,
+    )
+    is_ok(output, '\n', 'no value')
+    is_ok(c.stash('foo'), 'bar', 'alias')
 
-    name = c.helpers.stash('name') or 'Somebody'
-
-    is_deeply_ok([c.stash('foo'), name], ['bar', 'Somebody'], 'alias')
+    is_ok(render(c, "%= stash('name') or 'Somebody'"), 'Somebody\n', 'default')
 
 with subtest('timing.begin'):
     c = controller()
@@ -383,10 +452,15 @@ with subtest('timing.server_timing'):
 
 with subtest('title'):
     c = controller()
-    title = c.title()
-    is_ok(title, None, 'no title')
-    c.title('Welcome!')
-    c.title('Welcome!', foo='bar')
+    output = render(
+        c,
+        """\
+        %= title()
+        % title('Welcome!')
+        % title('Welcome!', foo='bar')
+        """,
+    )
+    is_ok(output, '\n', 'no title')
     is_deeply_ok([c.title(), c.stash('foo')], ['Welcome!', 'bar'], 'stash')
 
 with subtest('ua'):
@@ -397,21 +471,17 @@ with subtest('ua'):
 with subtest('url_for'):
     c = controller()
     c.app.routes.get('/named/:foo/:baz').set(name='named')
-    url = c.helpers.url_for('named', foo='bar', baz='yada')
-    is_ok(url.to_str(), '/named/bar/yada', 'alias')
+    is_ok(render(c, "%= url_for('named', foo='bar', baz='yada')"), '/named/bar/yada\n', 'alias')
 
-    url = c.helpers.url_for('/index.html').set(query={'foo': 'bar'})
-    is_ok(url.to_str(), '/index.html?foo=bar', 'query')
+    is_ok(render(c, "%= url_for('/index.html').set(query={'foo': 'bar'})"), '/index.html?foo=bar\n', 'query')
 
 with subtest('url_with'):
     c = controller()
     c.app.routes.get('/named/:foo/:baz').set(name='named')
     c.req.url.parse('/?page=1')
-    url = c.url_with('named', foo='bar', baz='yada')
-    is_ok(url.to_str(), '/named/bar/yada?page=1', 'inherited query')
+    is_ok(render(c, "%= url_with('named', foo='bar', baz='yada')"), '/named/bar/yada?page=1\n', 'inherited query')
 
-    url = c.url_with().set(query={'page': 2})
-    is_ok(url.query.param('page'), '2', 'replaced')
+    is_ok(render(c, "%= url_with().set(query={'page': 2})"), '?page=2\n', 'replaced')
 
 with subtest('register'):
     plugin = Pyjoyment.new().plugins.load_plugin('DefaultHelpers')
