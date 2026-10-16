@@ -416,7 +416,7 @@ def _compile_format(format: Constraint | None, has_default: bool) -> str:
 
 def _compile_req(req: Constraint) -> str:
     if isinstance(req, list):
-        return '(' + '|'.join(re.escape(alternative) for alternative in sorted(req, reverse=True)) + ')'
+        return '(' + '|'.join(re.escape(alternative) for alternative in sorted(map(str, req), reverse=True)) + ')'
     if isinstance(req, re.Pattern):
         return f'({_regex_source(req)})'
     return f'({req})'
