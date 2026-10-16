@@ -1,9 +1,11 @@
 import Pyjo.IOLoop
+import Pyjo.String.HTML
 import Pyjo.Transaction.HTTP
 import Pyjo.UserAgent
 import Pyjoyment
 import Pyjoyment.Routes.Match
 
+from Pyjo.File import tempdir
 from Pyjo.JSON import decode_json
 from Pyjo.Test import *
 
@@ -285,12 +287,53 @@ with subtest('render'):
 
     app.routes.get('/json', json)
 
-    # TODO: the examples of templates, when Pyjoyment.Plugin.EPRenderer is ported
+    def inline(c):
+        # Render inline template
+        c.render(inline='<%= 1 + 1 %>')
+
+    app.routes.get('/inline', inline)
+
+    def template(c):
+        # Render template "foo/bar.html.ep"
+        c.render(template='foo/bar', format='html', handler='ep')
+
+    app.routes.get('/template', template)
+
+    def values(c):
+        # Render template "test.*.*" with arbitrary values "foo" and "bar"
+        c.render(template='test', foo='test', bar=23)
+
+    app.routes.get('/values', values)
+
+    def xml(c):
+        # Render template "test.xml.*"
+        c.render(template='test', format='xml')
+
+    app.routes.get('/xml', xml)
+
+    def alternative(c):
+        # Render template "test.xml.*" (alternative)
+        c.render('test', format='xml')
+
+    app.routes.get('/alternative', alternative)
+
+    tmp = tempdir()
+    tmp.child('foo').make_path()
+    tmp.child('foo', 'bar.html.ep').spew(b'<p>Bar</p>\n')
+    tmp.child('test.html.ep').spew(b'<%= foo %> <%= bar %>\n')
+    tmp.child('test.xml.ep').spew(b'<test>works</test>\n')
+    app.renderer.paths.append(str(tmp))
 
     is_ok(request(app, '/text').res.text, 'I ♥ Pyjoyment!', 'characters')
     is_ok(request(app, '/stash').res.text, 'I ♥ Pyjoyment!', 'characters from the stash')
     is_deeply_ok(request(app, '/data').res.json(), {'test': 'I ♥ Pyjoyment!'}, 'binary data')
     is_deeply_ok(request(app, '/json').res.json(), {'test': 'I ♥ Pyjoyment!'}, 'JSON')
+    is_ok(request(app, '/inline').res.text, '2\n', 'inline template')
+    is_ok(request(app, '/template').res.text, '<p>Bar</p>\n', 'template')
+    is_ok(request(app, '/values').res.text, 'test 23\n', 'template with values')
+    res = request(app, '/xml').res
+    is_deeply_ok([res.text, res.headers.content_type], ['<test>works</test>\n', 'application/xml'], 'XML')
+    is_ok(request(app, '/alternative').res.text, '<test>works</test>\n', 'XML (alternative)')
     app, c = controller()
     throws_ok(lambda: c.render(), re.compile(r'Could not render a response'), 'nothing to render')
 
@@ -316,13 +359,28 @@ with subtest('render_maybe'):
     boolean = c.render_maybe('foo/index', format='html')
     is_ok(boolean, None, 'no template')
     is_ok(c.stash('foo'), None, 'arguments localized')
-    # TODO: the example of a template that exists, when Pyjoyment.Plugin.EPRenderer is ported
+
+    app, c = controller()
+    tmp = tempdir()
+    tmp.child('index.html.ep').spew(b'Index\n')
+    app.renderer.paths.append(str(tmp))
+
+    # Render template "index_local" only if it exists
+    c.render_maybe('index_local') or c.render('index')
+
+    is_ok(c.res.text, 'Index\n', 'fallback')
 
 with subtest('render_to_string'):
     app, c = controller()
     output = c.render_to_string('foo/index', format='pdf')
     is_ok(output, None, 'no template')
     is_ok(c.render_to_string(text='works'), b'works', 'text')
+
+    # Render inline template
+    two = c.render_to_string(inline='<%= 1 + 1 %>')
+
+    is_ok(two, '2\n', 'inline template')
+    isa_ok(two, Pyjo.String.HTML.object, 'markup')
 
 with subtest('rendered'):
     app, c = controller()
