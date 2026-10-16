@@ -735,9 +735,10 @@ def _class_names(cls: type | tuple[type, ...]) -> str:
     return cls.__name__
 
 
+# The first frame outside of the package, as Pyjo.Test.Pyjo raises $Test::Builder::Level of Test::Mojo
 def _caller() -> str | None:
     frame = inspect.currentframe()
-    while frame is not None and frame.f_code.co_filename == __file__:
+    while frame is not None and os.path.dirname(frame.f_code.co_filename) == os.path.dirname(__file__):
         frame = frame.f_back
     if frame is None:
         return None

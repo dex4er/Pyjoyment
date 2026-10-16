@@ -241,6 +241,7 @@ strict = [
   "Pyjo/String/Unicode.py",
   "Pyjo/Template.py",
   "Pyjo/Test/__init__.py",
+  "Pyjo/Test/Pyjo.py",
   "Pyjo/Transaction/__init__.py",
   "Pyjo/Transaction/HTTP.py",
   "Pyjo/Transaction/WebSocket.py",
