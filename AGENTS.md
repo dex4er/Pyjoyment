@@ -775,6 +775,13 @@ pattern.match_partial(path)`.
 - A module that is not ported yet but uses a ported one follows its API: the
   lines that use it are taken from the target Mojolicious, and so is the
   expectation of a test of them that the target changed.
+- The files that Mojolicious bundles in `lib/Mojolicious/resources` are in
+  `Pyjoyment/resources`, under the same names. The artwork of Mojolicious, as
+  its logo, the raptors, the favicon and the pinstripes, is not copied: it is
+  under CC-BY-SA, and the license of Mojolicious does not grant its logo. Its
+  place is taken by images of Pyjoyment of the same size, which are
+  placeholders, so that the paths that the templates and the tests of Mojo use,
+  as `/mojo/logo-white.png`, serve a file.
 
 ## Linting and Formatting
 

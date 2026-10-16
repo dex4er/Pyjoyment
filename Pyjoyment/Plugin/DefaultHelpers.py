@@ -191,6 +191,23 @@ include ::
 
 Alias for :meth:`Pyjoyment.Controller.Pyjoyment_Controller.render_to_string`.
 
+is_fresh ::
+
+    boolean = c.is_fresh()
+    boolean = c.is_fresh(etag='abc')
+    boolean = c.is_fresh(etag='W/"def"')
+    boolean = c.is_fresh(last_modified=epoch)
+
+Check freshness of request by comparing the ``If-None-Match`` and
+``If-Modified-Since`` request headers to the ``ETag`` and ``Last-Modified``
+response headers with :meth:`Pyjoyment.Static.Pyjoyment_Static.is_fresh`. ::
+
+    # Add ETag/Last-Modified headers and check freshness before rendering
+    if c.is_fresh(etag='abc', last_modified=1424985708):
+        c.rendered(304)
+    else:
+        c.render(text='I ♥ Pyjoyment!')
+
 layout ::
 
     % layout('green')
@@ -238,6 +255,26 @@ with ``Location`` header, takes the same arguments as ``url_for``. ::
     c.res.code = 307
     c.redirect_to('some_route')
 
+reply.asset ::
+
+    c.reply.asset(Pyjo.Asset.File.new())
+
+Reply with a :mod:`Pyjo.Asset.File` or :mod:`Pyjo.Asset.Memory` object using
+:meth:`Pyjoyment.Static.Pyjoyment_Static.serve_asset`, and perform content
+negotiation with ``Range``, ``If-Modified-Since`` and ``If-None-Match``
+headers. ::
+
+    # Serve asset with custom modification time
+    asset = Pyjo.Asset.Memory.new()
+    asset.add_chunk(b'Hello World!').mtime = 784111777
+    c.res.headers.content_type = 'text/plain'
+    c.reply.asset(asset)
+
+    # Serve static file if it exists
+    if asset := c.app.static.file('images/logo.png'):
+        c.res.headers.content_type = 'image/png'
+        c.reply.asset(asset)
+
 reply.exception ::
 
     c = c.reply.exception('Oops!')
@@ -245,6 +282,23 @@ reply.exception ::
 
 Render an exception response in the appropriate format by delegating to more
 specific exception helpers.
+
+reply.file ::
+
+    c.reply.file('/etc/passwd')
+
+Reply with a static file from an absolute path anywhere on the file system
+using :attr:`Pyjoyment.Pyjoyment_App.static`. ::
+
+    # Longer version
+    c.reply.asset(Pyjo.Asset.File.new(path='/etc/passwd'))
+
+    # Serve file from an absolute path with a custom content type
+    c.res.headers.content_type = 'application/myapp'
+    c.reply.file('/home/sri/foo.txt')
+
+    # Serve file from a secret application directory
+    c.reply.file(c.app.home.child('secret', 'file.txt'))
 
 reply.html_exception ::
 
@@ -284,6 +338,20 @@ reply.not_found ::
 
 Render a not found response in the appropriate format by delegating to more
 specific exception helpers.
+
+reply.static ::
+
+    c.reply.static('images/logo.png')
+    c.reply.static('../lib/MyApp.py')
+
+Reply with a static file using :attr:`Pyjoyment.Pyjoyment_App.static`, usually
+from the ``public`` directories or ``DATA`` sections of your application. Note
+that this helper uses a relative path, but does not protect from traversing to
+parent directories. ::
+
+    # Serve file from a relative path with a custom content type
+    c.res.headers.content_type = 'application/myapp'
+    c.reply.static('foo.txt')
 
 reply.txt_exception ::
 
@@ -415,6 +483,18 @@ Alias for :meth:`Pyjoyment.Controller.Pyjoyment_Controller.url_for`. ::
 
     %= url_for('/index.html').set(query={'foo': 'bar'})
 
+url_for_asset ::
+
+    %= url_for_asset('/app.js')
+
+Alias for :meth:`Pyjoyment.Controller.Pyjoyment_Controller.url_for_asset`.
+
+url_for_file ::
+
+    %= url_for_file('/index.html')
+
+Alias for :meth:`Pyjoyment.Controller.Pyjoyment_Controller.url_for_file`.
+
 url_with ::
 
     %= url_with('named', foo='bar', baz='yada')
@@ -433,10 +513,11 @@ Ported from `Mojolicious::Plugin::DefaultHelpers
 <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojolicious/Plugin/DefaultHelpers.pm>`_ of Mojolicious 9.49.
 """
 
-# TODO: the helpers is_fresh, reply.asset, reply.file, reply.static, url_for_asset and url_for_file, when
-# Pyjoyment.Static is ported, and validation, when Pyjoyment.Validator is ported
+# TODO: the helper validation, when Pyjoyment.Validator is ported
 # TODO: the helpers proxy.get_p, proxy.post_p and proxy.start_p, with proxy_app.t, when Pyjo.Test.Pyjo is ported
 
+import Pyjo.Asset
+import Pyjo.Asset.File
 import Pyjo.Collection
 import Pyjo.Exception
 import Pyjo.IOLoop
@@ -476,7 +557,7 @@ class Pyjoyment_Plugin_DefaultHelpers(Pyjoyment.Plugin.object):
         """
         # Controller alias helpers
         app.helper('app', _app)
-        for name in ('param', 'stash', 'session', 'url_for'):
+        for name in ('param', 'stash', 'session', 'url_for', 'url_for_asset', 'url_for_file'):
             app.helper(name, _alias(name))
 
         # Stash key shortcuts (should not generate log messages)
@@ -499,6 +580,7 @@ class Pyjoyment_Plugin_DefaultHelpers(Pyjoyment.Plugin.object):
         app.helper('exception_format', _exception_format)
         app.helper('flash', _flash)
         app.helper('inactivity_timeout', _inactivity_timeout)
+        app.helper('is_fresh', _is_fresh)
         app.helper('redirect_to', _redirect_to)
         app.helper('respond_to', _respond_to)
         app.helper('url_with', _url_with)
@@ -507,6 +589,10 @@ class Pyjoyment_Plugin_DefaultHelpers(Pyjoyment.Plugin.object):
         app.helper('include', _include)
 
         app.helper('log', _log)
+
+        app.helper('reply.asset', _asset)
+        app.helper('reply.file', _file)
+        app.helper('reply.static', _static)
 
         app.helper('reply.exception', _exception)
         app.helper('reply.not_found', _not_found)
@@ -540,6 +626,11 @@ def _alias(name: str) -> Callable[..., Any]:
 
 def _app(c: 'Controller') -> 'Pyjoyment.object':
     return c.app
+
+
+def _asset(c: 'Controller', asset: Pyjo.Asset.object) -> 'Controller':
+    c.app.static.serve_asset(c, asset)
+    return c.rendered()
 
 
 def _b(c: 'Controller', *args: Any) -> Pyjo.String.Bytes.object:
@@ -669,6 +760,10 @@ def _fallbacks(c: 'Controller', options: dict[str, Any], template: str, bundled:
     return bool(c.render_maybe(bundled, **{**options, 'handler': 'ep'}))
 
 
+def _file(c: 'Controller', path: Any) -> 'Controller':
+    return _asset(c, Pyjo.Asset.File.new(path=str(path)))
+
+
 def _flash(c: 'Controller', *args: Any, **values: Any) -> Any:
     # Check old flash
     session = c.session()
@@ -711,6 +806,10 @@ def _inactivity_timeout(c: 'Controller', timeout: float) -> 'Controller':
 
 def _include(c: 'Controller', *args: Any, **values: Any) -> Any:
     return c.render_to_string(*args, **values)
+
+
+def _is_fresh(c: 'Controller', *, etag: str | None = None, last_modified: float | None = None) -> bool:
+    return c.app.static.is_fresh(c, etag=etag, last_modified=last_modified)
 
 
 def _json_exception(c: 'Controller', e: Any) -> Any:
@@ -802,6 +901,12 @@ def _txt_exception(c: 'Controller', e: Any) -> Any:
 
 def _txt_not_found(c: 'Controller') -> Any:
     return c.render(text='Not Found', format='txt', status=404)
+
+
+def _static(c: 'Controller', file: str) -> 'Controller':
+    if not c.app.static.serve(c, file):
+        raise Pyjo.Exception.new(f'Static file "{file}" not found')
+    return c.rendered()
 
 
 def _stash_key(name: str) -> Callable[..., Any]:
