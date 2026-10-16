@@ -208,7 +208,7 @@ def decode(charset: str, data: str | bytes) -> str | None:
         return None
 
 
-# TODO: decrypt_cookie, with the sessions of Pyjoyment, which needs ChaCha20-Poly1305, not in the standard library
+# Left out from Mojolicious: decrypt_cookie, as ChaCha20-Poly1305 of the sessions is not in the standard library
 
 
 def deprecated(*args: object) -> None:
@@ -270,7 +270,7 @@ def encode(charset: str, chars: str) -> bytes:
     return chars.encode(charset, 'replace')
 
 
-# TODO: encrypt_cookie, with the sessions of Pyjoyment, which needs ChaCha20-Poly1305, not in the standard library
+# Left out from Mojolicious: encrypt_cookie, as ChaCha20-Poly1305 of the sessions is not in the standard library
 
 # TODO: extract_usage, with the commands of Pyjoyment
 

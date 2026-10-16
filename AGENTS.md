@@ -144,6 +144,9 @@ does not start fails the test instead of hanging it.
   file has the name of Mojo's test with the part of the module as Pyjoyment
   names it: `reactor_detect.t` is `Reactor_detect.py`, `ioloop_tls.t` is
   `IOLoop_TLS.py`, and `tls.t` is `TLS.py`.
+- `t/Pyjoyment/` holds the tests of the framework, ported from Mojo's
+  `t/mojolicious/*.t` and named the same way: `types.t` is `Types.py`.
+  `ojo.t` is in `t/Pyjo/`, as the functions of `ojo` are those of `Pyjo`.
 - `t/certs/` holds the certificates of the tests, as `t/mojo/certs` in Mojo.
 - `t/cookies/` holds the cookie files of the tests, as `t/mojo/cookies` in
   Mojo.
