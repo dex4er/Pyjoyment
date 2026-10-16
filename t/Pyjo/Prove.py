@@ -33,6 +33,11 @@ SCRIPTS = {
         from Pyjo.Test import *
         plan(skip_all='not now')
     """,
+    'first_fails.py': """
+        from Pyjo.Test import *
+        ok(False)
+        done_testing()
+    """,
     'noplan.py': """
         from Pyjo.Test import *
         ok(True)
@@ -101,10 +106,9 @@ def prove_stderr(*args, scripts=SCRIPTS):
             with open(path, 'w') as f:
                 f.write(textwrap.dedent(code))
         env = dict(os.environ, PYTHONPATH=ROOT)
-        p = subprocess.run(
-            [sys.executable, '-m', 'Pyjo.Prove', *args], cwd=tmp, env=env, capture_output=True, text=True
-        )
-    return p.stdout, p.stderr, p.returncode
+        p = subprocess.run([sys.executable, '-m', 'Pyjo.Prove', *args], cwd=tmp, env=env, capture_output=True)
+    # Bytes, as the universal newlines of text would turn the carriage returns of the count into newlines
+    return p.stdout.decode(), p.stderr.decode(), p.returncode
 
 
 def prove_tty(*args, env=None, scripts=SCRIPTS):
@@ -449,16 +453,47 @@ with subtest('Colors on a terminal'):
     if not hasattr(os, 'openpty'):
         skip('no terminal', 5)
     else:
-        out, code = prove_tty('pass.py')
+        out, code = prove_tty('--no-count', 'pass.py')
         like_ok(out, rf'(?m)^pass\.py \.+ {colored(32, "ok")}$', 'colors by default')
-        out, code = prove_tty('--no-color', 'pass.py')
+        out, code = prove_tty('--no-count', '--no-color', 'pass.py')
         unlike_ok(out, r'\033', 'no colors with --no-color')
-        out, code = prove_tty('pass.py', env={'NO_COLOR': '1'})
+        out, code = prove_tty('--no-count', 'pass.py', env={'NO_COLOR': '1'})
         unlike_ok(out, r'\033', 'no colors with NO_COLOR')
-        out, code = prove_tty('--color', 'pass.py', env={'NO_COLOR': '1'})
+        out, code = prove_tty('--no-count', '--color', 'pass.py', env={'NO_COLOR': '1'})
         like_ok(out, rf'(?m)^pass\.py \.+ {colored(32, "ok")}$', '--color over NO_COLOR')
-        out, code = prove_tty('pass.py', env={'TERM': 'dumb'})
+        out, code = prove_tty('--no-count', 'pass.py', env={'TERM': 'dumb'})
         unlike_ok(out, r'\033', 'no colors on a dumb terminal')
+
+with subtest('Count'):
+    out, code = prove('pass.py')
+    unlike_ok(out, r'/\?', 'no count when the output is not a terminal')
+
+    out, code = prove('--count', 'pass.py', 'skip.py')
+    like_ok(out, r'^\rpass\.py \.+ \rpass\.py \.+ 1/\? ', 'name, then the count of the first test')
+    like_ok(out, r'\r +\rpass\.py \.+ ok\n', 'count cleared before the result')
+    like_ok(out, r'\r +\rskip\.py \.+ skipped: not now\n', 'count of a skipped script cleared')
+    out, code = prove('--count', '--nocount', 'pass.py')
+    unlike_ok(out, r'/\?', 'no count with --nocount')
+    out, code = prove('--count', '-v', 'pass.py')
+    unlike_ok(out, r'/\?', 'no count with -v')
+
+    out, code = prove('--count', '--color', 'first_fails.py')
+    like_ok(out, rf'\rfirst_fails\.py \.+ {colored(31, "1/? ")}', 'red count of a failure')
+
+    out, code = prove('--count', '-j', '2', 'pass.py', 'fail.py')
+    like_ok(out, r'\r===\( +\d+;\d+  \d/\?  \d/\? \)=+', 'line of the scripts that run')
+    like_ok(out, r'\r +\rfail\.py \.+ Failed 2/3 subtests\n', 'line cleared before the result')
+
+with subtest('Count on a terminal'):
+    if not hasattr(os, 'openpty'):
+        skip('no terminal', 3)
+    else:
+        out, code = prove_tty('--no-color', 'pass.py')
+        like_ok(out, r'\rpass\.py \.+ 1/\? ', 'count by default')
+        out, code = prove_tty('--no-color', '--no-count', 'pass.py')
+        unlike_ok(out, r'/\?', 'no count with --no-count')
+        out, code = prove_tty('--no-color', '-v', 'pass.py')
+        unlike_ok(out, r'/\?', 'no count with -v')
 
 with subtest('Verbose'):
     out, code = prove('-v', 'pass.py')

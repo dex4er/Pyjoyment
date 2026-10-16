@@ -160,6 +160,12 @@ with tempfile.TemporaryDirectory() as tmp:
             is_ok(names['result'].passed, True, 'result.passed with the standard error captured')
             is_deeply_ok(names['result'].stderr, [], 'result.stderr')
 
+            names, out = run("""
+                result = await run_script('t/test.py', [sys.executable], dict(os.environ), progress=print)
+            """)
+            is_ok(names['result'].passed, True, 'result.passed with the progress')
+            is_ok(out.count("Result(path='t/test.py'"), 2, 'progress at the start and after the test')
+
         with subtest('find_scripts'):
             names, _ = run("""
                 scripts = find_scripts(['t'], '.py', recurse=True)
@@ -195,6 +201,12 @@ with tempfile.TemporaryDirectory() as tmp:
             """)
             is_ok([r.path for r in names['results']], ['t/a.py', 't/b.py'], 'results without colors')
             unlike_ok(out, r'\033', 'no colors')
+
+            names, out = run("""
+                results = asyncio.run(run(['t/a.py', 't/b.py'], count=False))
+            """)
+            is_ok([r.path for r in names['results']], ['t/a.py', 't/b.py'], 'results without the count')
+            unlike_ok(out, r'\r', 'no count')
 
         with subtest('main'):
             names, out = run("""

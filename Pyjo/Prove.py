@@ -79,6 +79,18 @@ Options
     ``prove`` has no such option: its ``--merge`` puts the standard error into
     the TAP output, which shows it with ``-v`` only.
 
+``--count``, ``--no-count``, ``--nocount``
+    Show the X/Y count of the tests of a test script while it runs or not,
+    renewed once a second. By default it is shown when the output goes to a
+    terminal, and never with ``-v``. With ``-j``, a line shows the number of
+    the tests of all the test scripts, the seconds of the run and the count of
+    each test script that runs. ::
+
+        t/Pyjo/URL.py ........ 12/?
+        ===(     158;3  12/?  40/40  3/? )======================================
+
+    ``prove`` shows it on a terminal only, even with ``--count``.
+
 ``-c``, ``--color``, ``--no-color``, ``--nocolor``
     Color the output or not. By default it is colored when it goes to a
     terminal, unless ``NO_COLOR`` is set or ``TERM`` is ``dumb``: the result of
@@ -229,18 +241,21 @@ async def run_script(
     timeout: float | None = None,
     capture_stderr: bool = False,
     color: bool = False,
+    progress: Callable[[Result], object] | None = None,
 ) -> Result:
     """::
 
         result = await run_script('t/test.py', [sys.executable], dict(os.environ))
         result = await run_script('t/test.py', [sys.executable], dict(os.environ), timeout=60)
         result = await run_script('t/test.py', [sys.executable], dict(os.environ), capture_stderr=True)
+        result = await run_script('t/test.py', [sys.executable], dict(os.environ), progress=print)
 
     Run a test script and parse its TAP output. The standard error of the
     script goes to the standard error of this process, or with
     ``capture_stderr`` to the lines of :attr:`Result.stderr`. With ``verbose``
     and ``stream``, the TAP output is printed as it comes, colored with
-    ``color``. A script that runs
+    ``color``. ``progress`` is called with the result when the script starts
+    and after each of its tests. A script that runs
     longer than ``timeout`` seconds is killed, with the processes it started.
     A script whose ``requires-python`` the Python of the command does not
     satisfy is skipped without running.
@@ -267,12 +282,17 @@ async def run_script(
         process_group=0 if hasattr(os, 'killpg') else None,
     )
     assert process.stdout is not None
+    if progress is not None:
+        progress(result)
     stderr = asyncio.create_task(_read_lines(process.stderr, result.stderr)) if process.stderr is not None else None
     try:
         async with asyncio.timeout(timeout):
             while raw := await process.stdout.readline():
                 line = raw.decode('utf-8', 'replace').rstrip('\r\n')
+                tests = result.tests
                 parse(result, line)
+                if progress is not None and result.tests != tests:
+                    progress(result)
                 if verbose and stream:
                     print(_tap_line(line, color), flush=True)
             result.exit_status = await process.wait()
@@ -329,6 +349,7 @@ async def run(
     trap: bool = False,
     capture_stderr: bool = False,
     color: bool | None = None,
+    count: bool | None = None,
 ) -> list[Result]:
     """::
 
@@ -336,12 +357,15 @@ async def run(
         results = asyncio.run(run(['t/a.py', 't/b.py'], timeout=60, trap=True))
         results = asyncio.run(run(['t/a.py', 't/b.py'], jobs=2, capture_stderr=True))
         results = asyncio.run(run(['t/a.py', 't/b.py'], color=False))
+        results = asyncio.run(run(['t/a.py', 't/b.py'], count=False))
 
     Run the test scripts, print a line for each of them and a summary, and
     return the results in the order of the scripts. With ``trap``, a run that
     Ctrl-C interrupts prints the summary and returns the results of the test
-    scripts that have finished. The output is colored with ``color``, by
-    default when it goes to a terminal.
+    scripts that have finished. The output is colored with ``color``, and the
+    tests of the test scripts are counted while they run with ``count``, both
+    by default when the output goes to a terminal, the count without
+    ``verbose`` only.
     """
     command = list(command or [sys.executable])
     env = dict(os.environ if env is None else env)
@@ -351,6 +375,9 @@ async def run(
     started = time.monotonic()
     out_color = _color_default(sys.stdout) if color is None else color
     err_color = _color_default(sys.stderr) if color is None else color
+    counter = (
+        _Count(width, jobs > 1, out_color) if not verbose and (_tty(sys.stdout) if count is None else count) else None
+    )
 
     finished: dict[int, Result] = {}
     interrupted = False
@@ -371,12 +398,17 @@ async def run(
                 timeout=timeout,
                 capture_stderr=capture_stderr,
                 color=out_color,
+                progress=counter.update if counter is not None else None,
             )
+            if counter is not None:
+                counter.finish(result)
             if verbose and not stream:
                 print(f'{path} ..', *(_tap_line(line, out_color) for line in result.output), sep='\n', flush=True)
             print(_status_line(result, width, out_color), flush=True)
             for line in result.stderr:
                 print(_paint(f'{path}: {line}', 'red', err_color), file=sys.stderr, flush=True)
+            if counter is not None:
+                counter.show(refresh=True)
             if result.bail_out is not None:
                 bailed_out.set()
             finished[i] = result
@@ -392,6 +424,8 @@ async def run(
         if not trap:
             raise
         interrupted = True
+        if counter is not None:
+            counter.clear()
         print(flush=True)
 
     done = [finished[i] for i in sorted(finished)]
@@ -425,6 +459,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         '--capture-stderr', action='store_true', help='print the standard error of a test script after its result'
     )
     parser.add_argument(
+        '--count', action='store_const', const=True, help='show the X/Y count of the tests, by default on a terminal'
+    )
+    parser.add_argument(
+        '--no-count', '--nocount', dest='count', action='store_const', const=False, help='do not show the count'
+    )
+    parser.add_argument(
         '-c', '--color', action='store_const', const=True, help='color the output, by default on a terminal'
     )
     # Both forms, which Getopt::Long of prove accepts for its --nocolor
@@ -455,6 +495,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 trap=args.trap,
                 capture_stderr=args.capture_stderr,
                 color=args.color,
+                count=args.count,
             )
         )
     except KeyboardInterrupt:
@@ -548,8 +589,12 @@ def _pad(version: tuple[int, ...], other: tuple[int, ...]) -> tuple[int, ...]:
     return version + (0,) * (len(other) - len(version))
 
 
+def _name(path: str, width: int) -> str:
+    return f'{path} {"." * (width - len(path))}'
+
+
 def _status_line(result: Result, width: int, color: bool = False) -> str:
-    name = f'{result.path} {"." * (width - len(result.path))}'
+    name = _name(result.path, width)
     if result.bail_out is not None:
         return f'{name} {_paint(f"Bailout called.  Further testing stopped:  {result.bail_out}", "red", color)}'
     if result.timed_out is not None:
@@ -582,11 +627,86 @@ def _paint(text: str, name: str, color: bool) -> str:
 
 # Not in prove: NO_COLOR (https://no-color.org) and TERM=dumb, which turn off the colors of Python itself too
 def _color_default(stream: TextIO | None) -> bool:
+    return _tty(stream) and not os.environ.get('NO_COLOR') and os.environ.get('TERM') != 'dumb'
+
+
+def _tty(stream: TextIO | None) -> bool:
     try:
-        tty = stream is not None and stream.isatty()
+        return stream is not None and stream.isatty()
     except (OSError, ValueError):
         return False
-    return tty and not os.environ.get('NO_COLOR') and os.environ.get('TERM') != 'dumb'
+
+
+# The width of the line of prove for the count of the test scripts that run at the same time
+_RULER_WIDTH = 72
+_RULER_TRAILER = '... )==='
+
+
+class _Count:
+    # The X/Y count of the tests of the test scripts that run, on a line that a carriage return renews, at most once a
+    # second, as prove does: the count of the one test script that runs, or with jobs, a line of all of them
+    def __init__(self, width: int, parallel: bool, color: bool) -> None:
+        self.width = width
+        self.parallel = parallel
+        self.color = color
+        self.active: dict[int, Result] = {}
+        self.counted: dict[int, int] = {}
+        self.tests = 0
+        self.started = time.monotonic()
+        self.second: int | None = None
+        self.length = 0
+
+    def update(self, result: Result) -> None:
+        key = id(result)
+        if key not in self.active:
+            self.active[key] = result
+            self.counted[key] = 0
+            if not self.parallel:
+                self.second = None
+                self._write(f'{_name(result.path, self.width)} ')
+            else:
+                self.show(refresh=True)
+            return
+        self.tests += result.tests - self.counted[key]
+        self.counted[key] = result.tests
+        self.show()
+
+    def finish(self, result: Result) -> None:
+        self.active.pop(id(result), None)
+        self.counted.pop(id(result), None)
+        self.clear()
+
+    def show(self, refresh: bool = False) -> None:
+        second = int(time.monotonic())
+        if not self.active or (second == self.second and not refresh):
+            return
+        self.second = second
+        if not self.parallel:
+            result = next(iter(self.active.values()))
+            name = f'{_name(result.path, self.width)} '
+            count = f'{result.tests}/{result.planned or "?"} '
+            self._write(f'{name}{_paint(count, "red", self.color and bool(result.failed))}', len(name) + len(count))
+            return
+        ruler = f'===( {self.tests:7d};{int(time.monotonic() - self.started)}  '
+        for r in self.active.values():
+            planned = str(r.planned or '?')
+            ruler += f'{r.tests:{len(planned)}d}/{planned}  '
+        ruler = f'{ruler[:-1]})==='
+        if len(ruler) > _RULER_WIDTH:
+            ruler = ruler[: _RULER_WIDTH - len(_RULER_TRAILER)] + _RULER_TRAILER
+        self._write(ruler.ljust(_RULER_WIDTH, '='))
+
+    def clear(self) -> None:
+        if self.length:
+            sys.stdout.write(f'\r{" " * self.length}\r')
+            sys.stdout.flush()
+            self.length = 0
+
+    # The length is the one on the screen, without the escape sequences of the colors
+    def _write(self, line: str, length: int | None = None) -> None:
+        sys.stdout.write(f'\r{line}')
+        sys.stdout.flush()
+        self.length = len(line) if length is None else length
 
 
 async def _read_lines(stream: asyncio.StreamReader, lines: list[str]) -> None:
