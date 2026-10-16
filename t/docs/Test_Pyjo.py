@@ -93,8 +93,14 @@ def record(name, *args):
     return True
 
 
+# The testers are kept, as the garbage collector would free their user agents and servers, which are in cycles, in
+# the middle of what the event loop does
+testers = []
+
+
 def tester(path=None):
     t = Pyjo.Test.Pyjo.new(app)
+    testers.append(t)
     if path is not None:
         t.get_ok(path)
     calls.clear()
@@ -129,7 +135,8 @@ with subtest('Synopsis'):
     ok(t.success, 'SSE')
 
 with subtest('Description'):
-    is_ok(os.environ.get('PYJO_LOG_LEVEL'), 'trace' if os.environ.get('HARNESS_IS_VERBOSE') else 'fatal', 'log level')
+    verbose = os.environ.get('PYJO_HARNESS_IS_VERBOSE', os.environ.get('HARNESS_IS_VERBOSE'))
+    is_ok(os.environ.get('PYJO_LOG_LEVEL'), 'trace' if verbose else 'fatal', 'log level')
     ok(Pyjo.Test.Pyjo.new().ua.insecure, 'insecure')
 
 with subtest('new'):

@@ -1,6 +1,7 @@
 from Pyjo.Test import *
 
 import contextlib
+import gc
 import io
 import os
 import pathlib
@@ -331,6 +332,11 @@ with subtest('tempfile'):
     # Longer version
     p = path(tempfile.NamedTemporaryFile(dir=tmp.name))
     ok(os.path.isfile(p), 'temporary file')
+
+    # Not in the docstring: the path keeps the temporary file, which is closed before the end of the interpreter, where
+    # the file object may go before its wrapper closes it
+    del p
+    gc.collect()
 
 tmp.cleanup()
 
