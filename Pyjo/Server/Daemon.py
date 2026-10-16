@@ -79,6 +79,7 @@ import Pyjo.Exception
 import Pyjo.IOLoop
 import Pyjo.IOLoop.Stream
 import Pyjo.IOLoop.TLS
+import Pyjo.Reactor
 import Pyjo.Server
 import Pyjo.Transaction
 import Pyjo.Transaction.HTTP
@@ -387,7 +388,7 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
         try:
             if sys.is_finalizing():
                 return
-            self._cleanup()
+            Pyjo.Reactor._finalize(self._cleanup)  # pyright: ignore[reportPrivateUsage]
         except Exception:
             pass
 

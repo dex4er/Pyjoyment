@@ -732,6 +732,16 @@ pattern.match_partial(path)`.
   `sys.is_finalizing()`, as Mojo checks `${^GLOBAL_PHASE}`, and keeps its
   whole body in a `try`: at the end of the interpreter the globals of the
   module may already be `None`, even `sys`.
+- Perl runs `DESTROY` when the last reference goes, at the end of a
+  statement; the garbage collector of Python frees the objects in cycles at
+  any allocation, even in the middle of what an event loop does, as inside
+  `selector.register` of asyncio. A finalizer that changes an event loop, as
+  one that closes a socket or removes an acceptor, cleans up through
+  `Pyjo.Reactor._finalize`: at once, as `DESTROY`, unless it interrupted a
+  frame of `Pyjo.IOLoop`, of a reactor, of asyncio or of `selectors`, where
+  the cleanup waits for the next tick of the event loop, which every reactor
+  runs at a point that is safe, and for the end of the interpreter.
+  `t/stdlib/IOLoop_gc.py` makes the garbage collector run all the time.
 - An optional module of Perl that Mojo uses when it is installed has a
   counterpart in the standard library, one of the port's own where the
   standard library has none, or is left out until something needs it:

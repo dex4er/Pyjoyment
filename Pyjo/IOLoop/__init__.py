@@ -860,6 +860,10 @@ def _cleanup() -> None:
             except Exception:
                 pass
 
+    # The cleanups that finalizers deferred, before and after the event loops and the garbage collector, whose
+    # finalizers run in this frame of Pyjo.IOLoop, and so are deferred too
+    Pyjo.Reactor._drain()  # pyright: ignore[reportPrivateUsage]
+
     for loop in list(_LOOPS):
         try:
             loop.reset()
@@ -873,6 +877,7 @@ def _cleanup() -> None:
             close(*connection.values())
     _FROZEN.clear()
     gc.collect()
+    Pyjo.Reactor._drain()  # pyright: ignore[reportPrivateUsage]
 
 
 # What Mojo calls on the class works with the singleton

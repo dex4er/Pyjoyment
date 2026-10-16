@@ -98,8 +98,11 @@ import Pyjo.EventEmitter
 from Pyjo.Loader import load_class
 
 import builtins
+import collections
 import concurrent.futures
 import os
+import sys
+import weakref
 
 from collections.abc import Awaitable, Callable, Coroutine, Generator
 from pkgutil import extend_path
@@ -153,6 +156,10 @@ class Pyjo_Reactor(Pyjo.EventEmitter.object):
     :mod:`Pyjo.Reactor` inherits all methods from :mod:`Pyjo.EventEmitter` and
     implements the following new ones.
     """
+
+    def __init__(self) -> None:
+        super().__init__()
+        _ALL.add(self)
 
     def again(self, id: str, after: float | None = None) -> None:
         """::
@@ -391,6 +398,57 @@ class Pyjo_Reactor(Pyjo.EventEmitter.object):
             reactor.watch(handle, False, False)
         """
         raise NotImplementedError('Method "watch" not implemented by subclass')
+
+    # Not in Mojolicious: run the cleanups that finalizers deferred at the next tick, in a way that is safe in the middle
+    # of what the reactor does, as the garbage collector runs a finalizer there
+    def _wake(self) -> None:
+        pass
+
+
+# Not in Mojolicious: the cleanups of the finalizers that the garbage collector ran in the middle of what an event loop
+# does, as a socket that an object closes there, or an acceptor that it removes, changes the structures that the event
+# loop or asyncio are changing; Perl runs a finalizer where the last reference goes, at the end of a statement
+_DEFERRED: collections.deque[Callable[[], Anything]] = collections.deque()
+
+# The reactors that run the deferred cleanups, any of them, as an object may belong to several event loops
+_ALL: 'weakref.WeakSet[Pyjo_Reactor]' = weakref.WeakSet()
+
+
+def _finalize(cb: Callable[[], Anything]) -> None:  # pyright: ignore[reportUnusedFunction]
+    # The cleanup runs at once, as Mojo's DESTROY runs, unless the garbage collector interrupted the code of an event
+    # loop, in a frame of Pyjo.IOLoop, of a reactor, of asyncio or of selectors, below the finalizer that calls it
+    prefixes = _prefixes()
+    # The frame below the finalizer, none when the interpreter frees the object outside of any code
+    frame = sys._getframe(1).f_back  # pyright: ignore[reportPrivateUsage]
+    while frame is not None:
+        if frame.f_code.co_filename.startswith(prefixes):
+            _DEFERRED.append(cb)
+            for reactor in list(_ALL):
+                reactor._wake()  # pyright: ignore[reportPrivateUsage]
+            return
+        frame = frame.f_back
+    cb()
+
+
+def _drain(*args: Anything) -> None:  # pyright: ignore[reportUnusedFunction]
+    # The cleanups, which fail as a finalizer fails, without an exception
+    while _DEFERRED:
+        cb = _DEFERRED.popleft()
+        try:
+            cb()
+        except Exception:
+            pass
+
+
+def _prefixes() -> tuple[str, ...]:
+    # The directories of the event loops, and of asyncio and selectors when they are loaded
+    pyjo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    prefixes = [os.path.join(pyjo, 'IOLoop') + os.sep, os.path.join(pyjo, 'Reactor') + os.sep]
+    if (asyncio := sys.modules.get('asyncio')) is not None and (file := getattr(asyncio, '__file__', None)):
+        prefixes.append(os.path.dirname(file) + os.sep)
+    if (selectors := sys.modules.get('selectors')) is not None and (file := getattr(selectors, '__file__', None)):
+        prefixes.append(file)
+    return tuple(prefixes)
 
 
 # What the base class gives to await: it waits for the promise itself
