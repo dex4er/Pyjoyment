@@ -145,8 +145,12 @@ does not start fails the test instead of hanging it.
   names it: `reactor_detect.t` is `Reactor_detect.py`, `ioloop_tls.t` is
   `IOLoop_TLS.py`, and `tls.t` is `TLS.py`.
 - `t/Pyjoyment/` holds the tests of the framework, ported from Mojo's
-  `t/mojolicious/*.t` and named the same way: `types.t` is `Types.py`.
-  `ojo.t` is in `t/Pyjo/`, as the functions of `ojo` are those of `Pyjo`.
+  `t/mojolicious/*.t` and named the same way: `types.t` is `Types.py`. A test
+  of an application, as the `*_lite_app.t` ones, is not one of a module, so it
+  keeps the name of Mojo, as a capital letter tells a module:
+  `log_lite_app.t` is `log_lite_app.py`. `ojo.t` is in `t/Pyjo/`, as the
+  functions of `ojo` are those of `Pyjo`, and so is `t/test/mojo.t`, the test
+  of `Test::Mojo`, as `Test_Pyjo.py`.
 - `t/certs/` holds the certificates of the tests, as `t/mojo/certs` in Mojo.
 - `t/cookies/` holds the cookie files of the tests, as `t/mojo/cookies` in
   Mojo.
@@ -170,9 +174,6 @@ does not start fails the test instead of hanging it.
   are skipped.
 - `t/lib/` holds helpers shared by the tests. Run on their own, they skip with
   `plan(skip_all=...)`, so `-r t` reports them as skipped instead of failing.
-  `t/lib/Lite.py` is a minimal Mojolicious::Lite for the tests that Mojo
-  writes on it, with routes, hooks and a controller that renders, until
-  Pyjoyment has its own.
 
 A test script imports the test functions and groups its tests in subtests,
 like Mojo's tests do; Python keywords give some functions an `_ok` suffix
@@ -507,6 +508,21 @@ copy:
   has sigils, so a value of the stash hides the helper of its name, and the
   variable `c` hides the helper `c`; the template calls such a helper as a
   method of `c`, as `c.title('Welcome!')`.
+- `use Mojolicious::Lite` is `from Pyjoyment.Lite import *`, which gives the
+  module that imports it an application of its own, as Mojo makes one for the
+  package that uses it: the functions are made for the module of the caller
+  by `__getattr__` of `Pyjoyment.Lite` and kept in the module, so that a
+  script that `load_app` runs again gets a new application. `get '/foo' =>
+sub {...}` is `get('/foo', cb)` or the decorator `@get('/foo')`, as a route
+  is a decorator of its callback, `group {...}` is `with group():`, and
+  `app->start` is `app.start()`. The templates of the `__DATA__` section of
+  a Lite script are in its docstring after a line `__DATA__`, as a variable
+  at the end of the script comes after the code that serves them.
+- `Test::Mojo` is `Pyjo.Test.Pyjo`, with the chains of methods of Mojo:
+  `$t->get_ok('/')->status_is(200)` is `t.get_ok('/').status_is(200)`. Its
+  attributes are attributes, so `$t->success(0)->or(...)` is an assignment
+  followed by the call, and its handler gets the names of the functions of
+  `Test::More`, as `is` and `is_deeply`, which the tests of Mojo check.
 - A callback that Mojo calls with `$_` gets the element as its first
   argument. A method name in a string, as in `$collection->map('text')`, can
   name a property, which is how a Mojo attribute is ported.
@@ -561,7 +577,8 @@ copy:
   newer Mojolicious applies to them: `raise` of `Mojo::Exception` is `throw`
   and `raise_`, and `finally` of `Mojo::Promise` is `lastly`, as Bluebird
   names it, and `finally_`; `continue` of `Mojolicious::Routes` and
-  `Mojolicious::Controller` is `proceed` and `continue_`. An attribute only
+  `Mojolicious::Controller` is `proceed` and `continue_`, and `or` of
+  `Test::Mojo` is `otherwise` and `or_`. An attribute only
   gets the other name, as `not`
   of `Mojo::UserAgent::Proxy` is `no`, after `NO_PROXY`. The functions of
   `Pyjo.Test` are the exception: they have an `_ok` suffix, as `is_ok`.
@@ -579,8 +596,9 @@ copy:
   are loaded, and the symbol table of packages are `sys.modules` and the
   `__file__` of a module, as `Pyjo.Home` and `Pyjo.Loader` use them; a module
   that is not loaded is not imported to find it.
-- The `__DATA__` section of a Perl module is the `DATA` variable of a Python
-  module, or its docstring after a line `__DATA__`.
+- The `__DATA__` section of a Perl module is the `__DATA__` variable of a
+  Python module, or its docstring after a line `__DATA__`, which a script of
+  `Pyjoyment.Lite` uses, as its docstring is there before `app.start()`.
 - `croak` of Carp reports the line of the caller, Python the line of the
   `raise`. Where Mojo's tests check the line that `croak` gives, as
   `load_class` of `Mojo::Loader` does, the port takes the frame of the caller
