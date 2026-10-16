@@ -37,6 +37,8 @@ and SOCKS5 support of :mod:`Pyjo.IOLoop` with ``PYJO_NO_NNR`` and
 A daemon is also a context manager, which stops listening and closes its
 connections at its end.
 
+The end of a ``with`` block stops the daemon and closes its sockets.
+
 Signals
 -------
 
