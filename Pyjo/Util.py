@@ -3332,7 +3332,28 @@ def _round(number: float) -> str:
     return f'{int(number * 10 + 0.5) / 10 if number < 10 else int(number + 0.5):.15g}'
 
 
-# TODO: _stash, with the controller of Pyjoyment
+# The values of a dict that an object keeps under a name, as the stash of a controller and the config and the defaults
+# of an application: the dict, a value, or the object after it merges a dict or keyword arguments
+def _stash(name: str, obj: Any, args: tuple[Any, ...], values: dict[str, Any]) -> Any:  # pyright: ignore[reportUnusedFunction]
+    attr = f'_{name}'
+    stash: dict[Any, Any] | None = getattr(obj, attr, None)
+    if stash is None:
+        setattr(obj, attr, stash := {})
+
+    # Dict
+    if not args and not values:
+        return stash
+
+    # Get
+    if len(args) == 1 and not isinstance(args[0], dict) and not values:
+        return stash.get(args[0])
+
+    # Set
+    for arg in args:
+        stash.update(cast(dict[Any, Any], arg))
+    stash.update(values)
+
+    return obj
 
 
 # Perl's split, which drops the empty fields at the end
