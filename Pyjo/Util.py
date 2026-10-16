@@ -3317,6 +3317,17 @@ def _html(string: str, attr: bool) -> str:
     return _RE_ENTITY.sub(lambda m: _entity(m[1], m[2], attr), string)
 
 
+# The name and the values of a call: none, a dict of values, a name, or a name and a dict, with the keyword arguments
+# as the pairs of names and values that Mojo takes after them; the modules of Pyjoyment use it, as Mojo::Util::_options
+def _options(args: tuple[Any, ...], values: dict[str, Any]) -> tuple[Any, dict[str, Any]]:  # pyright: ignore[reportUnusedFunction]
+    name: Any = None
+    if len(args) == 2 or (len(args) == 1 and not isinstance(args[0], dict)):
+        name, args = args[0], args[1:]
+    if len(args) > 1 or (args and not isinstance(args[0], dict)):
+        raise TypeError(f'Unexpected positional arguments: {args!r}')
+    return name, ({**cast(dict[str, Any], args[0]), **values} if args else dict(values))
+
+
 def _round(number: float) -> str:
     return f'{int(number * 10 + 0.5) / 10 if number < 10 else int(number + 0.5):.15g}'
 
