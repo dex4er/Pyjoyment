@@ -579,6 +579,11 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
         Application server relative URLs will be processed with, defaults to a
         :mod:`Pyjo.UserAgent.Server` object. ::
 
+            # Mock web service
+            ua.server.app = Pyjoyment.new()
+            ua.server.app.routes.get('/time', lambda c: c.render(json={'now': time.time()}))
+            now = ua.get('/time').result.json()['now']
+
             # Change log level
             ua.server.app.log.level = 'fatal'
 
@@ -588,7 +593,6 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
             # Port currently used for processing relative URLs non-blocking
             print(ua.server.nb_url().port)
         """
-        # TODO: the example of a mock web service, when Pyjoyment is ported
         if self._server is None:
             self._server = Pyjo.UserAgent.Server.new(ioloop=self.ioloop)
             self._own_server = True

@@ -184,14 +184,12 @@ Ported from `Mojolicious <https://github.com/mojolicious/mojo/blob/v9.49/lib/Moj
 # TODO: the hook before_command, with Pyjoyment.Commands, when it is ported
 # TODO: the helpers of Pyjoyment.Plugin.TagHelpers in the documentation, when it is ported
 
-import Pyjo.Base
-import Pyjo.Home
+import Pyjo.App
 import Pyjo.Loader
 import Pyjo.Log
 import Pyjo.Promise
 import Pyjo.Server
 import Pyjo.Transaction.HTTP
-import Pyjo.UserAgent
 import Pyjo.Util
 import Pyjoyment.Controller
 import Pyjoyment.Plugins
@@ -203,17 +201,16 @@ import Pyjoyment.Types
 import functools
 import inspect
 import os
-import sys
 
 from collections.abc import Callable
 from pkgutil import extend_path
 from typing import Any, Self, cast, overload
 
 
-class Pyjoyment_App(Pyjo.Base.object):
+class Pyjoyment_App(Pyjo.App.object):
     """
-    :mod:`Pyjoyment` inherits all methods from :mod:`Pyjo.Base` and implements
-    the following new ones.
+    :mod:`Pyjoyment` inherits all attributes and methods from :mod:`Pyjo.App`
+    and implements the following new ones.
     """
 
     # Left out from Mojolicious: $CODENAME and $VERSION, as the version of the distribution is in its metadata
@@ -364,23 +361,18 @@ class Pyjoyment_App(Pyjo.Base.object):
 
         # TODO: validator, when Pyjoyment.Validator is ported
 
-        self._home: Pyjo.Home.object | None = None
-        self._log: Pyjo.Log.object | None = None
         self._mode: str | None = None
-        self._moniker: str | None = None
         self._secrets: list[str] | None = None
-        self._ua: Pyjo.UserAgent.object | None = None
         self._dispatch = False
 
-        for name, value in {**(attrs or {}), **kwargs, **Pyjo.Server.args_override}.items():
-            setattr(self, name, value)
+        super().__init__(attrs, **kwargs)
 
         home = self.home
         self.renderer.paths.append(home.child('templates').to_str())
         # TODO: the "public" directory of the home in the paths of static, when Pyjoyment.Static is ported
 
         # Default to controller and application namespace
-        package = _package(type(self))
+        package = Pyjo.App._package(type(self))  # pyright: ignore[reportPrivateUsage]
         controller = f'{package}.Controller'
         self.preload_namespaces = [controller]
         self.routes.namespaces = [controller, package]
@@ -403,27 +395,6 @@ class Pyjoyment_App(Pyjo.Base.object):
             return getattr(self.build_controller(), name)
         package = f'{type(self).__module__}.{type(self).__qualname__}'
         raise AttributeError(f'Can\'t locate object method "{name}" via package "{package}"', name=name, obj=self)
-
-    @property
-    def home(self) -> Pyjo.Home.object:
-        """::
-
-            home = app.home
-            app.home = Pyjo.Home.new()
-
-        The home directory of your application, defaults to a :mod:`Pyjo.Home`
-        object which stringifies to the actual path. ::
-
-            # Portably generate path relative to home directory
-            path = app.home.child('data', 'important.txt')
-        """
-        if self._home is None:
-            self._home = Pyjo.Home.new().detect(type(self))
-        return self._home
-
-    @home.setter
-    def home(self, value: Pyjo.Home.object) -> None:
-        self._home = value
 
     @property
     def log(self) -> Pyjo.Log.object:
@@ -475,25 +446,6 @@ class Pyjoyment_App(Pyjo.Base.object):
         self._mode = value
 
     @property
-    def moniker(self) -> str:
-        """::
-
-            moniker = app.moniker
-            app.moniker = 'foo_bar'
-
-        Moniker of this application, often used as default filename for
-        configuration files and the like, defaults to decamelizing the
-        application class with :func:`Pyjo.Util.decamelize`.
-        """
-        if self._moniker is None:
-            self._moniker = Pyjo.Util.decamelize(_package(type(self)).replace('.', '::'))
-        return self._moniker
-
-    @moniker.setter
-    def moniker(self, value: str) -> None:
-        self._moniker = value
-
-    @property
     def secrets(self) -> list[str]:
         """::
 
@@ -523,27 +475,6 @@ class Pyjoyment_App(Pyjo.Base.object):
     @secrets.setter
     def secrets(self, value: list[str]) -> None:
         self._secrets = value
-
-    @property
-    def ua(self) -> Pyjo.UserAgent.object:
-        """::
-
-            ua = app.ua
-            app.ua = Pyjo.UserAgent.new()
-
-        A full featured HTTP user agent for use in your applications, defaults
-        to a :mod:`Pyjo.UserAgent` object. ::
-
-            # Perform blocking request
-            print(app.ua.get('example.com').result.body)
-        """
-        if self._ua is None:
-            self._ua = Pyjo.UserAgent.new()
-        return self._ua
-
-    @ua.setter
-    def ua(self, value: Pyjo.UserAgent.object) -> None:
-        self._ua = value
 
     def build_controller(self, tx: Any = None) -> Pyjoyment.Controller.object:
         """::
@@ -590,37 +521,6 @@ class Pyjoyment_App(Pyjo.Base.object):
         self.plugins.emit_hook('after_build_tx', tx, self)
 
         return tx
-
-    # config(**values) with no values is config(), which the first overload types
-    @overload
-    def config(self) -> dict[str, Any]: ...  # pyright: ignore[reportOverlappingOverload]
-
-    @overload
-    def config(self, name: str, /) -> Any: ...
-
-    @overload
-    def config(self, values: dict[str, Any], /) -> Self: ...
-
-    @overload
-    def config(self, **values: Any) -> Self: ...
-
-    def config(self, *args: Any, **values: Any) -> Any:
-        """::
-
-            hash = app.config()
-            foo = app.config('foo')
-            app = app.config({'foo': 'bar', 'baz': 23})
-            app = app.config(foo='bar', baz=23)
-
-        Application configuration. ::
-
-            # Remove value
-            foo = app.config().pop('foo')
-
-            # Assign multiple values at once
-            app.config(foo='test', bar=23)
-        """
-        return Pyjo.Util._stash('config', self, args, values)  # pyright: ignore[reportPrivateUsage]
 
     # defaults(**values) with no values is defaults(), which the first overload types
     @overload
@@ -813,9 +713,7 @@ class Pyjoyment_App(Pyjo.Base.object):
         """
         # TODO: the warmup of static and the commands, when Pyjoyment.Static and Pyjoyment.Commands are ported
         self.renderer.warmup()
-        if os.environ.get('PYJO_APP_LOADER') is not None:
-            Pyjo.Server.loaded_app = self
-        return self
+        return super().start(*args)
 
     def startup(self) -> None:
         """::
@@ -862,15 +760,6 @@ def _exception(next: Callable[[], Any], c: Pyjoyment.Controller.object) -> None:
 
 def _reply_exception(c: Pyjoyment.Controller.object, e: Any) -> None:
     c.helpers.reply.exception(e)
-
-
-# The name of a class as Mojo has the package: the module that names the class its object, or the class in the module,
-# and the class only in a script
-def _package(cls: type) -> str:
-    module = cls.__module__
-    if getattr(sys.modules.get(module), 'object', None) is cls:
-        return module
-    return cls.__qualname__ if module == '__main__' else f'{module}.{cls.__qualname__}'
 
 
 # Not in Mojolicious: a namespace that other distributions can add modules to
