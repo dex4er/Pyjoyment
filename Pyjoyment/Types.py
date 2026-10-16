@@ -58,18 +58,12 @@ import Pyjo.File
 import os
 import re
 
-from typing import TYPE_CHECKING, Protocol, Self, overload
+from typing import TYPE_CHECKING, Self, overload
 
 
 if TYPE_CHECKING:
     import Pyjo.Headers
-    import Pyjo.Message.Response
-
-
-# TODO: Pyjoyment.Controller, when it is ported
-class _Controller(Protocol):
-    @property
-    def res(self) -> 'Pyjo.Message.Response.object': ...
+    import Pyjoyment.Controller
 
 
 _ACCEPT_RE = re.compile(r'^\s*([^,; ]+)(?:\s*\;\s*q\s*=\s*(\d+(?:\.\d+)?))?\s*$', re.IGNORECASE)
@@ -133,7 +127,7 @@ class Pyjoyment_Types(Pyjo.Base.object):
         """
 
     def content_type(
-        self, c: _Controller, *, ext: str | None = None, file: str | os.PathLike[str] | None = None
+        self, c: 'Pyjoyment.Controller.object', *, ext: str | None = None, file: str | os.PathLike[str] | None = None
     ) -> 'Pyjo.Headers.object | None':
         """::
 

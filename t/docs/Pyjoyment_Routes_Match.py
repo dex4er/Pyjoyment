@@ -1,13 +1,7 @@
+import Pyjoyment.Controller
 import Pyjoyment.Routes.Route
 
 from Pyjo.Test import *
-
-
-# TODO: Pyjoyment.Controller, when it is ported; until then a controller that only the conditions get, as here none
-class Controller:
-    @classmethod
-    def new(cls) -> 'Controller':
-        return cls()
 
 
 with subtest('Synopsis'):
@@ -20,7 +14,7 @@ with subtest('Synopsis'):
     r.put('/user/:id')
 
     # Match
-    c = Controller.new()
+    c = Pyjoyment.Controller.new()
     match = Pyjoyment.Routes.Match.new(root=r)
     match.find(c, method='PUT', path='/user/23')
     is_ok(match.stack[0]['id'], '23', 'captured')
@@ -66,14 +60,14 @@ with subtest('find'):
     r = Pyjoyment.Routes.new()
     r.get('/').to(foo='bar')
     match = Pyjoyment.Routes.Match.new(root=r)
-    match.find(Controller.new(), method='GET', path='/')
+    match.find(Pyjoyment.Controller.new(), method='GET', path='/')
     is_ok(match.endpoint, r.children[0], 'endpoint')
 
 with subtest('path_for'):
     r = Pyjoyment.Routes.new()
     r.get('/:foo/:bar', 'named').to(bar='baz')
     match = Pyjoyment.Routes.Match.new(root=r)
-    match.find(Controller.new(), method='GET', path='/a/b')
+    match.find(Pyjoyment.Controller.new(), method='GET', path='/a/b')
     info = match.path_for()
     is_deeply_ok(info, {'path': '/a/b', 'websocket': False}, 'current route')
     info = match.path_for(foo='bar')

@@ -38,7 +38,11 @@ import Pyjo.Base
 import Pyjo.Util
 import Pyjoyment.Routes.Route
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+
+if TYPE_CHECKING:
+    import Pyjoyment.Controller
 
 
 _MISSING = object()
@@ -105,8 +109,7 @@ class Pyjoyment_Routes_Match(Pyjo.Base.object):
         self._captures: dict[str, Any] = {}
         self._conditions: dict[str, Any] | None = None
 
-    # TODO: Pyjoyment.Controller in place of Any for c, when it is ported
-    def find(self, c: Any, *, method: str, path: str, websocket: bool = False) -> bool:
+    def find(self, c: 'Pyjoyment.Controller.object', *, method: str, path: str, websocket: bool = False) -> bool:
         """::
 
             match.find(Pyjoyment.Controller.new(), method='GET', path='/')
@@ -151,7 +154,14 @@ class Pyjoyment_Routes_Match(Pyjo.Base.object):
 
         return {'path': route.render(merged), 'websocket': route.has_websocket}
 
-    def _match(self, r: Pyjoyment.Routes.Route.object, c: Any, method: str, path: str, websocket: bool) -> bool:
+    def _match(
+        self,
+        r: Pyjoyment.Routes.Route.object,
+        c: 'Pyjoyment.Controller.object',
+        method: str,
+        path: str,
+        websocket: bool,
+    ) -> bool:
         # Pattern
         partial = r.partial
         detect = (endpoint := r.is_endpoint) and not partial
