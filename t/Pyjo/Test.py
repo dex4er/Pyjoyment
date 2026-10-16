@@ -77,6 +77,72 @@ with subtest('No plan'):
     like_ok(err, r'no plan was declared', 'right diagnostics')
     is_ok(code, 254, 'right exit status')
 
+with subtest('Plan as a context manager'):
+    out, err, code = run("""
+        from Pyjo.Test import *
+        with plan():
+            ok(True, 'first')
+            ok(True, 'second')
+    """)
+    is_ok(out, 'ok 1 - first\nok 2 - second\n1..2\n', 'right output')
+    is_ok(err, '', 'no diagnostics')
+    is_ok(code, 0, 'right exit status')
+
+with subtest('Plan as a context manager with the number of tests'):
+    out, err, code = run("""
+        from Pyjo.Test import *
+        with plan(tests=2):
+            ok(True, 'first')
+            ok(True, 'second')
+    """)
+    is_ok(out, '1..2\nok 1 - first\nok 2 - second\n', 'right output')
+    is_ok(err, '', 'no diagnostics')
+    is_ok(code, 0, 'right exit status')
+
+with subtest('Plan as a context manager with fewer tests than planned'):
+    out, err, code = run("""
+        from Pyjo.Test import *
+        with plan(tests=3):
+            ok(True)
+    """)
+    is_ok(out, '1..3\nok 1\n', 'right output')
+    is_ok(err, '# Looks like you planned 3 tests but ran 1.\n', 'right diagnostics')
+    is_ok(code, 255, 'right exit status')
+
+with subtest('Plan as a context manager with an exception'):
+    out, err, code = run("""
+        from Pyjo.Test import *
+        with plan():
+            ok(True)
+            raise RuntimeError('Oops')
+    """)
+    is_ok(out, 'ok 1\n', 'no plan')
+    like_ok(err, r'RuntimeError: Oops', 'exception')
+    like_ok(err, r'Looks like your test exited with 255 just after 1', 'right diagnostics')
+    is_ok(code, 255, 'right exit status')
+
+with subtest('Plan as a context manager with done_testing'):
+    out, err, code = run("""
+        from Pyjo.Test import *
+        with plan():
+            ok(True)
+            done_testing()
+    """)
+    is_ok(out, 'ok 1\n1..1\n', 'right output')
+    is_ok(err, '', 'no diagnostics')
+    is_ok(code, 0, 'right exit status')
+
+with subtest('Plan as a context manager in a subtest'):
+    out, err, code = run("""
+        from Pyjo.Test import *
+        with subtest('Inner'):
+            with plan():
+                ok(True)
+        done_testing()
+    """)
+    is_ok(out, '# Subtest: Inner\n    ok 1\n    1..1\nok 1 - Inner\n1..1\n', 'right output')
+    is_ok(code, 0, 'right exit status')
+
 with subtest('Skip all'):
     out, err, code = run("""
         from Pyjo.Test import *

@@ -191,6 +191,11 @@ with subtest('Simple'):
 done_testing()
 ```
 
+A test of the project ends with `done_testing()`, as Mojo's tests do, so that
+the diff of a newer Mojolicious applies to it; `with plan():`, which issues the
+plan at the end of its block, is for the tests of the code that uses
+Pyjoyment, and for the tests of `Pyjo.Test` itself.
+
 The exit status comes from an `atexit` handler that `Pyjo.Test` registers,
 and only once a test function has been called, so importing the module (as
 Sphinx does) has no effect. Older test files still wrap their body in

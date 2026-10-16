@@ -128,6 +128,18 @@ with subtest('Running tests'):
         is_ok(out, 'ok 1 - works\n1..1\n', 'PYTHONPATH=. python t/Pyjo/URL.py')
         is_ok(code, 0, 'right exit status')
 
+with subtest('Plans'):
+    out, err, code = run(
+        """
+        with plan():
+            ok(True, 'first')
+            ok(True, 'second')
+        """,
+        after='',
+    )
+    is_ok(out, 'ok 1 - first\nok 2 - second\n1..2\n', 'planned at the end of the block')
+    is_ok(code, 0, 'right exit status')
+
 with subtest('Subtests'):
     out, err, code = run("""
         with subtest('Simple'):
@@ -369,6 +381,25 @@ with subtest('plan'):
         after='',
     )
     is_ok(out, '1..0 # SKIP set TEST_ONLINE to enable this test\n', 'skipped')
+    is_ok(code, 0, 'right exit status')
+
+    out, err, code = run(
+        """
+        with plan():
+            ok(True)
+        """,
+        after='',
+    )
+    is_ok(out, 'ok 1\n1..1\n', 'planned at the end of the block')
+    is_ok(code, 0, 'right exit status')
+    out, err, code = run(
+        """
+        with plan(tests=1):
+            ok(True)
+        """,
+        after='',
+    )
+    is_ok(out, '1..1\nok 1\n', 'planned up front')
     is_ok(code, 0, 'right exit status')
 
 with subtest('plan_skip_all'):
