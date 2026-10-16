@@ -202,7 +202,7 @@ the most of its I/O, a second time on `Pyjo.Reactor.Poll`, as a reactor
 without asyncio has to pass them too:
 
 ```sh
-PYJO_REACTOR=Pyjo.Reactor.Poll mise exec -- python -m Pyjo.Prove -l -j 4 --capture-stderr \
+PYJO_REACTOR=Pyjo.Reactor.Poll mise exec -- python -m Pyjo.Prove -l -j 4 --capture-stderr --stderr-lines 1000 \
   t/Pyjo/IOLoop*.py t/Pyjo/TLS.py t/Pyjo/Promise*.py t/Pyjo/Subprocess.py t/stdlib/IOLoop*.py \
   t/Pyjo/UserAgent*.py t/stdlib/UserAgent*.py t/Pyjo/Server_Daemon.py t/stdlib/Server_Daemon.py \
   t/Pyjo/Server_Hot.py t/stdlib/Server_Hot.py t/Pyjo/Server_Prefork.py t/stdlib/Server_Prefork.py \
@@ -251,7 +251,12 @@ result, each line after the name of the script, which tells the script that
 leaked. It passes `--color` too, as the log of GitHub Actions shows colors
 while the output goes to a pipe, not to a terminal; the color of a line of
 the standard error is around the whole line, so `ResourceWarning:` is still
-in it. A test closes what it
+in it. `--stderr-lines 1000` keeps the first and the last lines of the
+standard error of a script, as a script that fails in a loop, like an I/O
+watcher of `Pyjo.Reactor.Poll` that raises each time the reactor calls it, can
+write hundreds of megabytes of it, which the log of GitHub Actions takes
+minutes to take in; a `ResourceWarning` among the lines left out does not
+fail CI, but such a script fails anyway. A test closes what it
 gets, as the handle of an `accept` or `connect` event or a connection of
 `http.client`, where Perl closes it with the last reference. To find where a
 leaked object was made:
