@@ -172,6 +172,10 @@ class Pyjo_Reactor_Poll(Pyjo.Reactor.object):
             # Wait for one event
             i = 0
             while not i and self._running:
+                # Not in Mojolicious: the cleanups that finalizers deferred, before the reactor waits
+                if Pyjo.Reactor._DEFERRED:  # pyright: ignore[reportPrivateUsage]
+                    Pyjo.Reactor._drain()  # pyright: ignore[reportPrivateUsage]
+
                 # Stop automatically if there is nothing to watch
                 if not len(self._timers) and not len(self._io):
                     return self.stop()

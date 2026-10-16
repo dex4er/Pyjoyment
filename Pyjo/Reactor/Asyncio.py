@@ -137,6 +137,20 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
     ) -> None:
         self._close_loop()
 
+    # The cleanups that finalizers deferred at the next tick, with call_soon of the event loop, which only appends to a
+    # queue, where the timers of the reactor would change its structures; the reactor stops after them when it watches
+    # nothing anymore, as after an event
+    def _wake(self) -> None:
+        loop = self._loop
+        if loop is not None and not loop.is_closed():
+            loop.call_soon(Pyjo_Reactor_Asyncio._weak_drain, weakref.ref(self))
+
+    @staticmethod
+    def _weak_drain(ref: 'weakref.ref[Any]') -> None:
+        Pyjo.Reactor._drain()  # pyright: ignore[reportPrivateUsage]
+        if (self := ref()) is not None and self._run and (not self._running or not self._watching()):
+            self._stop()
+
     def _close_loop(self) -> None:
         loop = getattr(self, '_own', None)
         if loop is not None and not loop.is_running() and not loop.is_closed():
