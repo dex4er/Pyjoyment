@@ -499,6 +499,14 @@ copy:
   statement that uses it, as a lambda cannot hold statements. The compiled
   code is not line for line the template, as the one of Mojo is, so a map
   gives the template lines of a traceback.
+- An `ep` template is translated the same way: `$c` and `$self` are `c` and
+  `self`, a value of the stash `$foo` is the variable `foo`, and a helper is
+  a function, as `%= include('menubar')`. A helper that takes a block as its
+  last argument, `content foo => begin`, closes its parenthesis after `end`:
+  `%= content('foo', begin` and `% end)`. Python has one namespace where Perl
+  has sigils, so a value of the stash hides the helper of its name, and the
+  variable `c` hides the helper `c`; the template calls such a helper as a
+  method of `c`, as `c.title('Welcome!')`.
 - A callback that Mojo calls with `$_` gets the element as its first
   argument. A method name in a string, as in `$collection->map('text')`, can
   name a property, which is how a Mojo attribute is ported.
