@@ -3,19 +3,13 @@ import Pyjo.Server.WSGI
 from Pyjo.JSON import decode_json
 from Pyjo.Test import *
 from Pyjo.Util import setenv
+from Pyjoyment.Lite import app, get, post, under
 
-import importlib
 import io
 import os
 import sys
 
 from unittest.mock import patch
-
-
-# The minimal Mojolicious::Lite of the tests
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
-Lite = importlib.import_module('Lite')
-app, get, post, under = Lite.app, Lite.get, Lite.post, Lite.under
 
 
 # Not in Mojolicious: a WSGI application gives the status and the headers to start_response and returns the body, where

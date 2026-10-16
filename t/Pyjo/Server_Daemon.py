@@ -10,26 +10,19 @@ import Pyjo.Server
 import Pyjo.Server.Daemon
 import Pyjo.Transaction.HTTP
 import Pyjo.UserAgent
+import Pyjoyment
 
 from Pyjo.File import tempdir
 from Pyjo.Test import *
 
 import gc
-import importlib
 import re
 import socket
-import sys
 
 from unittest.mock import patch
 
 
-# The minimal Mojolicious::Lite of the tests
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
-Lite = importlib.import_module('Lite')
-Mojolicious = Lite.Mojolicious
-
-
-class TestApp(Mojolicious):
+class TestApp(Pyjoyment.object):
     def handler(self, tx):
         tx.res.code = 200
         tx.res.body = b'Hello TestApp!'
@@ -73,7 +66,7 @@ with subtest('Reverse proxy'):
         ok(Pyjo.Server.Daemon.new().reverse_proxy, 'reverse proxy')
 
 with subtest('Config'):
-    app = Mojolicious()
+    app = Pyjoyment.new()
     is_ok(app.config('foo'), None, 'no value')
     is_deeply_ok(app.config(foo='bar').config(), {'foo': 'bar'}, 'right value')
     is_ok(app.config('foo'), 'bar', 'right value')
@@ -85,14 +78,17 @@ with subtest('Config'):
 
 # Not in Mojolicious: the scripts and modules that Mojo has in t/mojo/lib, written into a temporary directory
 tmp = tempdir()
-tmp.child('myapp.py').spew('import sys\n\nfrom Lite import app\n\napp.config(script=sys.argv[0])\n\napp.start()\n')
+tmp.child('myapp.py').spew(
+    'import sys\n\nfrom Pyjoyment.Lite import app\n\napp.config(script=sys.argv[0])\n\napp.start()\n'
+)
 tmp.child('A.py').spew('class A:\n    pass\n')
 tmp.child('LoaderException.py').spew('class LoaderException:\n    def new(self):\n        pass\n\n\nfoo = {\n')
 
 with subtest('Loading'):
     daemon = Pyjo.Server.Daemon.new()
     path = tmp.child('myapp.py')
-    is_ok(type(daemon.load_app(path)).__qualname__, 'Lite', 'right reference')
+    app = daemon.load_app(path)
+    is_ok(f'{type(app).__module__}.{type(app).__qualname__}', 'Pyjoyment.Lite.Pyjoyment_Lite', 'right reference')
     is_ok(daemon.app.config('script'), path.to_abs().to_str(), 'right script name')
     is_ok(type(daemon.build_app(f'{__name__}.TestApp')).__qualname__, 'TestApp', 'right reference')
     is_ok(type(daemon.app).__qualname__, 'TestApp', 'right reference')
@@ -129,16 +125,17 @@ with subtest('Invalid listen location'):
     )
 
 with subtest('Transaction'):
-    app = Mojolicious()
+    app = Pyjoyment.new()
     isa_ok(app.build_tx(), Pyjo.Transaction.HTTP.object, 'right transaction')
 
-app = Mojolicious()
+app = Pyjoyment.new()
 
 ua = Pyjo.UserAgent.new(ioloop=Pyjo.IOLoop.singleton)
 
 with subtest('Moniker'):
     ua.server.app = app
-    is_ok(ua.server.app.moniker, 'mojolicious', 'right moniker')
+    # Unlike Mojolicious: the moniker of Pyjoyment
+    is_ok(ua.server.app.moniker, 'pyjoyment', 'right moniker')
 
 # Silence
 app.log.level = 'fatal'
@@ -149,10 +146,10 @@ def chunked(c):
     params = c.req.params.to_dict()
     chunks = []
     for key in sorted(params):
-        chunks.append(params[key])
+        chunks.append(params[key].encode())
 
     def cb(c):
-        chunk = chunks.pop(0) if chunks else ''
+        chunk = chunks.pop(0) if chunks else b''
         c.write_chunk(chunk, cb if chunk else None)
 
     cb(c)
@@ -180,7 +177,7 @@ def port_action(c):
 def timeout_action(c):
     id = c.tx.connection
     c.res.headers.header('X-Connection-ID', id)
-    c.render(text=Pyjo.IOLoop.stream(id).timeout)
+    c.render(text=f'{Pyjo.IOLoop.stream(id).timeout:g}')
 
 
 app.routes.any('/*whatever', {'text': 'Whatever!'})

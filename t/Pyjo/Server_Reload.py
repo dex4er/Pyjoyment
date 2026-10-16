@@ -56,7 +56,7 @@ script.spew(
     f"""
 import sys
 sys.path.insert(0, {LIB!r})
-from Lite import app, get
+from Pyjoyment.Lite import app, get
 from Pyjo.File import path
 import Pyjo.IOLoop
 
@@ -106,7 +106,7 @@ with subtest('Update script without changing size'):
         f"""
 import sys
 sys.path.insert(0, {LIB!r})
-from Lite import app, get
+from Pyjoyment.Lite import app, get
 from Pyjo.File import path
 import Pyjo.IOLoop
 
@@ -145,7 +145,7 @@ with subtest('Update script without changing mtime'):
         f"""
 import sys
 sys.path.insert(0, {LIB!r})
-from Lite import app, get
+from Pyjoyment.Lite import app, get
 from Pyjo.File import path
 import Pyjo.IOLoop
 

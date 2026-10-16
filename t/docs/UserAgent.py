@@ -4,17 +4,13 @@ import Pyjo.Server.Daemon
 from Pyjo.File import tempdir
 from Pyjo.Test import *
 
+# The examples request real hosts, so a daemon with an application of Pyjoyment.Lite answers them instead
+from Pyjoyment.Lite import app
+
 import contextlib
-import importlib
 import io
-import os
-import sys
 
 
-# The examples request real hosts, so a daemon with the minimal Mojolicious::Lite of the tests answers them instead
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
-Lite = importlib.import_module('Lite')
-app = Lite.app
 app.log.level = 'fatal'
 
 HTML = '<html><head><title>Mojolicious</title></head><body><h2><a>One</a></h2><h2><a>Two</a></h2></body></html>'

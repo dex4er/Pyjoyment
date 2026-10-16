@@ -123,21 +123,18 @@ with subtest('download'):
     import Pyjo.IOLoop
     import Pyjo.Server.Daemon
     import Pyjo.UserAgent
+    import Pyjoyment
 
-    import importlib
-    import sys
+    # The URL of a daemon with an application in place of https://example.com
+    app = Pyjoyment.new()
+    app.log.level = 'fatal'
 
-    # The URL of a daemon with the minimal Mojolicious::Lite of the tests in place of https://example.com
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
-    Lite = importlib.import_module('Lite')
-    Lite.app.log.level = 'fatal'
-
-    @Lite.get('/test.tar.gz')
+    @app.routes.get('/test.tar.gz')
     def tarball(c):
         c.res.headers.accept_ranges = 'bytes'
         c.render(data=(c.req.headers.accept or 'none').encode())
 
-    daemon = Pyjo.Server.Daemon.new(app=Lite.app, listen=['http://127.0.0.1'], silent=True).start()
+    daemon = Pyjo.Server.Daemon.new(app=app, listen=['http://127.0.0.1'], silent=True).start()
     url = f'http://127.0.0.1:{daemon.ports()[0]}/test.tar.gz'
 
     def download():

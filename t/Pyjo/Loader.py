@@ -125,8 +125,7 @@ with subtest('Invalid class'):
     is_ok(load_class('.Pyjoyment.Lite'), True, 'nothing to load')
     is_ok(load_class('Pyjoyment.Lite.'), True, 'nothing to load')
     is_ok(load_class('.Pyjoyment.Lite.'), True, 'nothing to load')
-    # TODO: Pyjoyment.Lite, when it is ported; until then Pyjoyment.Types
-    is_ok(load_class('Pyjoyment.Types'), None, 'loaded successfully')
+    is_ok(load_class('Pyjoyment.Lite'), None, 'loaded successfully')
 
 with subtest('Load classes recursively'):
     is_deeply_ok(

@@ -2,20 +2,14 @@ import Pyjo.Message.Response
 import Pyjo.Server.CGI
 
 from Pyjo.Test import *
+from Pyjoyment.Lite import app, get, post
 
 import contextlib
-import importlib
 import io
 import os
 import sys
 
 from unittest.mock import patch
-
-
-# The minimal Mojolicious::Lite of the tests
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
-Lite = importlib.import_module('Lite')
-app, get, post = Lite.app, Lite.get, Lite.post
 
 
 # Not in Mojolicious: local %ENV, *STDIN and *STDOUT, with the output of the CGI script as bytes; the tests report
@@ -42,10 +36,10 @@ def chunked(c):
     params = c.req.params.to_dict()
     chunks = []
     for key in sorted(params):
-        chunks.append(params[key])
+        chunks.append(params[key].encode())
 
     def cb(c):
-        chunk = chunks.pop(0) if chunks else ''
+        chunk = chunks.pop(0) if chunks else b''
         c.write_chunk(chunk, cb if chunk else None)
 
     cb(c)

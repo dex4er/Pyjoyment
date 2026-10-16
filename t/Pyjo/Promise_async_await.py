@@ -1,8 +1,11 @@
 import Pyjo.IOLoop
 import Pyjo.Promise
+import Pyjo.Test.Pyjo
+import Pyjo.UserAgent
 
 from Pyjo.Test import *
 from Pyjo.Util import warn
+from Pyjoyment.Lite import *
 
 import gc
 import warnings
@@ -13,7 +16,69 @@ import warnings
 # Left out from Mojolicious: test_awaitable of Test::Future::AsyncAwait::Awaitable, the API of Future::AsyncAwait is
 # __await__ in Python, which t/stdlib/Promise.py checks with asyncio
 
-# TODO: the application, its routes, the user agent and Test::Mojo, when Pyjoyment.Lite and Test::Mojo are ported
+# Silence
+app.log.level = 'fatal'
+
+
+@helper('defer_resolve_p')
+def defer_resolve_p(c, msg):
+    promise = Pyjo.Promise.new()
+    Pyjo.IOLoop.next_tick(lambda loop: promise.resolve(msg))
+    return promise
+
+
+@helper('defer_reject_p')
+def defer_reject_p(c, msg):
+    promise = Pyjo.Promise.new()
+    Pyjo.IOLoop.next_tick(lambda loop: promise.reject(msg))
+    return promise
+
+
+get('/one', {'text': 'works!'})
+
+get('/two', {'text': 'also'})
+
+
+@get('/three')
+async def three(c):
+    first = await c.defer_resolve_p('this ')
+    second = await c.defer_resolve_p('works')
+    third = await c.defer_resolve_p(' too!')
+    c.render(text=f'{first}{second}{third}')
+
+
+@get('/four')
+async def four(c):
+    text = await Pyjo.Promise.resolve('fail')
+    try:
+        await c.defer_reject_p('this went perfectly')
+        err = None
+    except Exception as e:
+        err = e
+    if err is not None:
+        c.render(text=str(err), status=500)
+    else:
+        c.render(text=text)
+
+
+@get('/five')
+async def five(c):
+    runaway = c.defer_reject_p('runaway too')
+    await c.defer_resolve_p('fail')
+    await runaway
+
+
+@get('/six')
+def six(c):
+    @c.on('message')
+    @Pyjo.Promise.coroutine
+    async def message(c, msg):
+        first = await c.defer_resolve_p(f'One: {msg}')
+        second = await c.defer_resolve_p(f'Two: {msg}')
+        c.send(f'{first} {second}').finish()
+
+
+ua = Pyjo.UserAgent.new(ioloop=Pyjo.IOLoop.singleton)
 
 
 # Not in Mojolicious: Perl frees a promise at the end of the statement, PyPy when its garbage collector runs, which
@@ -34,6 +99,22 @@ async def reject_p():
 
 
 @Pyjo.Promise.coroutine
+async def test_one():
+    return await ua.get_p('/one')
+
+
+@Pyjo.Promise.coroutine
+async def test_two(separator):
+    text = ''
+    two = await ua.get_p('/two')
+    text += two.res.text
+    one = await ua.get_p('/one')
+    text += separator + one.res.text
+
+    return text
+
+
+@Pyjo.Promise.coroutine
 async def test_three(ok):
     def cb(resolve, reject):
         Pyjo.IOLoop.next_tick(lambda loop: (resolve if ok else reject)('value'))
@@ -41,10 +122,36 @@ async def test_three(ok):
     return Pyjo.Promise.new(cb)
 
 
-# Left out from Mojolicious: "Basic async/await" and "Multiple awaits", which need the user agent
+t = Pyjo.Test.Pyjo.new()
 
-# Left out from Mojolicious: "Application with async/await action" and "Exception handling and async/await", which
-# need the application
+with subtest('Basic async/await'):
+    promise = test_one()
+    isa_ok(promise, Pyjo.Promise.object, 'right class')
+    tx = None
+
+    def tx_cb(value):
+        global tx
+        tx = value
+
+    promise.then(tx_cb).catch(lambda *reason: warn(str(reason)))
+    promise.wait()
+    is_ok(tx.res.text, 'works!', 'right content')
+
+with subtest('Multiple awaits'):
+    text = None
+
+    def text_cb(value):
+        global text
+        text = value
+
+    test_two(' ').then(text_cb).catch(lambda *reason: warn(str(reason))).wait()
+    is_ok(text, 'also works!', 'right content')
+
+with subtest('Application with async/await action'):
+    t.get_ok('/three').content_is('this works too!')
+
+with subtest('Exception handling and async/await'):
+    t.get_ok('/four').status_is(500).content_like(r'this went perfectly')
 
 with subtest('Exception handling with file and line reporting'):
     error = None
@@ -70,7 +177,8 @@ with subtest('Exception handling without "Unhandled rejected promise" warning'):
         collect()
         like_ok(' '.join(str(w.message) for w in warn), r'Unhandled rejected promise', 'unhandled promise')
 
-# Left out from Mojolicious: "Runaway exception", which needs the application
+with subtest('Runaway exception'):
+    t.get_ok('/five').status_is(500).content_like(r'runaway too')
 
 with subtest('Async function body returning a promise'):
     text = None
@@ -98,7 +206,8 @@ with subtest('Async nested function returning a promise'):
     # Unlike Mojolicious: the exception of Python keeps the file and the line in its traceback, not in its message
     like_ok(str(res), r'^timeout', 'right content')
 
-# Left out from Mojolicious: "Async WebSocket", which needs the application
+with subtest('Async WebSocket'):
+    t.websocket_ok('/six').send_ok('test').message_ok().message_is('One: test Two: test').finish_ok()
 
 
 # Top-level await

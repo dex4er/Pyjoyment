@@ -13,23 +13,18 @@ import Pyjo.Promise
 import Pyjo.Server.Daemon
 import Pyjo.UserAgent
 import Pyjo.UserAgent.Server
+import Pyjoyment.Lite
 
 from Pyjo.Test import *
 from Pyjo.Util import gzip
+from Pyjoyment.Lite import any, app, get, post
 
 import gc
-import importlib
 import re
-import sys
 import time
 
 from unittest.mock import patch
 
-
-# The minimal Mojolicious::Lite of the tests
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
-Lite = importlib.import_module('Lite')
-app, any, get, post = Lite.app, Lite.any, Lite.get, Lite.post
 
 # Silence
 app.log.level = 'trace'
@@ -44,7 +39,7 @@ timeout = None
 
 @get('/timeout')
 def timeout_action(c):
-    c.inactivity_timeout(c.param('timeout'))
+    c.inactivity_timeout(float(c.param('timeout')))
 
     def finish(c):
         global timeout
@@ -55,7 +50,7 @@ def timeout_action(c):
 
 @get('/no_length')
 def no_length(c):
-    c.finish('works too!')
+    c.finish(b'works too!')
     c.rendered(200)
 
 
@@ -74,8 +69,7 @@ def echo_post(c):
     c.render(data=c.req.body)
 
 
-# TODO: the inline template "<%= c.req.method =%>", when Pyjoyment.Lite replaces t/lib/Lite.py
-any('/method', lambda c: c.render(text=c.req.method))
+any('/method', {'inline': '<%= c.req.method =%>'})
 
 
 @get('/one')
@@ -124,7 +118,7 @@ is_ok(Pyjo.UserAgent.Server.app(), app, 'applications are equal')
 is_ok(Pyjo.UserAgent.new().server.app, app, 'applications are equal')
 Pyjo.UserAgent.Server.app(app)
 is_ok(Pyjo.UserAgent.Server.app(), app, 'applications are equal')
-dummy = Lite.Lite()
+dummy = Pyjoyment.Lite.new()
 ua = Pyjo.UserAgent.new()
 ua.server.app = dummy
 isnt_ok(ua.server.app, app, 'applications are not equal')

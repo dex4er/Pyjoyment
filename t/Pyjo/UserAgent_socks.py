@@ -6,6 +6,7 @@ import Pyjo.IOLoop.TLS
 import Pyjo.UserAgent
 
 from Pyjo.Test import *
+from Pyjoyment.Lite import app, get, websocket
 
 import importlib
 import os
@@ -19,11 +20,10 @@ if not Pyjo.IOLoop.Client.object.can_socks():
 if not Pyjo.IOLoop.TLS.object.can_tls():
     plan(skip_all='TLS support required for this test!')
 
-# The minimal Mojolicious::Lite and the SOCKS proxy server of the tests
+# The SOCKS proxy server of the tests
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
-Lite = importlib.import_module('Lite')
 SocksServer = importlib.import_module('SocksServer')
-app, get, websocket = Lite.app, Lite.get, Lite.websocket
+
 
 # Silence
 app.log.level = 'fatal'

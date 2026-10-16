@@ -41,7 +41,7 @@ def application(port):
             f"""
 import sys
 sys.path.insert(0, {LIB!r})
-from Lite import app, get
+from Pyjoyment.Lite import app, get
 app.log.level = 'fatal'
 app.config(hot={{'listen': ['http://127.0.0.1:{port}'], 'workers': 1}})
 get('/', {{'text': 'Hello!'}})

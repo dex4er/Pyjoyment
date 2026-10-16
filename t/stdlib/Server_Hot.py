@@ -37,7 +37,7 @@ def application(dir, port):
         f"""
 import sys
 sys.path.insert(0, {os.path.abspath(LIB)!r})
-from Lite import app, get
+from Pyjoyment.Lite import app, get
 app.log.level = 'fatal'
 app.config(hot={{'listen': ['http://127.0.0.1:{port}'], 'workers': 1}})
 get('/', lambda c: c.render(text=f'int_max_str_digits={{sys.flags.int_max_str_digits}}'))
