@@ -41,7 +41,11 @@ def shell(command, cwd):
     os.makedirs(bindir, exist_ok=True)
     if not os.path.exists(os.path.join(bindir, 'python')):
         os.symlink(sys.executable, os.path.join(bindir, 'python'))
-    env = dict(os.environ, PATH=os.pathsep.join([bindir, os.environ.get('PATH', '')]), PYTHONPATH=ROOT)
+    env = dict(
+        {k: v for k, v in os.environ.items() if k != 'PYJO_PROVE_OPTS'},
+        PATH=os.pathsep.join([bindir, os.environ.get('PATH', '')]),
+        PYTHONPATH=ROOT,
+    )
     p = subprocess.run(command, shell=True, cwd=cwd, capture_output=True, text=True, env=env)
     return p.stdout, p.returncode
 
@@ -80,6 +84,13 @@ with subtest('Synopsis'):
             is_ok(code, 0, 'right exit status')
         else:
             skip('pyjo-prove is not installed', 2)
+
+with subtest('Environment'):
+    with tempfile.TemporaryDirectory() as tmp:
+        scripts(tmp)
+        out, code = shell("PYJO_PROVE_OPTS='-l -j 4' python -m Pyjo.Prove -r t", tmp)
+        like_ok(out, r'(?m)^Files=5, Tests=5, ', "PYJO_PROVE_OPTS='-l -j 4' python -m Pyjo.Prove -r t")
+        is_ok(code, 0, 'right exit status')
 
 with subtest('Description'):
     with tempfile.TemporaryDirectory() as tmp:

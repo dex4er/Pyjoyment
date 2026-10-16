@@ -91,6 +91,12 @@ SCRIPTS = {
         ok(True)
         done_testing()
     """,
+    'env.py': """
+        from Pyjo.Test import *
+        import os
+        is_ok(os.environ.get('PYJO_PROVE_OPTS'), None, 'no options of the harness')
+        done_testing()
+    """,
     'child.py': """
         from Pyjo.Test import *
         import subprocess, sys
@@ -101,19 +107,20 @@ SCRIPTS = {
 }
 
 
-def prove(*args, scripts=SCRIPTS):
-    out, err, code = prove_stderr(*args, scripts=scripts)
+def prove(*args, scripts=SCRIPTS, env=None):
+    out, err, code = prove_stderr(*args, scripts=scripts, env=env)
     return out, code
 
 
-def prove_stderr(*args, scripts=SCRIPTS):
+def prove_stderr(*args, scripts=SCRIPTS, env=None):
     with tempfile.TemporaryDirectory() as tmp:
         for name, code in scripts.items():
             path = os.path.join(tmp, *name.split('/'))
             os.makedirs(os.path.dirname(path), exist_ok=True)
             with open(path, 'w') as f:
                 f.write(textwrap.dedent(code))
-        env = dict(os.environ, PYTHONPATH=ROOT)
+        # Not the options of a harness that runs this test
+        env = {k: v for k, v in os.environ.items() if k != 'PYJO_PROVE_OPTS'} | {'PYTHONPATH': ROOT} | (env or {})
         p = subprocess.run([sys.executable, '-m', 'Pyjo.Prove', *args], cwd=tmp, env=env, capture_output=True)
     # Bytes, as the universal newlines of text would turn the carriage returns of the count into newlines
     return p.stdout.decode(), p.stderr.decode(), p.returncode
@@ -126,7 +133,7 @@ def prove_tty(*args, env=None, scripts=SCRIPTS):
             with open(os.path.join(tmp, name), 'w') as f:
                 f.write(textwrap.dedent(code))
         env = (
-            {k: v for k, v in os.environ.items() if k != 'NO_COLOR'}
+            {k: v for k, v in os.environ.items() if k not in ('NO_COLOR', 'PYJO_PROVE_OPTS')}
             | {'TERM': 'xterm', 'PYTHONPATH': ROOT}
             | (env or {})
         )
@@ -553,6 +560,19 @@ with subtest('Include directories'):
     like_ok(out, r'(?m)^t/import\.py \.+ ok$', 'module found with -l')
     out, code = prove('--lib', 't/import.py', scripts=scripts)
     like_ok(out, r'(?m)^t/import\.py \.+ ok$', 'module found with --lib')
+
+with subtest('Options from the environment'):
+    out, code = prove('pass.py', env={'PYJO_PROVE_OPTS': '-v'})
+    like_ok(out, r'(?m)^ok 1 - first$', 'option from PYJO_PROVE_OPTS')
+    out, code = prove('--no-color', 'pass.py', env={'PYJO_PROVE_OPTS': '--color'})
+    unlike_ok(out, r'\033', 'the command line overrides PYJO_PROVE_OPTS')
+    out, code = prove('pass.py', env={'PYJO_PROVE_OPTS': f"--exec '{sys.executable} -X utf8'"})
+    like_ok(out, r'(?m)^pass\.py \.+ ok$', 'split as a shell splits words')
+    out, code = prove('env.py', env={'PYJO_PROVE_OPTS': '--color'})
+    like_ok(out, r'Result: \033\[32mPASS', 'test script does not get PYJO_PROVE_OPTS')
+    out, err, code = prove_stderr('pass.py', env={'PYJO_PROVE_OPTS': "'"})
+    like_ok(err, r'PYJO_PROVE_OPTS: No closing quotation', 'invalid quoting')
+    is_ok(code, 2, 'right exit status')
 
 with subtest('Verbose'):
     out, code = prove('-v', 'pass.py')

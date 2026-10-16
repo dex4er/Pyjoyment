@@ -111,6 +111,18 @@ Options
     so is ``NOTESTS``. With ``--capture-stderr``, the standard error of a
     test script is red.
 
+Environment
+-----------
+
+``PYJO_PROVE_OPTS``
+    Options that go before the ones of the command line, which override them,
+    split as a shell splits words. The test scripts do not get it, so that a
+    test script that runs :mod:`Pyjo.Prove` itself runs it without them. ::
+
+        $ PYJO_PROVE_OPTS='-l -j 4' python -m Pyjo.Prove -r t
+
+    ``prove`` reads its options from ``.proverc`` instead.
+
 Functions
 ---------
 """
@@ -464,8 +476,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         sys.exit(main(['-r', 't']))
 
-    Command line interface: parse the options, run the test scripts and return
-    the exit status.
+    Command line interface: parse the options, after the ones of
+    ``PYJO_PROVE_OPTS``, run the test scripts and return the exit status.
     """
     parser = argparse.ArgumentParser(prog='pyjo-prove', description='Run test scripts which print TAP.')
     parser.add_argument('-r', '--recurse', action='store_true', help='run the test scripts in subdirectories too')
@@ -507,7 +519,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     # Both forms, which Getopt::Long of prove accepts for its --nocolor
     parser.add_argument('--no-color', '--nocolor', dest='color', action='store_const', const=False, help='do not color')
     parser.add_argument('paths', nargs='*', default=['t'], help='test scripts and directories, t by default')
-    args = parser.parse_args(argv)
+    # Not in prove: PYJO_PROVE_OPTS, where prove reads .proverc
+    try:
+        opts = shlex.split(os.environ.get('PYJO_PROVE_OPTS', ''))
+    except ValueError as e:
+        parser.error(f'PYJO_PROVE_OPTS: {e}')
+    args = parser.parse_args([*opts, *(sys.argv[1:] if argv is None else argv)])
 
     ext = args.ext if args.ext.startswith('.') else f'.{args.ext}'
     scripts = find_scripts(args.paths, ext, args.recurse)
@@ -515,7 +532,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         print('No tests found.', file=sys.stderr)
         return 1
 
-    env = dict(os.environ)
+    # A test script that runs the harness does not get the options of this one, as prove leaves out HARNESS_OPTIONS
+    env = {name: value for name, value in os.environ.items() if name != 'PYJO_PROVE_OPTS'}
     if args.include:
         env['PYTHONPATH'] = os.pathsep.join([*args.include, *filter(None, [env.get('PYTHONPATH')])])
 
