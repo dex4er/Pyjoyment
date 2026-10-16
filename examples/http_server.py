@@ -16,7 +16,7 @@ daemon.unsubscribe('request')
 
 
 # Embedded template file
-DATA = r"""
+__DATA__ = r"""
 @@ index.html.ep
 <!DOCTYPE html>
 <html>

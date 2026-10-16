@@ -9,7 +9,7 @@ import types
 
 lib = tempdir()
 lib.child('Some', 'Namespace').make_path()
-lib.child('Some', 'Namespace', 'Good.py').spew("DATA = '''\n@@ some_file.txt\nSome file.\n'''\n")
+lib.child('Some', 'Namespace', 'Good.py').spew("__DATA__ = '''\n@@ some_file.txt\nSome file.\n'''\n")
 lib.child('Some', 'Namespace', 'Bad.py').spew('raise Exception("Bad module")\n')
 sys.path.insert(0, lib.to_str())
 
@@ -35,7 +35,7 @@ with subtest('Synopsis'):
 with subtest('Description'):
     foo = types.ModuleType('Foo')
     sys.modules['Foo'] = foo
-    foo.DATA = r"""
+    foo.__DATA__ = r"""
 @@ test.txt
 This is the first file.
 
@@ -69,7 +69,7 @@ with subtest('data_section'):
 with subtest('file_is_binary'):
     from Pyjo.Loader import file_is_binary
 
-    sys.modules['Foo.Bar'].DATA = '@@ test.png (base64)\niVBORw0KGgo=\n'
+    sys.modules['Foo.Bar'].__DATA__ = '@@ test.png (base64)\niVBORw0KGgo=\n'
     del sys.modules['Foo.Bar'].__doc__
     boolean = file_is_binary('Foo', 'test2.html')
     ok(boolean, 'Base64 encoded')

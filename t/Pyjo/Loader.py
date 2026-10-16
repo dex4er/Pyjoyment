@@ -41,7 +41,7 @@ for name in ('MyLoaderTest.Foo.Bar', 'MyLoaderTest.Foo.Baz'):
 # Perl's open of a filehandle to a string, as the DATA handle of a package
 def package(name, data):
     sys.modules[name] = types.ModuleType(name)
-    sys.modules[name].DATA = data
+    sys.modules[name].__DATA__ = data
 
 
 with subtest('Single character core module'):

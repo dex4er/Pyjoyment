@@ -21,12 +21,12 @@ Pyjo.Loader - Load all kinds of things
 :mod:`Pyjo.Loader` is a class loader and plugin framework. Aside from finding
 modules and loading classes, it allows multiple files to be stored in the
 ``DATA`` section of a module, which can then be accessed individually. The
-section is the ``DATA`` variable of the module, or its docstring after a line
-``__DATA__``. ::
+section is the ``__DATA__`` variable of the module, or its docstring after a
+line ``__DATA__``. ::
 
     # Foo.py
 
-    DATA = r'''
+    __DATA__ = r'''
     @@ test.txt
     This is the first file.
 
@@ -238,8 +238,8 @@ def _all(cls: Class) -> dict[str, str | bytes]:
     if name in _CACHE:
         return _CACHE[name]
 
-    # Not in Mojolicious: the DATA variable of a module, or its docstring after a line __DATA__
-    data = getattr(module, 'DATA', None)
+    # Not in Mojolicious: the __DATA__ variable of a module, or its docstring after a line __DATA__
+    data = getattr(module, '__DATA__', None)
     if not isinstance(data, str):
         doc = module.__doc__
         if not isinstance(doc, str) or not re.search(r'^__DATA__\r?$', doc, re.M):

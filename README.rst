@@ -232,7 +232,7 @@ Standalone HTTP server serving embedded template file
 
 
    # Embedded template file
-   DATA = r"""
+   __DATA__ = r"""
    @@ index.html.ep
    <!DOCTYPE html>
    <html>
