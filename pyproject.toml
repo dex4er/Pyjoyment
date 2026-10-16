@@ -258,6 +258,8 @@ strict = [
   "Pyjoyment/HelloWorld.py",
   "Pyjoyment/Plugin/__init__.py",
   "Pyjoyment/Plugin/DefaultHelpers.py",
+  "Pyjoyment/Plugin/EPLRenderer.py",
+  "Pyjoyment/Plugin/EPRenderer.py",
   "Pyjoyment/Plugin/HeaderCondition.py",
   "Pyjoyment/Plugins.py",
   "Pyjoyment/Renderer.py",
