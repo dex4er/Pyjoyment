@@ -112,6 +112,19 @@ class Pyjoyment_Routes_Route(Pyjo.Base.object):
         self._requires: list[tuple[str, Any]] | None = None
         self._websocket = False
 
+    # Not in Mojolicious: a route is a decorator of its callback, as the functions of Pyjoyment.Lite and the methods of
+    # the routes are used without one
+    def __call__(self, cb: Callable[..., Any]) -> Self:
+        """::
+
+            @r.get('/foo')
+            def foo(c):
+                c.render(text='Hello World!')
+
+        Set the callback of the route, as a decorator, and return the route.
+        """
+        return self.to(cb=cb)
+
     # Unlike Mojolicious: Mojo registers the shortcuts of a root with Mojo::DynamicMethods, Python looks them up in the
     # root when a method is not found
     def __getattr__(self, name: str) -> Any:

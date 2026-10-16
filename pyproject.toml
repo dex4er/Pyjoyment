@@ -256,6 +256,7 @@ strict = [
   "Pyjoyment/__init__.py",
   "Pyjoyment/Controller.py",
   "Pyjoyment/HelloWorld.py",
+  "Pyjoyment/Lite.py",
   "Pyjoyment/Plugin/__init__.py",
   "Pyjoyment/Plugin/DefaultHelpers.py",
   "Pyjoyment/Plugin/EPLRenderer.py",
