@@ -591,6 +591,10 @@ copy:
 - Perl passes arguments by reference, so a callback can change a string of
   its caller through `$_[1]`; in Python, the caller passes a mutable object,
   like `io.StringIO`, and the callback changes it.
+  A method that changes a string of its caller through a reference, as
+  `match_partial(\$path)` of `Mojolicious::Routes::Pattern` removes what
+  matched, returns the new string with its result: `captures, path =
+pattern.match_partial(path)`.
 - The name of the class of an object in a message, `blessed $self` or
   `ref $self`, is `module.qualname` of its class, as
   `Pyjo.EventEmitter.Pyjo_EventEmitter`.
