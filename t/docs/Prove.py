@@ -154,6 +154,12 @@ with tempfile.TemporaryDirectory() as tmp:
             is_ok(names['result'].passed, True, 'result.passed with a timeout')
             is_ok(names['result'].timed_out, None, 'result.timed_out')
 
+            names, _ = run("""
+                result = await run_script('t/test.py', [sys.executable], dict(os.environ), capture_stderr=True)
+            """)
+            is_ok(names['result'].passed, True, 'result.passed with the standard error captured')
+            is_deeply_ok(names['result'].stderr, [], 'result.stderr')
+
         with subtest('find_scripts'):
             names, _ = run("""
                 scripts = find_scripts(['t'], '.py', recurse=True)
@@ -177,6 +183,12 @@ with tempfile.TemporaryDirectory() as tmp:
             """)
             is_ok([r.path for r in names['results']], ['t/a.py', 't/b.py'], 'results with a timeout and trap')
             like_ok(out, r'(?m)^Result: PASS$', 'summary with a timeout and trap')
+
+            names, out = run("""
+                results = asyncio.run(run(['t/a.py', 't/b.py'], jobs=2, capture_stderr=True))
+            """)
+            is_ok([r.path for r in names['results']], ['t/a.py', 't/b.py'], 'results with the standard error captured')
+            like_ok(out, r'(?m)^Result: PASS$', 'summary with the standard error captured')
 
         with subtest('main'):
             names, out = run("""

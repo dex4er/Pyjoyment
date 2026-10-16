@@ -202,7 +202,7 @@ the most of its I/O, a second time on `Pyjo.Reactor.Poll`, as a reactor
 without asyncio has to pass them too:
 
 ```sh
-PYJO_REACTOR=Pyjo.Reactor.Poll PYTHONPATH=. mise exec -- python -m Pyjo.Prove -j 4 \
+PYJO_REACTOR=Pyjo.Reactor.Poll PYTHONPATH=. mise exec -- python -m Pyjo.Prove -j 4 --capture-stderr \
   t/Pyjo/IOLoop*.py t/Pyjo/TLS.py t/Pyjo/Promise*.py t/Pyjo/Subprocess.py t/stdlib/IOLoop*.py \
   t/Pyjo/UserAgent*.py t/stdlib/UserAgent*.py t/Pyjo/Server_Daemon.py t/stdlib/Server_Daemon.py \
   t/Pyjo/Server_Hot.py t/stdlib/Server_Hot.py t/Pyjo/Server_Prefork.py t/stdlib/Server_Prefork.py \
@@ -244,7 +244,11 @@ CI runs the tests in the development mode of Python, `PYTHONDEVMODE=1` (or
 `python -X dev`), which shows the `ResourceWarning` of a socket, a file or a
 temporary directory that nothing closed. Python writes it to the standard
 error, often from the garbage collector, where it cannot fail a test, so CI
-fails when `ResourceWarning:` appears in the output. A test closes what it
+fails when `ResourceWarning:` appears in the output. CI runs the scripts at
+the same time, whose standard error would mix, so it passes
+`--capture-stderr`: the standard error of a script follows the line of its
+result, each line after the name of the script, which tells the script that
+leaked. A test closes what it
 gets, as the handle of an `accept` or `connect` event or a connection of
 `http.client`, where Perl closes it with the last reference. To find where a
 leaked object was made:
