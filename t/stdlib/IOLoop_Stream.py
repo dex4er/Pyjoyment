@@ -1,9 +1,11 @@
 import Pyjo.IOLoop
 import Pyjo.IOLoop.Stream
 import Pyjo.IOLoop.TLS
+import Pyjo.Reactor.Poll
 
 from Pyjo.Test import *
 
+import gc
 import os
 import socket
 import ssl
@@ -91,6 +93,17 @@ with subtest('Context manager'):
     with Pyjo.IOLoop.Stream.new(a) as stream:
         is_ok(stream.handle, a, 'handle')
     is_ok(a.fileno(), -1, 'stream closed at the end of the block')
+    b.close()
+
+with subtest('Reactor that is gone'):
+    a, b = socket.socketpair()
+    reactor = Pyjo.Reactor.Poll.new()
+    stream = Pyjo.IOLoop.Stream.new(a)
+    stream.reactor = reactor
+    del reactor
+    gc.collect()
+    stream.close()
+    is_ok(a.fileno(), -1, 'handle closed')
     b.close()
 
 done_testing()

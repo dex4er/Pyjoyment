@@ -5,6 +5,8 @@ from Pyjo.Test import *
 
 import functools
 import gc
+import sys
+import weakref
 
 
 class Counter:
@@ -90,5 +92,26 @@ with subtest('Once does not keep the emitter alive'):
     del emitter
     gc.collect()
     throws_ok(lambda: cb(), ReferenceError, 'emitter is gone')
+
+with subtest('Once leaves no cycle'):
+    gc.disable()
+    try:
+
+        class Object:
+            pass
+
+        emitter = Pyjo.EventEmitter.new()
+        thing = Object()
+        ref = weakref.ref(thing)
+        emitter.once('foo', lambda e, thing=thing: ...)
+        del thing
+        ok(ref() is not None, 'subscriber keeps the object')
+        emitter.emit('foo')
+        if sys.implementation.name == 'pypy':
+            skip('PyPy frees objects only when its garbage collector runs', 1)
+        else:
+            ok(ref() is None, 'object is freed without the garbage collector')
+    finally:
+        gc.enable()
 
 done_testing()

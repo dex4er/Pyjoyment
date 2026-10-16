@@ -188,7 +188,8 @@ class Pyjoyment_Routes(Pyjoyment_Routes_Route):
             r.proceed(Pyjoyment.Controller.new())
 
         Continue dispatch chain and emit the hook ``around_action`` of
-        :mod:`Pyjoyment` for every action.
+        :mod:`Pyjoyment` for every action. ``continue_`` is an alias, the name
+        of Mojolicious with an underscore.
         """
         match = c.match
         stack = match.stack

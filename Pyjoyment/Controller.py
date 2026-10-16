@@ -205,9 +205,13 @@ class Pyjoyment_Controller(Pyjo.Base.object):
             c.proceed()
 
         Continue dispatch chain from an intermediate destination with
-        :meth:`Pyjoyment.Routes.Pyjoyment_Routes.proceed`.
+        :meth:`Pyjoyment.Routes.Pyjoyment_Routes.proceed`. ``continue_`` is an
+        alias, the name of Mojolicious with an underscore.
         """
         self.app.routes.proceed(self)
+
+    # The name of Mojolicious, with an underscore as continue is a keyword of Python
+    continue_ = proceed
 
     @overload
     def cookie(self, name: str, /) -> str | None: ...

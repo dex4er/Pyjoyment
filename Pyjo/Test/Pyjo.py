@@ -78,6 +78,7 @@ from Pyjo.JSON import j
 from Pyjo.Util import decode
 
 import os
+import re
 
 from collections.abc import Callable
 from types import TracebackType
@@ -1385,14 +1386,32 @@ def _desc(desc: str | None, default: str) -> str:
     return desc or default
 
 
+# A regular expression of Pyjo.Test
+type _Pattern = str | bytes | re.Pattern[str] | re.Pattern[bytes] | tuple[str | bytes, str]
+
+
+# like and unlike of Test::More, which match the string of a value, as a number, and match bytes, the characters
+# 0-255 of Perl, with a pattern of characters
+def _like(function: Callable[..., bool]) -> Callable[..., bool]:
+    def like(got: Any, regex: _Pattern, desc: str | None = None) -> bool:
+        pattern = regex.pattern if isinstance(regex, re.Pattern) else regex[0] if isinstance(regex, tuple) else regex
+        if isinstance(got, bytes) and not isinstance(pattern, bytes):
+            got = got.decode('latin-1')
+        elif got is not None and not isinstance(got, str | bytes):
+            got = str(got)
+        return function(got, regex, desc)
+
+    return like
+
+
 # The functions of Pyjo.Test by the names of the functions of Test::More
 _FUNCTIONS: dict[str, Callable[..., Any]] = {
     'is': Pyjo.Test.is_ok,
     'is_deeply': Pyjo.Test.is_deeply_ok,
     'isnt': Pyjo.Test.isnt_ok,
-    'like': Pyjo.Test.like_ok,
+    'like': _like(Pyjo.Test.like_ok),
     'ok': Pyjo.Test.ok,
-    'unlike': Pyjo.Test.unlike_ok,
+    'unlike': _like(Pyjo.Test.unlike_ok),
 }
 
 
