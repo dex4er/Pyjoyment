@@ -89,4 +89,11 @@ with subtest('A client of asyncio'):
     asyncio.run(main())
     is_deeply_ok(got, [b'ASYNCIO'], 'the reactor and asyncio in the same loop')
 
+with subtest('Context manager'):
+    with Pyjo.IOLoop.Datagram.new() as datagram:
+        datagram.bind(address='127.0.0.1')
+        handle = datagram.handle
+        ok(handle.fileno() >= 0, 'bound')
+    is_ok(handle.fileno(), -1, 'socket closed at the end of the block')
+
 done_testing()

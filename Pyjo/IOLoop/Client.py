@@ -18,6 +18,8 @@ Pyjo.IOLoop.Client - Non-blocking TCP/IP and UNIX domain socket client
 :mod:`Pyjo.IOLoop.Client` opens TCP/IP and UNIX domain socket connections for
 :mod:`Pyjo.IOLoop`.
 
+The end of a ``with`` block closes the connection.
+
 Events
 ------
 
@@ -66,7 +68,8 @@ import time
 import weakref
 
 from collections.abc import Callable, Generator
-from typing import Any, Literal
+from types import TracebackType
+from typing import Any, Literal, Self
 
 
 # Non-blocking name resolution, which Mojo does with Net::DNS::Native, is a thread of the standard library here
@@ -263,6 +266,16 @@ class Pyjo_IOLoop_Client(Pyjo.EventEmitter.object):
                 self.close()
         except Exception:
             pass
+
+    # Not in Mojolicious: a context manager, which closes the connection where the block ends, as PyPy frees the object
+    # only when its garbage collector runs
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+        self, type: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None
+    ) -> None:
+        self.close()
 
     @property
     def reactor(self) -> Pyjo.Reactor.object:

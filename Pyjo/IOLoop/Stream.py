@@ -23,6 +23,8 @@ Pyjo.IOLoop.Stream - Non-blocking I/O stream
 :mod:`Pyjo.IOLoop`. A handle is a socket, an :class:`ssl.SSLSocket` too, or
 anything else with a file descriptor, like a pipe.
 
+The end of a ``with`` block closes the stream.
+
 Events
 ------
 
@@ -99,6 +101,7 @@ import sys
 import weakref
 
 from collections.abc import Callable
+from types import TracebackType
 from typing import Any, Self
 
 
@@ -148,6 +151,16 @@ class Pyjo_IOLoop_Stream(Pyjo.EventEmitter.object):
                 self.close()
         except Exception:
             pass
+
+    # Not in Mojolicious: a context manager, which closes the stream where the block ends, as PyPy frees the object only
+    # when its garbage collector runs
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+        self, type: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None
+    ) -> None:
+        self.close()
 
     @property
     def reactor(self) -> Pyjo.Reactor.object:

@@ -103,4 +103,11 @@ with subtest('ALPN with contexts'):
 for handle in handles:
     handle.close()
 
+with subtest('Context manager'):
+    a, b = socket.socketpair()
+    with Pyjo.IOLoop.TLS.new(a):
+        pass
+    is_ok(a.fileno(), -1, 'connection of the handshake closed at the end of the block')
+    b.close()
+
 done_testing()

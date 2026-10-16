@@ -21,6 +21,8 @@ Pyjo.IOLoop.Server - Non-blocking TCP and UNIX domain socket server
 :mod:`Pyjo.IOLoop.Server` accepts TCP/IP and UNIX domain socket connections
 for :mod:`Pyjo.IOLoop`.
 
+The end of a ``with`` block closes the listen socket.
+
 Events
 ------
 
@@ -57,7 +59,8 @@ import stat
 import sys
 import weakref
 
-from typing import Any
+from types import TracebackType
+from typing import Any, Self
 
 
 class Pyjo_IOLoop_Server(Pyjo.EventEmitter.object):
@@ -87,6 +90,16 @@ class Pyjo_IOLoop_Server(Pyjo.EventEmitter.object):
                 self.close()
         except Exception:
             pass
+
+    # Not in Mojolicious: a context manager, which closes the listen socket where the block ends, as PyPy frees the
+    # object only when its garbage collector runs
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+        self, type: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None
+    ) -> None:
+        self.close()
 
     @property
     def reactor(self) -> Pyjo.Reactor.object:

@@ -112,4 +112,11 @@ with subtest("Can't create listen socket"):
         isa_ok(e.__cause__, OSError, 'the error of the system is the cause')
     taken.close()
 
+with subtest('Context manager'):
+    with Pyjo.IOLoop.Server.new() as server:
+        server.listen(address='127.0.0.1')
+        handle = server.handle
+        ok(handle.fileno() >= 0, 'listening')
+    is_ok(handle.fileno(), -1, 'listen socket closed at the end of the block')
+
 done_testing()
