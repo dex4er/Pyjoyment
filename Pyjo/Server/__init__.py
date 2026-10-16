@@ -195,6 +195,8 @@ class Pyjo_Server(Pyjo.EventEmitter.object):
         object.
         """
         if self._app is None:
+            # Unlike Mojolicious: the default is Pyjo.HelloWorld, an application of pure Pyjo, where Mojo::HelloWorld is one
+            # of Mojolicious, so a server does not load Pyjoyment
             return self.build_app('Pyjo.HelloWorld')
         return self._app
 
