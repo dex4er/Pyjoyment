@@ -74,7 +74,7 @@ def echo_post(c):
     c.render(data=c.req.body)
 
 
-# TODO: the inline template "<%= $c->req->method =%>", when Pyjoyment and its renderer are ported
+# TODO: the inline template "<%= c.req.method =%>", when Pyjoyment.Lite replaces t/lib/Lite.py
 any('/method', lambda c: c.render(text=c.req.method))
 
 

@@ -377,9 +377,9 @@ class Pyjoyment_App(Pyjo.App.object):
         self.preload_namespaces = [controller]
         self.routes.namespaces = [controller, package]
 
-        for plugin in ('HeaderCondition', 'DefaultHelpers'):
+        # TODO: the plugin TagHelpers, between DefaultHelpers and EPLRenderer, when it is ported
+        for plugin in ('HeaderCondition', 'DefaultHelpers', 'EPLRenderer', 'EPRenderer'):
             self.plugin(plugin)
-        # TODO: the plugins TagHelpers, EPLRenderer and EPRenderer, when they are ported
 
         # Exception handling should be first in chain
         self.hook('around_dispatch', _exception)

@@ -5,6 +5,7 @@ from Pyjo.Util import gunzip
 
 import gc
 import re
+import sys
 
 
 # Partial rendering
@@ -171,10 +172,13 @@ throws_ok(
 helper_class = type(second.myapp)
 is_ok(type(second.myapp), helper_class, 'same class')
 ok(hasattr(helper_class, 'defaults'), 'helpers are active')
-# TODO: the class of an inline template, "<%= __PACKAGE__ =%>", when Pyjoyment.Plugin.EPRenderer is ported: the same
-# class each time, the helpers active in it and cleaned up after the application
+template_class = second.render_to_string(inline='<%= __name__ =%>')
+is_ok(second.render_to_string(inline='<%= __name__ =%>'), template_class, 'same class')
+template_module = sys.modules[template_class]
+ok(hasattr(template_module, 'stash'), 'helpers are active')
 del app2
 gc.collect()
 ok(not hasattr(helper_class, 'defaults'), 'helpers have been cleaned up')
+ok(not hasattr(template_module, 'stash'), 'helpers have been cleaned up')
 
 done_testing()

@@ -46,7 +46,7 @@ if TYPE_CHECKING:
 type Handler = Callable[[Pyjoyment_Renderer, Any, io.StringIO, dict[str, Any]], Any]
 
 # Bundled templates
-# TODO: the bundled templates, with Pyjoyment.Plugin.EPRenderer
+# TODO: the bundled templates, with Pyjoyment.Plugin.TagHelpers, whose helpers they use
 _TEMPLATES = Pyjo.File.path(__file__).sibling('resources', 'templates')
 
 

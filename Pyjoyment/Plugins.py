@@ -19,6 +19,13 @@ examples.
 :mod:`Pyjoyment.Plugin.DefaultHelpers`
     General purpose helper collection, loaded automatically.
 
+:mod:`Pyjoyment.Plugin.EPLRenderer`
+    Renderer for plain embedded Python templates, loaded automatically.
+
+:mod:`Pyjoyment.Plugin.EPRenderer`
+    Renderer for more sophisticated embedded Python templates, loaded
+    automatically.
+
 :mod:`Pyjoyment.Plugin.HeaderCondition`
     Route condition for all kinds of headers, loaded automatically.
 
@@ -36,8 +43,7 @@ Ported from `Mojolicious::Plugins <https://github.com/mojolicious/mojo/blob/v9.4
 of Mojolicious 9.49.
 """
 
-# TODO: the plugins of the list, Config, EPLRenderer, EPRenderer, JSONConfig, Mount, NotYAMLConfig and TagHelpers,
-# when they are ported
+# TODO: the plugins of the list, Config, JSONConfig, Mount, NotYAMLConfig and TagHelpers, when they are ported
 
 import Pyjo.EventEmitter
 import Pyjo.Exception

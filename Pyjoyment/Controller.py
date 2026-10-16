@@ -50,7 +50,7 @@ of Mojolicious 9.49.
 import Pyjo.Base
 import Pyjo.Exception
 import Pyjo.String.Bytes
-import Pyjo.String.Unicode
+import Pyjo.String.HTML
 import Pyjo.URL
 import Pyjo.Util
 import Pyjoyment.Routes.Match
@@ -493,6 +493,9 @@ class Pyjoyment_Controller(Pyjo.Base.object):
             # Render JSON
             c.render(json={'test': 'I ♥ Pyjoyment!'})
 
+            # Render inline template
+            c.render(inline='<%= 1 + 1 %>')
+
             # Render template "foo/bar.html.ep"
             c.render(template='foo/bar', format='html', handler='ep')
 
@@ -505,7 +508,6 @@ class Pyjoyment_Controller(Pyjo.Base.object):
             # Render template "test.xml.*" (alternative)
             c.render('test', format='xml')
         """
-        # TODO: the example of an inline template, when Pyjoyment.Plugin.EPRenderer is ported
 
         # Template may be first argument
         if template:
@@ -535,7 +537,7 @@ class Pyjoyment_Controller(Pyjo.Base.object):
             if ts:
                 if output is None:
                     return None
-                return Pyjo.String.Bytes.new(output) if isinstance(output, bytes) else Pyjo.String.Unicode.new(output)
+                return Pyjo.String.Bytes.new(output) if isinstance(output, bytes) else Pyjo.String.HTML.new(output)
             if output is None:
                 if maybe:
                     return None
@@ -587,18 +589,20 @@ class Pyjoyment_Controller(Pyjo.Base.object):
 
     def render_to_string(
         self, template: str | None = None, /, **args: Any
-    ) -> Pyjo.String.Unicode.object | Pyjo.String.Bytes.object | None:
+    ) -> Pyjo.String.HTML.object | Pyjo.String.Bytes.object | None:
         """::
 
             output = c.render_to_string('foo/index', format='pdf')
 
         Try to render content and return it wrapped in a
-        :mod:`Pyjo.String.Unicode` or a :mod:`Pyjo.String.Bytes` object or
-        return ``None``, all arguments get localized automatically and are only
-        available during this render operation, takes the same arguments as
-        :meth:`render`.
+        :mod:`Pyjo.String.HTML` object, markup that templates do not escape, or
+        a :mod:`Pyjo.String.Bytes` object or return ``None``, all arguments get
+        localized automatically and are only available during this render
+        operation, takes the same arguments as :meth:`render`. ::
+
+            # Render inline template
+            two = c.render_to_string(inline='<%= 1 + 1 %>')
         """
-        # TODO: the example of an inline template, when Pyjoyment.Plugin.EPRenderer is ported
         return self.render(template, **args, **{'mojo.string': True})
 
     def rendered(self, status: int | None = None) -> Self:
