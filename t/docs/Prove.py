@@ -160,6 +160,12 @@ with tempfile.TemporaryDirectory() as tmp:
             is_ok(names['result'].passed, True, 'result.passed with the standard error captured')
             is_deeply_ok(names['result'].stderr, [], 'result.stderr')
 
+            names, _ = run("""
+                result = await run_script('t/test.py', [sys.executable], dict(os.environ), capture_stderr=True, stderr_lines=100)
+            """)
+            is_ok(names['result'].passed, True, 'result.passed with a limit of the standard error')
+            is_ok(names['result'].stderr_left_out, 0, 'result.stderr_left_out')
+
             names, out = run("""
                 result = await run_script('t/test.py', [sys.executable], dict(os.environ), progress=print)
             """)
@@ -195,6 +201,14 @@ with tempfile.TemporaryDirectory() as tmp:
             """)
             is_ok([r.path for r in names['results']], ['t/a.py', 't/b.py'], 'results with the standard error captured')
             like_ok(out, r'(?m)^Result: PASS$', 'summary with the standard error captured')
+
+            names, out = run("""
+                results = asyncio.run(run(['t/a.py', 't/b.py'], jobs=2, capture_stderr=True, stderr_lines=1000))
+            """)
+            is_ok(
+                [r.path for r in names['results']], ['t/a.py', 't/b.py'], 'results with a limit of the standard error'
+            )
+            like_ok(out, r'(?m)^Result: PASS$', 'summary with a limit of the standard error')
 
             names, out = run("""
                 results = asyncio.run(run(['t/a.py', 't/b.py'], color=False))

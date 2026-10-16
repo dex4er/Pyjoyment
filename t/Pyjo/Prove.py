@@ -83,6 +83,14 @@ SCRIPTS = {
     'directives.py': """
         print('ok 1', 'not ok 2 # TODO later', 'ok 3 # TODO fixed', 'ok 4 # SKIP why', '1..4', sep='\\n')
     """,
+    'flood.py': """
+        from Pyjo.Test import *
+        import sys
+        for n in range(1, 11):
+            print(f'line {n}', file=sys.stderr)
+        ok(True)
+        done_testing()
+    """,
     'child.py': """
         from Pyjo.Test import *
         import subprocess, sys
@@ -396,6 +404,38 @@ with subtest('Capture the standard error'):
 
     out, err, code = prove_stderr('--capture-stderr', '--timeout', '2', 'child.py')
     like_ok(out, r'(?m)^child\.py \.+ Timed out$', 'a process of the script keeps its output open')
+
+with subtest('Limit the lines of the standard error'):
+    out, err, code = prove_stderr('--capture-stderr', 'flood.py')
+    is_ok(err, ''.join(f'flood.py: line {n}\n' for n in range(1, 11)), 'all lines by default')
+
+    out, err, code = prove_stderr('--capture-stderr', '--stderr-lines', '4', 'flood.py')
+    is_ok(
+        err,
+        'flood.py: line 1\nflood.py: line 2\nflood.py: [6 lines left out]\nflood.py: line 9\nflood.py: line 10\n',
+        'the first half and the last half',
+    )
+    is_ok(code, 0, 'right exit status')
+
+    out, err, code = prove_stderr('--capture-stderr', '--stderr-lines', '3', 'flood.py')
+    is_ok(
+        err,
+        'flood.py: line 1\nflood.py: line 2\nflood.py: [7 lines left out]\nflood.py: line 10\n',
+        'the larger half first',
+    )
+
+    out, err, code = prove_stderr('--capture-stderr', '--stderr-lines', '1', 'flood.py')
+    is_ok(err, 'flood.py: line 1\nflood.py: [9 lines left out]\n', 'one line')
+
+    out, err, code = prove_stderr('--capture-stderr', '--stderr-lines', '0', 'flood.py')
+    is_ok(err, 'flood.py: [10 lines left out]\n', 'no lines')
+
+    out, err, code = prove_stderr('--capture-stderr', '--stderr-lines', '10', 'flood.py')
+    is_ok(err, ''.join(f'flood.py: line {n}\n' for n in range(1, 11)), 'as many lines as the limit')
+
+    out, err, code = prove_stderr('--capture-stderr', '--stderr-lines', '-1', 'flood.py')
+    like_ok(err, r'invalid number of lines: -1', 'negative number of lines')
+    is_ok(code, 2, 'right exit status')
 
 with subtest('Run without tests'):
     out, code = prove('skip.py')

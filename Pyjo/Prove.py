@@ -83,6 +83,14 @@ Options
     ``prove`` has no such option: its ``--merge`` puts the standard error into
     the TAP output, which shows it with ``-v`` only.
 
+``--stderr-lines N``
+    With ``--capture-stderr``, print at most N lines of the standard error of
+    a test script, no limit by default: the first half of them and the last
+    half, which ends with what the script said last, and between them a line
+    that tells how many were left out. ::
+
+        t/Pyjo/URL.py: [922554 lines left out]
+
 ``--count``, ``--no-count``, ``--nocount``
     Show the X/Y count of the tests of a test script while it runs or not,
     renewed once a second. By default it is shown when the output goes to a
@@ -109,6 +117,7 @@ Functions
 
 import argparse
 import asyncio
+import collections
 import operator
 import os
 import re
@@ -157,6 +166,7 @@ class Result:
     errors: list[str] = field(default_factory=lambda: [])
     output: list[str] = field(default_factory=lambda: [])
     stderr: list[str] = field(default_factory=lambda: [])
+    stderr_left_out: int = 0
 
     @property
     def passed(self) -> bool:
@@ -244,6 +254,7 @@ async def run_script(
     stream: bool = False,
     timeout: float | None = None,
     capture_stderr: bool = False,
+    stderr_lines: int | None = None,
     color: bool = False,
     progress: Callable[[Result], object] | None = None,
 ) -> Result:
@@ -252,11 +263,14 @@ async def run_script(
         result = await run_script('t/test.py', [sys.executable], dict(os.environ))
         result = await run_script('t/test.py', [sys.executable], dict(os.environ), timeout=60)
         result = await run_script('t/test.py', [sys.executable], dict(os.environ), capture_stderr=True)
+        result = await run_script('t/test.py', [sys.executable], dict(os.environ), capture_stderr=True, stderr_lines=100)
         result = await run_script('t/test.py', [sys.executable], dict(os.environ), progress=print)
 
     Run a test script and parse its TAP output. The standard error of the
     script goes to the standard error of this process, or with
-    ``capture_stderr`` to the lines of :attr:`Result.stderr`. With ``verbose``
+    ``capture_stderr`` to the lines of :attr:`Result.stderr`, at most
+    ``stderr_lines`` of them, the first half and the last half, with the number
+    of the lines between them in :attr:`Result.stderr_left_out`. With ``verbose``
     and ``stream``, the TAP output is printed as it comes, colored with
     ``color``. ``progress`` is called with the result when the script starts
     and after each of its tests. A script that runs
@@ -288,7 +302,9 @@ async def run_script(
     assert process.stdout is not None
     if progress is not None:
         progress(result)
-    stderr = asyncio.create_task(_read_lines(process.stderr, result.stderr)) if process.stderr is not None else None
+    stderr = (
+        asyncio.create_task(_read_lines(process.stderr, result, stderr_lines)) if process.stderr is not None else None
+    )
     try:
         async with asyncio.timeout(timeout):
             while raw := await process.stdout.readline():
@@ -352,6 +368,7 @@ async def run(
     timeout: float | None = None,
     trap: bool = False,
     capture_stderr: bool = False,
+    stderr_lines: int | None = None,
     color: bool | None = None,
     count: bool | None = None,
 ) -> list[Result]:
@@ -360,6 +377,7 @@ async def run(
         results = asyncio.run(run(['t/a.py', 't/b.py'], jobs=2))
         results = asyncio.run(run(['t/a.py', 't/b.py'], timeout=60, trap=True))
         results = asyncio.run(run(['t/a.py', 't/b.py'], jobs=2, capture_stderr=True))
+        results = asyncio.run(run(['t/a.py', 't/b.py'], jobs=2, capture_stderr=True, stderr_lines=1000))
         results = asyncio.run(run(['t/a.py', 't/b.py'], color=False))
         results = asyncio.run(run(['t/a.py', 't/b.py'], count=False))
 
@@ -401,6 +419,7 @@ async def run(
                 stream=stream,
                 timeout=timeout,
                 capture_stderr=capture_stderr,
+                stderr_lines=stderr_lines,
                 color=out_color,
                 progress=counter.update if counter is not None else None,
             )
@@ -409,8 +428,11 @@ async def run(
             if verbose and not stream:
                 print(f'{path} ..', *(_tap_line(line, out_color) for line in result.output), sep='\n', flush=True)
             print(_status_line(result, width, out_color), flush=True)
-            for line in result.stderr:
-                print(_paint(f'{path}: {line}', 'red', err_color), file=sys.stderr, flush=True)
+            lines = [f'{path}: {line}' for line in result.stderr]
+            if result.stderr_left_out:
+                lines.insert(_head(stderr_lines or 0), f'{path}: [{result.stderr_left_out} lines left out]')
+            for line in lines:
+                print(_paint(line, 'red', err_color), file=sys.stderr, flush=True)
             if counter is not None:
                 counter.show(refresh=True)
             if result.bail_out is not None:
@@ -466,6 +488,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         '--capture-stderr', action='store_true', help='print the standard error of a test script after its result'
     )
+    # Not in prove: --stderr-lines, for --capture-stderr
+    parser.add_argument(
+        '--stderr-lines',
+        type=_lines,
+        metavar='N',
+        help='print at most N lines of the standard error of a test script with --capture-stderr',
+    )
     parser.add_argument(
         '--count', action='store_const', const=True, help='show the X/Y count of the tests, by default on a terminal'
     )
@@ -502,6 +531,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 timeout=args.timeout,
                 trap=args.trap,
                 capture_stderr=args.capture_stderr,
+                stderr_lines=args.stderr_lines,
                 color=args.color,
                 count=args.count,
             )
@@ -717,9 +747,31 @@ class _Count:
         self.length = len(line) if length is None else length
 
 
-async def _read_lines(stream: asyncio.StreamReader, lines: list[str]) -> None:
-    while raw := await stream.readline():
-        lines.append(raw.decode('utf-8', 'replace').rstrip('\r\n'))
+# The first half of the lines, and the last half in a queue that leaves out the lines before them
+async def _read_lines(stream: asyncio.StreamReader, result: Result, limit: int | None) -> None:
+    head = None if limit is None else _head(limit)
+    tail = collections.deque[str](maxlen=None if limit is None else limit // 2)
+    try:
+        while raw := await stream.readline():
+            line = raw.decode('utf-8', 'replace').rstrip('\r\n')
+            if head is None or len(result.stderr) < head:
+                result.stderr.append(line)
+                continue
+            if len(tail) == tail.maxlen:
+                result.stderr_left_out += 1
+            tail.append(line)
+    finally:
+        result.stderr.extend(tail)
+
+
+def _head(limit: int) -> int:
+    return (limit + 1) // 2
+
+
+def _lines(value: str) -> int:
+    if (lines := int(value)) < 0:
+        raise argparse.ArgumentTypeError(f'invalid number of lines: {value}')
+    return lines
 
 
 def _kill(process: asyncio.subprocess.Process) -> None:
