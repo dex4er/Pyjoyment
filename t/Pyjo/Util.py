@@ -683,7 +683,7 @@ with subtest('humanize_bytes'):
     is_ok(humanize_bytes(-717946880), '-685MiB', 'large negative MiB')
     is_ok(humanize_bytes(245760), '240KiB', 'less than a MiB')
 
-# TODO: the subtest "encrypt_cookie/decrypt_cookie", with the functions
+# Left out from Mojolicious: the subtest "encrypt_cookie/decrypt_cookie", as the functions are left out
 
 with subtest('random_bytes'):
     isnt_ok(random_bytes(16), random_bytes(16), 'two random_bytes invocations are not the same')
