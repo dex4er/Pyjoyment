@@ -11,6 +11,8 @@ Pyjo.UserAgent.Server - Application server
 :mod:`Pyjo.UserAgent.Server` is an embedded web server based on
 :mod:`Pyjo.Server.Daemon` that processes requests for :mod:`Pyjo.UserAgent`.
 
+The end of a ``with`` block closes its servers.
+
 See also
 --------
 
@@ -32,7 +34,8 @@ import Pyjo.URL
 import sys
 import weakref
 
-from typing import Any, cast
+from types import TracebackType
+from typing import Any, Self, cast
 
 
 # The application of all servers that have none of their own
@@ -79,6 +82,16 @@ class Pyjo_UserAgent_Server(Pyjo.Base.object):
             self.restart()
         except Exception:
             pass
+
+    # Not in Mojolicious: a context manager, which closes its servers where the block ends, as PyPy frees the object
+    # only when its garbage collector runs
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+        self, type: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None
+    ) -> None:
+        self.restart()
 
     @property
     def app(self) -> Pyjo.Server.Application | None:

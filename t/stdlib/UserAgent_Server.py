@@ -6,6 +6,7 @@ from Pyjo.Test import *
 
 import gc
 import http.client
+import socket
 import threading
 
 
@@ -71,5 +72,13 @@ with subtest('Restart when the system gives the same port again'):
     is_deeply_ok(get(server.ioloop, server.url()), (200, b'Your Pyjo is working!'), 'right response')
 
     is_deeply_ok(get(server.ioloop, server.url()), (200, b'Your Pyjo is working!'), 'right response')
+
+with subtest('Context manager'):
+    with Pyjo.UserAgent.Server.new() as server:
+        port = server.url().port
+        socket.create_connection(('127.0.0.1', port)).close()
+    throws_ok(
+        lambda: socket.create_connection(('127.0.0.1', port)), ConnectionRefusedError, 'servers closed at the end'
+    )
 
 done_testing()
