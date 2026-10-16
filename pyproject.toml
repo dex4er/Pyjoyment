@@ -252,4 +252,5 @@ strict = [
   "Pyjo/UserAgent/Transactor.py",
   "Pyjo/Util.py",
   "Pyjo/WebSocket.py",
+  "Pyjoyment/Types.py",
 ]
