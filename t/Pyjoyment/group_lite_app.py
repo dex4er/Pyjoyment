@@ -363,7 +363,9 @@ t.ua.cookie_jar.ignore = lambda cookie: False
 # Fresh start without cookies, session or flash
 t.get_ok('/bridge2stash', {'X-Flash': 1}).status_is(200).content_is('stash too!!!!!!!!\n')
 
-# TODO: the random static requests of /mojo/logo-white.png, when Pyjoyment.Static is ported
+# Random static requests
+t.get_ok('/mojo/logo-white.png').status_is(200)
+t.get_ok('/mojo/logo-white.png').status_is(200)
 
 # With cookies, session and flash again
 (

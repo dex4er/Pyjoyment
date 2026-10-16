@@ -181,7 +181,13 @@ t = Pyjo.Test.Pyjo.new()
 with subtest('Normal route'):
     (t.get_ok('/').status_is(200).header_isnt('Cache-Control', 'max-age=3600, must-revalidate').content_is('works'))
 
-# TODO: the subtest "Normal static file", when Pyjoyment.Static is ported
+with subtest('Normal static file'):
+    (
+        t.get_ok('/test.txt')
+        .status_is(200)
+        .header_is('Cache-Control', 'max-age=3600, must-revalidate')
+        .content_is('Normal static file!\n')
+    )
 
 with subtest('Override static file'):
     t.get_ok('/hello.txt').status_is(200).content_is('Custom static file works!')
@@ -192,7 +198,13 @@ with subtest('render_later from before_dispatch'):
 with subtest('Custom dispatcher'):
     t.get_ok('/custom?a=works+too').status_is(205).content_is('works too')
 
-# TODO: the subtest "Static file", when Pyjoyment.Static is ported
+with subtest('Static file'):
+    (
+        t.get_ok('/res.txt')
+        .status_is(200)
+        .header_is('Cache-Control', 'max-age=3600, must-revalidate')
+        .content_is('Static response!\n')
+    )
 
 with subtest(' Custom response'):
     (

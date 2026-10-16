@@ -8,7 +8,7 @@ from Pyjoyment.Lite import app, get
 
 # More paths with higher precedence
 app.renderer.paths.insert(0, app.home.child('templates2').to_str())
-# TODO: the "public2" directory in front of the paths of static, when Pyjoyment.Static is ported
+app.static.paths.insert(0, app.home.child('public2').to_str())
 
 get('/twenty_three', '23')
 
@@ -34,8 +34,24 @@ with subtest('"templates2" directory (variant)'):
         .content_is('The answer is 43!\n')
     )
 
-# TODO: the subtests '"public2" directory', '"public" directory' and '"public2" directory' of the static files, when
-# Pyjoyment.Static is ported
+with subtest('"public2" directory'):
+    (
+        t.get_ok('/hello.txt')
+        .status_is(200)
+        .header_is('Server', 'Pyjoyment (Python)')
+        .content_is('Also higher precedence!\n')
+    )
+
+with subtest('"public" directory'):
+    t.get_ok('/hello2.txt').status_is(200).header_is('Server', 'Pyjoyment (Python)').content_is('X')
+
+with subtest('"public2" directory'):
+    (
+        t.get_ok('/hello3.txt')
+        .status_is(200)
+        .header_is('Server', 'Pyjoyment (Python)')
+        .content_is('Hello Mojo from... ALL GLORY TO THE HYPNOTOAD!\n')
+    )
 
 with subtest('"templates2" directory'):
     t.get_ok('/yada').status_is(200).header_is('Server', 'Pyjoyment (Python)').content_is('Higher precedence!\n')
