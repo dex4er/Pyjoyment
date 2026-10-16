@@ -252,6 +252,9 @@ strict = [
   "Pyjo/UserAgent/Transactor.py",
   "Pyjo/Util.py",
   "Pyjo/WebSocket.py",
+  "Pyjoyment/Routes/__init__.py",
+  "Pyjoyment/Routes/Match.py",
   "Pyjoyment/Routes/Pattern.py",
+  "Pyjoyment/Routes/Route.py",
   "Pyjoyment/Types.py",
 ]
