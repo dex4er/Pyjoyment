@@ -190,6 +190,12 @@ with tempfile.TemporaryDirectory() as tmp:
             is_ok([r.path for r in names['results']], ['t/a.py', 't/b.py'], 'results with the standard error captured')
             like_ok(out, r'(?m)^Result: PASS$', 'summary with the standard error captured')
 
+            names, out = run("""
+                results = asyncio.run(run(['t/a.py', 't/b.py'], color=False))
+            """)
+            is_ok([r.path for r in names['results']], ['t/a.py', 't/b.py'], 'results without colors')
+            unlike_ok(out, r'\033', 'no colors')
+
         with subtest('main'):
             names, out = run("""
                 sys.exit(main(['-r', 't']))

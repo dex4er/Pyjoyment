@@ -3,6 +3,7 @@ import Pyjo.Prove
 from Pyjo.Test import *
 
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -74,6 +75,9 @@ SCRIPTS = {
         print('second warning', file=sys.stderr)
         done_testing()
     """,
+    'directives.py': """
+        print('ok 1', 'not ok 2 # TODO later', 'ok 3 # TODO fixed', 'ok 4 # SKIP why', '1..4', sep='\\n')
+    """,
     'child.py': """
         from Pyjo.Test import *
         import subprocess, sys
@@ -101,6 +105,38 @@ def prove_stderr(*args, scripts=SCRIPTS):
             [sys.executable, '-m', 'Pyjo.Prove', *args], cwd=tmp, env=env, capture_output=True, text=True
         )
     return p.stdout, p.stderr, p.returncode
+
+
+def prove_tty(*args, env=None, scripts=SCRIPTS):
+    # The output to a terminal, where the terminal turns a newline into a carriage return and a newline
+    with tempfile.TemporaryDirectory() as tmp:
+        for name, code in scripts.items():
+            with open(os.path.join(tmp, name), 'w') as f:
+                f.write(textwrap.dedent(code))
+        env = (
+            {k: v for k, v in os.environ.items() if k != 'NO_COLOR'}
+            | {'TERM': 'xterm', 'PYTHONPATH': ROOT}
+            | (env or {})
+        )
+        master, slave = os.openpty()
+        p = subprocess.Popen(
+            [sys.executable, '-m', 'Pyjo.Prove', *args], cwd=tmp, env=env, stdout=slave, stderr=subprocess.DEVNULL
+        )
+        os.close(slave)
+        out = b''
+        try:
+            while chunk := os.read(master, 4096):
+                out += chunk
+        except OSError:
+            # Linux reports the end of the output of a terminal as EIO
+            pass
+        os.close(master)
+        p.wait()
+    return out.decode().replace('\r\n', '\n'), p.returncode
+
+
+def colored(code, text):
+    return re.escape(f'\033[{code}m{text}\033[0m')
 
 
 def interrupt(*args):
@@ -356,6 +392,69 @@ with subtest('Capture the standard error'):
 
     out, err, code = prove_stderr('--capture-stderr', '--timeout', '2', 'child.py')
     like_ok(out, r'(?m)^child\.py \.+ Timed out$', 'a process of the script keeps its output open')
+
+with subtest('Run without tests'):
+    out, code = prove('skip.py')
+    like_ok(out, r'(?m)^All tests successful\.$', 'summary')
+    like_ok(out, r'(?m)^Files=1, Tests=0, ', 'counts')
+    like_ok(out, r'(?m)^Result: NOTESTS$', 'result')
+    is_ok(code, 0, 'right exit status')
+
+with subtest('Colors'):
+    out, err, code = prove_stderr('-j', '2', '--capture-stderr', 'pass.py', 'fail.py', 'stderr.py')
+    unlike_ok(out, r'\033', 'no colors when the output is not a terminal')
+    unlike_ok(err, r'\033', 'no colors when the standard error is not a terminal')
+
+    out, err, code = prove_stderr('--color', '--capture-stderr', 'pass.py', 'skip.py', 'stderr.py', 'directives.py')
+    like_ok(out, rf'(?m)^pass\.py \.+ {colored(32, "ok")}$', 'green ok')
+    like_ok(out, rf'(?m)^skip\.py \.+ {colored(33, "skipped: not now")}$', 'yellow skipped')
+    like_ok(out, rf'(?m)^{colored(32, "All tests successful.")}$', 'green summary')
+    like_ok(out, rf'(?m)^{colored(33, "directives.py: TODO passed:  3")}$', 'yellow TODO passed')
+    like_ok(out, rf'(?m)^Result: {colored(32, "PASS")}$', 'green PASS')
+    like_ok(err, rf'(?m)^{colored(31, "stderr.py: first warning")}$', 'red standard error')
+    is_ok(code, 0, 'right exit status')
+
+    out, code = prove('--color', 'fail.py', 'die.py', 'bail.py')
+    like_ok(out, rf'(?m)^fail\.py \.+ {colored(31, "Failed 2/3 subtests")}$', 'red failure')
+    like_ok(out, rf'(?m)^die\.py \.+ {colored(31, "Dubious")}$', 'red dubious')
+    like_ok(out, rf'(?m)^bail\.py \.+ {colored(31, "Bailout called.  Further testing stopped:  no database")}$', 'red')
+    like_ok(out, rf'(?m)^  {colored(31, "Failed tests:  2, 3")}$', 'red failed tests')
+    like_ok(out, rf'(?m)^  {colored(31, "Non-zero exit status: 255")}$', 'red error')
+    like_ok(out, rf'(?m)^  {colored(31, "Bail out:  no database")}$', 'red bail out')
+    like_ok(out, rf'(?m)^Result: {colored(31, "FAIL")}$', 'red FAIL')
+
+    out, code = prove('--color', '--timeout', '2', 'sleep.py')
+    like_ok(out, rf'(?m)^sleep\.py \.+ {colored(31, "Timed out")}$', 'red timeout')
+
+    out, code = prove('--color', 'skip.py')
+    like_ok(out, rf'(?m)^Result: {colored(33, "NOTESTS")}$', 'yellow NOTESTS')
+
+    out, code = prove('--color', '-v', 'fail.py', 'directives.py')
+    like_ok(out, r'(?m)^ok 1$', 'passed test point as it is')
+    like_ok(out, rf'(?m)^{colored(31, "not ok 2")}$', 'red failed test point')
+    like_ok(out, rf'(?m)^{colored(33, "not ok 2 # TODO later")}$', 'yellow TODO test point')
+    like_ok(out, rf'(?m)^{colored(33, "ok 4 # SKIP why")}$', 'yellow skipped test point')
+
+    out, code = prove('--color', '-v', '-j', '2', 'fail.py', 'pass.py')
+    like_ok(out, rf'(?m)^{colored(31, "not ok 2")}$', 'red failed test point of parallel jobs')
+
+    out, code = prove('--color', '--no-color', 'pass.py')
+    unlike_ok(out, r'\033', 'no colors with --no-color')
+
+with subtest('Colors on a terminal'):
+    if not hasattr(os, 'openpty'):
+        skip('no terminal', 5)
+    else:
+        out, code = prove_tty('pass.py')
+        like_ok(out, rf'(?m)^pass\.py \.+ {colored(32, "ok")}$', 'colors by default')
+        out, code = prove_tty('--no-color', 'pass.py')
+        unlike_ok(out, r'\033', 'no colors with --no-color')
+        out, code = prove_tty('pass.py', env={'NO_COLOR': '1'})
+        unlike_ok(out, r'\033', 'no colors with NO_COLOR')
+        out, code = prove_tty('--color', 'pass.py', env={'NO_COLOR': '1'})
+        like_ok(out, rf'(?m)^pass\.py \.+ {colored(32, "ok")}$', '--color over NO_COLOR')
+        out, code = prove_tty('pass.py', env={'TERM': 'dumb'})
+        unlike_ok(out, r'\033', 'no colors on a dumb terminal')
 
 with subtest('Verbose'):
     out, code = prove('-v', 'pass.py')
