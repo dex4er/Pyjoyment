@@ -2,8 +2,13 @@ import Pyjo.Asset.File
 import Pyjo.Asset.Memory
 import Pyjo.Collection
 import Pyjo.Exception
+import Pyjo.IOLoop.Server
+import Pyjo.Promise
+import Pyjo.Server.Daemon
 import Pyjo.String.Bytes
+import Pyjo.Test.Pyjo
 import Pyjo.Transaction.HTTP
+import Pyjo.URL
 import Pyjo.UserAgent.Transactor
 import Pyjoyment
 
@@ -276,6 +281,92 @@ with subtest('param'):
     c = controller()
     c.param('foo', 'bar')
     is_ok(render(c, "%= param('foo')"), 'bar\n', 'alias')
+
+# The hosts of the examples of the proxy helpers, a local server for the one that responds, and a port that nothing
+# listens on for the one that fails, as a test does not request remote hosts
+backend = Pyjoyment.new()
+backend.log.level = 'fatal'
+backend.routes.any('/', lambda c: c.render(text=f'backend {c.req.method}'))
+daemon = Pyjo.Server.Daemon.new(listen=['http://127.0.0.1'], silent=True, app=backend)
+example = f'http://127.0.0.1:{daemon.start().ports()[0]}'
+nowhere = f'http://127.0.0.1:{Pyjo.IOLoop.Server.object.generate_port()}'
+
+
+def proxy(action):
+    app = Pyjoyment.new()
+    app.log.level = 'fatal'
+    apps.append(app)
+    app.routes.any('/', action)
+    return Pyjo.Test.Pyjo.new(app)
+
+
+with subtest('proxy.get_p'):
+
+    def action(c):
+        promise = c.proxy.get_p(example, {'Accept': '*/*'})
+        isa_ok(promise, Pyjo.Promise.object, 'promise')
+
+    proxy(action).get_ok('/').status_is(200).content_is('backend GET')
+
+    def action(c):
+        # Forward with exception handling
+        @c.proxy.get_p(nowhere).catch
+        def catch(err):
+            c.log().debug(f'Proxy error: {err}')
+            c.render(text='Something went wrong!', status=400)
+
+    proxy(action).get_ok('/').status_is(400).content_is('Something went wrong!')
+
+with subtest('proxy.post_p'):
+
+    def action(c):
+        promise = c.proxy.post_p(example, {'Accept': '*/*'})
+        isa_ok(promise, Pyjo.Promise.object, 'promise')
+
+    proxy(action).get_ok('/').status_is(200).content_is('backend POST')
+
+    def action(c):
+        # Forward with exception handling
+        @c.proxy.post_p(nowhere, form={'test': 'pass'}).catch
+        def catch(err):
+            c.log().debug(f'Proxy error: {err}')
+            c.render(text='Something went wrong!', status=400)
+
+    proxy(action).get_ok('/').status_is(400).content_is('Something went wrong!')
+
+with subtest('proxy.start_p'):
+
+    def action(c):
+        # A new transaction, with the URL of the local server
+        tx = Pyjo.Transaction.HTTP.new()
+        tx.req.url = Pyjo.URL.new(example)
+        promise = c.proxy.start_p(tx)
+        isa_ok(promise, Pyjo.Promise.object, 'promise')
+
+    proxy(action).get_ok('/').status_is(200).content_is('backend GET')
+
+    def action(c):
+        # Forward with exception handling
+        tx = c.ua().build_tx('GET', nowhere)
+
+        @c.proxy.start_p(tx).catch
+        def catch(err):
+            c.log().debug(f'Proxy error: {err}')
+            c.render(text='Something went wrong!', status=400)
+
+    proxy(action).get_ok('/').status_is(400).content_is('Something went wrong!')
+
+    def action(c):
+        # Forward with custom request and response headers
+        headers = c.req.headers.clone().dehop()
+        headers.header('X-Proxy', 'Pyjo')
+        tx = c.ua().build_tx('GET', example, headers.to_dict())
+        c.proxy.start_p(tx)
+        tx.res.content.once('body', lambda content: c.res.headers.header('X-Proxy', 'Pyjo'))
+
+    proxy(action).get_ok('/').status_is(200).header_is('X-Proxy', 'Pyjo').content_is('backend GET')
+
+daemon.stop()
 
 with subtest('redirect_to'):
     c = controller()
