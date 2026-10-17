@@ -68,6 +68,68 @@ eval
 
 Use :mod:`Pyjoyment.Command.eval` to run code against application.
 
+generate
+~~~~~~~~
+::
+
+    $ pyjo generate
+    $ pyjo generate help
+    $ ./myapp.py generate help
+
+List available generator commands with short descriptions. ::
+
+    $ pyjo generate help <generator>
+    $ ./myapp.py generate help <generator>
+
+List available options for generator command with short descriptions.
+
+generate app
+~~~~~~~~~~~~
+::
+
+    $ pyjo generate app <AppName>
+
+Use :mod:`Pyjoyment.Command.Author.generate.app` to generate application
+directory structure for a fully functional :mod:`Pyjoyment` application.
+
+generate dockerfile
+~~~~~~~~~~~~~~~~~~~
+::
+
+    $ ./myapp.py generate dockerfile
+    $ python -m MyApp generate dockerfile
+
+Use :mod:`Pyjoyment.Command.Author.generate.dockerfile` to generate
+``Dockerfile`` for application.
+
+generate lite-app
+~~~~~~~~~~~~~~~~~
+::
+
+    $ pyjo generate lite-app
+
+Use :mod:`Pyjoyment.Command.Author.generate.lite_app` to generate a fully
+functional :mod:`Pyjoyment.Lite` application.
+
+generate plugin
+~~~~~~~~~~~~~~~
+::
+
+    $ pyjo generate plugin <PluginName>
+
+Use :mod:`Pyjoyment.Command.Author.generate.plugin` to generate directory
+structure for a fully functional :mod:`Pyjoyment` plugin.
+
+generate pyproject
+~~~~~~~~~~~~~~~~~~
+::
+
+    $ pyjo generate pyproject
+    $ ./myapp.py generate pyproject
+
+Use :mod:`Pyjoyment.Command.Author.generate.pyproject` to generate
+``pyproject.toml`` file for application.
+
 get
 ~~~
 ::
@@ -92,6 +154,15 @@ List available commands with short descriptions. ::
     $ ./myapp.py help <command>
 
 List available options for the command with short descriptions.
+
+inflate
+~~~~~~~
+::
+
+    $ ./myapp.py inflate
+
+Use :mod:`Pyjoyment.Command.Author.inflate` to turn templates and static files
+embedded in the ``DATA`` sections of your application into real files.
 
 prefork
 ~~~~~~~
@@ -141,7 +212,6 @@ Classes
 -------
 """
 
-# TODO: the commands generate and inflate, when they are ported
 # Left out from Mojolicious: the command cpanify, as uv publish uploads distributions to PyPI
 
 import Pyjo.Exception

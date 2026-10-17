@@ -256,6 +256,19 @@ uv keeps such a build apart from one without the variable in its cache.
 `CGIHTTPRequestHandler`, which Python 3.15 removed, as the second run of CI
 on Python 3.14.
 
+The workflow Docker Smoke Test builds and runs the images of
+`generate dockerfile`, for an application, a Lite script with
+`pyproject.toml` and one with the inline metadata of PEP 723, which
+`.github/scripts/docker-smoke.sh` generates, and checks that they serve their
+pages and stop gracefully on the TERM of `docker stop`. The image gets the
+wheel of the checkout, as the version that is tested is not on PyPI, which is
+the only change of the generated `Dockerfile`. The script runs locally as
+well, with Docker:
+
+```sh
+mise exec -- .github/scripts/docker-smoke.sh app
+```
+
 CI sets `PYTHONWARNINGS=error::SyntaxWarning,error::DeprecationWarning`, so an
 invalid escape sequence or a deprecated API fails the build, before a new
 Python removes it; the weekly run catches the deprecations of a new Python
@@ -522,6 +535,22 @@ copy:
   server imports the script of an application, which ends with
   `application = app.start()`, with its own arguments in `sys.argv`, so that
   the command has to be detected.
+- The generators of the command `generate` write projects for uv, where Mojo
+  writes ones for ExtUtils::MakeMaker: `generate makefile` is
+  `generate pyproject`, and `cpanify` is left out, as `uv publish` uploads to
+  PyPI. An application is a package in the directory of its project, without
+  `lib`, as `Pyjo.Prove -l` adds the current directory, and its
+  `pyproject.toml` has no build system, as `uv init --app` makes it, since
+  `Pyjo.Home` finds `templates` and `public` next to the package, which a
+  wheel would leave behind; `MyApp/__main__.py` takes the place of
+  `script/my_app`. A script of `Pyjoyment.Lite` has its dependencies in the
+  `pyproject.toml` of `generate pyproject` next to it, as in Mojo, or in the
+  inline metadata of PEP 723, which `generate dockerfile` installs where
+  there is no `pyproject.toml`. A plugin is a distribution, built with
+  hatchling, whose wheel has only its module, without the `__init__.py` of
+  the namespace `Pyjoyment.Plugin`, which `extend_path` keeps open. A
+  namespace finds its parts through the `__path__` of its parent package, so
+  `Pyjoyment/__init__.py` extends its own before it imports its subpackages.
 - `ojo` is the functions of the package `Pyjo`, which `from Pyjo import *`
   imports, and `perl -Mojo -E` is `python -m Pyjo`. A function imports the
   modules it uses when it is called, as every `import Pyjo.X` runs

@@ -193,6 +193,13 @@ See also
 Ported from `Mojolicious <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojolicious.pm>`_ of Mojolicious 9.49.
 """
 
+# Not in Mojolicious: a namespace that other distributions can add modules to, open before the package imports its
+# subpackages, as Pyjoyment.Plugin and Pyjoyment.Command, which are namespaces that find their parts in it
+from pkgutil import extend_path
+
+
+__path__ = extend_path(__path__, __name__)
+
 import Pyjo.App
 import Pyjo.Loader
 import Pyjo.Log
@@ -216,7 +223,6 @@ import os
 import sys
 
 from collections.abc import Callable
-from pkgutil import extend_path
 from typing import Any, Self, cast, overload
 
 
@@ -893,9 +899,6 @@ def _exception(next: Callable[[], Any], c: Pyjoyment.Controller.object) -> None:
 def _reply_exception(c: Pyjoyment.Controller.object, e: Any) -> None:
     c.helpers.reply.exception(e)
 
-
-# Not in Mojolicious: a namespace that other distributions can add modules to
-__path__ = extend_path(__path__, __name__)
 
 new = Pyjoyment_App.new
 object = Pyjoyment_App
