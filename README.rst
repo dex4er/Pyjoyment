@@ -30,8 +30,8 @@ web framework:
   (TAP), with ``Pyjo.Test``, inspired by Perl's ``Test::More``, and a test
   harness, ``Pyjo.Prove``, inspired by Perl's ``prove``.
 
-The ``Pyjoyment`` package is reserved for the web framework itself: routes,
-controllers, renderer and ``Pyjoyment.Lite``.
+The ``Pyjoyment`` package is the web framework itself: routes, controllers,
+renderer, plugins, ``Pyjoyment.Lite`` and the command line interface.
 
 Pyjoyment requires Python 3.12 or newer and runs on PyPy on a best-effort
 basis. It needs nothing besides the Python standard library.
@@ -48,10 +48,11 @@ Mojolicious 9 to Python 3.12 and newer, with ``asyncio`` as its event loop.
 The toolkit, the ``Pyjo`` package, is ported: URLs, DOM and CSS selectors,
 JSON, templates, HTTP messages and cookies, the event loop with promises, the
 user agent, and the servers, on their own, preforking, with hot deployment or
-reloading, and through ASGI, WSGI and CGI. A ported module names the
-Mojolicious version it was ported from in its documentation. The web
-framework, the ``Pyjoyment`` package with routes, controllers and plugins, is
-not there yet.
+reloading, and through ASGI, WSGI and CGI. So is the web framework, the
+``Pyjoyment`` package: routes, controllers, the renderer with templates and
+template strings, plugins, ``Pyjoyment.Lite`` and the commands. The tests of
+Mojolicious are ported with them, and a ported module names the Mojolicious
+version it was ported from in its documentation.
 
 The progress is tracked in `GitHub Issues <https://github.com/dex4er/Pyjoyment/issues>`_.
 
@@ -75,6 +76,75 @@ or, in a project managed with `uv <https://docs.astral.sh/uv/>`_: ::
 
 Quick start
 ===========
+
+These three lines are a whole web application.
+
+.. code-block:: python
+
+   from Pyjoyment.Lite import *
+
+
+   get('/', {'text': 'I ♥ Pyjoyment!'})
+
+   app.start()
+
+To run the example with the built-in development web server, just put the
+code into a file and start it with ``pyjo-reload``. ::
+
+    $ pyjo-reload hello.py
+    Web application available at http://127.0.0.1:3000
+
+Test it with any HTTP client you prefer. ::
+
+    $ curl http://127.0.0.1:3000/
+    I ♥ Pyjoyment!
+
+Duct tape for the HTML5 web
+===========================
+
+Use all the latest Python and HTML features in beautiful single file
+prototypes like this one, and grow them easily into well-structured
+Model-View-Controller web applications with ``pyjo generate app``.
+
+.. code-block:: python
+
+   """
+   __DATA__
+
+   @@ index.html.ep
+   % url = url_for('title')
+   <script>
+     const ws = new WebSocket('<%= url.to_abs() %>');
+     ws.onmessage = function (event) { document.body.innerHTML += event.data };
+     ws.onopen    = function (event) { ws.send('https://mojolicious.org') };
+   </script>
+   """
+
+   from Pyjoyment.Lite import *
+
+
+   # Render template "index.html.ep" from the DATA section
+   @get('/')
+   def index(c):
+       c.render(template='index')
+
+
+   # WebSocket service used by the template to extract the title from a website
+   @websocket('/title')
+   def title(c):
+       @c.on('message')
+       def message(c, msg):
+           c.ua().get_p(msg).then(lambda tx: c.send(tx.result.dom().at('title').text))
+
+
+   app.start()
+
+The templates of a script of ``Pyjoyment.Lite`` are in its docstring, after a
+line ``__DATA__``, and the website is requested without blocking, as the
+WebSocket service runs in the event loop.
+
+Servers
+========
 
 ``Pyjo.HelloWorld`` is the application that a server runs when it is given
 none, and it answers every request with ``Your Pyjo is working!``. It runs

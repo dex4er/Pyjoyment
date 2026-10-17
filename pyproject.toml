@@ -146,7 +146,15 @@ ignore = [
 "Pyjo/Reactor/**" = ["TID251"]
 "Pyjo/Prove.py" = ["TID251"]
 "benchmarks/**" = ["TID251"]
-"examples/**" = ["TID251"]
+"examples/**" = [
+  "TID251",
+  # F403 "`from Pyjoyment.Lite import *` used; unable to detect undefined
+  # names": a script of Pyjoyment.Lite imports its functions, like `use
+  # Mojolicious::Lite` in Perl.
+  "F403",
+  # F405 "`get` may be undefined, or defined from star imports"
+  "F405",
+]
 # E402 "Module level import not at top of file": the namespace of the package is
 # open before it imports its subpackages, which extend it with their parts.
 "Pyjoyment/__init__.py" = ["E402"]
