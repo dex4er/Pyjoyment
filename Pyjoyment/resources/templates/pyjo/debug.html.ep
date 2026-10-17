@@ -12,17 +12,17 @@
     <meta http-equiv="Expires" content="-1">
     %= favicon()
     %= javascript('/pyjo/highlight.js/highlight.min.js')
-    %# Not in Mojolicious: the language Python of highlight.js, which its build of Mojolicious has not
-    %= javascript('/pyjo/highlight.js/python.min.js')
     %= javascript('/pyjo/highlight.js/pyjoyment.min.js')
-    %= javascript('/pyjo/popper/popper.js')
+    %# Left out from Mojolicious: popper.js, as bootstrap.js is the bundle of Bootstrap, which has Popper
     %= javascript('/pyjo/bootstrap/bootstrap.js')
     %= stylesheet('/pyjo/bootstrap/bootstrap.css')
     %= stylesheet('/pyjo/highlight.js/highlight-mojo-dark.css')
     %= stylesheet('/pyjo/pyjo.css')
     <script>
       'use strict';
-      hljs.initHighlightingOnLoad();
+      %# Unlike Mojolicious: highlightAll of highlight.js 11, where Mojo calls initHighlightingOnLoad of highlight.js 10,
+      %# which highlight.js 11 deprecates
+      hljs.highlightAll();
       window.addEventListener('load', () => {
         for (const tooltip of document.querySelectorAll('[data-bs-toggle="tooltip"]')) {
           new bootstrap.Tooltip(tooltip);
