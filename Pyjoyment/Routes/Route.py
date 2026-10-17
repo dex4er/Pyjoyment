@@ -40,6 +40,7 @@ import Pyjoyment.Routes.Pattern
 
 import functools
 import re
+import sys
 import weakref
 
 from collections.abc import Callable
@@ -133,7 +134,13 @@ class Pyjoyment_Routes_Route(Pyjo.Base.object):
             if dynamic := shortcuts.get(name):
                 return functools.partial(dynamic, self)
         package = f'{type(self).__module__}.{type(self).__qualname__}'
-        raise AttributeError(f'Can\'t locate object method "{name}" via package "{package}"', name=name, obj=self)
+
+        # The location of the caller, which croak adds to the message
+        caller = sys._getframe(1)  # pyright: ignore[reportPrivateUsage]
+        at = f'at {caller.f_code.co_filename} line {caller.f_lineno}'
+        raise AttributeError(
+            f'Can\'t locate object method "{name}" via package "{package}" {at}.\n', name=name, obj=self
+        )
 
     @property
     def parent(self) -> 'Pyjoyment_Routes_Route | None':

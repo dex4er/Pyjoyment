@@ -70,7 +70,14 @@ with subtest('Static asset'):
 with subtest('Bundled static file'):
     t.get_ok('/static/favicon.ico').status_is(200).content_type_is('image/x-icon')
 
-# TODO: the subtest "Bundled template", with the link of /static/pyjo/pyjo.css, when the bundled templates are ported
+# Renamed from Mojolicious: the stylesheet of the bundled template is pyjo/pyjo.css, where Mojo has mojo/mojo.css
+with subtest('Bundled template'):
+    (
+        t.get_ok('/doesnotexist')
+        .status_is(404)
+        .element_exists('link[href=/static/favicon.ico]')
+        .element_exists('link[href=/static/pyjo/pyjo.css]')
+    )
 
 with subtest('Helpers with prefix'):
     t.get_ok('/helpers').status_is(200).content_is("""\

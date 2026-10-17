@@ -713,15 +713,7 @@ def _development(page: str, c: 'Controller', e: Any = None) -> 'Controller':
     bundled = 'pyjo/' + ('debug' if mode == 'development' else page)
     if _fallbacks(c, options, page, bundled):
         return c
-    if _fallbacks(c, {**options, 'format': 'html'}, page, bundled):
-        return c
-
-    # TODO: remove with the bundled templates, when Pyjoyment.Plugin.TagHelpers is ported; until then the plain text
-    # response, as a request that nothing renders never ends
-    if page == 'exception':
-        c.helpers.reply.txt_exception(e)
-    else:
-        c.helpers.reply.txt_not_found()
+    _fallbacks(c, {**options, 'format': 'html'}, page, bundled)
     return c
 
 
@@ -729,7 +721,7 @@ def _dumper(c: 'Controller', *values: Any) -> str:
     return dumper(*values)
 
 
-def _exception(c: 'Controller', e: Any) -> Any:
+def _exception(c: 'Controller', e: Any = None) -> Any:
     return c.helpers.reply.http_exception(e)
 
 

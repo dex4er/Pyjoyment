@@ -371,17 +371,15 @@ with subtest('reply.html_exception'):
     c.reply.html_exception(Pyjo.Exception.new())
     isa_ok(c.stash('exception'), Pyjo.Exception.object, 'exception in the stash')
     ok('snapshot' in c.stash(), 'snapshot')
-    # TODO: the rendered exception page, when the bundled templates are ported with Pyjoyment.Plugin.TagHelpers, in
-    # place of the plain text
     is_ok(c.res.code, 500, 'status')
+    like_ok(c.res.text, r'<title>Server Error', 'exception page')
 
 with subtest('reply.html_not_found'):
     c = controller()
     c.reply.html_not_found()
     ok('snapshot' in c.stash(), 'snapshot')
-    # TODO: the rendered not found page, when the bundled templates are ported with Pyjoyment.Plugin.TagHelpers, in
-    # place of the plain text
-    is_deeply_ok([c.res.code, c.res.body], [404, b'Not Found'], 'response')
+    is_ok(c.res.code, 404, 'status')
+    like_ok(c.res.text, r'<title>Page Not Found', 'not found page')
 
 with subtest('reply.json_exception'):
     c = controller()

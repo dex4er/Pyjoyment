@@ -129,4 +129,6 @@ jobs:
           grep -q 'Pyjoyment/__init__.py' wheel.txt
           grep -q 'Pyjoyment/resources/public/favicon.ico' wheel.txt
           grep -q 'Pyjoyment/resources/public/pyjo/logo.png' wheel.txt
+          grep -q 'Pyjoyment/resources/public/pyjo/bootstrap/bootstrap.css' wheel.txt
+          grep -q 'Pyjoyment/resources/templates/pyjo/debug.html.ep' wheel.txt
           grep -q 'Pyjo/py.typed' wheel.txt
