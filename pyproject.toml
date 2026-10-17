@@ -288,4 +288,6 @@ strict = [
   "Pyjoyment/Sessions.py",
   "Pyjoyment/Static.py",
   "Pyjoyment/Types.py",
+  "Pyjoyment/Validator/__init__.py",
+  "Pyjoyment/Validator/Validation.py",
 ]

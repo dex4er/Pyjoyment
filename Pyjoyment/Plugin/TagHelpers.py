@@ -25,6 +25,13 @@ attributes always be generated automatically. ::
     <%= radio_button('country', 'france') %> France
     <%= radio_button('country', 'uk') %> UK
 
+For fields that failed validation with the helper ``validation`` of
+:mod:`Pyjoyment.Plugin.DefaultHelpers` the ``field-with-error`` class will be
+automatically added through ``tag_with_error``, to make styling with CSS
+easier. ::
+
+    <input class="field-with-error" name="age" type="text" value="250">
+
 The helpers take the attributes of the tag as keyword arguments. An attribute
 whose name is not an identifier of Python, or is a keyword of it, as
 ``class``, ``for`` or ``data-id``, is passed with ``**``, and an attribute
@@ -889,9 +896,10 @@ def _text_area(c: 'Controller', name: str, /, *args: Any, **attrs: Any) -> Pyjo.
     return _validation(c, name, 'textarea', content, **{'name': name, **attrs})
 
 
-# TODO: the tag of a field that failed validation with the helper tag_with_error, when Pyjoyment.Validator is ported
 def _validation(c: 'Controller', name: str, tag: str, content: Any, /, **attrs: Any) -> Pyjo.String.HTML.object:
-    return _tag(tag, content, **attrs)
+    if not c.helpers.validation().has_error(name):
+        return _tag(tag, content, **attrs)
+    return c.helpers.tag_with_error(tag, content, **attrs)
 
 
 new = Pyjoyment_Plugin_TagHelpers.new

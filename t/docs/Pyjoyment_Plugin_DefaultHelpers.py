@@ -4,6 +4,7 @@ import Pyjo.Collection
 import Pyjo.Exception
 import Pyjo.String.Bytes
 import Pyjo.Transaction.HTTP
+import Pyjo.UserAgent.Transactor
 import Pyjoyment
 
 from Pyjo.File import tempdir
@@ -581,6 +582,25 @@ with subtest('url_with'):
     is_ok(render(c, "%= url_with('named', foo='bar', baz='yada')"), '/named/bar/yada?page=1\n', 'inherited query')
 
     is_ok(render(c, "%= url_with().set(query={'page': 2})"), '?page=2\n', 'replaced')
+
+with subtest('validation'):
+    c = controller()
+    c.req.url.parse('/?title=+Hello+')
+    v = c.validation()
+
+    # Validate GET/POST parameter
+    v = c.validation()
+    v.required('title', 'trim').size(3, 50)
+    title = v.param('title')
+    is_ok(title, 'Hello', 'parameter')
+
+    # Validate file upload
+    tx = Pyjo.UserAgent.Transactor.new().tx('POST', '/', form={'tarball': {'content': 'data', 'filename': 'a.tar'}})
+    c = controller().app.build_controller(tx)
+    v = c.validation()
+    v.required('tarball').upload().size(1, 1048576)
+    tarball = v.param('tarball')
+    is_ok(tarball.filename, 'a.tar', 'upload')
 
 with subtest('register'):
     plugin = Pyjoyment.new().plugins.load_plugin('DefaultHelpers')
