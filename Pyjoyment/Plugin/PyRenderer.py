@@ -184,6 +184,9 @@ def _load(path: str, key: str, encoding: str | None) -> Callable[..., Any]:
 
     module = types.ModuleType(f'{__name__}.{key}')
     module.__file__ = path
+
+    # No spec, as a spec without a loader makes linecache warn, which then reads the lines from the file
+    del module.__spec__
     exec(code, module.__dict__)
     if not callable(cb := module.__dict__.get('render')):
         raise Pyjo.Exception.new(f'Template "{path}" has no function "render"')
