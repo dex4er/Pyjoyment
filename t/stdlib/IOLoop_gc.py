@@ -6,6 +6,7 @@ import Pyjoyment
 from Pyjo.Test import *
 
 import gc
+import threading
 
 
 # The garbage collector of Python frees the objects in cycles at any allocation, even in the middle of what the event
@@ -46,6 +47,18 @@ with subtest('A finalizer in the event loop cleans up after the callback'):
     Pyjo.IOLoop.next_tick(collect)
     Pyjo.IOLoop.start()
     is_deeply_ok(seen, [True, False], 'acceptor removed after the callback')
+
+with subtest('A finalizer in another thread cleans up at the next tick'):
+    id = daemon_in_cycle()
+    # The garbage collector runs in the thread that allocates, as a thread of name resolution, while the main thread
+    # may be in the middle of what the event loop does
+    thread = threading.Thread(target=gc.collect)
+    thread.start()
+    thread.join()
+    ok(Pyjo.IOLoop.acceptor(id), 'acceptor is still there')
+    Pyjo.IOLoop.timer(0.05, lambda loop: loop.stop())
+    Pyjo.IOLoop.start()
+    ok(not Pyjo.IOLoop.acceptor(id), 'acceptor removed at the next tick')
 
 with subtest('User agents in cycles, which the garbage collector frees all the time'):
     # PyPy has no thresholds, its garbage collector runs when it does

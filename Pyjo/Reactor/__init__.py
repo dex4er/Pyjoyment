@@ -102,6 +102,7 @@ import collections
 import concurrent.futures
 import os
 import sys
+import threading
 import weakref
 
 from collections.abc import Awaitable, Callable, Coroutine, Generator
@@ -416,18 +417,21 @@ _ALL: 'weakref.WeakSet[Pyjo_Reactor]' = weakref.WeakSet()
 
 def _finalize(cb: Callable[[], Anything]) -> None:  # pyright: ignore[reportUnusedFunction]
     # The cleanup runs at once, as Mojo's DESTROY runs, unless the garbage collector interrupted the code of an event
-    # loop, in a frame of Pyjo.IOLoop, of a reactor, of asyncio or of selectors, below the finalizer that calls it
-    prefixes = _prefixes()
-    # The frame below the finalizer, none when the interpreter frees the object outside of any code
-    frame = sys._getframe(1).f_back  # pyright: ignore[reportPrivateUsage]
-    while frame is not None:
-        if frame.f_code.co_filename.startswith(prefixes):
-            _DEFERRED.append(cb)
-            for reactor in list(_ALL):
-                reactor._wake()  # pyright: ignore[reportPrivateUsage]
+    # loop, in a frame of Pyjo.IOLoop, of a reactor, of asyncio or of selectors, below the finalizer that calls it, or
+    # ran in another thread than the main one, as a thread of name resolution, while the main thread may be in the
+    # middle of what its event loop does, which the frames of this thread do not show
+    if threading.current_thread() is threading.main_thread():
+        prefixes = _prefixes()
+        # The frame below the finalizer, none when the interpreter frees the object outside of any code
+        frame = sys._getframe(1).f_back  # pyright: ignore[reportPrivateUsage]
+        while frame is not None and not frame.f_code.co_filename.startswith(prefixes):
+            frame = frame.f_back
+        if frame is None:
+            cb()
             return
-        frame = frame.f_back
-    cb()
+    _DEFERRED.append(cb)
+    for reactor in list(_ALL):
+        reactor._wake()  # pyright: ignore[reportPrivateUsage]
 
 
 def _drain(*args: Anything) -> None:  # pyright: ignore[reportUnusedFunction]

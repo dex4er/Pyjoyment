@@ -745,8 +745,14 @@ pattern.match_partial(path)`.
   `Pyjo.Reactor._finalize`: at once, as `DESTROY`, unless it interrupted a
   frame of `Pyjo.IOLoop`, of a reactor, of asyncio or of `selectors`, where
   the cleanup waits for the next tick of the event loop, which every reactor
-  runs at a point that is safe, and for the end of the interpreter.
-  `t/stdlib/IOLoop_gc.py` makes the garbage collector run all the time.
+  runs at a point that is safe, and for the end of the interpreter. The
+  garbage collector runs in any thread that allocates, as a thread of name
+  resolution, whose frames do not show what the main thread does, so a
+  finalizer outside of the main thread always waits for the next tick, and
+  the asyncio reactor is woken up with `call_soon_threadsafe`; on Linux,
+  epoll reports a socket closed in the middle of `add_reader` as
+  `FileNotFoundError`. `t/stdlib/IOLoop_gc.py` makes the garbage collector
+  run all the time.
 - An optional module of Perl that Mojo uses when it is installed has a
   counterpart in the standard library, one of the port's own where the
   standard library has none, or is left out until something needs it:
