@@ -1,6 +1,8 @@
 import Pyjoyment
 
 from Pyjo.Test import *
+from Pyjoyment.Lite import app as lite
+from Pyjoyment.Lite import plugin
 
 
 app = Pyjoyment.new(secrets=['works'])
@@ -10,6 +12,11 @@ with subtest('Synopsis'):
     # Pyjoyment
     app.plugin('EPLRenderer')
     ok('epl' in app.renderer.handlers, 'handler')
+
+    # Pyjoyment.Lite
+    lite.renderer.handlers.pop('epl')
+    plugin('EPLRenderer')
+    ok('epl' in lite.renderer.handlers, 'handler of Lite')
 
 with subtest('Description'):
     c = app.build_controller()

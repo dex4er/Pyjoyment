@@ -7,14 +7,22 @@ Pyjoyment.Plugin.HeaderCondition - Header condition plugin
     app.plugin('HeaderCondition')
     app.routes.get('/foo').requires(headers={'Referer': re.compile(r'example\\.com')})
 
+    # Pyjoyment.Lite
+    plugin('HeaderCondition')
+
+    @get('/').requires(headers={'Referer': re.compile(r'example\\.com')})
+    def index(c): ...
+
     # All headers need to match
     app.routes.get('/foo').requires(headers={'X-Secret-Header': 'Foo', 'Referer': re.compile(r'example\\.com')})
 
     # The "agent" condition is a shortcut for the "User-Agent" header
-    app.routes.get('/').requires(agent=re.compile(r'Firefox'))
+    @get('/').requires(agent=re.compile(r'Firefox'))
+    def firefox(c): ...
 
     # The "host" condition is a shortcut for the detected host
-    app.routes.get('/').requires(host=re.compile(r'mojolicious\\.org'))
+    @get('/').requires(host=re.compile(r'mojolicious\\.org'))
+    def mojolicious(c): ...
 
 :mod:`Pyjoyment.Plugin.HeaderCondition` is a route condition for header-based
 routes.
@@ -33,8 +41,6 @@ See also
 Ported from `Mojolicious::Plugin::HeaderCondition
 <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojolicious/Plugin/HeaderCondition.pm>`_ of Mojolicious 9.49.
 """
-
-# TODO: the examples of Pyjoyment.Lite in the synopsis, when it is ported
 
 import Pyjoyment.Plugin
 

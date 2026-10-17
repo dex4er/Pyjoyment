@@ -6,6 +6,9 @@ Pyjoyment.Plugin.EPLRenderer - Embedded Python Lite renderer plugin
     # Pyjoyment
     app.plugin('EPLRenderer')
 
+    # Pyjoyment.Lite
+    plugin('EPLRenderer')
+
 :mod:`Pyjoyment.Plugin.EPLRenderer` is a renderer for ``epl`` templates,
 which are pretty much just raw :mod:`Pyjo.Template`. The template gets the
 controller as its first argument. ::
@@ -27,8 +30,6 @@ See also
 Ported from `Mojolicious::Plugin::EPLRenderer
 <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojolicious/Plugin/EPLRenderer.pm>`_ of Mojolicious 9.49.
 """
-
-# TODO: the examples of Pyjoyment.Lite in the synopsis, when it is ported
 
 import Pyjo.Exception
 import Pyjo.Template
