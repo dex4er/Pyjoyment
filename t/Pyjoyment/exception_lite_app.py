@@ -488,8 +488,6 @@ with subtest('Text exceptions'):
 # nounicat.png, where Mojo has failraptor.png and noraptor.png
 with subtest('Bundled static files'):
     t.get_ok('/pyjo/highlight.js/highlight.min.js').status_is(200).content_type_is('application/javascript')
-    # Not in Mojolicious: the language Python of highlight.js
-    t.get_ok('/pyjo/highlight.js/python.min.js').status_is(200).content_type_is('application/javascript')
     t.get_ok('/pyjo/highlight.js/pyjoyment.min.js').status_is(200).content_type_is('application/javascript')
     t.get_ok('/pyjo/highlight.js/highlight-mojo-dark.css').status_is(200).content_type_is('text/css')
 

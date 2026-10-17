@@ -2,10 +2,14 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "description": [
     "rangeStrategy: always bump dependencies, even when the new version is already in the range.",
-    "rebaseWhen: rebase only on conflicts, to save unnecessary workflow runs."
+    "rebaseWhen: rebase only on conflicts, to save unnecessary workflow runs.",
+    "gitIgnoredAuthors: Bundle Check commits the bundled files of package-lock.json to Renovate branches as github-actions. Without this, Renovate would see the branch as modified by someone else and stop rebasing and updating it."
   ],
   "extends": ["config:recommended", ":semanticCommitsDisabled"],
   "addLabels": ["renovate"],
+  "gitIgnoredAuthors": [
+    "41898282+github-actions[bot]@users.noreply.github.com"
+  ],
   "osvVulnerabilityAlerts": true,
   "rangeStrategy": "bump",
   "vulnerabilityAlerts": {
@@ -32,6 +36,12 @@
       "matchManagers": ["pep621"],
       "matchDepTypes": ["dependency-groups"],
       "groupName": "dependency groups"
+    },
+    {
+      "description": "The JavaScript libraries of the bundled templates, which Bundle Check copies into Pyjoyment/resources/public/pyjo. A major release can change the API that the templates call, and the tests do not run JavaScript, so it waits for an approval in the Dependency Dashboard.",
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true
     }
   ],
   "customManagers": [

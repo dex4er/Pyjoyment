@@ -59,13 +59,13 @@ lint:
         - .trunk/trunk.yaml
     # Libraries and stylesheets that Pyjoyment bundles as they are, from
     # their own projects or from Mojolicious, so that a newer version replaces
-    # them without a diff of formatting
+    # them without a diff of formatting, and the lock of npm, which npm writes
     - linters:
         - ALL
       paths:
+        - package-lock.json
         - Pyjoyment/resources/public/pyjo/bootstrap/**
         - Pyjoyment/resources/public/pyjo/highlight.js/**
-        - Pyjoyment/resources/public/pyjo/popper/**
         - Pyjoyment/resources/public/pyjo/pyjo.css
     # Benchmarks, examples and tests that need other libraries, which are not
     # installed for the project, as the servers of the dependency group

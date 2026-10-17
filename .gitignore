@@ -22,3 +22,6 @@ __pycache__
 !/Pyjo/IOLoop/certs/server.key
 # Certificates of the tests, like t/mojo/certs in Mojo
 !/t/certs/*.key
+
+# The packages of npm, which npm run bundle copies from
+node_modules/

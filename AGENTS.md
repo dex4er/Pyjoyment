@@ -805,16 +805,37 @@ pattern.match_partial(path)`.
   `favicon.svg` at 48, 32 and 16 pixels. The text in them is set in Fredoka,
   under the SIL Open Font License, and converted to paths, so that the SVG
   needs no font.
-- The libraries that the bundled templates use, Bootstrap, Popper and
-  highlight.js, are in the versions that the target Mojolicious bundles, each
-  with the text of its license in a `LICENSE` next to it, and the stylesheet
-  `mojo/mojo.css` is `pyjo/pyjo.css`. Trunk does not lint or format them, so
-  that a newer version replaces them as they are. The build of highlight.js of
-  Mojolicious has no Python, so `python.min.js` of the same release of
-  highlight.js is next to it, and `pyjoyment.min.js`, the language of the
-  templates, is `mojolicious.min.js` with Python in the place of Perl. The links
-  of the pages are those of Pyjoyment. A bundled template has its markers as
-  comments of the template, as `%# Renamed from Mojolicious:`.
+- The JavaScript libraries that the bundled templates use, Bootstrap and
+  highlight.js, are kept up to date on their own, not in the versions that
+  Mojolicious bundles. `package.json` names their packages of npm, with exact
+  versions that Renovate bumps, and maps the files of the packages to the files
+  in `Pyjoyment/resources/public/pyjo`, under the names that Mojolicious gives
+  them; `npm run bundle` copies them, after `npm ci --ignore-scripts`, which
+  checks the packages against `package-lock.json` and runs none of their
+  scripts:
+
+  ```sh
+  mise exec -- npm ci --ignore-scripts
+  mise exec -- npm run bundle
+  ```
+
+  The workflow Bundle Check fails a pull request whose files do not match the
+  lock, and commits them to a branch of Renovate, which cannot run the copy,
+  with the token of the workflow; a push with that token starts no workflow, so
+  the job starts Bundle Check, Tests and Trunk Check on the commit with
+  `workflow_dispatch`. Renovate keeps a major release for an approval in its
+  Dependency Dashboard, as the tests do not run JavaScript: such a release is
+  checked in a browser, and the templates follow its API. `bootstrap.js` is the
+  bundle of Bootstrap, which has Popper, so Pyjoyment has no `popper.js`, and
+  the build of highlight.js has Python among its languages. Each library has
+  the text of its license in a `LICENSE` next to it. The stylesheet
+  `mojo/mojo.css` is `pyjo/pyjo.css`, the theme of highlight.js
+  `highlight-mojo-dark.css` is the one of Mojolicious, and `pyjoyment.min.js`,
+  the language of highlight.js for the templates, is `mojolicious.min.js` with
+  Python in the place of Perl; the copy leaves them as they are. Trunk does not
+  lint or format any of them, so that a newer version replaces them as they
+  are. The links of the pages are those of Pyjoyment. A bundled template has
+  its markers as comments of the template, as `%# Renamed from Mojolicious:`.
 
 ## Linting and Formatting
 
