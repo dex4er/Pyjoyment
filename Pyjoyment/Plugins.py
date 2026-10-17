@@ -16,6 +16,9 @@ Plugins
 The following plugins are included in the :mod:`Pyjoyment` distribution as
 examples.
 
+:mod:`Pyjoyment.Plugin.Config`
+    Python-ish configuration files.
+
 :mod:`Pyjoyment.Plugin.DefaultHelpers`
     General purpose helper collection, loaded automatically.
 
@@ -28,6 +31,9 @@ examples.
 
 :mod:`Pyjoyment.Plugin.HeaderCondition`
     Route condition for all kinds of headers, loaded automatically.
+
+:mod:`Pyjoyment.Plugin.JSONConfig`
+    JSON configuration files.
 
 :mod:`Pyjoyment.Plugin.PyRenderer`
     Renderer for template strings, loaded automatically.
@@ -49,7 +55,7 @@ Ported from `Mojolicious::Plugins <https://github.com/mojolicious/mojo/blob/v9.4
 of Mojolicious 9.49.
 """
 
-# TODO: the plugins of the list, Config, JSONConfig, Mount and NotYAMLConfig, when they are ported
+# TODO: the plugins of the list, Mount and NotYAMLConfig, when they are ported
 
 import Pyjo.EventEmitter
 import Pyjo.Exception
