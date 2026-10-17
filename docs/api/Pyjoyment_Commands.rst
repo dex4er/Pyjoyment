@@ -1,0 +1,2 @@
+.. automodule:: Pyjoyment.Commands
+    :members:

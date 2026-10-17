@@ -32,6 +32,17 @@ Hooks
 
 :mod:`Pyjoyment` will emit the following hooks in the listed order.
 
+before_command
+    Emitted right before the application runs a command through the command
+    line interface. ::
+
+        @app.hook('before_command')
+        def before_command(command, args): ...
+
+    Useful for reconfiguring the application before running a command or to
+    modify the behavior of a command. (Passed the command object and the list
+    of the command arguments)
+
 before_server_start
     Emitted right before the application server is started, for web servers
     that support it, which includes all the built-in ones. ::
@@ -182,8 +193,6 @@ See also
 Ported from `Mojolicious <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojolicious.pm>`_ of Mojolicious 9.49.
 """
 
-# TODO: the hook before_command, with Pyjoyment.Commands, when it is ported
-
 import Pyjo.App
 import Pyjo.Loader
 import Pyjo.Log
@@ -191,6 +200,7 @@ import Pyjo.Promise
 import Pyjo.Server
 import Pyjo.Transaction.HTTP
 import Pyjo.Util
+import Pyjoyment.Commands
 import Pyjoyment.Controller
 import Pyjoyment.Plugins
 import Pyjoyment.Renderer
@@ -232,7 +242,7 @@ class Pyjoyment_App(Pyjo.App.object):
         sets up the renderer, a default set of plugins and an
         ``around_dispatch`` hook with the default exception handling.
         """
-        # TODO: the commands, when Pyjoyment.Commands is ported
+        self._commands: Pyjoyment.Commands.object | None = None
 
         self.controller_class: type[Pyjoyment.Controller.object] | str = Pyjoyment.Controller.object
         """::
@@ -444,6 +454,27 @@ class Pyjoyment_App(Pyjo.App.object):
         raise AttributeError(
             f'Can\'t locate object method "{name}" via package "{package}" {at}.\n', name=name, obj=self
         )
+
+    @property
+    def commands(self) -> Pyjoyment.Commands.object:
+        """::
+
+            commands = app.commands
+            app.commands = Pyjoyment.Commands.new()
+
+        Command line interface for your application, defaults to a
+        :mod:`Pyjoyment.Commands` object. ::
+
+            # Add another namespace to load commands from
+            app.commands.namespaces.append('MyApp.Command')
+        """
+        if self._commands is None:
+            self._commands = Pyjoyment.Commands.new(app=self)
+        return self._commands
+
+    @commands.setter
+    def commands(self, value: Pyjoyment.Commands.object) -> None:
+        self._commands = value
 
     @property
     def log(self) -> Pyjo.Log.object:
@@ -754,19 +785,29 @@ class Pyjoyment_App(Pyjo.App.object):
         """
         self.plugins.emit_hook('before_server_start', server, self)
 
-    def start(self, *args: str) -> Self:
+    def start(self, *args: str) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride]
         """::
 
             app.start()
+            app.start(*sys.argv[1:])
 
-        Start the application. When the environment variable
-        ``PYJO_APP_LOADER`` is set, as :meth:`Pyjo.Server.Pyjo_Server.load_app`
-        does, it is kept in :data:`Pyjo.Server.loaded_app` for the server.
+        Start the command line interface for your application. For a full list
+        of commands that are available by default see
+        :mod:`Pyjoyment.Commands`. Note that the options ``-h``/``--help``,
+        ``--home`` and ``-m``/``--mode``, which are shared by all commands,
+        will be parsed from ``sys.argv`` when :mod:`Pyjoyment.Commands` is
+        imported. ::
+
+            # Always start daemon
+            app.start('daemon', '-l', 'http://*:8080')
+
+        When the environment variable ``PYJO_APP_LOADER`` is set, as
+        :meth:`Pyjo.Server.Pyjo_Server.load_app` does, the application is
+        kept in :data:`Pyjo.Server.loaded_app` for the server instead.
         """
-        # TODO: the commands, when Pyjoyment.Commands is ported
         self.static.warmup()
         self.renderer.warmup()
-        return super().start(*args)
+        return self.commands.run(*(args or sys.argv[1:]))
 
     def startup(self) -> None:
         """::

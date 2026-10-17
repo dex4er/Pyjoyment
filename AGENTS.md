@@ -495,7 +495,9 @@ copy:
   `.decode('latin-1')`.
   HTTP headers are such characters too, as `http.client` has them: bytes
   from the wire are decoded as ISO-8859-1.
-- An environment variable `MOJO_*` is `PYJO_*`.
+- An environment variable `MOJO_*` is `PYJO_*`, and so are the ones that
+  `prove` sets for the tests, as `HARNESS_ACTIVE`, which `Pyjo.Prove` sets as
+  `PYJO_HARNESS_ACTIVE`.
 - A name that Mojolicious takes from somewhere else, as `Mojo::Server::Hypnotoad`
   and `Mojo::Server::Morbo` are named after characters of Futurama, is a name
   that says what the module does, `Pyjo.Server.Hot` and `Pyjo.Server.Reload`,
@@ -504,6 +506,15 @@ copy:
   script of Mojolicious, as `script/morbo`, is a `main` function of the module
   with `argparse`, a `pyjo-` command in `[project.scripts]` of
   `pyproject.toml` (`pyjo-reload`) and `python -m` of the module.
+  `script/mojo`, the command line interface of `Mojo::HelloWorld`, is `pyjo`,
+  the `main` of `Pyjoyment.Commands`, and `python -m Pyjoyment`.
+- A command of Mojolicious, as `Mojolicious::Command::daemon`, is a module of
+  the package `Pyjoyment.Command` with the name of the command, as
+  `Pyjoyment.Command.daemon`, and its usage, which Mojo extracts from the
+  section SYNOPSIS of its POD, is the first literal block of the docstring of
+  the module, which the class reads with `usage = extract_usage()`. Its
+  options are parsed with `getopt` of `Pyjo.Util`, whose targets are a dict,
+  as Python has no references to variables.
 - `ojo` is the functions of the package `Pyjo`, which `from Pyjo import *`
   imports, and `perl -Mojo -E` is `python -m Pyjo`. A function imports the
   modules it uses when it is called, as every `import Pyjo.X` runs

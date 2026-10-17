@@ -1,5 +1,6 @@
 import Pyjo.Message.Response
 import Pyjo.Server.CGI
+import Pyjoyment.Command.cgi
 
 from Pyjo.Test import *
 from Pyjoyment.Lite import app, get, post
@@ -57,8 +58,6 @@ def proxy(c):
     c.render(text=reverse)
 
 
-# TODO: Mojolicious::Command::cgi, which runs the server as here, when it is ported
-
 with subtest('Reverse proxy'):
     ok(not Pyjo.Server.CGI.new().reverse_proxy, 'no reverse proxy')
     with patch.dict(os.environ, {'PYJO_REVERSE_PROXY': '1'}):
@@ -74,7 +73,7 @@ with subtest('Simple'):
             'SERVER_PROTOCOL': 'HTTP/1.0',
         }
     ) as stdout:
-        status = Pyjo.Server.CGI.new(app=app).run()
+        status = Pyjoyment.Command.cgi.new(app=app).run()
         msg = stdout.getvalue()
     is_ok(status, 200, 'right status')
 
@@ -95,7 +94,7 @@ with subtest('HEAD request'):
             'SERVER_PROTOCOL': 'HTTP/1.0',
         }
     ) as stdout:
-        status = Pyjo.Server.CGI.new(app=app).run()
+        status = Pyjoyment.Command.cgi.new(app=app).run()
         msg = stdout.getvalue()
     is_ok(status, 200, 'right status')
 
@@ -116,7 +115,7 @@ with subtest('Non-parsed headers'):
             'SERVER_PROTOCOL': 'HTTP/1.0',
         }
     ) as stdout:
-        status = Pyjo.Server.CGI.new(app=app, nph=True).run()
+        status = Pyjoyment.Command.cgi.new(app=app).run('--nph')
         msg = stdout.getvalue()
     is_ok(status, 200, 'right status')
 
@@ -141,7 +140,7 @@ with subtest('Chunked'):
         },
         content,
     ) as stdout:
-        status = Pyjo.Server.CGI.new(app=app).run()
+        status = Pyjoyment.Command.cgi.new(app=app).run()
         msg = stdout.getvalue()
     is_ok(status, 200, 'right status')
 
@@ -162,7 +161,7 @@ with subtest('Parameters'):
             'SERVER_PROTOCOL': 'HTTP/1.0',
         }
     ) as stdout:
-        status = Pyjo.Server.CGI.new(app=app).run()
+        status = Pyjoyment.Command.cgi.new(app=app).run()
         msg = stdout.getvalue()
     is_ok(status, 200, 'right status')
 
@@ -191,7 +190,7 @@ with subtest('Binding'):
             'SERVER_PROTOCOL': 'HTTP/1.0',
         }
     ) as stdout:
-        status = Pyjo.Server.CGI.new(app=app).run()
+        status = Pyjoyment.Command.cgi.new(app=app).run()
         msg = stdout.getvalue()
     is_ok(status, 200, 'right status')
     res = Pyjo.Message.Response.new().parse(b'HTTP/1.1 200 OK\x0d\x0a' + msg)
@@ -215,7 +214,7 @@ with subtest('Reverse proxy'):
             'PYJO_REVERSE_PROXY': '1',
         }
     ) as stdout:
-        status = Pyjo.Server.CGI.new(app=app).run()
+        status = Pyjoyment.Command.cgi.new(app=app).run()
         msg = stdout.getvalue()
     is_ok(status, 200, 'right status')
 
@@ -240,7 +239,7 @@ with subtest('Trusted proxies'):
             'PYJO_TRUSTED_PROXIES': '127.0.0.0/8, 192.0.0.0/8',
         }
     ) as stdout:
-        status = Pyjo.Server.CGI.new(app=app).run()
+        status = Pyjoyment.Command.cgi.new(app=app).run()
         msg = stdout.getvalue()
     is_ok(status, 200, 'right status')
 
@@ -264,7 +263,7 @@ with subtest('Trusted proxies (no REMOTE_ADDR)'):
             'PYJO_TRUSTED_PROXIES': '127.0.0.0/8, 192.0.0.0/8',
         }
     ) as stdout:
-        status = Pyjo.Server.CGI.new(app=app).run()
+        status = Pyjoyment.Command.cgi.new(app=app).run()
         msg = stdout.getvalue()
     is_ok(status, 200, 'right status')
 

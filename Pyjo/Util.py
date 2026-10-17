@@ -288,7 +288,7 @@ def extract_usage(file: 'str | os.PathLike[str] | None' = None) -> str:
     first literal block, defaults to using the file this function was called
     from. ::
 
-        # "Usage: APPLICATION test [OPTIONS]\n"
+        # "Usage: APPLICATION test [OPTIONS]\\n"
         extract_usage()
 
         \"\"\"
