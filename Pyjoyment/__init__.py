@@ -163,9 +163,10 @@ Helpers
 
 In addition to the attributes and methods below you can also call helpers on
 :mod:`Pyjoyment` objects. This includes all helpers from
-:mod:`Pyjoyment.Plugin.DefaultHelpers`. Note that application helpers are
-always called with a new default controller object, so they can't depend on
-or change controller state, which includes request, response and stash. ::
+:mod:`Pyjoyment.Plugin.DefaultHelpers` and :mod:`Pyjoyment.Plugin.TagHelpers`.
+Note that application helpers are always called with a new default controller
+object, so they can't depend on or change controller state, which includes
+request, response and stash. ::
 
     # Call helper
     print(app.dumper({'foo': 'bar'}))
@@ -182,7 +183,6 @@ Ported from `Mojolicious <https://github.com/mojolicious/mojo/blob/v9.49/lib/Moj
 """
 
 # TODO: the hook before_command, with Pyjoyment.Commands, when it is ported
-# TODO: the helpers of Pyjoyment.Plugin.TagHelpers in the documentation, when it is ported
 
 import Pyjo.App
 import Pyjo.Loader
@@ -403,8 +403,7 @@ class Pyjoyment_App(Pyjo.App.object):
         self.preload_namespaces = [controller]
         self.routes.namespaces = [controller, package]
 
-        # TODO: the plugin TagHelpers, between DefaultHelpers and EPLRenderer, when it is ported
-        for plugin in ('HeaderCondition', 'DefaultHelpers', 'EPLRenderer', 'EPRenderer'):
+        for plugin in ('HeaderCondition', 'DefaultHelpers', 'TagHelpers', 'EPLRenderer', 'EPRenderer'):
             self.plugin(plugin)
 
         # Exception handling should be first in chain
@@ -658,7 +657,8 @@ class Pyjoyment_App(Pyjo.App.object):
         Add or replace a helper that will be available as a method of the
         controller object and the application object. For a full list of
         helpers that are available by default see
-        :mod:`Pyjoyment.Plugin.DefaultHelpers`. ::
+        :mod:`Pyjoyment.Plugin.DefaultHelpers` and
+        :mod:`Pyjoyment.Plugin.TagHelpers`. ::
 
             # Helper
             cache = {}

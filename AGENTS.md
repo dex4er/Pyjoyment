@@ -513,6 +513,14 @@ copy:
   has sigils, so a value of the stash hides the helper of its name, and the
   variable `c` hides the helper `c`; the template calls such a helper as a
   method of `c`, as `c.title('Welcome!')`.
+- A tag helper takes the attributes of its tag as keyword arguments, after
+  its positional ones, and a block of a template as the last positional
+  argument, before them: `form_for login => (method => 'POST') => begin` is
+  `%= form_for('login', begin` and `%= end, method='POST')`. An attribute that
+  is a keyword of Python or has a dash goes with `**`, as
+  `**{'class': 'menu'}`, and an attribute without a value is `None`. The
+  attributes of an option or a group of `select_field` are a dict after its
+  value, where Mojo takes a flat list of names and values.
 - `use Mojolicious::Lite` is `from Pyjoyment.Lite import *`, which gives the
   module that imports it an application of its own, as Mojo makes one for the
   package that uses it: the functions are made for the module of the caller

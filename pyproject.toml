@@ -263,6 +263,7 @@ strict = [
   "Pyjoyment/Plugin/EPLRenderer.py",
   "Pyjoyment/Plugin/EPRenderer.py",
   "Pyjoyment/Plugin/HeaderCondition.py",
+  "Pyjoyment/Plugin/TagHelpers.py",
   "Pyjoyment/Plugins.py",
   "Pyjoyment/Renderer.py",
   "Pyjoyment/Routes/__init__.py",

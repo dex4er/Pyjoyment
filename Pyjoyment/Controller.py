@@ -26,7 +26,7 @@ Helpers
 In addition to the attributes and methods below you can also call helpers
 provided by :attr:`~Pyjoyment_Controller.app` on :mod:`Pyjoyment.Controller`
 objects. This includes all helpers from
-:mod:`Pyjoyment.Plugin.DefaultHelpers`. ::
+:mod:`Pyjoyment.Plugin.DefaultHelpers` and :mod:`Pyjoyment.Plugin.TagHelpers`. ::
 
     # Call helpers
     c.layout('green')
@@ -43,8 +43,6 @@ See also
 Ported from `Mojolicious::Controller <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojolicious/Controller.pm>`_
 of Mojolicious 9.49.
 """
-
-# TODO: the helpers of Pyjoyment.Plugin.TagHelpers in the documentation, when it is ported
 
 # No imports, for security reasons!
 import Pyjo.Base
@@ -352,7 +350,8 @@ class Pyjoyment_Controller(Pyjo.Base.object):
 
         Return a proxy object containing the current controller object and on
         which helpers provided by :attr:`app` can be called. This includes all
-        helpers from :mod:`Pyjoyment.Plugin.DefaultHelpers`. ::
+        helpers from :mod:`Pyjoyment.Plugin.DefaultHelpers` and
+        :mod:`Pyjoyment.Plugin.TagHelpers`. ::
 
             # Make sure to use the "title" helper and not the controller method
             c.helpers.title('Welcome!')
