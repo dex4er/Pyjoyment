@@ -55,6 +55,19 @@ with subtest('Optional values'):
     is_ok(parse(['-c'], 'c|count:i')[0].count, 0, 'no number')
     is_deeply_ok(parse([], 'p|proxy:s@')[0].proxy, [], 'no option')
 
+with subtest('Hashes'):
+    result, _ = parse(['-D', 'a=1', '--define', 'b=2=3', '-D', '=x'], 'D|define=s%')
+    is_deeply_ok(result.define, {'a': '1', 'b': '2=3', '': 'x'}, 'strings')
+    is_deeply_ok(parse(['-I', 'x=5'], 'I|int=i%')[0].int, {'x': 5}, 'integers')
+    is_deeply_ok(parse([], 'D|define=s%')[0].define, {}, 'no option')
+    result, stderr = parse(['-D', 'a'], 'D|define=s%')
+    ok(not result, 'failure')
+    like_ok(stderr, r'^Option D, key "a", requires a value\n', 'right warning')
+    result, stderr = parse(['-I', 'x=5', '-I', 'y=z'], 'I|int=i%')
+    is_deeply_ok(result.int, {'x': 5}, 'value before the error')
+    like_ok(stderr, r'^Value "z" invalid for option I \(integer number expected\)\n', 'right warning')
+    is_deeply_ok(parse(['-D', 'a'], 'D|define:s%')[0].define, {'a': ''}, 'optional value')
+
 with subtest('Flags'):
     result, _ = parse(['-h', '-v', '-v', '--no-color'], 'h|help', 'v|verbose+', 'color!')
     is_ok(result.help, True, 'flag')
@@ -90,6 +103,49 @@ with subtest('Errors'):
         lambda: Pyjo.GetOpt.new().option('t|test=x'), re.compile(r'^Error in option spec: "t\|test=x"'), 'bad spec'
     )
 
+with subtest('Defaults'):
+    getopt = Pyjo.GetOpt.new().option('M|method=s', default='GET').option('v|verbose', default=False)
+    result = getopt.parse([])
+    is_ok(result.method, 'GET', 'default')
+    is_ok(result.verbose, False, 'default of a flag')
+    is_ok(getopt.parse(['-M', 'POST']).method, 'POST', 'value')
+    getopt = Pyjo.GetOpt.new().option('H|header=s@', default=['a'])
+    is_deeply_ok(getopt.parse([]).header, ['a'], 'default of a list')
+    is_deeply_ok(getopt.parse(['-H', 'b']).header, ['b'], 'values instead of the default')
+    is_deeply_ok(getopt.parse([]).header, ['a'], 'default again')
+
+with subtest('Types and choices'):
+    import Pyjo.File
+
+    getopt = Pyjo.GetOpt.new().option('home=s', type=Pyjo.File.path)
+    result = getopt.parse(['--home', '/tmp'])
+    ok(isinstance(result.home, Pyjo.File.object), 'converted')
+    is_ok(result.home.to_str(), '/tmp', 'right value')
+    getopt = Pyjo.GetOpt.new().option('w|weekday=i', type=lambda value: ['Mon', 'Tue'][value])
+    is_ok(getopt.parse(['-w', '1']).weekday, 'Tue', 'converted after the type of the specification')
+    result, stderr = io.StringIO(), io.StringIO()
+    with contextlib.redirect_stderr(stderr):
+        result = getopt.parse(['-w', '5'])
+    ok(not result, 'failure')
+    like_ok(stderr.getvalue(), r'^Value "5" invalid for option w \(list index out of range\)\n', 'right warning')
+    getopt = Pyjo.GetOpt.new().option('m|mode=s', choices=['development', 'production'])
+    is_ok(getopt.parse(['-m', 'production']).mode, 'production', 'choice')
+    stderr = io.StringIO()
+    with contextlib.redirect_stderr(stderr):
+        ok(not getopt.parse(['-m', 'x']), 'failure')
+    like_ok(
+        stderr.getvalue(),
+        r'^Value "x" invalid for option m \(choose from development, production\)\n',
+        'right warning',
+    )
+    getopt = Pyjo.GetOpt.new().option('l|level=i@', choices=[1, 2])
+    is_deeply_ok(getopt.parse(['-l', '1', '-l', '2']).level, [1, 2], 'choices of a list after the type')
+    called = []
+    getopt = Pyjo.GetOpt.new()
+    getopt.on('d|day=s', lambda name, value: called.append(value), type=str.upper, choices=['MON'])
+    getopt.parse(['-d', 'mon'])
+    is_deeply_ok(called, ['MON'], 'callback')
+
 with subtest('Pass through'):
     args = ['-t', 'foo', '-x', 'bar', '--', '-y']
     result, stderr = parse(args, 't|test=s', pass_through=True)
@@ -113,6 +169,12 @@ with subtest('Targets'):
     ok(result, 'success')
     is_deeply_ok(listen, ['a', 'b'], 'list')
     is_deeply_ok(called, [('backlog', 5), ('insecure', True)], 'callbacks')
+    define = {}
+    getopt = Pyjo.GetOpt.new().option('D|define=s%', define)
+    getopt.on('x=s%', lambda name, value: called.append((name, value)))
+    getopt.parse(['-D', 'a=1', '-x', 'b=2'])
+    is_deeply_ok(define, {'a': '1'}, 'dict')
+    is_deeply_ok(called[-1], ('x', ('b', '2')), 'callback of a hash')
     ok(callable(backlog), 'decorator returns the callback')
     ok(not hasattr(result, 'listen'), 'no value of a target in the result')
 

@@ -66,6 +66,17 @@ takes. ::
     # A list of values in the result
     getopt.option('H|header=s@')
 
+    # A dict of the keys and the values of --define key=value in the result
+    getopt.option('D|define=s%')
+
+Next to what Getopt::Long has, an option can have a default, a type, which
+converts its value, and the values that it accepts, as the arguments of
+argparse. ::
+
+    getopt.option('M|method=s', default='GET')
+    getopt.option('home=s', type=Pyjo.File.path)
+    getopt.option('m|mode=s', choices=['development', 'production'])
+
 The name of an option in the result, and the name that a callback gets, is
 its first name that is longer than one letter, or its only name, with ``_``
 for ``-``: ``inactivity_timeout`` for ``i|inactivity-timeout=i``.
@@ -91,12 +102,15 @@ from Pyjo.Util import warn
 import re
 import sys
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any, Self, cast, overload
 
 
 type Callback = Callable[[str, Any], Any]
-type Target = list[Any] | Callback | None
+type Target = list[Any] | dict[Any, Any] | Callback | None
+
+_RE_FLOAT = re.compile(r'[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?')
+_RE_INT = re.compile(r'[-+]?\d+')
 
 
 class Pyjo_GetOpt(Pyjo.Base.object):
@@ -121,12 +135,28 @@ class Pyjo_GetOpt(Pyjo.Base.object):
         self._options: list[_Option] = []
 
     @overload
-    def on[F: Callback](self, spec: str, cb: None = None) -> Callable[[F], F]: ...
+    def on[F: Callback](
+        self,
+        spec: str,
+        cb: None = None,
+        *,
+        type: Callable[[Any], Any] | None = None,
+        choices: Sequence[Any] | None = None,
+    ) -> Callable[[F], F]: ...
 
     @overload
-    def on[F: Callback](self, spec: str, cb: F) -> F: ...
+    def on[F: Callback](
+        self, spec: str, cb: F, *, type: Callable[[Any], Any] | None = None, choices: Sequence[Any] | None = None
+    ) -> F: ...
 
-    def on(self, spec: str, cb: Callback | None = None) -> Any:
+    def on(
+        self,
+        spec: str,
+        cb: Callback | None = None,
+        *,
+        type: Callable[[Any], Any] | None = None,
+        choices: Sequence[Any] | None = None,
+    ) -> Any:
         """::
 
             cb = getopt.on('b|backlog=i', lambda name, value: ...)
@@ -134,34 +164,51 @@ class Pyjo_GetOpt(Pyjo.Base.object):
             @getopt.on('b|backlog=i')
             def backlog(name, value): ...
 
-        Add an option whose callback gets its name and its value, as a
-        decorator without the callback.
+        Add an option whose callback gets its name and its value, or a tuple
+        of the key and the value of a hash, as a decorator without the
+        callback. ``type`` and ``choices`` are those of :meth:`option`.
         """
         if cb is None:
 
             def decorator(cb: Callback) -> Callback:
-                return self.on(spec, cb)
+                return self.on(spec, cb, type=type, choices=choices)
 
             return decorator
-        self.option(spec, cb)
+        self.option(spec, cb, type=type, choices=choices)
         return cb
 
-    def option(self, spec: str, target: Target = None) -> Self:
+    def option(
+        self,
+        spec: str,
+        target: Target = None,
+        *,
+        default: Any = None,
+        type: Callable[[Any], Any] | None = None,
+        choices: Sequence[Any] | None = None,
+    ) -> Self:
         """::
 
             getopt = getopt.option('m|mode=s')
             getopt = getopt.option('l|listen=s', [])
+            getopt = getopt.option('D|define=s%', {})
             getopt = getopt.option('b|backlog=i', lambda name, value: ...)
+            getopt = getopt.option('M|method=s', default='GET')
+            getopt = getopt.option('home=s', type=Pyjo.File.path)
+            getopt = getopt.option('m|mode=s', choices=['development', 'production'])
 
-        Add an option, whose value goes to the result, to a list or to a
-        callback.
+        Add an option, whose value goes to the result, to a list, to a dict or
+        to a callback. ``default`` is the value in the result of an option
+        that is not given. ``type`` converts a value, after the type of the
+        specification, and a :class:`ValueError`, a :class:`TypeError` or a
+        :class:`LookupError` of it makes the value invalid, as a value that is
+        not in ``choices``.
         """
-        if not (m := re.fullmatch(r'([\w?-]+(?:\|[\w?-]+)*)(?:(!)|(\+)|([=:])([sif])(@)?)?', spec)):
+        if not (m := re.fullmatch(r'([\w?-]+(?:\|[\w?-]+)*)(?:(!)|(\+)|([=:])([sif])([@%])?)?', spec)):
             raise Pyjo.Exception.new(f'Error in option spec: "{spec}"')
         names = m[1].split('|')
         name = next((name for name in names if len(name) > 1), names[0]).replace('-', '_')
         kind = 'negatable' if m[2] else 'increment' if m[3] else 'value' if m[4] else 'flag'
-        option = _Option(name, kind, m[5] or '', m[4] == ':', bool(m[6]), target)
+        option = _Option(name, kind, m[5] or '', m[4] == ':', m[6] or '', target, default, type, choices)
         self._options.append(option)
         for name in names:
             self._names[name] = option
@@ -183,7 +230,10 @@ class Pyjo_GetOpt(Pyjo.Base.object):
         argv = sys.argv if args is None else args
         start = 1 if args is None else 0
         rest, keep = argv[start:], list[str]()
-        values: dict[str, Any] = {o.name: [] if o.multi else None for o in self._options if o.target is None}
+        values: dict[str, Any] = {
+            o.name: [] if o.multi == '@' else {} if o.multi == '%' else None for o in self._options if o.target is None
+        }
+        seen: set[str] = set()
         success = True
 
         i = 0
@@ -218,6 +268,7 @@ class Pyjo_GetOpt(Pyjo.Base.object):
                     warn(f'Option {given} does not take an argument')
                     success = False
                     continue
+                seen.add(option.name)
                 if option.kind == 'increment':
                     _store(option, values, (values.get(option.name) or 0) + 1)
                 else:
@@ -233,22 +284,57 @@ class Pyjo_GetOpt(Pyjo.Base.object):
                     warn(f'Option {given} requires an argument')
                     success = False
                     continue
-                value = '' if option.type == 's' else '0'
+                value = ''
+
+            # The key of a hash
+            key = None
+            if option.multi == '%':
+                key, equals, value = value.partition('=')
+                if not equals and not option.optional:
+                    warn(f'Option {given}, key "{key}", requires a value')
+                    success = False
+                    continue
 
             # The type of the value
-            if option.type == 'i' and not re.fullmatch(r'[-+]?\d+', value):
-                warn(f'Value "{value}" invalid for option {given} (integer number expected)')
+            if (converted := self._convert(option, given, value)) is _INVALID:
                 success = False
-            elif option.type == 'f' and not re.fullmatch(r'[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?', value):
-                warn(f'Value "{value}" invalid for option {given} (real number expected)')
-                success = False
-            else:
-                _store(
-                    option, values, int(value) if option.type == 'i' else float(value) if option.type == 'f' else value
+                continue
+            seen.add(option.name)
+            _store(option, values, converted if key is None else (key, converted))
+
+        # The defaults of the options that are not given
+        for option in self._options:
+            if option.target is None and option.default is not None and option.name not in seen:
+                default = option.default
+                values[option.name] = (
+                    list(default) if option.multi == '@' else dict(default) if option.multi == '%' else default
                 )
 
         argv[start:] = keep
         return Pyjo_GetOpt_Result(values, success)
+
+    def _convert(self, option: '_Option', given: str, value: str) -> Any:
+        if option.optional and value == '' and option.type != 's':
+            value = '0'
+        if option.type == 'i' and not _RE_INT.fullmatch(value):
+            warn(f'Value "{value}" invalid for option {given} (integer number expected)')
+            return _INVALID
+        if option.type == 'f' and not _RE_FLOAT.fullmatch(value):
+            warn(f'Value "{value}" invalid for option {given} (real number expected)')
+            return _INVALID
+        converted: Any = int(value) if option.type == 'i' else float(value) if option.type == 'f' else value
+
+        # Not in Getopt::Long: the type and the choices of argparse
+        if option.convert is not None:
+            try:
+                converted = option.convert(converted)
+            except (LookupError, TypeError, ValueError) as e:
+                warn(f'Value "{value}" invalid for option {given} ({str(e).strip(chr(39))})')
+                return _INVALID
+        if option.choices is not None and converted not in option.choices:
+            warn(f'Value "{value}" invalid for option {given} (choose from {", ".join(map(str, option.choices))})')
+            return _INVALID
+        return converted
 
 
 class Pyjo_GetOpt_Result:
@@ -274,7 +360,21 @@ class Pyjo_GetOpt_Result:
 
 
 class _Option:
-    def __init__(self, name: str, kind: str, type: str, optional: bool, multi: bool, target: Target) -> None:
+    def __init__(
+        self,
+        name: str,
+        kind: str,
+        type: str,
+        optional: bool,
+        multi: str,
+        target: Target,
+        default: Any,
+        convert: Callable[[Any], Any] | None,
+        choices: Sequence[Any] | None,
+    ) -> None:
+        self.choices = choices
+        self.convert = convert
+        self.default = default
         self.kind = kind
         self.multi = multi
         self.name = name
@@ -283,20 +383,30 @@ class _Option:
         self.type = type
 
 
+# A value that is not valid, as None is one
+_INVALID = Pyjo.Base.new()
+
+
 def _is_value(type: str, arg: str) -> bool:
     if type == 's':
         return not arg.startswith('-') or arg == '-'
-    return re.fullmatch(r'[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?' if type == 'f' else r'[-+]?\d+', arg) is not None
+    return (_RE_FLOAT if type == 'f' else _RE_INT).fullmatch(arg) is not None
 
 
 def _store(option: _Option, values: dict[str, Any], value: Any) -> None:
     target = option.target
     if isinstance(target, list):
         cast(list[Any], target).append(value)
+    elif isinstance(target, dict):
+        key, value = cast(tuple[Any, Any], value)
+        cast(dict[Any, Any], target)[key] = value
     elif target is not None:
         target(option.name, value)
-    elif option.multi:
+    elif option.multi == '@':
         values[option.name].append(value)
+    elif option.multi == '%':
+        key, value = cast(tuple[Any, Any], value)
+        values[option.name][key] = value
     else:
         values[option.name] = value
 

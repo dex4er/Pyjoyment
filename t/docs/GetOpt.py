@@ -71,6 +71,20 @@ with subtest('Options'):
     getopt.option('H|header=s@')
     is_deeply_ok(getopt.parse(['-H', 'a', '-H', 'b']).header, ['a', 'b'], 'list')
 
+    # A dict of the keys and the values of --define key=value in the result
+    getopt.option('D|define=s%')
+    is_deeply_ok(getopt.parse(['--define', 'a=1']).define, {'a': '1'}, 'dict')
+
+    import Pyjo.File
+
+    getopt.option('M|method=s', default='GET')
+    getopt.option('home=s', type=Pyjo.File.path)
+    getopt.option('m|mode=s', choices=['development', 'production'])
+    opts = getopt.parse(['--home', '/tmp', '-m', 'production'])
+    is_ok(opts.method, 'GET', 'default')
+    is_ok(opts.home.to_str(), '/tmp', 'type')
+    is_ok(opts.mode, 'production', 'choices')
+
     is_ok(Pyjo.GetOpt.new().option('i|inactivity-timeout=i').parse(['-i', '1']).inactivity_timeout, 1, 'name')
 
 with subtest('new'):
@@ -93,6 +107,10 @@ with subtest('on'):
     ok(callable(cb) and callable(keep), 'returned')
 
 with subtest('option'):
+    define = {}
+    getopt = Pyjo.GetOpt.new().option('D|define=s%', define)
+    getopt.parse(['-D', 'a=1'])
+    is_deeply_ok(define, {'a': '1'}, 'dict')
     listen = []
     getopt = Pyjo.GetOpt.new().option('m|mode=s').option('l|listen=s', listen).option('b|backlog=i', lambda n, v: None)
     ok(getopt.parse(['-m', 'x', '-l', 'y', '-b', '1']), 'chained')
