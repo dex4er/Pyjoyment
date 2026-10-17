@@ -102,6 +102,8 @@ target-version = "py312"
 [tool.ruff.per-file-target-version]
 "t/Pyjo/String_Template_native.py" = "py314"
 "t/docs/String_Template.py" = "py314"
+"t/Pyjoyment/py_native_lite_app.py" = "py314"
+"t/docs/Pyjoyment_Plugin_PyRenderer.py" = "py314"
 
 [tool.ruff.format]
 quote-style = "single"
@@ -169,6 +171,12 @@ executionEnvironments = [
     ".",
   ] },
   { root = "t/docs/String_Template.py", pythonVersion = "3.14", extraPaths = [
+    ".",
+  ] },
+  { root = "t/Pyjoyment/py_native_lite_app.py", pythonVersion = "3.14", extraPaths = [
+    ".",
+  ] },
+  { root = "t/docs/Pyjoyment_Plugin_PyRenderer.py", pythonVersion = "3.14", extraPaths = [
     ".",
   ] },
   { root = "." },
@@ -263,6 +271,7 @@ strict = [
   "Pyjoyment/Plugin/EPLRenderer.py",
   "Pyjoyment/Plugin/EPRenderer.py",
   "Pyjoyment/Plugin/HeaderCondition.py",
+  "Pyjoyment/Plugin/PyRenderer.py",
   "Pyjoyment/Plugin/TagHelpers.py",
   "Pyjoyment/Plugins.py",
   "Pyjoyment/Renderer.py",

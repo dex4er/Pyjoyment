@@ -407,6 +407,9 @@ class Pyjoyment_App(Pyjo.App.object):
         for plugin in ('HeaderCondition', 'DefaultHelpers', 'TagHelpers', 'EPLRenderer', 'EPRenderer'):
             self.plugin(plugin)
 
+        # Not in Mojolicious: the renderer of template strings
+        self.plugin('PyRenderer')
+
         # Exception handling should be first in chain
         self.hook('around_dispatch', _exception)
 
