@@ -765,6 +765,44 @@ class Pyjoyment_App(Pyjo.App.object):
             def startup(self): ...
         """
 
+    @overload
+    def template[F: Callable[..., Any]](self, name: str, cb: None = None) -> Callable[[F], F]: ...
+
+    @overload
+    def template[F: Callable[..., Any]](self, name: str, cb: F) -> F: ...
+
+    # Not in Mojolicious: the templates of functions, for the handler "py"
+    def template(self, name: str, cb: Callable[..., Any] | None = None) -> Any:
+        """::
+
+            app.template('index.html', lambda c: t('<p>Hello!</p>'))
+
+            @app.template('index.html')
+            def index(c): ...
+
+        Add or replace a template of a function, which gets the controller
+        and the values of the stash that it names and returns a template
+        string, with
+        :meth:`Pyjoyment.Renderer.Pyjoyment_Renderer.add_template`, see
+        :mod:`Pyjoyment.Plugin.PyRenderer`. ::
+
+            # Template
+            @app.template('hello.html')
+            def hello(c, name):
+                return t('<p>Hello {name}!</p>')
+
+            # Controller
+            c.render('hello', name='Joe')
+        """
+        if cb is None:
+
+            def decorator(cb: Callable[..., Any]) -> Callable[..., Any]:
+                return self.template(name, cb)
+
+            return decorator
+        self.renderer.add_template(name, cb)
+        return cb
+
     def warmup(self) -> None:
         """::
 

@@ -100,6 +100,30 @@ with subtest('Helpers'):
     myapp = MyApp4.new()
     is_ok(app.build_controller().two(), myapp.build_controller().two(), 'same helper')
 
+with subtest('Templates'):
+    # The test is "t", so the function of the templates is imported where they are
+    def templates():
+        from Pyjo.String.Template import t
+
+        # Pyjoyment.Lite
+        @template('hello.html')
+        def hello(c, name):
+            return t('<p>Hello {name}!</p>')
+
+        # Pyjoyment
+        class MyApp6(Pyjoyment.object):
+            def startup(self):
+                self.template('hello.html', lambda c, name: t('<p>Hello {name}!</p>', name=name))
+
+        return MyApp6
+
+    MyApp6 = templates()
+    get('/hello', lambda c: c.render('hello', name='Joe'))
+    t.get_ok('/hello').content_is('<p>Hello Joe!</p>')
+    myapp = MyApp6.new()
+    myapp.routes.get('/hello', lambda c: c.render('hello', name='Joe'))
+    Pyjo.Test.Pyjo.new(myapp).get_ok('/hello').content_is('<p>Hello Joe!</p>')
+
 with subtest('Under'):
     app.routes.children.clear()
 
@@ -202,6 +226,21 @@ with subtest('put'):
 
 with subtest('query'):
     is_deeply_ok(methods(query), [[['QUERY'], '/:foo']] * 5, 'QUERY')
+
+with subtest('template'):
+
+    def templates():
+        from Pyjo.String.Template import t
+
+        template('index.html', lambda c: t('<p>Hello!</p>'))
+
+        @template('index.html')
+        def index(c): ...
+
+        return index
+
+    index = templates()
+    is_ok(app.renderer.templates['index.html'], index, 'template')
 
 with subtest('under'):
     with group():

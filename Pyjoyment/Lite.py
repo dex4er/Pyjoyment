@@ -99,6 +99,22 @@ method :meth:`Pyjoyment.Pyjoyment_App.helper`. ::
         def startup(self):
             self.helper('two', lambda c: 1 + 1)
 
+Templates
+^^^^^^^^^
+
+Instead of the ``template`` function you just use the method
+:meth:`Pyjoyment.Pyjoyment_App.template`. ::
+
+    # Pyjoyment.Lite
+    @template('hello.html')
+    def hello(c, name):
+        return t('<p>Hello {name}!</p>')
+
+    # Pyjoyment
+    class MyApp(Pyjoyment.object):
+        def startup(self):
+            self.template('hello.html', lambda c, name: t('<p>Hello {name}!</p>', name=name))
+
 Under
 ^^^^^
 
@@ -254,6 +270,17 @@ Generate route with
 :meth:`Pyjoyment.Routes.Route.Pyjoyment_Routes_Route.query`, matching only
 ``QUERY`` requests.
 
+template ::
+
+    template('index.html', lambda c: t('<p>Hello!</p>'))
+
+    @template('index.html')
+    def index(c): ...
+
+Add a template of a function with :meth:`Pyjoyment.Pyjoyment_App.template`,
+the counterpart of a template of the ``DATA`` section for template strings,
+see :mod:`Pyjoyment.Plugin.PyRenderer`.
+
 under ::
 
     route = under(lambda c: ...)
@@ -321,6 +348,7 @@ __all__ = [
     'post',
     'put',
     'query',
+    'template',
     'under',
     'websocket',
 ]
@@ -388,6 +416,9 @@ def _import(caller: str, file: str | None) -> dict[str, Any]:
     functions['delete'] = functions['del_'] = dsl.route('delete')
     functions.update(app=app, group=dsl.group, helper=app.helper, hook=app.hook, plugin=app.plugin, under=dsl.under)
 
+    # Not in Mojolicious: the templates of functions, for the handler "py"
+    functions['template'] = app.template
+
     # Make sure there's a default application for testing
     if Pyjo.UserAgent.Server.app() is None:
         Pyjo.UserAgent.Server.app(app)
@@ -444,6 +475,7 @@ if TYPE_CHECKING:
     def post(*args: Any, **constraints: Any) -> Pyjoyment.Routes.Route.object: ...
     def put(*args: Any, **constraints: Any) -> Pyjoyment.Routes.Route.object: ...
     def query(*args: Any, **constraints: Any) -> Pyjoyment.Routes.Route.object: ...
+    def template(name: str, cb: Callable[..., Any] | None = None) -> Any: ...
     def under(*args: Any, **constraints: Any) -> Pyjoyment.Routes.Route.object: ...
     def websocket(*args: Any, **constraints: Any) -> Pyjoyment.Routes.Route.object: ...
 

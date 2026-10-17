@@ -6,7 +6,14 @@ Pyjoyment.Plugin.PyRenderer - Template string renderer plugin
     # Pyjoyment
     app.plugin('PyRenderer')
 
-    # A t-string of Python 3.14
+    # A template of a function
+    @app.template('index.html')
+    def index(c, name):
+        return t'<p>Hello {name}!</p>'
+
+    c.render('index', name='Joe')
+
+    # An inline t-string of Python 3.14
     c.render(inline=t'<p>Hello {name}!</p>')
 
     # The same on any Python
@@ -17,8 +24,7 @@ are template strings, t-strings of
 `PEP 750 <https://peps.python.org/pep-0750/>`_ or of
 :func:`Pyjo.String.Template.t`, rendered by :mod:`Pyjo.String.Template`, which
 escapes the values that they interpolate, unless they are markup, as the
-helpers of :mod:`Pyjoyment.Plugin.TagHelpers` return. An inline template that
-is a template string is rendered by it, unless another handler is given. ::
+helpers of :mod:`Pyjoyment.Plugin.TagHelpers` return. ::
 
     from Pyjo.String.Template import t
 
@@ -29,9 +35,31 @@ is a template string is rendered by it, unless another handler is given. ::
     # "<p><a href="/">Home</a></p>"
     c.render(inline=t('<p>{link}</p>', link=c.link_to('Home', '/')))
 
-The values of a t-string are evaluated where it is written, so a template
-string gets the values of the stash as the code around it does,
-``c.stash('name')``, and calls the helpers as methods of the controller.
+A template string is code, which cannot be read from a file of data as a
+template of :mod:`Pyjoyment.Plugin.EPRenderer` is, so a template is a function
+that returns one, registered with :meth:`Pyjoyment.Pyjoyment_App.template`,
+or the function ``template`` of :mod:`Pyjoyment.Lite`, by its name with the
+format, as ``index.html``. The function gets the controller and the values
+of the stash that it names as its parameters, as the variables of an ``ep``
+template, or all of them with ``**``, and it can set the values of the stash
+that the renderer reads, as a layout. ::
+
+    # A template with a layout
+    @app.template('hello.html')
+    def hello(c, name):
+        c.layout('default')
+        c.title('Hello')
+        return t'<p>Hello {name}!</p>'
+
+    # The layout, which gets the content and the title
+    @app.template('layouts/default.html')
+    def default(c, **stash):
+        return t'<title>{c.title()}</title><body>{c.content()}</body>'
+
+An inline template that is a template string is rendered by it, unless
+another handler is given. Its values are evaluated where it is written, so it
+gets the values of the stash as the code around it does, ``c.stash('name')``,
+and a layout does not apply to it, as to any inline template.
 
 This is a core plugin, that means it is always enabled and its code a good
 example for learning to build new plugins, you're welcome to fork it.
@@ -48,16 +76,17 @@ Inspired by `Mojolicious::Plugin::EPLRenderer
 <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojolicious/Plugin/EPLRenderer.pm>`_ of Mojolicious 9.49.
 """
 
-# TODO: the templates of functions, with a decorator for Pyjoyment.Lite, and the templates of files, as
-# "index.html.py", in the next steps of the renderer of t-strings
+# TODO: the templates of files, as "index.html.py", in the next step of the renderer of t-strings
 
 import Pyjo.String.Template
 import Pyjoyment.Plugin
 
 from Pyjo.Util import encode, md5_sum
 
+import inspect
 import io
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 
@@ -89,15 +118,38 @@ def _handler(
     output: io.StringIO,
     options: dict[str, Any],
 ) -> None:
-    inline = options.get('inline')
-    if not Pyjo.String.Template.is_template(inline):
-        return
+    log = c.helpers.log()
 
     # Inline
-    template = Pyjo.String.Template.t(inline)
-    name = md5_sum(encode('UTF-8', '{}'.join(template.strings)))
-    c.helpers.log().trace(f'Rendering inline template "{name}"')
-    output.write(template.render())
+    inline = options.get('inline')
+    if inline is not None:
+        if not Pyjo.String.Template.is_template(inline):
+            return
+        template = Pyjo.String.Template.t(inline)
+        name = md5_sum(encode('UTF-8', '{}'.join(template.strings)))
+        log.trace(f'Rendering inline template "{name}"')
+        output.write(template.render())
+        return
+
+    # Function
+    if (name := renderer.template_name(options)) is None:
+        return
+    if (cb := renderer.templates.get(name.removesuffix('.py'))) is None:
+        log.debug(f'Template "{name}" not found')
+        return
+    log.trace(f'Rendering template "{name}" of a function')
+    output.write(Pyjo.String.Template.escape(_call(cb, c, c.stash())))
+
+
+# The controller and the values of the stash that the function names, or all of them for **
+def _call(cb: Callable[..., Any], c: 'Pyjoyment.Controller.object', stash: dict[str, Any]) -> Any:
+    parameters = list(inspect.signature(cb).parameters.values())
+    rest = parameters[1:]
+    if any(p.kind is inspect.Parameter.VAR_KEYWORD for p in rest):
+        values = {k: v for k, v in stash.items() if k.isidentifier() and k != parameters[0].name}
+    else:
+        values = {p.name: stash[p.name] for p in rest if p.name in stash}
+    return cb(c, **values)
 
 
 new = Pyjoyment_Plugin_PyRenderer.new
