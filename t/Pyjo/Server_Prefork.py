@@ -3,7 +3,9 @@ from Pyjo.Test import *
 import gc
 import os
 import signal
+import socket
 import sys
+import time
 
 
 # Left out from Mojolicious: TEST_PREFORK, which enables the tests, as they are quick; MOJO_REACTOR, as the tests run on
@@ -98,7 +100,8 @@ with subtest('Multiple workers and graceful shutdown'):
         ua = Pyjo.UserAgent.new()
         tx = ua.get(f'http://127.0.0.1:{port}')
         ua.ioloop.reset()
-        os.kill(os.getpid(), signal.SIGQUIT)
+        # Unlike Mojolicious: TERM shuts the server down gracefully, where Mojo has QUIT
+        os.kill(os.getpid(), signal.SIGTERM)
 
     prefork.on('reap', lambda prefork, pid: reap.append(pid))
 
@@ -172,7 +175,8 @@ with subtest('Multiple workers and graceful shutdown (Pyjo.HelloWorld)'):
         ua = Pyjo.UserAgent.new()
         tx = ua.get(f'http://127.0.0.1:{port}')
         ua.ioloop.reset()
-        os.kill(os.getpid(), signal.SIGQUIT)
+        # Unlike Mojolicious: TERM shuts the server down gracefully, where Mojo has QUIT
+        os.kill(os.getpid(), signal.SIGTERM)
 
     prefork.on('reap', lambda prefork, pid: reap.append(pid))
     prefork.on('finish', finish)
@@ -210,7 +214,8 @@ with subtest('One worker and immediate shutdown'):
         ua = Pyjo.UserAgent.new()
         tx = ua.get(f'http://127.0.0.1:{port}')
         ua.ioloop.reset()
-        os.kill(os.getpid(), signal.SIGTERM)
+        # Unlike Mojolicious: QUIT shuts the server down immediately, where Mojo has TERM
+        os.kill(os.getpid(), signal.SIGQUIT)
 
     prefork.on('reap', lambda prefork, pid: reap.append(pid))
     prefork.on('finish', finish)
@@ -222,8 +227,8 @@ with subtest('One worker and immediate shutdown'):
     is_ok(tx.res.code, 200, 'right status')
     is_ok(tx.res.body, b'works too!', 'right content')
 
-# Not in Mojolicious: a worker that gets QUIT before it has its handler stops, where Mojo's serves on
-with subtest('QUIT right after the fork'):
+# Not in Mojolicious: a worker that gets TERM before it has its handler stops, where Mojo's serves on
+with subtest('TERM right after the fork'):
     port = Pyjo.IOLoop.Server.object.generate_port()
     prefork = Pyjo.Server.Prefork.new(heartbeat_interval=0.5, listen=[f'http://127.0.0.1:{port}'], workers=1)
     spawn, reap, heartbeats = [], [], []
@@ -231,7 +236,7 @@ with subtest('QUIT right after the fork'):
     @prefork.on('spawn')
     def quit(prefork, pid):
         if not len(spawn):
-            os.kill(pid, signal.SIGQUIT)
+            os.kill(pid, signal.SIGTERM)
         spawn.append(pid)
 
     @prefork.on('heartbeat')
@@ -244,5 +249,75 @@ with subtest('QUIT right after the fork'):
     prefork.run()
     ok(heartbeats.count(spawn[0]) < 5, 'first worker has stopped')
     is_ok(reap[0], spawn[0], 'first worker reaped')
+
+
+# Not in Mojolicious: a second INT, as of Ctrl-C pressed twice, shuts the server down immediately after a graceful
+# shutdown, and a second TERM does not
+with subtest('Second INT and TERM'):
+
+    def second_signal(second):
+        port = Pyjo.IOLoop.Server.object.generate_port()
+        prefork = Pyjo.Server.Prefork.new(heartbeat_interval=0.5, listen=[f'http://127.0.0.1:{port}'], workers=1)
+        prefork.unsubscribe('request')
+
+        # A request that keeps the worker from stopping gracefully
+        @prefork.on('request')
+        def request(prefork, tx):
+            pass
+
+        finished, connections = [], []
+        prefork.on('finish', lambda prefork, graceful: finished.append(graceful))
+
+        @prefork.once('heartbeat')
+        def heartbeat(prefork, pid):
+            connections.append(connection := socket.create_connection(('127.0.0.1', port)))
+            connection.sendall(b'GET / HTTP/1.1\r\nHost: x\r\n\r\n')
+            os.kill(os.getpid(), signal.SIGINT)
+
+            @prefork.once('wait')
+            def again(prefork):
+                os.kill(os.getpid(), second)
+
+        prefork.graceful_timeout = 2
+        started = time.monotonic()
+        prefork.run()
+        for connection in connections:
+            connection.close()
+        return finished, time.monotonic() - started
+
+    finished, elapsed = second_signal(signal.SIGTERM)
+    is_deeply_ok(finished, [True], 'a second TERM does nothing')
+    finished, elapsed = second_signal(signal.SIGINT)
+    is_deeply_ok(finished, [True, False], 'a second INT shuts the server down immediately')
+    ok(elapsed < 2, 'stopped before the graceful timeout')
+
+# Not in Mojolicious: HUP restarts the workers gracefully, or emits the event "reload"
+with subtest('HUP'):
+    port = Pyjo.IOLoop.Server.object.generate_port()
+    prefork = Pyjo.Server.Prefork.new(heartbeat_interval=0.5, listen=[f'http://127.0.0.1:{port}'], workers=1)
+    spawn, reap = [], []
+    prefork.on('spawn', lambda prefork, pid: spawn.append(pid))
+
+    @prefork.on('reap')
+    def reaped(prefork, pid):
+        reap.append(pid)
+        os.kill(os.getpid(), signal.SIGTERM)
+
+    prefork.once('heartbeat', lambda prefork, pid: os.kill(os.getpid(), signal.SIGHUP))
+    prefork.run()
+    ok(len(spawn) >= 2, 'worker restarted')
+    is_ok(reap[0], spawn[0], 'first worker stopped')
+
+    prefork = Pyjo.Server.Prefork.new(heartbeat_interval=0.5, listen=[f'http://127.0.0.1:{port}'], workers=1)
+    reloads = []
+
+    @prefork.on('reload')
+    def reload(prefork):
+        reloads.append(True)
+        os.kill(os.getpid(), signal.SIGTERM)
+
+    prefork.once('heartbeat', lambda prefork, pid: os.kill(os.getpid(), signal.SIGHUP))
+    prefork.run()
+    is_deeply_ok(reloads, [True], 'event emitted')
 
 done_testing()

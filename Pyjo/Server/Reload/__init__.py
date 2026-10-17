@@ -197,8 +197,9 @@ class Pyjo_Server_Reload(Pyjo.Base.object):
         # Clean manager environment
         def stop(signum: int, frame: Any) -> None:
             self._finished = True
+            # Unlike Mojolicious: QUIT stops the worker immediately, as TERM stops Pyjo.Server.Daemon gracefully
             if self._worker:
-                _kill(signal.SIGTERM, self._worker)
+                _kill(signal.SIGQUIT, self._worker)
 
         # Not in Mojolicious: local %SIG, the handlers of the signals are set back at the end
         handlers = {name: signal.signal(name, stop) for name in (signal.SIGINT, signal.SIGTERM)}
@@ -225,8 +226,9 @@ class Pyjo_Server_Reload(Pyjo.Base.object):
                     if len(files) == 1
                     else f'{len(files)} files changed, restarting.'
                 )
+            # Unlike Mojolicious: QUIT stops the worker immediately, as TERM stops Pyjo.Server.Daemon gracefully
             if self._worker:
-                _kill(signal.SIGTERM, self._worker)
+                _kill(signal.SIGQUIT, self._worker)
             self._modified = True
 
         if pid := self._worker:

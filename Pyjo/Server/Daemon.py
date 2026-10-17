@@ -48,7 +48,19 @@ following signals.
 INT, TERM
 ~~~~~~~~~
 
+Shut down server gracefully: stop accepting new connections and wait for the
+accepted ones to be closed. A second ``INT``, as of Ctrl-C pressed twice,
+shuts it down immediately, a second ``TERM`` does nothing.
+
+QUIT
+~~~~
+
 Shut down server immediately.
+
+HUP
+~~~
+
+Ignored, as there is nothing to reload.
 
 Events
 ------
@@ -420,20 +432,32 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
 
             daemon.run()
 
-        Run server and wait for the signals ``INT`` and ``TERM``.
+        Run server and wait for the signals ``INT``, ``TERM`` and ``QUIT``.
         """
         # Make sure the event loop can be stopped in regular intervals
         loop = self.ioloop
         interval = loop.recurring(1, lambda loop: None)
+        graceful = False
 
+        # Unlike Mojolicious: INT and TERM stop the event loop gracefully, as Docker and Kubernetes stop the server with
+        # TERM, and QUIT immediately, where Mojo stops it immediately on INT and TERM; a second INT, as of Ctrl-C pressed
+        # twice, stops it immediately, and the graceful stop is left to the next tick, as a handler of Python runs in the
+        # middle of what the event loop does
         def stop(signum: int, frame: Any) -> None:
-            loop.stop()
+            nonlocal graceful
+            if signum == signal.SIGQUIT or (signum == signal.SIGINT and graceful):
+                loop.stop()
+            elif not graceful:
+                graceful = True
+                loop.next_tick(lambda loop: loop.stop_gracefully())
 
-        # Not in Mojolicious: a thread other than the main one cannot handle signals
+        # Not in Mojolicious: a thread other than the main one cannot handle signals, and HUP is ignored, as there is
+        # nothing to reload
         handlers: dict[signal.Signals, Any] = {}
         if threading.current_thread() is threading.main_thread():
-            for name in (signal.SIGINT, signal.SIGTERM):
+            for name in (signal.SIGINT, signal.SIGTERM, signal.SIGQUIT):
                 handlers[name] = signal.signal(name, stop)
+            handlers[signal.SIGHUP] = signal.signal(signal.SIGHUP, signal.SIG_IGN)
         try:
             self.start().ioloop.start()
         finally:

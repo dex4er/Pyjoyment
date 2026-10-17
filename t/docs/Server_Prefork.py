@@ -85,7 +85,7 @@ prefork.run()
         )
     )
     is_ok(get(port, '/foo'), b'GET request for /foo!', 'served by a worker')
-    process.send_signal(signal.SIGQUIT)
+    process.send_signal(signal.SIGTERM)
     is_ok(process.wait(30), 0, 'stopped gracefully')
     like_ok(process.stdout.read(), rf'Web application available at http://127.0.0.1:{port}', 'listening')
     process.stdout.close()
@@ -120,7 +120,7 @@ with subtest('finish'):
     prefork = new()
     prefork.on('finish', lambda prefork, graceful: ...)
     prefork.on('finish', lambda prefork, graceful: print('Graceful server shutdown' if graceful else 'Server shutdown'))
-    is_ok(once(prefork), 'Server shutdown\n', 'emitted')
+    is_ok(once(prefork), 'Graceful server shutdown\n', 'emitted')
 
 with subtest('heartbeat'):
     prefork = new()

@@ -115,7 +115,7 @@ with subtest('Hot deployment'):
     def stop():
         if pid := _pid(dir.child('hot.pid')):
             try:
-                os.kill(int(pid), signal.SIGTERM)
+                os.kill(int(pid), signal.SIGQUIT)
             except OSError:
                 pass
 
