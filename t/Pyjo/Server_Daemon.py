@@ -9,6 +9,7 @@ import Pyjo.Promise
 import Pyjo.Server
 import Pyjo.Server.Daemon
 import Pyjo.Transaction.HTTP
+import Pyjo.URL
 import Pyjo.UserAgent
 import Pyjoyment
 
@@ -121,6 +122,18 @@ with subtest('Invalid listen location'):
     throws_ok(
         lambda: Pyjo.Server.Daemon.new(listen=['fail']).start(),
         re.compile(r'Invalid listen location'),
+        'right error',
+    )
+
+# Not in Mojolicious: a location of a Pyjo.URL object, which Mojo::URL->new takes as it stringifies a Mojo::URL
+with subtest('Listen location of a URL object'):
+    url = Pyjo.URL.new().set(scheme='http', host='127.0.0.1')
+    with Pyjo.Server.Daemon.new(listen=[url], silent=True) as daemon:
+        port = daemon.start().ports()[0]
+        is_ok(Pyjo.UserAgent.new(ioloop=Pyjo.IOLoop.singleton).get(f'http://127.0.0.1:{port}/').res.code, 200, 'served')
+    throws_ok(
+        lambda: Pyjo.Server.Daemon.new(listen=[Pyjo.URL.new('fail')]).start(),
+        re.compile(r'Invalid listen location "fail"'),
         'right error',
     )
 

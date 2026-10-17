@@ -112,8 +112,13 @@ import sys
 import threading
 import weakref
 
+from collections.abc import Sequence
 from types import TracebackType
 from typing import Any, Self
+
+
+# A location to listen on, which Pyjo.URL parses
+type Location = str | Pyjo.URL.object
 
 
 DEBUG = bool(os.environ.get('PYJO_SERVER_DEBUG'))
@@ -141,7 +146,7 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
         inactivity_timeout: float | None = None,
         ioloop: Pyjo.IOLoop.object | None = None,
         keep_alive_timeout: float | None = None,
-        listen: list[str] | None = None,
+        listen: Sequence[Location] | None = None,
         max_clients: int | None = None,
         max_requests: int = 100,
         silent: bool | None = None,
@@ -190,7 +195,7 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
         """
 
         self._keep_alive_timeout: float | None = keep_alive_timeout
-        self._locations: list[str] | None = listen
+        self._locations: list[Location] | None = list(listen) if listen is not None else None
 
         self.max_clients = max_clients
         """::
@@ -269,15 +274,16 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
         self._keep_alive_timeout = value
 
     @property
-    def listen(self) -> list[str]:
+    def listen(self) -> list[Location]:
         """::
 
             listen = daemon.listen
             daemon.listen = ['https://127.0.0.1:8080']
 
-        List of one or more locations to listen on, defaults to the value of
-        the ``PYJO_LISTEN`` environment variable or ``http://*:3000``
-        (shortcut for ``http://0.0.0.0:3000``). ::
+        List of one or more locations to listen on, as strings or
+        :mod:`Pyjo.URL` objects, defaults to the value of the ``PYJO_LISTEN``
+        environment variable or ``http://*:3000`` (shortcut for
+        ``http://0.0.0.0:3000``). ::
 
             # Listen on all IPv4 interfaces
             daemon.listen = ['http://*:3000']
@@ -302,6 +308,9 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
 
             # Listen on two ports with HTTP and HTTPS at the same time
             daemon.listen = ['http://*:3000', 'https://*:4000']
+
+            # Location of a URL object
+            daemon.listen = [Pyjo.URL.new().set(scheme='http', host='127.0.0.1', port=3000)]
 
             # Use a custom certificate and key
             daemon.listen = ['https://*:3000?cert=/x/server.crt&key=/y/server.key']
@@ -393,8 +402,8 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
         return self._locations
 
     @listen.setter
-    def listen(self, value: list[str]) -> None:
-        self._locations = value
+    def listen(self, value: Sequence[Location]) -> None:
+        self._locations = list(value)
 
     def __del__(self) -> None:
         try:
@@ -621,8 +630,9 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
         if c.get('tx') is None:
             self.ioloop.stream(id).timeout = self.keep_alive_timeout
 
-    def _listen(self, listen: str) -> None:
-        url = Pyjo.URL.new(listen)
+    def _listen(self, listen: Location) -> None:
+        # A Pyjo.URL stringifies, as a Mojo::URL does for Mojo::URL->new
+        url = Pyjo.URL.new(str(listen))
         proto = url.protocol
         if proto not in ('http', 'https', 'http+unix'):
             raise Pyjo.Exception.new(f'Invalid listen location "{listen}"')
