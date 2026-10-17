@@ -23,15 +23,15 @@ port=38460
 
 # python -m puts the current directory first in sys.path, so the server runs in ROOT, or the Pyjo of the
 # current directory would be profiled instead
-(cd "$root" && PYJO_REACTOR=Pyjo.Reactor.$reactor PYTHONPATH=$root exec "$PY" -m cProfile -o "$OUT" "$B/pyjo_daemon.py" $port >/dev/null 2>&1) &
+(cd "$root" && PYJO_REACTOR=Pyjo.Reactor.$reactor PYTHONPATH=$root exec "$PY" -m cProfile -o "$OUT" "$B/pyjo_daemon.py" "$port" >/dev/null 2>&1) &
 pid=$!
 for _ in $(seq 100); do
   curl -s -m 1 -o /dev/null "http://127.0.0.1:$port/" && break
   sleep 0.1
 done
-WARMUP=0 "$PY" "$B/ka.py" $port "$requests"
-kill -TERM $pid
-wait $pid
+WARMUP=0 "$PY" "$B/ka.py" "$port" "$requests"
+kill -TERM "$pid"
+wait "$pid"
 
 "$PY" - "$OUT" "$requests" <<'EOF'
 import pstats

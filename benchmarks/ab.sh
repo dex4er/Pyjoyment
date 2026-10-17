@@ -19,7 +19,7 @@ while getopts n:r: opt; do
 done
 shift $((OPTIND - 1))
 ref=${1:-master}
-[ ${#reactors[@]} -gt 0 ] || reactors=(Asyncio Poll)
+[[ ${#reactors[@]} -gt 0 ]] || reactors=(Asyncio Poll)
 
 W=$(mktemp -d)/ref
 git -C "$R" worktree add -q --detach "$W" "$ref" || exit 1
@@ -36,8 +36,8 @@ run() {
     sleep 0.1
   done
   "$PY" "$B/ka.py" "$port" 20000 | awk '{print $2}'
-  kill -TERM $pid
-  wait $pid
+  kill -TERM "$pid"
+  wait "$pid"
 }
 
 median() { sort -n | awk '{a[NR] = $1} END {print (NR % 2 ? a[(NR + 1) / 2] : int((a[NR / 2] + a[NR / 2 + 1]) / 2))}'; }

@@ -22,7 +22,7 @@ echo "logs: $OUT"
 uptime
 
 # Wait for TIME_WAIT to drain, as a new connection per request uses up the ephemeral ports
-drain() { while [ "$(netstat -an 2>/dev/null | grep -c TIME_WAIT)" -gt 500 ]; do sleep 5; done; }
+drain() { while [[ "$(netstat -an 2>/dev/null | grep -c TIME_WAIT)" -gt 500 ]]; do sleep 5; done; }
 
 stop() {
   lsof -nP -iTCP:"$1" -sTCP:LISTEN -t | xargs -r kill
@@ -34,7 +34,7 @@ stop() {
 bench() {
   local name=$1 port=$2 ka=$3 warmup=$4
   shift 4
-  if [ ${#selected[@]} -gt 0 ] && [[ " ${selected[*]} " != *" $name "* ]]; then return; fi
+  if [[ ${#selected[@]} -gt 0 ]] && [[ " ${selected[*]} " != *" $name "* ]]; then return; fi
   # A server left on the port would share it, as the Pyjo servers listen with SO_REUSEPORT
   if lsof -nP -iTCP:"$port" -sTCP:LISTEN -t >/dev/null; then
     echo "== $name: port $port is busy"
@@ -47,7 +47,7 @@ bench() {
     sleep 0.1
   done
   echo "== $name: $(curl -s "http://127.0.0.1:$port/")"
-  if [ "$ka" = yes ]; then
+  if [[ $ka == yes ]]; then
     for _ in 1 2 3; do WARMUP=$warmup timeout 300 "$PY" "$B/ka.py" "$port" 20000 2>&1 | tail -1; done
   fi
   drain
