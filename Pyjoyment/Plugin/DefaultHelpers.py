@@ -237,6 +237,59 @@ param ::
 
 Alias for :meth:`Pyjoyment.Controller.Pyjoyment_Controller.param`.
 
+proxy.get_p ::
+
+    promise = c.proxy.get_p('http://example.com', {'Accept': '*/*'})
+
+Perform non-blocking ``GET`` request and forward response as efficiently as
+possible, takes the same arguments as
+:attr:`Pyjo.UserAgent.Pyjo_UserAgent.get` and returns a :mod:`Pyjo.Promise`
+object. ::
+
+    # Forward with exception handling
+    @c.proxy.get_p('http://mojolicious.org').catch
+    def catch(err):
+        c.log().debug(f'Proxy error: {err}')
+        c.render(text='Something went wrong!', status=400)
+
+proxy.post_p ::
+
+    promise = c.proxy.post_p('http://example.com', {'Accept': '*/*'})
+
+Perform non-blocking ``POST`` request and forward response as efficiently as
+possible, takes the same arguments as
+:attr:`Pyjo.UserAgent.Pyjo_UserAgent.post` and returns a :mod:`Pyjo.Promise`
+object. ::
+
+    # Forward with exception handling
+    @c.proxy.post_p('example.com', form={'test': 'pass'}).catch
+    def catch(err):
+        c.log().debug(f'Proxy error: {err}')
+        c.render(text='Something went wrong!', status=400)
+
+proxy.start_p ::
+
+    promise = c.proxy.start_p(Pyjo.Transaction.HTTP.new())
+
+Perform non-blocking request for a custom :mod:`Pyjo.Transaction.HTTP` object
+and forward response as efficiently as possible, returns a :mod:`Pyjo.Promise`
+object. ::
+
+    # Forward with exception handling
+    tx = c.ua().build_tx('GET', 'http://mojolicious.org')
+
+    @c.proxy.start_p(tx).catch
+    def catch(err):
+        c.log().debug(f'Proxy error: {err}')
+        c.render(text='Something went wrong!', status=400)
+
+    # Forward with custom request and response headers
+    headers = c.req.headers.clone().dehop()
+    headers.header('X-Proxy', 'Pyjo')
+    tx = c.ua().build_tx('GET', 'http://example.com', headers.to_dict())
+    c.proxy.start_p(tx)
+    tx.res.content.once('body', lambda content: c.res.headers.header('X-Proxy', 'Pyjo'))
+
 redirect_to ::
 
     c = c.redirect_to('named', foo='bar')
@@ -534,13 +587,12 @@ Ported from `Mojolicious::Plugin::DefaultHelpers
 <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojolicious/Plugin/DefaultHelpers.pm>`_ of Mojolicious 9.49.
 """
 
-# TODO: the helpers proxy.get_p, proxy.post_p and proxy.start_p, with proxy_app.t, when Pyjo.Test.Pyjo is ported
-
 import Pyjo.Asset
 import Pyjo.Asset.File
 import Pyjo.Collection
 import Pyjo.Exception
 import Pyjo.IOLoop
+import Pyjo.Promise
 import Pyjo.String.Bytes
 import Pyjo.String.HTML
 import Pyjo.String.Unicode
@@ -550,6 +602,7 @@ from Pyjo.Util import dumper, random_bytes
 
 import functools
 import time
+import weakref
 
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
@@ -611,6 +664,10 @@ class Pyjoyment_Plugin_DefaultHelpers(Pyjoyment.Plugin.object):
         app.helper('include', _include)
 
         app.helper('log', _log)
+
+        app.helper('proxy.get_p', functools.partial(_proxy_method_p, 'GET'))
+        app.helper('proxy.post_p', functools.partial(_proxy_method_p, 'POST'))
+        app.helper('proxy.start_p', _proxy_start_p)
 
         app.helper('reply.asset', _asset)
         app.helper('reply.file', _file)
@@ -849,6 +906,71 @@ def _not_found(c: 'Controller') -> Any:
     return c.helpers.reply.http_not_found()
 
 
+def _proxy_method_p(method: str, c: 'Controller', *args: Any, **kwargs: Any) -> Pyjo.Promise.object:
+    return _proxy_start_p(c, c.ua().build_tx(method, *args, **kwargs))
+
+
+def _proxy_start_p(c: 'Controller', source_tx: Any) -> Pyjo.Promise.object:
+    tx: Any = c.render_later().tx
+
+    promise = Pyjo.Promise.new()
+    source = weakref.ref(source_tx)
+
+    def body(source_content: Any) -> None:
+        source_tx = source()
+        if source_tx is None:
+            return
+
+        source_res = source_tx.res
+        res = tx.res
+        content = res.content
+        res.code = source_res.code
+        res.message = source_res.message
+        headers = source_res.headers.clone().dehop()
+        content.headers = headers
+        promise.resolve()
+
+        source_stream = Pyjo.IOLoop.stream(source_tx.connection)
+        if not (stream := Pyjo.IOLoop.stream(tx.connection)):
+            return
+
+        write = content.write_chunk if source_content.is_chunked else content.write
+
+        def read(source_content: Any, data: bytes) -> None:
+            write(data if len(data) else None)
+            tx.resume()
+
+            # Throttle transparently when backpressure rises
+            if stream.can_write:
+                return
+            source_stream.stop()
+
+            @stream.once('drain')
+            def drain(stream: Any) -> None:
+                source_stream.start()
+
+        source_content.unsubscribe('read').on('read', read)
+
+        def finish(source_res: Any) -> None:
+            write(b'')
+            tx.resume()
+
+        source_res.once('finish', finish)
+
+    source_tx.res.content.set(auto_upgrade=False, auto_decompress=False).once('body', body)
+
+    @source_tx.once('finish')
+    def finish(source_tx: Any) -> None:
+        promise.reject(_tx_error(source_tx))
+
+    def ignore(*args: Any) -> None:
+        pass
+
+    c.ua().start_p(source_tx).catch(ignore)
+
+    return promise
+
+
 def _redirect_to(c: 'Controller', *args: Any, **values: Any) -> 'Controller':
     # Don't override 3xx status
     res = c.res
@@ -905,6 +1027,11 @@ def _timing_server_timing(c: 'Controller', metric: str, desc: str | None = None,
     if dur is not None:
         value += f';dur={dur}'
     c.res.headers.append('Server-Timing', value)
+
+
+def _tx_error(tx: Any) -> str:
+    error: dict[str, Any] = tx.error or {}
+    return str(error.get('message') or 'Unknown error')
 
 
 def _txt_exception(c: 'Controller', e: Any) -> Any:

@@ -225,11 +225,40 @@ with subtest('on'):
 
         c.render(text='on')
 
-    # TODO: the examples of the events of a WebSocket, message, json and binary, with websocket_lite_app.t, when
-    # Pyjo.Test.Pyjo is ported
     app.routes.get('/', action)
     request(app, '/')
     is_deeply_ok(events, ['finish'], 'event')
+
+    # The examples of the events of a WebSocket, each in an action of its own
+    def message_action(c):
+        # Receive WebSocket message
+        @c.on('message')
+        def message(c, msg):
+            c.app.log.debug(f'Message: {msg}')
+            events.append(f'message {msg}')
+
+    def json_action(c):
+        # Receive JSON object via WebSocket message
+        @c.on('json')
+        def json(c, hash):
+            c.app.log.debug(f'Test: {hash["test"]}')
+            events.append(f'json {hash["test"]}')
+
+    def binary_action(c):
+        # Receive WebSocket "Binary" message
+        @c.on('binary')
+        def binary(c, data):
+            c.app.log.debug(f'Received {len(data)} bytes')
+            events.append(f'binary {len(data)}')
+
+    app.routes.websocket('/message', message_action)
+    app.routes.websocket('/json', json_action)
+    app.routes.websocket('/binary', binary_action)
+    t = Pyjo.Test.Pyjo.new(app)
+    t.websocket_ok('/message').send_ok('hello').finish_ok()
+    t.websocket_ok('/json').send_ok({'json': {'test': 23}}).finish_ok()
+    t.websocket_ok('/binary').send_ok({'binary': b'\x00\x01\x02'}).finish_ok()
+    is_deeply_ok(events, ['finish', 'message hello', 'json 23', 'binary 3'], 'WebSocket events')
 
 with subtest('param'):
     app, c = controller()
