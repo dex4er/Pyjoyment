@@ -68,13 +68,16 @@ lint:
         - Pyjoyment/resources/public/pyjo/highlight.js/**
         - Pyjoyment/resources/public/pyjo/pyjo.css
     # Configuration files of the tests, which are templates of Pyjo.Template
-    # before they are JSON or TOML, as those of Mojolicious
+    # before they are JSON, TOML or YAML, as those of Mojolicious
     - linters:
         - prettier
         - taplo
+        - yamlfmt
+        - yamllint
       paths:
         - t/Pyjoyment/json_config_lite_app.json
         - t/Pyjoyment/toml_config_lite_app.toml
+        - t/Pyjoyment/yaml_config_lite_app*.yml
     # Benchmarks, examples and tests that need other libraries, which are not
     # installed for the project, as the servers of the dependency group
     # "servers"
