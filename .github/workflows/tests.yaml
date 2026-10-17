@@ -72,14 +72,16 @@ jobs:
           python -m Pyjo.Prove -l --color -j 4 --timeout 60 --capture-stderr --stderr-lines 1000 -r t 2>&1 | tee prove.log
           if grep -n 'ResourceWarning:' prove.log; then exit 1; fi
 
-      # The tests of the event loop, and of the user agent and the servers,
-      # which do the most of its I/O, run on the reactor without asyncio too.
+      # The tests of the event loop, and of the user agent, the WebSockets and
+      # the servers, which do the most of its I/O, run on the reactor without
+      # asyncio too, with the tests that request remote hosts.
       - name: Run tests on Pyjo.Reactor.Poll
         shell: bash
         env:
           PYJO_REACTOR: Pyjo.Reactor.Poll
           PYTHONDEVMODE: "1"
           PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
+          TEST_ONLINE: ${{ matrix.python == 'mise' && '1' || '' }}
         run: |
           python -m Pyjo.Prove -l --color -j 4 --timeout 60 --capture-stderr --stderr-lines 1000 \
             t/Pyjo/IOLoop*.py t/Pyjo/TLS.py t/Pyjo/Promise*.py t/Pyjo/Subprocess.py t/stdlib/IOLoop*.py \

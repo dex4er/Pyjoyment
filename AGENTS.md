@@ -129,7 +129,8 @@ A test that requests remote hosts, as `t/Pyjo/UserAgent_online.py`, is
 skipped unless `TEST_ONLINE` is set, as in Mojolicious. Its hosts are those of
 GitHub, which the runners of GitHub Actions reach the most reliably, and CI
 sets `TEST_ONLINE` on the Python of `mise.toml` only, so that one job, not
-each of them, depends on the network.
+each of them, depends on the network; that job runs it on `Pyjo.Reactor.Poll`
+too, as the other tests of the user agent.
 
 CI runs the tests with `--timeout 60`: a test script that hangs, such as a
 reactor that never stops, is killed with the processes it started and fails
