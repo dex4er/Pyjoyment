@@ -522,6 +522,20 @@ copy:
   server imports the script of an application, which ends with
   `application = app.start()`, with its own arguments in `sys.argv`, so that
   the command has to be detected.
+- The generators of the command `generate` write projects for uv, where Mojo
+  writes ones for ExtUtils::MakeMaker: `generate makefile` is
+  `generate pyproject`, and `cpanify` is left out, as `uv publish` uploads to
+  PyPI. An application is a package in the directory of its project, without
+  `lib`, as `Pyjo.Prove -l` adds the current directory, and its
+  `pyproject.toml` has no build system, as `uv init --app` makes it, since
+  `Pyjo.Home` finds `templates` and `public` next to the package, which a
+  wheel would leave behind; `MyApp/__main__.py` takes the place of
+  `script/my_app`. A script of `Pyjoyment.Lite` declares its dependencies in
+  the inline metadata of PEP 723. A plugin is a distribution, built with
+  hatchling, whose wheel has only its module, without the `__init__.py` of
+  the namespace `Pyjoyment.Plugin`, which `extend_path` keeps open. A
+  namespace finds its parts through the `__path__` of its parent package, so
+  `Pyjoyment/__init__.py` extends its own before it imports its subpackages.
 - `ojo` is the functions of the package `Pyjo`, which `from Pyjo import *`
   imports, and `perl -Mojo -E` is `python -m Pyjo`. A function imports the
   modules it uses when it is called, as every `import Pyjo.X` runs

@@ -68,6 +68,13 @@ with local(PYJO_MODE=None):
 # imports Pyjoyment.Commands
 import Pyjoyment.Command  # noqa: E402
 import Pyjoyment.Command.asgi  # noqa: E402
+import Pyjoyment.Command.Author.generate  # noqa: E402
+import Pyjoyment.Command.Author.generate.app  # noqa: E402
+import Pyjoyment.Command.Author.generate.dockerfile  # noqa: E402
+import Pyjoyment.Command.Author.generate.lite_app  # noqa: E402
+import Pyjoyment.Command.Author.generate.plugin  # noqa: E402
+import Pyjoyment.Command.Author.generate.pyproject  # noqa: E402
+import Pyjoyment.Command.Author.inflate  # noqa: E402
 import Pyjoyment.Command.cgi  # noqa: E402
 import Pyjoyment.Command.daemon  # noqa: E402
 import Pyjoyment.Command.eval  # noqa: E402
@@ -166,7 +173,22 @@ like_ok(buffer.getvalue(), r'See, it works', 'description has been picked up')
 unlike_ok(buffer.getvalue(), r'my-fake-test-command', 'fake command has been ignored')
 
 # help
-# TODO: the help of the commands generate app and generate lite-app, when they are ported
+buffer = io.StringIO()
+with contextlib.redirect_stdout(buffer):
+    commands.run('help', 'generate', 'lite-app')
+like_ok(buffer.getvalue(), r'Usage: APPLICATION generate lite-app \[OPTIONS\] \[NAME\]', 'right output')
+buffer = io.StringIO()
+with contextlib.redirect_stdout(buffer):
+    commands.run('generate', 'help', 'lite-app')
+like_ok(buffer.getvalue(), r'Usage: APPLICATION generate lite-app \[OPTIONS\] \[NAME\]', 'right output')
+buffer = io.StringIO()
+with contextlib.redirect_stdout(buffer):
+    commands.run('generate', 'app', '-h')
+like_ok(buffer.getvalue(), r'Usage: APPLICATION generate app \[OPTIONS\] \[NAME\]', 'right output')
+buffer = io.StringIO()
+with contextlib.redirect_stdout(buffer):
+    commands.run('generate', 'lite-app', '--help')
+like_ok(buffer.getvalue(), r'Usage: APPLICATION generate lite-app \[OPTIONS\] \[NAME\]', 'right output')
 buffer = io.StringIO()
 with contextlib.redirect_stdout(buffer), local(PYJO_HARNESS_ACTIVE='0'):
     commands.run('help')
@@ -274,11 +296,127 @@ with contextlib.redirect_stderr(buffer):
 like_ok(buffer.getvalue(), r'Unknown option: unknown', 'right output')
 
 # generate
-# TODO: the commands generate, generate app, generate dockerfile, generate lite_app, generate makefile and generate
-# plugin, when they are ported
+generator = Pyjoyment.Command.Author.generate.new()
+is_deeply_ok(generator.namespaces, ['Pyjoyment.Command.Author.generate'], 'right namespaces')
+ok(generator.description, 'has a description')
+like_ok(generator.message, r'generate', 'has a message')
+like_ok(generator.hint, r'help', 'has a hint')
+buffer = io.StringIO()
+with contextlib.redirect_stdout(buffer), local(PYJO_HARNESS_ACTIVE='0'):
+    generator.run()
+like_ok(buffer.getvalue(), r'(?s)Usage: APPLICATION generate GENERATOR \[OPTIONS\].*lite-app.*plugin', 'right output')
+
+# generate app
+app = Pyjoyment.Command.Author.generate.app.new()
+ok(app.description, 'has a description')
+like_ok(app.usage, r'app', 'has usage information')
+cwd = Pyjo.File.path()
+dir = Pyjo.File.tempdir()
+os.chdir(dir)
+buffer = io.StringIO()
+with contextlib.redirect_stdout(buffer):
+    app.run()
+like_ok(buffer.getvalue(), r'my_app', 'right output')
+# Renamed from Mojolicious: the __main__ module of the package, where Mojo has script/my_app
+ok(os.path.exists(app.rel_file('my_app/MyApp/__main__.py').to_str()), 'script exists')
+# Unlike Mojolicious: the package in the directory of the project, where Mojo has lib/MyApp.pm
+ok(os.path.exists(app.rel_file('my_app/MyApp/__init__.py').to_str()), 'application class exists')
+ok(os.path.exists(app.rel_file('my_app/MyApp/Controller/Example.py').to_str()), 'controller exists')
+ok(os.path.exists(app.rel_file('my_app/my_app.yml').to_str()), 'config file exists')
+# Renamed from Mojolicious: t/basic.py, where Mojo has t/basic.t
+ok(os.path.exists(app.rel_file('my_app/t/basic.py').to_str()), 'test exists')
+# Not in Mojolicious: pyproject.toml of the application
+ok(os.path.exists(app.rel_file('my_app/pyproject.toml').to_str()), 'pyproject.toml exists')
+ok(os.path.isdir(app.rel_file('my_app/public/assets').to_str()), 'assets directory exists')
+ok(os.path.exists(app.rel_file('my_app/public/index.html').to_str()), 'static file exists')
+ok(os.path.exists(app.rel_file('my_app/templates/layouts/default.html.ep').to_str()), 'layout exists')
+ok(os.path.exists(app.rel_file('my_app/templates/example/welcome.html.ep').to_str()), 'template exists')
+os.chdir(cwd)
+
+with subtest('generate dockerfile'):
+    dockerfile = Pyjoyment.Command.Author.generate.dockerfile.new()
+    ok(dockerfile.description, 'has a description')
+    like_ok(dockerfile.usage, r'dockerfile', 'has usage information')
+    dir = Pyjo.File.tempdir()
+    os.chdir(dir)
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        dockerfile.run()
+    like_ok(buffer.getvalue(), r'Dockerfile', 'right output')
+    ok(os.path.exists(app.rel_file('Dockerfile').to_str()), 'Dockerfile exists')
+    # Not in Mojolicious: .dockerignore and the user
+    ok(os.path.exists(app.rel_file('.dockerignore').to_str()), '.dockerignore exists')
+    unlike_ok(app.rel_file('Dockerfile').slurp().decode(), r'USER', 'no user')
+    app.rel_file('Dockerfile').remove()
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        dockerfile.run('-u', 'app')
+    like_ok(app.rel_file('Dockerfile').slurp().decode(), r'(?m)^USER app$', 'right user')
+    buffer = io.StringIO()
+    with contextlib.redirect_stderr(buffer):
+        throws_ok(
+            lambda: dockerfile.run('--unknown'), re.compile(r'Usage: APPLICATION generate dockerfile'), 'unknown option'
+        )
+    like_ok(buffer.getvalue(), r'Unknown option: unknown', 'right output')
+    os.chdir(cwd)
+
+# generate lite_app
+app = Pyjoyment.Command.Author.generate.lite_app.new()
+ok(app.description, 'has a description')
+like_ok(app.usage, r'lite-app', 'has usage information')
+dir = Pyjo.File.tempdir()
+os.chdir(dir)
+buffer = io.StringIO()
+with contextlib.redirect_stdout(buffer):
+    app.run()
+like_ok(buffer.getvalue(), r'myapp\.py', 'right output')
+ok(os.path.exists(app.rel_file('myapp.py').to_str()), 'app exists')
+os.chdir(cwd)
+
+# generate makefile
+# Renamed from Mojolicious: generate pyproject, where Mojo has generate makefile
+pyproject = Pyjoyment.Command.Author.generate.pyproject.new()
+ok(pyproject.description, 'has a description')
+like_ok(pyproject.usage, r'pyproject', 'has usage information')
+dir = Pyjo.File.tempdir()
+os.chdir(dir)
+buffer = io.StringIO()
+with contextlib.redirect_stdout(buffer):
+    pyproject.run()
+like_ok(buffer.getvalue(), r'pyproject\.toml', 'right output')
+ok(os.path.exists(app.rel_file('pyproject.toml').to_str()), 'pyproject.toml exists')
+os.chdir(cwd)
+
+# generate plugin
+plugin = Pyjoyment.Command.Author.generate.plugin.new()
+ok(plugin.description, 'has a description')
+like_ok(plugin.usage, r'plugin', 'has usage information')
+dir = Pyjo.File.tempdir()
+os.chdir(dir)
+buffer = io.StringIO()
+with contextlib.redirect_stdout(buffer):
+    plugin.run()
+like_ok(buffer.getvalue(), r'MyPlugin\.py', 'right output')
+ok(os.path.exists(app.rel_file('Pyjoyment-Plugin-MyPlugin/Pyjoyment/Plugin/MyPlugin.py').to_str()), 'class exists')
+ok(os.path.exists(app.rel_file('Pyjoyment-Plugin-MyPlugin/t/basic.py').to_str()), 'test exists')
+ok(os.path.exists(app.rel_file('Pyjoyment-Plugin-MyPlugin/pyproject.toml').to_str()), 'pyproject.toml exists')
+buffer = io.StringIO()
+with contextlib.redirect_stdout(buffer):
+    plugin.run('-f', 'MyApp.Ext.Test')
+like_ok(buffer.getvalue(), r'Test\.py', 'right output')
+ok(os.path.exists(app.rel_file('MyApp-Ext-Test/MyApp/Ext/Test.py').to_str()), 'class exists')
+ok(os.path.exists(app.rel_file('MyApp-Ext-Test/t/basic.py').to_str()), 'test exists')
+ok(os.path.exists(app.rel_file('MyApp-Ext-Test/pyproject.toml').to_str()), 'pyproject.toml exists')
+buffer = io.StringIO()
+with contextlib.redirect_stderr(buffer):
+    throws_ok(lambda: plugin.run('--unknown'), re.compile(r'Usage: APPLICATION generate plugin'), 'unknown option')
+like_ok(buffer.getvalue(), r'Unknown option: unknown', 'right output')
+os.chdir(cwd)
 
 # inflate
-# TODO: the command inflate, when it is ported
+inflate = Pyjoyment.Command.Author.inflate.new()
+ok(inflate.description, 'has a description')
+like_ok(inflate.usage, r'inflate', 'has usage information')
 
 with subtest('prefork'):
     with subtest('Description'):
