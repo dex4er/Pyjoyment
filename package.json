@@ -1,0 +1,24 @@
+{
+  "name": "pyjoyment-bundled",
+  "private": true,
+  "description": "The JavaScript libraries of the bundled templates of Pyjoyment, which npm run bundle copies into Pyjoyment/resources/public/pyjo",
+  "license": "Artistic-2.0",
+  "scripts": {
+    "bundle": "node --input-type=module --eval \"import fs from 'node:fs'; const { bundle } = JSON.parse(fs.readFileSync('package.json')).pyjoyment; for (const [to, from] of Object.entries(bundle)) fs.copyFileSync('node_modules/' + from, to);\""
+  },
+  "dependencies": {
+    "@highlightjs/cdn-assets": "11.12.0",
+    "bootstrap": "5.3.8"
+  },
+  "pyjoyment": {
+    "bundle": {
+      "Pyjoyment/resources/public/pyjo/bootstrap/LICENSE": "bootstrap/LICENSE",
+      "Pyjoyment/resources/public/pyjo/bootstrap/bootstrap.bundle.min.js.map": "bootstrap/dist/js/bootstrap.bundle.min.js.map",
+      "Pyjoyment/resources/public/pyjo/bootstrap/bootstrap.css": "bootstrap/dist/css/bootstrap.min.css",
+      "Pyjoyment/resources/public/pyjo/bootstrap/bootstrap.js": "bootstrap/dist/js/bootstrap.bundle.min.js",
+      "Pyjoyment/resources/public/pyjo/bootstrap/bootstrap.min.css.map": "bootstrap/dist/css/bootstrap.min.css.map",
+      "Pyjoyment/resources/public/pyjo/highlight.js/LICENSE": "@highlightjs/cdn-assets/LICENSE",
+      "Pyjoyment/resources/public/pyjo/highlight.js/highlight.min.js": "@highlightjs/cdn-assets/highlight.min.js"
+    }
+  }
+}
