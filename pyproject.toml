@@ -147,6 +147,9 @@ ignore = [
 "Pyjo/Prove.py" = ["TID251"]
 "benchmarks/**" = ["TID251"]
 "examples/**" = ["TID251"]
+# E402 "Module level import not at top of file": the namespace of the package is
+# open before it imports its subpackages, which extend it with their parts.
+"Pyjoyment/__init__.py" = ["E402"]
 
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 # Only a reactor uses the event loop, so that another reactor can replace it.
