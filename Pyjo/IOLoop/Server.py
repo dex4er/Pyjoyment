@@ -82,6 +82,7 @@ class Pyjo_IOLoop_Server(Pyjo.EventEmitter.object):
         self._handle: socket.socket | None = None
         self._reactor: weakref.ref[Pyjo.Reactor.object] | None = None
         self._reuse: str | None = None
+        self._watched: weakref.ref[Pyjo.Reactor.object] | None = None
 
     def __del__(self) -> None:
         # Module globals may be gone at the end of the interpreter
@@ -355,14 +356,19 @@ class Pyjo_IOLoop_Server(Pyjo.EventEmitter.object):
         """
         if (handle := self._handle) is None:
             return
+        # Not in Mojolicious: an acceptor that is active already in this reactor is not watched again, where Mojo
+        # replaces its watcher
+        reactor = self.reactor
+        if self._active and self._watched is not None and self._watched() is reactor:
+            return
         ref = weakref.ref(self)
 
         def cb(reactor: Any, writable: bool) -> None:
             if (server := ref()) is not None:
                 server._accept()
 
-        self._active = True
-        self.reactor.io(handle, cb).watch(handle, True, False)
+        self._active, self._watched = True, weakref.ref(reactor)
+        reactor.io(handle, cb).watch(handle, True, False)
 
     def stop(self) -> None:
         """::
@@ -372,7 +378,7 @@ class Pyjo_IOLoop_Server(Pyjo.EventEmitter.object):
         Stop accepting connections.
         """
         if self._active:
-            self._active = False
+            self._active, self._watched = False, None
             if self._handle is not None:
                 self.reactor.remove(self._handle)
 
