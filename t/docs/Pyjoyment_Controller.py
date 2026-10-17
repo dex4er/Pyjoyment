@@ -1,12 +1,13 @@
 import Pyjo.IOLoop
 import Pyjo.String.HTML
+import Pyjo.Test.Pyjo
 import Pyjo.Transaction.HTTP
 import Pyjo.UserAgent
 import Pyjoyment
 import Pyjoyment.Routes.Match
 
 from Pyjo.File import tempdir
-from Pyjo.JSON import decode_json
+from Pyjo.JSON import decode_json, encode_json
 from Pyjo.Test import *
 
 import re
@@ -181,10 +182,13 @@ with subtest('finish'):
     app.log.level = 'fatal'
     app.routes.get('/1', lambda c: c.finish())
     app.routes.get('/2', lambda c: c.finish(b'Bye!'))
-    # TODO: the examples of a WebSocket, finish(1000) and finish(1003, 'Cannot accept data!'), with websocket_lite_app.t,
-    # when Pyjo.Test.Pyjo is ported
+    app.routes.websocket('/3', lambda c: c.finish(1000))
+    app.routes.websocket('/4', lambda c: c.finish(1003, 'Cannot accept data!'))
     is_ok(request(app, '/1').res.code, 200, 'finished')
     is_ok(request(app, '/2').res.body, b'Bye!', 'finished with data')
+    t = Pyjo.Test.Pyjo.new(app)
+    t.websocket_ok('/3').finished_ok(1000)
+    t.websocket_ok('/4').finished_ok(1003)
 
 with subtest('helpers'):
     app, c = controller()
@@ -453,8 +457,58 @@ with subtest('res'):
 
 with subtest('send'):
     app, c = controller()
-    # TODO: the examples of a WebSocket, with websocket_lite_app.t, when Pyjo.Test.Pyjo is ported
     throws_ok(lambda: c.send('I ♥ Pyjoyment!'), re.compile(r'No WebSocket connection'), 'no WebSocket')
+
+    app = Pyjoyment.new()
+    app.log.level = 'fatal'
+
+    @app.routes.websocket('/')
+    def send(c):
+        c.send({'binary': b'data'})
+        c.send({'text': b'data'})
+        c.send({'json': {'test': [1, 2, 3]}})
+
+        # Send "Text" message
+        c.send('I ♥ Pyjoyment!')
+
+        # Send JSON object as "Text" message
+        c.send({'json': {'test': 'I ♥ Pyjoyment!'}})
+
+        # Send JSON object as "Binary" message
+        c.send({'binary': encode_json({'test': 'I ♥ Pyjoyment!'})})
+
+        # Send "Ping" frame
+        from Pyjo.WebSocket import WS_PING
+
+        c.send([1, 0, 0, 0, WS_PING, b'Hello World!'])
+
+        # Make sure the first message has been written before continuing
+        c.send('First message!', lambda c: c.send('Second message!'))
+
+        # Increase inactivity timeout for connection to 300 seconds
+        c.inactivity_timeout(300)
+
+    (
+        Pyjo.Test.Pyjo.new(app)
+        .websocket_ok('/')
+        .message_ok()
+        .message_is({'binary': b'data'})
+        .message_ok()
+        .message_is({'text': b'data'})
+        .message_ok()
+        .json_message_is({'test': [1, 2, 3]})
+        .message_ok()
+        .message_is('I ♥ Pyjoyment!')
+        .message_ok()
+        .json_message_is({'test': 'I ♥ Pyjoyment!'})
+        .message_ok()
+        .json_message_is({'test': 'I ♥ Pyjoyment!'})
+        .message_ok()
+        .message_is('First message!')
+        .message_ok()
+        .message_is('Second message!')
+        .finish_ok()
+    )
 
 with subtest('session'):
     app, c = controller()

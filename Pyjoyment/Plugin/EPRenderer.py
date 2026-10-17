@@ -8,6 +8,11 @@ Pyjoyment.Plugin.EPRenderer - Embedded Python renderer plugin
     app.plugin('EPRenderer', name='foo')
     app.plugin('EPRenderer', name='bar', template={'line_start': '.'})
 
+    # Pyjoyment.Lite
+    plugin('EPRenderer')
+    plugin('EPRenderer', name='foo')
+    plugin('EPRenderer', name='bar', template={'line_start': '.'})
+
 :mod:`Pyjoyment.Plugin.EPRenderer` is a renderer for Embedded Python
 templates, ``ep``, the default handler of :mod:`Pyjoyment`. They are
 templates of :mod:`Pyjo.Template` with automatic escaping, in which the
@@ -36,13 +41,15 @@ Options
 
 name ::
 
-    app.plugin('EPRenderer', name='foo')
+    # Pyjoyment.Lite
+    plugin('EPRenderer', name='foo')
 
 Handler name, defaults to ``ep``.
 
 template ::
 
-    app.plugin('EPRenderer', template={'line_start': '.'})
+    # Pyjoyment.Lite
+    plugin('EPRenderer', template={'line_start': '.'})
 
 Attribute values passed to :mod:`Pyjo.Template` objects used to render
 templates.
@@ -55,8 +62,6 @@ See also
 Ported from `Mojolicious::Plugin::EPRenderer
 <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojolicious/Plugin/EPRenderer.pm>`_ of Mojolicious 9.49.
 """
-
-# TODO: the examples of Pyjoyment.Lite in the synopsis and the options, when it is ported
 
 import Pyjo.Base
 import Pyjo.Template

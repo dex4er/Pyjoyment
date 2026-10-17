@@ -1,10 +1,13 @@
 import Pyjoyment
 
 from Pyjo.Test import *
+from Pyjoyment.Lite import app as lite
+from Pyjoyment.Lite import plugin
 
 
 app = Pyjoyment.new(secrets=['works'])
 app.log.level = 'fatal'
+lite.log.level = 'fatal'
 
 with subtest('Synopsis'):
     # Pyjoyment
@@ -15,6 +18,14 @@ with subtest('Synopsis'):
     c = app.build_controller()
     is_ok(c.render_to_string(inline='.= 1 + 1', handler='bar'), '2\n', 'template')
     is_ok(app.renderer.default_handler, 'ep', 'default handler')
+
+    # Pyjoyment.Lite
+    plugin('EPRenderer')
+    plugin('EPRenderer', name='foo')
+    plugin('EPRenderer', name='bar', template={'line_start': '.'})
+    ok('foo' in lite.renderer.handlers, 'name of Lite')
+    c = lite.build_controller()
+    is_ok(c.render_to_string(inline='.= 1 + 1', handler='bar'), '2\n', 'template of Lite')
 
 with subtest('Description'):
     app.routes.get('/').set(name='index')
@@ -37,12 +48,14 @@ with subtest('Description'):
     is_ok(c.stash('title'), 'Welcome!', 'helper hidden by a value of the stash')
 
 with subtest('name'):
-    app.plugin('EPRenderer', name='foo')
-    ok('foo' in app.renderer.handlers, 'handler name')
+    # Pyjoyment.Lite
+    plugin('EPRenderer', name='foo')
+    ok('foo' in lite.renderer.handlers, 'handler name')
 
 with subtest('template'):
-    app.plugin('EPRenderer', template={'line_start': '.'})
-    c = app.build_controller()
+    # Pyjoyment.Lite
+    plugin('EPRenderer', template={'line_start': '.'})
+    c = lite.build_controller()
     is_ok(c.render_to_string(inline='.= 2 + 2'), '4\n', 'attribute values')
 
 with subtest('register'):
