@@ -2,7 +2,7 @@ import Pyjo.Asset.File
 import Pyjo.Asset.Memory
 import Pyjo.Collection
 import Pyjo.Exception
-import Pyjo.IOLoop.Server
+import Pyjo.IOLoop
 import Pyjo.Promise
 import Pyjo.Server.Daemon
 import Pyjo.String.Bytes
@@ -282,14 +282,16 @@ with subtest('param'):
     c.param('foo', 'bar')
     is_ok(render(c, "%= param('foo')"), 'bar\n', 'alias')
 
-# The hosts of the examples of the proxy helpers, a local server for the one that responds, and a port that nothing
-# listens on for the one that fails, as a test does not request remote hosts
+# The hosts of the examples of the proxy helpers, as a test does not request remote hosts: a local server for the one
+# that responds, and a server that closes every connection at once for the one that fails, as a port that nothing
+# listens on could be taken by a server of another test before the request
 backend = Pyjoyment.new()
 backend.log.level = 'fatal'
 backend.routes.any('/', lambda c: c.render(text=f'backend {c.req.method}'))
 daemon = Pyjo.Server.Daemon.new(listen=['http://127.0.0.1'], silent=True, app=backend)
 example = f'http://127.0.0.1:{daemon.start().ports()[0]}'
-nowhere = f'http://127.0.0.1:{Pyjo.IOLoop.Server.object.generate_port()}'
+broken = Pyjo.IOLoop.server(lambda loop, stream, id: stream.close(), address='127.0.0.1')
+nowhere = f'http://127.0.0.1:{Pyjo.IOLoop.acceptor(broken).port}'
 
 
 def proxy(action):
@@ -367,6 +369,7 @@ with subtest('proxy.start_p'):
     proxy(action).get_ok('/').status_is(200).header_is('X-Proxy', 'Pyjo').content_is('backend GET')
 
 daemon.stop()
+Pyjo.IOLoop.remove(broken)
 
 with subtest('redirect_to'):
     c = controller()
