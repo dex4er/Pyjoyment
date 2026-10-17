@@ -1,6 +1,7 @@
 import Pyjo.IOLoop
 import Pyjo.IOLoop.Server
 import Pyjo.IOLoop.TLS
+import Pyjo.Reactor.Poll
 
 from Pyjo.Test import *
 
@@ -111,6 +112,32 @@ with subtest("Can't create listen socket"):
         like_ok(str(e), r"^Can't create listen socket: ", 'error with the message of Mojo')
         isa_ok(e.__cause__, OSError, 'the error of the system is the cause')
     taken.close()
+
+# Not in Mojolicious: an acceptor that is started twice is watched once
+with subtest('Started twice'):
+    reactor = Pyjo.Reactor.Poll.new()
+    calls = []
+    io = reactor.io
+    reactor.io = lambda handle, cb: calls.append(handle) or io(handle, cb)
+    with Pyjo.IOLoop.Server.new() as server:
+        server.reactor = reactor
+        server.listen(address='127.0.0.1')
+        server.start()
+        server.start()
+        is_ok(len(calls), 1, 'watched once')
+        server.stop()
+        server.start()
+        is_ok(len(calls), 2, 'watched again after stop')
+        other = Pyjo.Reactor.Poll.new()
+        other_io = other.io
+        other.io = lambda handle, cb: calls.append(handle) or other_io(handle, cb)
+        server.reactor = other
+        server.start()
+        is_ok(len(calls), 3, 'watched in another reactor')
+        server.reactor = reactor
+        server.stop()
+        server.reactor = other
+        server.stop()
 
 with subtest('Context manager'):
     with Pyjo.IOLoop.Server.new() as server:
