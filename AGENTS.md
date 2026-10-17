@@ -342,7 +342,9 @@ of a module that ports nothing from upstream leaves its release as it is.
 
 Some modules have no counterpart in Mojolicious: `Pyjo.Test` (inspired by
 Perl's `Test::More`), `Pyjo.Prove` (inspired by Perl's `prove`),
-`Pyjo.String.*`, `Pyjo.IOLoop.Datagram` (inspired by `dgram` of Node.js),
+`Pyjo.String.*`, `Pyjo.GetOpt` (inspired by `Getopt::Long::Parser`, the engine
+of `getopt` of `Pyjo.Util`, where Perl has references to variables as the
+targets of the options), `Pyjo.IOLoop.Datagram` (inspired by `dgram` of Node.js),
 `Pyjo.App` (inspired by `Mojo` of Mojolicious 6, the base class of
 `Mojolicious` until Mojolicious 7, as `Pyjo_App` is of `Pyjoyment_App`),
 `Pyjo.HelloWorld` (an application of pure Pyjo, where `Mojo::HelloWorld` is
@@ -361,10 +363,9 @@ ported.
 `Mojo::Util` exports again; the subtests of `t/mojo/base_util.t` are those
 of `t/mojo/util.t`, so it has no test file of its own. Next to them,
 `Pyjo.Util` has helpers of its own, for Python. A function of Mojo that waits
-for a module that is not ported yet, as `getopt` for the commands, has a
-`# TODO:` comment in its place. A function that works on characters in Mojo
-takes a `str`, and also `bytes` where a ported module needs them, like
-`url_unescape`.
+for a module that is not ported yet has a `# TODO:` comment in its place. A
+function that works on characters in Mojo takes a `str`, and also `bytes`
+where a ported module needs them, like `url_unescape`.
 
 A module is ported anew from Mojolicious, not migrated from the existing
 Python code. The existing Python module is a reference for how Perl idioms

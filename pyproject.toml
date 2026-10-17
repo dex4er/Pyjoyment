@@ -211,6 +211,7 @@ strict = [
   "Pyjo/EventEmitter.py",
   "Pyjo/Exception.py",
   "Pyjo/File.py",
+  "Pyjo/GetOpt.py",
   "Pyjo/Headers.py",
   "Pyjo/HelloWorld.py",
   "Pyjo/Home.py",

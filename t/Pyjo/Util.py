@@ -1,3 +1,12 @@
+"""
+Pyjo.Util test
+==============
+::
+
+    extract_usage test!
+"""
+
+from Pyjo.File import tempdir
 from Pyjo.String.HTML import html
 from Pyjo.String.Unicode import u
 from Pyjo.Test import *
@@ -12,8 +21,10 @@ from Pyjo.Util import (
     die,
     dumper,
     encode,
+    extract_usage,
     generate_secret,
     getenv,
+    getopt,
     gunzip,
     gzip,
     header_params,
@@ -198,7 +209,61 @@ with subtest('header_params'):
         header_params('rel="x"; t*=UTF-8\'de\'a%20b'), ({'rel': 'x', 't*': "UTF-8'de'a%20b"}, ''), 'right result'
     )
 
-# TODO: the subtests "extract_usage", "getopt" and "getopt (return value)", with the commands of Pyjoyment
+with subtest('extract_usage'):
+    is_ok(extract_usage(), 'extract_usage test!\n', 'right result')
+    # The script of t/mojo/lib, in a temporary directory, as a test writes nothing into t
+    myapp = (
+        tempdir()
+        .child('myapp.py')
+        .spew(b'''\
+"""
+myapp.py
+========
+::
+
+    USAGE: myapp.py daemon
+
+     test
+    123
+"""
+''')
+    )
+    is_ok(extract_usage(myapp.to_str()), 'USAGE: myapp.py daemon\n\n test\n123\n', 'right result')
+
+with subtest('getopt'):
+    opts = getopt(['--charset', 'UTF-8'], {'c|charset=s': None})
+    is_ok(opts.charset, 'UTF-8', 'right string')
+    array = ['-t', 'test', '-h', '--whatever', 'Whatever!', 'stuff']
+    opts = getopt(array, {'t|test=s': None}, pass_through=True)
+    is_ok(opts.test, 'test', 'right string')
+    is_deeply_ok(array, ['-h', '--whatever', 'Whatever!', 'stuff'], 'right structure')
+    opts = getopt(array, {'h': None, 'w|whatever=s': None})
+    ok(opts.h, 'flag has been set')
+    is_ok(opts.whatever, 'Whatever!', 'right string')
+    is_deeply_ok(array, ['stuff'], 'right structure')
+    argv = sys.argv
+    try:
+        sys.argv = [argv[0], '--charset', 'UTF-16', 'test']
+        charset = []
+        getopt({'c|charset=s': charset})
+        is_deeply_ok(charset, ['UTF-16'], 'right structure')
+        is_deeply_ok(sys.argv[1:], ['test'], 'right structure')
+    finally:
+        sys.argv = argv
+
+with subtest('getopt (return value)'):
+    with contextlib.redirect_stderr(io.StringIO()):
+        ret = getopt(['--lang', 'de'], {'l|lang=s': None})
+        is_ok(ret.lang, 'de', 'right result')
+        ok(ret, 'right return value')
+
+        ret = getopt(['--lnag', 'de'], {'l|lang=s': None})
+        is_ok(ret.lang, None, 'right result')
+        ok(not ret, 'right return value')
+
+        ret = getopt(['--lnag', 'de', '--lang', 'de'], {'l|lang=s': None})
+        is_ok(ret.lang, 'de', 'right result')
+        ok(not ret, 'right return value')
 
 with subtest('unindent'):
     is_ok(unindent(' test\n  123\n 456\n'), 'test\n 123\n456\n', 'right unindented result')

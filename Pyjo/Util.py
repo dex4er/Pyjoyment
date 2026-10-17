@@ -32,6 +32,7 @@ Functions
 ---------
 """
 
+import ast
 import base64
 import codecs
 import functools
@@ -52,7 +53,11 @@ from collections.abc import Callable, Sequence
 from gzip import compress as _gzip_compress
 from gzip import decompress as _gzip_decompress
 from types import FunctionType, ModuleType, TracebackType
-from typing import Any, NoReturn, Protocol, cast, overload
+from typing import TYPE_CHECKING, Any, NoReturn, Protocol, cast, overload
+
+
+if TYPE_CHECKING:
+    import Pyjo.GetOpt
 
 
 # "Sun, 06 Nov 1994 08:49:37 GMT" and "Sunday, 06-Nov-94 08:49:37 GMT"
@@ -272,7 +277,46 @@ def encode(charset: str, chars: str) -> bytes:
 
 # Left out from Mojolicious: encrypt_cookie, as ChaCha20-Poly1305 of the sessions is not in the standard library
 
-# TODO: extract_usage, with the commands of Pyjoyment
+
+def extract_usage(file: 'str | os.PathLike[str] | None' = None) -> str:
+    """::
+
+        usage = extract_usage()
+        usage = extract_usage('/home/sri/foo.py')
+
+    Extract usage message from the synopsis of the docstring of a module, its
+    first literal block, defaults to using the file this function was called
+    from. ::
+
+        # "Usage: APPLICATION test [OPTIONS]\n"
+        extract_usage()
+
+        \"\"\"
+        Test command
+        ============
+        ::
+
+            Usage: APPLICATION test [OPTIONS]
+        \"\"\"
+    """
+    # Unlike Mojolicious: the synopsis of the docstring, which the file is parsed for without running it, where Mojo
+    # extracts the section SYNOPSIS of POD
+    path = os.fspath(file) if file is not None else sys._getframe(1).f_code.co_filename  # pyright: ignore[reportPrivateUsage]
+    with open(path, encoding='utf-8') as handle:
+        docstring = ast.get_docstring(ast.parse(handle.read()), clean=False) or ''
+
+    lines = docstring.split('\n')
+    block: list[str] = []
+    for i, line in enumerate(lines):
+        if line.rstrip().endswith('::'):
+            indent = len(line) - len(line.lstrip())
+            for line in lines[i + 1 :]:
+                if line.strip() and len(line) - len(line.lstrip()) <= indent:
+                    break
+                block.append(line)
+            break
+    usage = unindent('\n'.join(block).strip('\n'))
+    return f'{usage}\n' if usage else ''
 
 
 def generate_secret() -> str:
@@ -306,7 +350,49 @@ def getenv(name: str, default: str | None = None) -> str | None:
     return os.environ.get(name, default)
 
 
-# TODO: getopt, with the commands of Pyjoyment
+@overload
+def getopt(
+    specs: 'dict[str, Pyjo.GetOpt.Target]', /, *, pass_through: bool = False
+) -> 'Pyjo.GetOpt.Pyjo_GetOpt_Result': ...
+
+
+@overload
+def getopt(
+    args: list[str], specs: 'dict[str, Pyjo.GetOpt.Target]', /, *, pass_through: bool = False
+) -> 'Pyjo.GetOpt.Pyjo_GetOpt_Result': ...
+
+
+def getopt(
+    args: 'list[str] | dict[str, Pyjo.GetOpt.Target]',
+    specs: 'dict[str, Pyjo.GetOpt.Target] | None' = None,
+    /,
+    *,
+    pass_through: bool = False,
+) -> 'Pyjo.GetOpt.Pyjo_GetOpt_Result':
+    """::
+
+        opts = getopt({'H|headers=s': headers, 't|timeout=i': None, 'v|verbose': None})
+        opts = getopt(args, {'H|headers=s': headers, 't|timeout=i': None, 'v|verbose': None})
+        opts = getopt(args, {'H|headers=s': headers, 't|timeout=i': None}, pass_through=True)
+
+    Extract options from a list with :mod:`Pyjo.GetOpt`, defaults to using
+    the arguments of ``sys.argv``. The target of an option is a list for its
+    values, a callback, which gets its name and its value, or ``None`` for
+    its value in the result, which is false after an error. ::
+
+        # Extract "charset" option
+        opts = getopt(['--charset', 'UTF-8'], {'charset=s': None})
+        print(opts.charset)
+    """
+    # Unlike Mojolicious: the options in a dict, and the values without a target in the result, as Python has no
+    # references to variables, which Mojo passes as the targets
+    import Pyjo.GetOpt
+
+    argv = None if isinstance(args, dict) else args
+    parser = Pyjo.GetOpt.new(pass_through=pass_through)
+    for spec, target in (args if isinstance(args, dict) else specs or {}).items():
+        parser.option(spec, target)
+    return parser.parse(argv)
 
 
 def gunzip(compressed: bytes) -> bytes:
