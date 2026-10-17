@@ -86,4 +86,9 @@ with subtest('"escape_slash"'):
 with subtest('"allow_dupkeys"'):
     is_deeply_ok(decode_json('{"test":1,"test":2}'), {'test': 2}, 'no duplicate keys error')
 
+with subtest('Errors'):
+    throws_ok(lambda: decode_json('test'), re.compile(r'^Malformed JSON: Expecting value'), 'malformed JSON')
+    throws_ok(lambda: from_json('[1,'), re.compile(r'^Malformed JSON: '), 'malformed JSON')
+    throws_ok(lambda: decode_json('test'), ValueError, 'ValueError')
+
 done_testing()

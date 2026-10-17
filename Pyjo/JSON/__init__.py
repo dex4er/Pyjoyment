@@ -514,6 +514,10 @@ def _stdlib_decode(data: bytes | bytearray | str, chars: bool = False) -> Any:
     except RecursionError:
         raise ValueError('Malformed JSON: Nesting too deep') from None
 
+    # The message of the json module, after the words of the pure Python one
+    except json.JSONDecodeError as e:
+        raise ValueError(f'Malformed JSON: {e}') from None
+
 
 def _stdlib_dumps(value: object) -> str:
     return json.dumps(

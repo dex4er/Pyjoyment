@@ -1,3 +1,4 @@
+import Pyjo.File
 import Pyjo.Test.Pyjo
 import Pyjoyment
 import Pyjoyment.Lite
@@ -5,6 +6,7 @@ import Pyjoyment.Lite
 from Pyjo.Test import *
 from Pyjoyment.Lite import *
 
+import os
 import re
 
 
@@ -76,14 +78,21 @@ with subtest('Application'):
     is_ok(MyApp2.new().max_request_size, app.max_request_size, 'same')
 
 with subtest('Plugins'):
-    # TODO: the example of the plugin Config, when Pyjoyment.Plugin.Config is ported; until then HeaderCondition
-    plugin('HeaderCondition')
+    # The configuration file of the example is in a temporary directory, as a test writes nothing into t
+    tmp = Pyjo.File.tempdir()
+    os.environ['PYJO_CONFIG'] = tmp.child('myapp.conf').spew(b"{'plugins': [{'HeaderCondition': {}}]}").to_str()
+    try:
+        # Pyjoyment.Lite
+        plugin('Config')
 
-    class MyApp3(Pyjoyment.object):
-        def startup(self):
-            self.plugin('HeaderCondition')
+        # Pyjoyment
+        class MyApp3(Pyjoyment.object):
+            def startup(self):
+                self.plugin('Config')
 
-    ok('agent' in MyApp3.new().routes.conditions, 'plugin')
+        ok('agent' in MyApp3.new().routes.conditions, 'plugin')
+    finally:
+        del os.environ['PYJO_CONFIG']
 
 with subtest('Helpers'):
     # Pyjoyment.Lite

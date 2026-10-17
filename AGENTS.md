@@ -181,8 +181,8 @@ does not start fails the test instead of hanging it.
 - `t/lib/` holds helpers shared by the tests. Run on their own, they skip with
   `plan(skip_all=...)`, so `-r t` reports them as skipped instead of failing.
 - `tt/` holds the Python files that the tests use as data, as the templates
-  of files of `Pyjoyment.Plugin.PyRenderer`, outside `t/`, as `-r t` runs
-  every Python file there. `tt/templates_native` holds the ones with the
+  of files of `Pyjoyment.Plugin.PyRenderer`, and the modules of `tt/lib`,
+  outside `t/`, as `-r t` runs every Python file there. `tt/templates_native` holds the ones with the
   t-strings of Python 3.14, which only the tests of 3.14 render, and which
   ruff and pyright check as Python 3.14. A test does not write files into
   `t/` or `tt/`: what it makes goes to a temporary directory.
@@ -636,7 +636,10 @@ sub {...}` is `get('/foo', cb)` or the decorator `@get('/foo')`, as a route
 - Modules that a Mojo test loads from `t/mojo/lib` are written into a
   temporary directory by the test, as `Pyjo.Prove` runs every `.py` file
   under `t`, and are top-level there, as Python does not merge a regular
-  package like `Mojo::` from every directory of `sys.path`.
+  package like `Mojo::` from every directory of `sys.path`. The modules of
+  `t/mojolicious/lib`, the test applications and plugins of the framework,
+  are in `tt/lib`, with `PyjoymentTest` for `MojoliciousTest`, and a test
+  puts `tt/lib` in front of `sys.path`.
 - A stack trace, Perl's `caller` frames, is a list of
   `traceback.FrameSummary`, the most recent first, as Mojo keeps it.
 - `like` of `Test::More` stringifies what it checks, `like_ok` does not:

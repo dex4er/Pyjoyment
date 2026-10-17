@@ -4,10 +4,11 @@ Python files that the tests in [`t/`](../t/README.md) use as data. They are
 not tests: the harness runs every `.py` file under `t/`, so these are kept
 outside of it.
 
-| Directory           | What it holds                                                                          |
-| ------------------- | -------------------------------------------------------------------------------------- |
-| `templates/`        | templates of files of `Pyjoyment.Plugin.PyRenderer`, as `files/hello.html.py`          |
-| `templates_native/` | the same with the t-strings of Python 3.14, checked by ruff and pyright as Python 3.14 |
+| Directory           | What it holds                                                                                        |
+| ------------------- | ---------------------------------------------------------------------------------------------------- |
+| `templates/`        | templates of files of `Pyjoyment.Plugin.PyRenderer`, as `files/hello.html.py`                        |
+| `templates_native/` | the same with the t-strings of Python 3.14, checked by ruff and pyright as Python 3.14               |
+| `lib/`              | modules of the tests, as `PyjoymentTest.Plugin.DeploymentPlugin`, where Mojo has `t/mojolicious/lib` |
 
 A test adds a directory to the paths of the renderer of its application, and
 renders a template by its name:
@@ -26,7 +27,16 @@ The templates are rendered by the tests that use them, as
 mise exec -- python -m Pyjo.Prove -l t/Pyjoyment/py_lite_app.py t/Pyjoyment/py_native_lite_app.py
 ```
 
+A test of the modules of `lib/` puts the directory in front of `sys.path`:
+
+```python
+sys.path.insert(0, Pyjo.File.path(__file__).to_abs().dirname().dirname().dirname().child('tt', 'lib').to_str())
+
+plugin('JSONConfig')  # with {"plugins": [{"PyjoymentTest.Plugin.DeploymentPlugin": {}}]}
+```
+
 The files are read, never written: a test that needs a file of its own, as a
 template with a syntax error, makes it in a temporary directory, not in `t/`
 or `tt/`. The renderer compiles a template without importing it, so no
-`__pycache__` appears here.
+`__pycache__` appears in `templates/`; the modules of `lib/` are imported, and
+their `__pycache__`, which git ignores, is not run by the harness.

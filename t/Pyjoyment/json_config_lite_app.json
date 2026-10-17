@@ -1,0 +1,16 @@
+{
+  %# Just a comment
+  %# Renamed from Mojolicious: the plugin is PyjoymentTest.Plugin.DeploymentPlugin of tt/lib, where Mojo has
+  %# MojoliciousTest::Plugin::DeploymentPlugin of t/mojolicious/lib
+  "foo": "bar",
+  "utf": "утф",
+  "plugins": [
+    {"PyjoymentTest.Plugin.DeploymentPlugin": {}},
+    {
+      "PyjoymentTest.Plugin.DeploymentPlugin": {
+        "name": "another_helper",
+        "message": "works too!"
+      }
+    }
+  ]
+}
