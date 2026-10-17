@@ -545,7 +545,7 @@ class Pyjo_Test_Pyjo(Pyjo.Base.object):
         for the callback. ::
 
             # Run tests against remote host
-            t.get_ok('https://docs.mojolicious.org').status_is(200)
+            t.get_ok('https://github.com').status_is(200)
 
             # Use relative URL for request with Basic authentication
             t.get_ok('//sri:secr3t@/secrets.json').status_is(200).json_is('/1/content', 'Pyjo rocks!')

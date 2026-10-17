@@ -442,7 +442,7 @@ with subtest('get_ok'):
 
         # Run tests against remote host
         if os.environ.get('TEST_ONLINE'):
-            Pyjo.Test.Pyjo.new().get_ok('https://docs.mojolicious.org').status_is(200)
+            Pyjo.Test.Pyjo.new().get_ok('https://github.com').status_is(200)
         else:
             skip('set TEST_ONLINE to request a remote host', 1)
 
