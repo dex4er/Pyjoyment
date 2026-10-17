@@ -72,6 +72,14 @@ mise exec -- uv run --python "$(mise exec -- which python)" \
   --only-group servers python -m Pyjo.Prove -l --timeout 120 -r t/servers
 ```
 
+On Python 3.14 too, which still has the CGI server of `http.server`, in an
+environment of its own:
+
+```sh
+UV_PROJECT_ENVIRONMENT=.venv-3.14 mise exec -- uv run --python 3.14 \
+  --only-group servers python -m Pyjo.Prove -l --timeout 120 -r t/servers
+```
+
 The output is standard TAP, so Perl's `prove -lr t` works too; `.proverc`
 gives it the extension and the interpreter.
 

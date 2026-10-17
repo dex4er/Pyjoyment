@@ -221,11 +221,15 @@ PYJO_REACTOR=Pyjo.Reactor.Poll mise exec -- python -m Pyjo.Prove -l -j 4 --captu
   t/Pyjo/Server_Reload.py t/stdlib/Server_Reload.py t/Pyjo/File_download.py
 ```
 
-CI runs the tests in `t/servers` on the Python of `mise.toml` only, with the
-dependency group `servers` installed by uv in `.venv`:
+CI runs the tests in `t/servers` on the Python of `mise.toml`, with the
+dependency group `servers` installed by uv in `.venv`, and again on Python
+3.14, in `.venv-3.14`, as the CGI server of `http.server` is gone from
+Python 3.15:
 
 ```sh
 mise exec -- uv run --python "$(mise exec -- which python)" \
+  --only-group servers python -m Pyjo.Prove -l --timeout 120 -r t/servers
+UV_PROJECT_ENVIRONMENT=.venv-3.14 mise exec -- uv run --python 3.14 \
   --only-group servers python -m Pyjo.Prove -l --timeout 120 -r t/servers
 ```
 
@@ -242,7 +246,8 @@ wheels of `pyuwsgi` have no plugin `cgi`. `extra-build-variables` in
 `pyproject.toml` builds the plugin into it with `UWSGI_EMBED_PLUGINS=cgi`, and
 uv keeps such a build apart from one without the variable in its cache.
 `http.server --cgi` runs the CGI tests too, on a Python that still has
-`CGIHTTPRequestHandler`, which Python 3.15 removed.
+`CGIHTTPRequestHandler`, which Python 3.15 removed, as the second run of CI
+on Python 3.14.
 
 CI sets `PYTHONWARNINGS=error::SyntaxWarning,error::DeprecationWarning`, so an
 invalid escape sequence or a deprecated API fails the build, before a new

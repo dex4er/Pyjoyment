@@ -1,13 +1,39 @@
-/build
-/dist
-.DS_Store
-.vscode
+# The parts of https://www.toptal.com/developers/gitignore/api/python,node,macos,visualstudiocode
+# that apply here; a path is anchored where it could match a directory of the
+# project, as "lib/" of the template would match t/lib. hatchling builds the
+# packages without the files that this file ignores.
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+.eggs/
+/build/
+/dist/
+
+# Virtual environments of uv, of the tests of the servers and of the benchmarks
 .venv
+.venv-*
 benchmarks/venv/
-.ruff_cache
-__pycache__
-*.egg-info
-*.pyc
+
+# Caches of the tools
+.ruff_cache/
+
+# The packages of npm, which npm run bundle copies from
+node_modules/
+npm-debug.log*
+
+# macOS
+.DS_Store
+._*
+
+# Editors
+.idea/
+.vscode/
+
+# Secrets, as in the rules of .claude/settings.json
 .env
 .env.*
 .envrc
@@ -22,6 +48,3 @@ __pycache__
 !/Pyjo/IOLoop/certs/server.key
 # Certificates of the tests, like t/mojo/certs in Mojo
 !/t/certs/*.key
-
-# The packages of npm, which npm run bundle copies from
-node_modules/
