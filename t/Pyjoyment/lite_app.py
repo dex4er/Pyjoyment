@@ -514,7 +514,7 @@ def malformed_utf8(c):
 @get('/json')
 def json(c):
     if (c.req.headers.content_type or '') == 'application/json':
-        return c.render(json=c.req.json)
+        return c.render(json=c.req.json())
     c.render(json={'foo': [1, -2, 3, 'b☃r']}, layout='layout')
 
 
