@@ -69,6 +69,13 @@ with subtest('html'):
     is_ok(html_unescape(html.escape(string)), string, 'decodes escape of html')
     is_ok(html_unescape('&eacute;&#233;&#xe9;'), html.unescape('&eacute;&#233;&#xe9;'), 'same as unescape of html')
 
+with subtest('Markup joined to a string'):
+    from Pyjo.String.HTML import html as markup
+
+    escaped = xml_escape(markup('&lt;'))
+    is_ok(type(escaped), str, 'plain string')
+    is_ok('<a title="' + escaped + '">', '<a title="&lt;">', 'joined as it is')
+
 with subtest('hashlib and hmac'):
     is_ok(md5_sum(b'foo'), hashlib.md5(b'foo').hexdigest(), 'md5')
     is_ok(sha1_sum(b'foo'), hashlib.sha1(b'foo').hexdigest(), 'sha1')

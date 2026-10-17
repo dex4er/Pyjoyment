@@ -29,6 +29,9 @@ examples.
 :mod:`Pyjoyment.Plugin.HeaderCondition`
     Route condition for all kinds of headers, loaded automatically.
 
+:mod:`Pyjoyment.Plugin.TagHelpers`
+    Template specific helper collection, loaded automatically.
+
 Events
 ------
 
@@ -43,7 +46,7 @@ Ported from `Mojolicious::Plugins <https://github.com/mojolicious/mojo/blob/v9.4
 of Mojolicious 9.49.
 """
 
-# TODO: the plugins of the list, Config, JSONConfig, Mount, NotYAMLConfig and TagHelpers, when they are ported
+# TODO: the plugins of the list, Config, JSONConfig, Mount and NotYAMLConfig, when they are ported
 
 import Pyjo.EventEmitter
 import Pyjo.Exception
