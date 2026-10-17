@@ -393,4 +393,49 @@ with subtest('Abstract methods'):
         'right error',
     )
 
+
+# Not in Mojolicious: INT and TERM stop the server gracefully, a second INT immediately, a second TERM does not, QUIT
+# immediately, and HUP is ignored
+with subtest('Signals'):
+    import signal
+    import sys
+    import time
+
+    def run(*signals, connect=False):
+        # An event loop of its own, which the connections of the other subtests do not keep from stopping gracefully
+        finished, connections = [], []
+        with (
+            Pyjo.IOLoop.new() as loop,
+            Pyjo.Server.Daemon.new(ioloop=loop, listen=['http://127.0.0.1'], silent=True) as daemon,
+        ):
+            daemon.start()
+            loop.once('finish', lambda loop: finished.append(True))
+            if connect:
+                connections.append(socket.create_connection(('127.0.0.1', daemon.ports()[0])))
+            for i, signum in enumerate(signals):
+                loop.timer(0.2 * (i + 1), lambda loop, signum=signum: os.kill(os.getpid(), signum))
+            loop.timer(5, lambda loop: loop.stop())
+            daemon.stop()
+            daemon.run()
+            for connection in connections:
+                connection.close()
+        return bool(finished)
+
+    if sys.platform == 'win32':
+        skip('no signals of POSIX', 8)
+    else:
+        ok(run(signal.SIGTERM), 'TERM stops gracefully')
+        ok(run(signal.SIGINT), 'INT stops gracefully')
+        ok(not run(signal.SIGQUIT), 'QUIT stops immediately')
+        ok(run(signal.SIGHUP, signal.SIGTERM), 'HUP is ignored')
+        started = time.monotonic()
+        ok(run(signal.SIGINT, signal.SIGINT, connect=True), 'graceful stop before the second INT')
+        ok(
+            time.monotonic() - started < 2,
+            'second INT stops immediately, with a connection that keeps it from stopping',
+        )
+        started = time.monotonic()
+        ok(run(signal.SIGTERM, signal.SIGTERM, connect=True), 'graceful stop before the second TERM')
+        ok(time.monotonic() - started > 4, 'second TERM does nothing')
+
 done_testing()

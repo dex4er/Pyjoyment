@@ -92,12 +92,12 @@ Pyjo.Server.Hot.new().run(pathlib.Path({str(app)!r}))
     port, app, result = ServerStart.retry(start)
     pid = app.with_name('hot.pid')
     is_ok(result.returncode, 0, 'daemonized')
-    atexit.register(lambda: pid.exists() and os.kill(int(pid.read_text()), signal.SIGTERM))
+    atexit.register(lambda: pid.exists() and os.kill(int(pid.read_text()), signal.SIGQUIT))
     is_ok(get(port), b'int_max_str_digits=1234', 'the command line of the process with -X, run again')
     deadline = time.monotonic() + 20
     while not pid.exists() and time.monotonic() < deadline:
         time.sleep(0.1)
-    os.kill(int(pid.read_text()), signal.SIGQUIT)
+    os.kill(int(pid.read_text()), signal.SIGTERM)
     ok(closed(port), 'stopped gracefully')
 
 with subtest('-t and -s'), tempfile.TemporaryDirectory() as dir:
@@ -112,6 +112,35 @@ with subtest('-t and -s'), tempfile.TemporaryDirectory() as dir:
     )
     is_ok(result.returncode, 0, 'stop')
     is_ok(result.stdout, 'Hot server not running.\n', 'not running')
+
+# Not in Mojolicious: HUP attempts a hot deployment, where Mojo has USR2, and -s stops the server gracefully with TERM
+with subtest('HUP and -s'), tempfile.TemporaryDirectory() as dir:
+    # The server is started again on a new port when it is taken
+    def start():
+        port = Pyjo.IOLoop.Server.object.generate_port()
+        app = application(dir, port)
+        result = subprocess.run([sys.executable, '-m', 'Pyjo.Server.Hot', str(app)], env=ENV, capture_output=True)
+        return None if ServerStart.in_use(result) else (port, app, result)
+
+    port, app, result = ServerStart.retry(start)
+    pid = app.with_name('hot.pid')
+    atexit.register(lambda: pid.exists() and os.kill(int(pid.read_text()), signal.SIGQUIT))
+    like_ok(get(port), rb'^int_max_str_digits=', 'serving')
+    deadline = time.monotonic() + 20
+    while not pid.exists() and time.monotonic() < deadline:
+        time.sleep(0.1)
+    old = int(pid.read_text())
+    os.kill(old, signal.SIGHUP)
+    deadline = time.monotonic() + 30
+    while (not pid.exists() or int(pid.read_text() or 0) == old) and time.monotonic() < deadline:
+        time.sleep(0.1)
+    isnt_ok(int(pid.read_text()), old, 'new manager')
+    like_ok(get(port), rb'^int_max_str_digits=', 'serving after the hot deployment')
+    result = subprocess.run(
+        [sys.executable, '-m', 'Pyjo.Server.Hot', '-s', str(app)], env=ENV, capture_output=True, text=True
+    )
+    like_ok(result.stdout, r'^Stopping Hot server \d+ gracefully\.', 'stopping')
+    ok(closed(port), 'stopped gracefully')
 
 with subtest('Foreground and TERM'), tempfile.TemporaryDirectory() as dir:
     # The server is started again on a new port when it is taken

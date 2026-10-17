@@ -792,6 +792,18 @@ pattern.match_partial(path)`.
   its own, so a signal that the child must not miss, as QUIT of a worker of
   `Pyjo.Server.Prefork`, is blocked with `signal.pthread_sigmask` across the
   fork and unblocked once the child has its handler.
+- The signals of the servers follow the conventions of containers, where
+  Mojo follows the ones of nginx and unicorn: Docker and Kubernetes stop a
+  server with TERM, so INT and TERM shut `Pyjo.Server.Daemon`,
+  `Pyjo.Server.Prefork` and `Pyjo.Server.Hot` down gracefully, a second INT,
+  as of Ctrl-C pressed twice, immediately, and QUIT immediately; HUP reloads,
+  as in gunicorn and in `ExecReload` of systemd: a hot deployment in
+  `Pyjo.Server.Hot`, where Mojo has USR2, which is left out, so that no
+  signal keeps the meaning that Mojo gives it, a graceful restart of the
+  workers in `Pyjo.Server.Prefork`, and nothing in `Pyjo.Server.Daemon`. A
+  worker stops gracefully on TERM and ignores INT, which Ctrl-C sends to all
+  the processes of the server. The tests of Mojo that send these signals
+  have `# Unlike Mojolicious:` comments.
 - `local` on an attribute, as `local $self->{running}`, is the value saved
   before and set back in a `finally`.
 - `__del__`, the counterpart of `DESTROY`, does nothing when

@@ -77,7 +77,7 @@ def wait_for(condition):
 
 # The server of the application, stopped gracefully, and killed when the test ends before it stops it
 def stop(app, port):
-    os.kill(pid(app), signal.SIGQUIT)
+    os.kill(pid(app), signal.SIGTERM)
     return wait_for(lambda: not listening(port) and not os.path.exists(app.sibling('hot.pid')))
 
 
@@ -92,7 +92,7 @@ def alive(pid):
 def kill(app):
     if manager := pid(app):
         try:
-            os.kill(manager, signal.SIGTERM)
+            os.kill(manager, signal.SIGQUIT)
         except OSError:
             pass
 

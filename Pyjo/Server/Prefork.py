@@ -46,12 +46,19 @@ with the following signals.
 INT, TERM
 ~~~~~~~~~
 
-Shut down server immediately.
+Shut down server gracefully. A second ``INT``, as of Ctrl-C pressed twice,
+shuts it down immediately, a second ``TERM`` does nothing.
 
 QUIT
 ~~~~
 
-Shut down server gracefully.
+Shut down server immediately.
+
+HUP
+~~~
+
+Restart the workers gracefully, or emit the event ``reload`` when it has
+subscribers.
 
 TTIN
 ~~~~
@@ -69,10 +76,18 @@ Worker signals
 :mod:`Pyjo.Server.Prefork` worker processes can be controlled at runtime
 with the following signals.
 
-QUIT
+TERM
 ~~~~
 
 Stop worker gracefully.
+
+QUIT
+~~~~
+
+Stop worker immediately.
+
+The workers ignore ``INT``, which Ctrl-C sends to all the processes of the
+server, and ``HUP``, as the manager stops them.
 
 Events
 ------
@@ -109,6 +124,17 @@ reap
 Emitted when a child process exited. ::
 
     prefork.on('reap', lambda prefork, pid: print(f'Worker {pid} stopped'))
+
+reload
+~~~~~~
+::
+
+    prefork.on('reload', lambda prefork: ...)
+
+Emitted when the manager gets the signal ``HUP``, in the place of the restart
+of the workers. ::
+
+    prefork.on('reload', lambda prefork: print('Reloading the configuration'))
 
 spawn
 ~~~~~
@@ -386,7 +412,8 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
 
         # Not in Mojolicious: local %SIG, the handlers of the signals are set back at the end
         handlers: dict[signal.Signals, Any] = {}
-        for name in (signal.SIGCHLD, signal.SIGINT, signal.SIGTERM, signal.SIGQUIT, signal.SIGTTIN, signal.SIGTTOU):
+        managed = (signal.SIGCHLD, signal.SIGHUP, signal.SIGINT, signal.SIGTERM, signal.SIGQUIT, signal.SIGTTIN)
+        for name in (*managed, signal.SIGTTOU):
             handlers[name] = signal.signal(name, note)
         waker, self._wakee = socket.socketpair()
         waker.setblocking(False)
@@ -475,7 +502,8 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
                 w['quit'] = quit + 1
                 if not quit:
                     log.info(f'Stopping worker {pid} gracefully ({_number(gt)} seconds)')
-                    if not _kill(signal.SIGQUIT, pid):
+                    # Unlike Mojolicious: TERM stops a worker gracefully, where Mojo sends QUIT
+                    if not _kill(signal.SIGTERM, pid):
                         self._stopped(pid)
             if graceful and graceful + gt <= now:
                 w['force'] = True
@@ -499,10 +527,19 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
                     if pid <= 0:
                         break
                     self.emit('reap', pid)._stopped(pid)
+            # Unlike Mojolicious: INT and TERM shut the server down gracefully, as Docker and Kubernetes stop it with TERM,
+            # and QUIT immediately, where Mojo does it the other way round, as nginx and unicorn do; a second INT, as of
+            # Ctrl-C pressed twice, shuts it down immediately
             elif signum in (signal.SIGINT, signal.SIGTERM):
-                self._term()
+                if not self._finished:
+                    self._term(True)
+                elif signum == signal.SIGINT:
+                    self._term()
             elif signum == signal.SIGQUIT:
-                self._term(True)
+                self._term()
+            # Not in Mojolicious: HUP restarts the workers gracefully, as gunicorn does, unless something else reloads
+            elif signum == signal.SIGHUP:
+                self._reload()
             elif signum == signal.SIGTTIN:
                 self.workers += 1
             elif signum == signal.SIGTTOU and self.workers > 0:
@@ -512,22 +549,31 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
                         w['graceful'] = time.monotonic()
                         break
 
+    def _reload(self) -> None:
+        if self.has_subscribers('reload'):
+            self.emit('reload')
+            return
+        self.app.log.info('Restarting workers gracefully')
+        now = time.monotonic()
+        for w in self._pool.values():
+            w['graceful'] = w.get('graceful') or now
+
     def _spawn(self) -> None:
         # Manager
         # Not in Mojolicious: the buffers of the standard streams are written before, so that the worker does not write
         # them again
         _flush()
-        # Unlike Mojolicious: QUIT is blocked while the manager forks, until the worker has its handler, where the worker
-        # of Mojo takes it with the handler of the manager and serves on, and Python clears a signal that comes during
-        # the fork
-        signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGQUIT})
+        # Unlike Mojolicious: TERM and QUIT are blocked while the manager forks, until the worker has its handlers, where
+        # the worker of Mojo takes them with the handlers of the manager and serves on, and Python clears a signal that
+        # comes during the fork
+        signal.pthread_sigmask(signal.SIG_BLOCK, _WORKER)
         try:
             pid = os.fork()
         except OSError as e:
-            signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal.SIGQUIT})
+            signal.pthread_sigmask(signal.SIG_UNBLOCK, _WORKER)
             raise OSError(e.errno, f"Can't fork: {e.strerror}") from e
         if pid:
-            signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal.SIGQUIT})
+            signal.pthread_sigmask(signal.SIG_UNBLOCK, _WORKER)
             self.emit('spawn', pid)._pool[pid] = {'time': time.monotonic()}
             return
 
@@ -546,6 +592,11 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
     def _term(self, graceful: bool = False) -> None:
         self.emit('finish', graceful)
         self._finished, self._graceful = True, graceful
+
+        # Not in Mojolicious: the workers that are stopping gracefully stop immediately too, after a graceful shutdown
+        if not graceful:
+            for w in self._pool.values():
+                w['force'] = True
 
     def _wait(self) -> None:
         # Poll for heartbeats
@@ -602,37 +653,45 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
             loop.recurring(self.heartbeat_interval, heartbeat)
 
             # Clean worker environment
-            for name in (signal.SIGCHLD, signal.SIGINT, signal.SIGTERM, signal.SIGTTIN, signal.SIGTTOU):
+            for name in (signal.SIGCHLD, signal.SIGTTIN, signal.SIGTTOU):
                 signal.signal(name, signal.SIG_DFL)
-            # Not in Mojolicious: the handler of QUIT only notes the signal, which the event loop handles, as Perl defers
-            # the handlers of signals to a safe point, and a socket pair that Python writes to on a signal wakes the
-            # event loop up, as Python repeats a system call that a signal interrupts until its timeout
-            quit = False
+            # Unlike Mojolicious: the workers ignore INT, which Ctrl-C sends to all the processes of the server, and HUP,
+            # as the manager stops them
+            for name in (signal.SIGHUP, signal.SIGINT):
+                signal.signal(name, signal.SIG_IGN)
+            # Not in Mojolicious: the handlers of TERM and QUIT only note the signal, which the event loop handles, as
+            # Perl defers the handlers of signals to a safe point, and a socket pair that Python writes to on a signal
+            # wakes the event loop up, as Python repeats a system call that a signal interrupts until its timeout
+            noted: list[int] = []
 
             def note(signum: int, frame: Any) -> None:
-                nonlocal quit
-                quit = True
+                noted.append(signum)
 
-            signal.signal(signal.SIGQUIT, note)
+            for name in _WORKER:
+                signal.signal(name, note)
             waker, wakee = socket.socketpair()
             waker.setblocking(False)
             wakee.setblocking(False)
             signal.set_wakeup_fd(waker.fileno())
 
             def wake(reactor: Any, writable: bool) -> None:
-                nonlocal quit
                 try:
                     wakee.recv(4096)
                 except OSError:
                     pass
-                if quit:
-                    quit = False
-                    loop.stop_gracefully()
+                # Unlike Mojolicious: TERM stops the worker gracefully, and QUIT immediately, where Mojo has QUIT for a
+                # graceful stop
+                while noted:
+                    if noted.pop(0) == signal.SIGQUIT:
+                        loop.stop()
+                    else:
+                        loop.stop_gracefully()
 
             loop.reactor.io(wakee, wake).watch(wakee, True, False)
 
-            # Not in Mojolicious: QUIT, which the manager blocks while it forks, comes now that the worker has its handler
-            signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal.SIGQUIT})
+            # Not in Mojolicious: TERM and QUIT, which the manager blocks while it forks, come now that the worker has its
+            # handlers
+            signal.pthread_sigmask(signal.SIG_UNBLOCK, _WORKER)
 
             def max_requests(loop: Any) -> None:
                 if (prefork := ref()) is not None:
@@ -654,6 +713,10 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
             traceback.print_exc()
             code = 255
         _exit(code)
+
+
+# Not in Mojolicious: the signals that the workers handle, which the manager blocks while it forks
+_WORKER = {signal.SIGTERM, signal.SIGQUIT}
 
 
 # Not in Mojolicious: os._exit, as the worker leaves what the manager does at its end, with the buffers of the standard

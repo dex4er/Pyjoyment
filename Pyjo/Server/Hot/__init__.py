@@ -29,7 +29,7 @@ You can run the same command again for automatic hot deployment. ::
     Starting hot deployment for Hot server 31841.
 
 This second invocation will load the application again, detect the process id
-file with it, and send a :ref:`USR2 <hot-usr2>` signal to the already running
+file with it, and send a :ref:`HUP <hot-hup>` signal to the already running
 server.
 
 The server runs the command line of its process again, :data:`sys.orig_argv`,
@@ -48,12 +48,13 @@ the following signals.
 INT, TERM
 ~~~~~~~~~
 
-Shut down server immediately.
+Shut down server gracefully. A second ``INT``, as of Ctrl-C pressed twice,
+shuts it down immediately, a second ``TERM`` does nothing.
 
 QUIT
 ~~~~
 
-Shut down server gracefully.
+Shut down server immediately.
 
 TTIN
 ~~~~
@@ -65,10 +66,10 @@ TTOU
 
 Decrease worker pool by one.
 
-.. _hot-usr2:
+.. _hot-hup:
 
-USR2
-~~~~
+HUP
+~~~
 
 Attempt zero downtime software upgrade (hot deployment) without losing any
 incoming connections. ::
@@ -84,7 +85,7 @@ incoming connections. ::
        |- Worker [3]
        +- Worker [4]
 
-The new manager will automatically send a ``QUIT`` signal to the old manager
+The new manager will automatically send a ``TERM`` signal to the old manager
 and take over serving requests after starting up successfully.
 
 Worker signals
@@ -93,10 +94,15 @@ Worker signals
 :mod:`Pyjo.Server.Hot` worker processes can be controlled at runtime with the
 following signals.
 
-QUIT
+TERM
 ~~~~
 
 Stop worker gracefully.
+
+QUIT
+~~~~
+
+Stop worker immediately.
 
 Settings
 --------
@@ -460,9 +466,16 @@ class Pyjo_Server_Hot(Pyjo.Base.object):
             if (hot := ref()) is not None:
                 hot._finish()
 
+        # Unlike Mojolicious: HUP, the signal of a reload, attempts a hot deployment, where Mojo has USR2, which is left
+        # out, as the signals of the server follow the conventions of containers and not the ones of Mojo
+        def reload(prefork: Any) -> None:
+            if (hot := ref()) is not None:
+                hot._upgrade = hot._upgrade or time.monotonic()
+
         prefork.on('wait', wait)
         prefork.on('reap', reap)
         prefork.on('finish', finish)
+        prefork.on('reload', reload)
 
         # Testing
         if os.environ.get('PYJO_HOT_TEST'):
@@ -477,22 +490,13 @@ class Pyjo_Server_Hot(Pyjo.Base.object):
             self._hot_deploy()
 
         # Daemonize as early as possible (but not for restarts)
-        def upgrade(signum: int, frame: Any) -> None:
-            if (hot := ref()) is not None:
-                hot._upgrade = hot._upgrade or time.monotonic()
+        prefork.start()
+        if not os.environ.get('PYJO_HOT_FOREGROUND') and int(os.environ['PYJO_HOT_REV']) < 3:
+            prefork.daemonize()
 
-        # Not in Mojolicious: local $SIG{USR2}, the handler of the signal is set back at the end
-        handler = signal.signal(signal.SIGUSR2, upgrade)
-        try:
-            prefork.start()
-            if not os.environ.get('PYJO_HOT_FOREGROUND') and int(os.environ['PYJO_HOT_REV']) < 3:
-                prefork.daemonize()
-
-            # Start accepting connections
-            prefork.cleanup = True
-            prefork.run()
-        finally:
-            signal.signal(signal.SIGUSR2, handler)
+        # Start accepting connections
+        prefork.cleanup = True
+        prefork.run()
 
     def _cleanup(self, pid: int) -> None:
         # Clean up failed upgrade
@@ -503,7 +507,7 @@ class Pyjo_Server_Hot(Pyjo.Base.object):
 
     def _finish(self) -> None:
         # Unlike Mojolicious: no upgrade once the server is finished, where Mojo sets "finish" and checks "finished", so
-        # that USR2 during a graceful shutdown still starts a new manager
+        # that HUP during a graceful shutdown still starts a new manager
         self._finished = True
         if not (new := self._new):
             return
@@ -519,7 +523,8 @@ class Pyjo_Server_Hot(Pyjo.Base.object):
             return
 
         # Start hot deployment
-        _kill(signal.SIGUSR2, pid)
+        # Unlike Mojolicious: HUP, where Mojo sends USR2
+        _kill(signal.SIGHUP, pid)
         _exit(f'Starting hot deployment for Hot server {pid}.')
 
     def _manage(self) -> None:
@@ -531,7 +536,8 @@ class Pyjo_Server_Hot(Pyjo.Base.object):
             if prefork.healthy != prefork.workers:
                 return
             log.info(f'Upgrade successful, stopping {old}')
-            _kill(signal.SIGQUIT, int(old))
+            # Unlike Mojolicious: TERM stops the old manager gracefully, where Mojo sends QUIT
+            _kill(signal.SIGTERM, int(old))
         os.environ['PYJO_HOT_PID'] = current
 
         # Upgrade
@@ -570,7 +576,8 @@ class Pyjo_Server_Hot(Pyjo.Base.object):
     def _stop(self) -> None:
         if not (pid := self.prefork.check_pid()):
             _exit('Hot server not running.')
-        _kill(signal.SIGQUIT, pid)
+        # Unlike Mojolicious: TERM stops the server gracefully, where Mojo sends QUIT
+        _kill(signal.SIGTERM, pid)
         _exit(f'Stopping Hot server {pid} gracefully.')
 
 
