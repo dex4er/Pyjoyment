@@ -328,7 +328,9 @@ with subtest('Multiple empty values'):
     ok(v.has_error(), 'has error')
     is_deeply_ok(v.error('bar'), ['required'], 'right error')
 
-with subtest('0'):
+# The subtest "0" of Mojo, which Test::More takes for a subtest without a name, as "0" is false in Perl, where
+# Pyjo.Test warns of a number as the name of a test
+with subtest('Field named 0'):
     v = t.app.validation().set(input={'0': 0})
     ok(v.has_data, 'has data')
     ok(v.required('0').size(1, 1).is_valid(), 'valid')
