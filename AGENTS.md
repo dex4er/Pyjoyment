@@ -345,8 +345,12 @@ Perl's `Test::More`), `Pyjo.Prove` (inspired by Perl's `prove`),
 `Pyjo.App` (inspired by `Mojo` of Mojolicious 6, the base class of
 `Mojolicious` until Mojolicious 7, as `Pyjo_App` is of `Pyjoyment_App`),
 `Pyjo.HelloWorld` (an application of pure Pyjo, where `Mojo::HelloWorld` is
-one of Mojolicious, which `Pyjoyment.HelloWorld` ports) and
-the helpers in `Pyjo.Util` that turn statements into expressions. These extras follow their inspiration where it
+one of Mojolicious, which `Pyjoyment.HelloWorld` ports),
+`Pyjoyment.Plugin.PyRenderer` (the renderer of template strings, inspired by
+`Mojolicious::Plugin::EPLRenderer`), `Pyjoyment.Plugin.TOMLConfig` (inspired
+by `Mojolicious::Plugin::NotYAMLConfig`, for the format of configuration of
+the standard library) and the helpers in `Pyjo.Util` that turn statements
+into expressions. These extras follow their inspiration where it
 helps, without porting it, and their tests are written for them rather than
 ported.
 

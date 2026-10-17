@@ -281,6 +281,7 @@ strict = [
   "Pyjoyment/Plugin/JSONConfig.py",
   "Pyjoyment/Plugin/PyRenderer.py",
   "Pyjoyment/Plugin/TagHelpers.py",
+  "Pyjoyment/Plugin/TOMLConfig.py",
   "Pyjoyment/Plugins.py",
   "Pyjoyment/Renderer.py",
   "Pyjoyment/Routes/__init__.py",
