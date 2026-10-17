@@ -975,7 +975,24 @@ class Pyjoyment_Controller(Pyjo.Base.object):
 
         return url
 
-    # TODO: url_for_asset and url_for_file, when Pyjoyment.Static is ported
+    def url_for_asset(self, asset: str) -> Pyjo.URL.object:
+        """::
+
+            url = c.url_for_asset('/app.js')
+
+        Generate a portable :mod:`Pyjo.URL` object with base for a static
+        asset.
+        """
+        return self.url_for(asset if _ABSOLUTE.match(asset) else self.app.static.asset_path(asset))
+
+    def url_for_file(self, file: str) -> Pyjo.URL.object:
+        """::
+
+            url = c.url_for_file('/index.html')
+
+        Generate a portable :mod:`Pyjo.URL` object with base for a static file.
+        """
+        return self.url_for(file if _ABSOLUTE.match(file) else self.app.static.file_path(file))
 
     def write(self, chunk: bytes | None = None, cb: Callable[[Self], Any] | None = None) -> Self:
         """::

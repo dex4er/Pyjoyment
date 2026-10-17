@@ -8,6 +8,7 @@ import Pyjoyment.Plugins
 import Pyjoyment.Renderer
 import Pyjoyment.Routes
 import Pyjoyment.Sessions
+import Pyjoyment.Static
 import Pyjoyment.Types
 
 from Pyjo.Test import *
@@ -258,6 +259,30 @@ with subtest('sessions'):
 
     is_ok(app.sessions.cookie_name, 'mysession', 'cookie name')
     is_ok(app.sessions.samesite, None, 'no SameSite')
+
+with subtest('static'):
+    app = Pyjoyment.new()
+    static = app.static
+    isa_ok(static, Pyjoyment.Static.object, 'default')
+    app.static = Pyjoyment.Static.new()
+
+    # Serve static files only with a "/static" prefix
+    app.static.prefix = '/static'
+
+    # Add another "public" directory
+    app.static.paths.append('/home/sri/public')
+
+    # Add another "public" directory with higher precedence
+    app.static.paths.insert(0, '/home/sri/themes/blue/public')
+
+    # Add another class with static files in DATA section
+    app.static.classes.append('Pyjoyment.Plugin.Fun')
+
+    # Remove built-in favicon
+    del app.static.extra['favicon.ico']
+
+    is_deeply_ok(app.static.paths, ['/home/sri/themes/blue/public', '/home/sri/public'], 'paths')
+    ok('favicon.ico' not in app.static.extra, 'no favicon')
 
 with subtest('types'):
     app = Pyjoyment.new()

@@ -559,6 +559,16 @@ with subtest('url_for'):
     url = c.url_with().set(query={'page': 2})
     is_ok(url.query.param('page'), '2', 'inherited query')
 
+with subtest('url_for_asset'):
+    app, c = controller()
+    url = c.url_for_asset('/app.js')
+    is_ok(url.to_str(), '/assets/app.js', 'asset')
+
+with subtest('url_for_file'):
+    app, c = controller()
+    url = c.url_for_file('/index.html')
+    is_ok(url.to_str(), '/index.html', 'file')
+
 with subtest('write'):
     app = Pyjoyment.new()
     app.log.level = 'fatal'

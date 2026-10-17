@@ -20,6 +20,8 @@ import sys
 # Not in Mojolicious: the templates of the DATA section are in the docstring, as the requests come before the end of the
 # script
 
+# Unlike Mojolicious: the session cookie is "pyjoyment", as Pyjoyment.Sessions names it
+
 
 class MyTestApp_Controller(Pyjoyment.Controller.object):
     def __del__(self):
@@ -119,7 +121,11 @@ def longpoll_order(c):
     c.stash()['order'] = 2
 
 
-# TODO: the route /longpoll/static, which replies with a static file, when Pyjoyment.Static is ported
+@get('/longpoll/static')
+def longpoll_static(c):
+    c.cookie('bar', 'baz')
+    c.session(foo='bar')
+    Pyjo.IOLoop.timer(0.25, lambda loop: c.reply.static('hello.txt'))
 
 
 @get('/longpoll/dynamic')
@@ -320,7 +326,18 @@ with subtest('The drain event should be emitted on the next reactor tick'):
     )
     is_ok(stash['order'], 1, 'the drain event was emitted on the next reactor tick')
 
-# TODO: the subtest "Static file with cookies and session", when Pyjoyment.Static is ported
+with subtest('Static file with cookies and session'):
+    with t.app.log.capture('trace') as logs:
+        (
+            t.get_ok('/longpoll/static')
+            .status_is(200)
+            .header_is('Server', 'Pyjoyment (Python)')
+            .header_like('Set-Cookie', r'bar=baz')
+            .header_like('Set-Cookie', r'pyjoyment=')
+            .content_type_is('text/plain;charset=UTF-8')
+            .content_is('Hello Mojo from a static file!\n')
+        )
+        like_ok(str(logs), r'Nothing has been rendered, expecting delayed response', 'right message')
 
 with subtest('Custom response'):
     (

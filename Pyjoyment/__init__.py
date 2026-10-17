@@ -196,6 +196,7 @@ import Pyjoyment.Plugins
 import Pyjoyment.Renderer
 import Pyjoyment.Routes
 import Pyjoyment.Sessions
+import Pyjoyment.Static
 import Pyjoyment.Types
 
 import functools
@@ -346,7 +347,30 @@ class Pyjoyment_App(Pyjo.App.object):
             app.sessions.samesite = None
         """
 
-        # TODO: static, when Pyjoyment.Static is ported
+        self.static: Pyjoyment.Static.object = Pyjoyment.Static.new()
+        """::
+
+            static = app.static
+            app.static = Pyjoyment.Static.new()
+
+        For serving static files from your ``public`` directories, defaults to
+        a :mod:`Pyjoyment.Static` object. ::
+
+            # Serve static files only with a "/static" prefix
+            app.static.prefix = '/static'
+
+            # Add another "public" directory
+            app.static.paths.append('/home/sri/public')
+
+            # Add another "public" directory with higher precedence
+            app.static.paths.insert(0, '/home/sri/themes/blue/public')
+
+            # Add another class with static files in DATA section
+            app.static.classes.append('Pyjoyment.Plugin.Fun')
+
+            # Remove built-in favicon
+            del app.static.extra['favicon.ico']
+        """
 
         self.types: Pyjoyment.Types.object = Pyjoyment.Types.new()
         """::
@@ -371,7 +395,7 @@ class Pyjoyment_App(Pyjo.App.object):
 
         home = self.home
         self.renderer.paths.append(home.child('templates').to_str())
-        # TODO: the "public" directory of the home in the paths of static, when Pyjoyment.Static is ported
+        self.static.paths.append(home.child('public').to_str())
 
         # Default to controller and application namespace
         package = Pyjo.App._package(type(self))  # pyright: ignore[reportPrivateUsage]
@@ -563,8 +587,8 @@ class Pyjoyment_App(Pyjo.App.object):
             app.dispatch(Pyjoyment.Controller.new())
 
         The heart of every :mod:`Pyjoyment` application, calls the
-        :attr:`routes` dispatcher for every request and passes it a
-        :mod:`Pyjoyment.Controller` object.
+        :attr:`static` and :attr:`routes` dispatchers for every request and
+        passes them a :mod:`Pyjoyment.Controller` object.
         """
         plugins = self.plugins.emit_hook('before_dispatch', c)
 
@@ -572,8 +596,10 @@ class Pyjoyment_App(Pyjo.App.object):
         if stash.get('mojo.rendered'):
             return
 
-        # TODO: try to find a static file, and emit the hook after_static, when Pyjoyment.Static is ported
+        # Try to find a static file
         tx: Any = c.tx
+        if not tx.res.code and self.static.dispatch(c):
+            plugins.emit_hook('after_static', c)
 
         # Start timer (ignore static files)
         if not stash.get('mojo.static'):
@@ -713,7 +739,8 @@ class Pyjoyment_App(Pyjo.App.object):
         ``PYJO_APP_LOADER`` is set, as :meth:`Pyjo.Server.Pyjo_Server.load_app`
         does, it is kept in :data:`Pyjo.Server.loaded_app` for the server.
         """
-        # TODO: the warmup of static and the commands, when Pyjoyment.Static and Pyjoyment.Commands are ported
+        # TODO: the commands, when Pyjoyment.Commands is ported
+        self.static.warmup()
         self.renderer.warmup()
         return super().start(*args)
 

@@ -378,8 +378,7 @@ def _import(caller: str, file: str | None) -> dict[str, Any]:
     # Initialize routes without namespaces
     routes = app.routes
     routes.namespaces = []
-    # TODO: the classes of Pyjoyment.Static, when it is ported
-    app.renderer.classes[0] = caller
+    app.static.classes[0] = app.renderer.classes[0] = caller
 
     # The Pyjoyment.Lite DSL
     dsl = _DSL(app, routes)

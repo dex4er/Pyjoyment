@@ -745,8 +745,14 @@ pattern.match_partial(path)`.
   `Pyjo.Reactor._finalize`: at once, as `DESTROY`, unless it interrupted a
   frame of `Pyjo.IOLoop`, of a reactor, of asyncio or of `selectors`, where
   the cleanup waits for the next tick of the event loop, which every reactor
-  runs at a point that is safe, and for the end of the interpreter.
-  `t/stdlib/IOLoop_gc.py` makes the garbage collector run all the time.
+  runs at a point that is safe, and for the end of the interpreter. The
+  garbage collector runs in any thread that allocates, as a thread of name
+  resolution, whose frames do not show what the main thread does, so a
+  finalizer outside of the main thread always waits for the next tick, and
+  the asyncio reactor is woken up with `call_soon_threadsafe`; on Linux,
+  epoll reports a socket closed in the middle of `add_reader` as
+  `FileNotFoundError`. `t/stdlib/IOLoop_gc.py` makes the garbage collector
+  run all the time.
 - An optional module of Perl that Mojo uses when it is installed has a
   counterpart in the standard library, one of the port's own where the
   standard library has none, or is left out until something needs it:
@@ -775,6 +781,22 @@ pattern.match_partial(path)`.
 - A module that is not ported yet but uses a ported one follows its API: the
   lines that use it are taken from the target Mojolicious, and so is the
   expectation of a test of them that the target changed.
+- The files that Mojolicious bundles in `lib/Mojolicious/resources` are in
+  `Pyjoyment/resources`, with `pyjo` in the place of `mojo` in their paths, as
+  `pyjo/logo-white.png` for `mojo/logo-white.png`. The artwork of Mojolicious,
+  as its logo, the raptors, the favicon and the pinstripes, is not copied: it
+  is under CC-BY-SA, and the license of Mojolicious does not grant its logo.
+  Its place is taken by the artwork of Pyjoyment, in the same formats and
+  sizes: a joystick for the logo, and a unicat, a cat with the horn of a
+  unicorn and a rainbow, for the raptor, whose images are named after it,
+  `failunicat.png` and `nounicat.png` for `failraptor.png` and `noraptor.png`.
+  The code, templates and tests that use these paths have a
+  `# Renamed from Mojolicious:` comment. Each image has its source next to it,
+  an SVG of the same name, which is edited and rendered again with
+  `rsvg-convert logo.svg -o logo.png`; `favicon.ico` holds the renders of
+  `favicon.svg` at 48, 32 and 16 pixels. The text in them is set in Fredoka,
+  under the SIL Open Font License, and converted to paths, so that the SVG
+  needs no font.
 
 ## Linting and Formatting
 

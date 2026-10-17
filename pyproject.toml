@@ -270,5 +270,6 @@ strict = [
   "Pyjoyment/Routes/Pattern.py",
   "Pyjoyment/Routes/Route.py",
   "Pyjoyment/Sessions.py",
+  "Pyjoyment/Static.py",
   "Pyjoyment/Types.py",
 ]

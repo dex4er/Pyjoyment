@@ -1,3 +1,5 @@
+import Pyjo.Asset.File
+import Pyjo.Asset.Memory
 import Pyjo.Collection
 import Pyjo.Exception
 import Pyjo.String.Bytes
@@ -228,6 +230,24 @@ with subtest('include'):
     is_ok(render(c, "%= include('menubar')"), '<a href="/">Home</a>\n\n', 'not escaped')
     is_ok(render(c, "%= include('menubar', format='txt')"), 'Home\n\n', 'format')
 
+with subtest('is_fresh'):
+    c = controller()
+    boolean = c.is_fresh()
+    ok(not boolean, 'stale')
+    boolean = c.is_fresh(etag='abc')
+    boolean = c.is_fresh(etag='W/"def"')
+    boolean = c.is_fresh(last_modified=1424985708)
+    ok(not boolean, 'stale')
+
+    # Add ETag/Last-Modified headers and check freshness before rendering
+    c = controller()
+    c.req.headers.if_none_match = '"abc"'
+    if c.is_fresh(etag='abc', last_modified=1424985708):
+        c.rendered(304)
+    else:
+        c.render(text='I ♥ Pyjoyment!')
+    is_ok(c.res.code, 304, 'fresh')
+
 with subtest('layout'):
     c = controller()
     output = render(
@@ -285,6 +305,29 @@ with subtest('redirect_to'):
 
     is_ok(c.res.code, 307, 'status kept')
 
+with subtest('reply.asset'):
+    c = controller()
+    c.reply.asset(Pyjo.Asset.File.new())
+    is_ok(c.res.code, 200, 'empty file')
+
+    # Serve asset with custom modification time
+    c = controller()
+    asset = Pyjo.Asset.Memory.new()
+    asset.add_chunk(b'Hello World!').mtime = 784111777
+    c.res.headers.content_type = 'text/plain'
+    c.reply.asset(asset)
+    is_ok(c.res.headers.last_modified, 'Sun, 06 Nov 1994 08:49:37 GMT', 'right "Last-Modified" value')
+
+    # Serve static file if it exists
+    c = controller()
+    tmp = tempdir()
+    tmp.child('images').make_path().child('logo.png').spew(b'PNG')
+    c.app.static.paths.append(str(tmp))
+    if asset := c.app.static.file('images/logo.png'):
+        c.res.headers.content_type = 'image/png'
+        c.reply.asset(asset)
+    is_ok(c.res.content.asset.slurp(), b'PNG', 'served')
+
 with subtest('reply.exception'):
     c = controller()
     c.exception_format('txt')
@@ -294,6 +337,32 @@ with subtest('reply.exception'):
     c.exception_format('json')
     c.reply.exception(Pyjo.Exception.new('Oops!'))
     is_deeply_ok(c.res.json(), {'error': 'Oops!\n'}, 'JSON of the exception, which ends with a newline')
+
+with subtest('reply.file'):
+    tmp = tempdir()
+    tmp.child('passwd').spew(b'root')
+    c = controller()
+    c.reply.file(tmp.child('passwd').to_str())
+    is_ok(c.res.content.asset.slurp(), b'root', 'served')
+
+    # Longer version
+    c = controller()
+    c.reply.asset(Pyjo.Asset.File.new(path=tmp.child('passwd').to_str()))
+    is_ok(c.res.content.asset.slurp(), b'root', 'served')
+
+    # Serve file from an absolute path with a custom content type
+    tmp.child('foo.txt').spew(b'foo')
+    c = controller()
+    c.res.headers.content_type = 'application/myapp'
+    c.reply.file(tmp.child('foo.txt').to_str())
+    is_ok(c.res.headers.content_type, 'application/myapp', 'custom content type')
+
+    # Serve file from a secret application directory
+    c = controller()
+    c.app.home = tmp
+    tmp.child('secret').make_path().child('file.txt').spew(b'secret')
+    c.reply.file(c.app.home.child('secret', 'file.txt'))
+    is_ok(c.res.content.asset.slurp(), b'secret', 'served')
 
 with subtest('reply.html_exception'):
     c = controller()
@@ -343,6 +412,25 @@ with subtest('reply.txt_not_found'):
     c = controller()
     c.reply.txt_not_found()
     is_deeply_ok([c.res.code, c.res.body], [404, b'Not Found'], 'response')
+
+with subtest('reply.static'):
+    c = controller()
+    c.reply.static('pyjo/logo.png')
+    is_ok(c.res.code, 200, 'served')
+    throws_ok(
+        lambda: c.reply.static('../lib/MyApp.py'),
+        re.compile(r'Static file "\.\./lib/MyApp\.py" not found'),
+        'not found',
+    )
+
+    # Serve file from a relative path with a custom content type
+    c = controller()
+    tmp = tempdir()
+    tmp.child('foo.txt').spew(b'foo')
+    c.app.static.paths.append(str(tmp))
+    c.res.headers.content_type = 'application/myapp'
+    c.reply.static('foo.txt')
+    is_ok(c.res.headers.content_type, 'application/myapp', 'custom content type')
 
 with subtest('respond_to'):
     c = controller()
@@ -479,6 +567,14 @@ with subtest('url_for'):
     is_ok(render(c, "%= url_for('named', foo='bar', baz='yada')"), '/named/bar/yada\n', 'alias')
 
     is_ok(render(c, "%= url_for('/index.html').set(query={'foo': 'bar'})"), '/index.html?foo=bar\n', 'query')
+
+with subtest('url_for_asset'):
+    c = controller()
+    is_ok(render(c, "%= url_for_asset('/app.js')"), '/assets/app.js\n', 'alias')
+
+with subtest('url_for_file'):
+    c = controller()
+    is_ok(render(c, "%= url_for_file('/index.html')"), '/index.html\n', 'alias')
 
 with subtest('url_with'):
     c = controller()
