@@ -1,0 +1,65 @@
+name: Docker Smoke Test
+
+# Builds and runs the images of "generate dockerfile" for an application, a
+# Lite script with pyproject.toml and a Lite script with the inline metadata
+# of PEP 723, with the wheel of the checkout, and checks that they serve the
+# generated pages and stop gracefully. The weekly run catches a change of the
+# images of Python and uv.
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - .github/scripts/docker-smoke.sh
+      - .github/workflows/docker-smoke.yaml
+      - Pyjo/**
+      - Pyjoyment/**
+      - mise.lock
+      - mise.toml
+      - pyproject.toml
+  pull_request:
+    branches:
+      - "*"
+    paths:
+      - .github/scripts/docker-smoke.sh
+      - .github/workflows/docker-smoke.yaml
+      - Pyjo/**
+      - Pyjoyment/**
+      - mise.lock
+      - mise.toml
+      - pyproject.toml
+  schedule:
+    - cron: 37 5 * * 1
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: smoke (${{ matrix.variant }})
+
+    strategy:
+      fail-fast: false
+      matrix:
+        variant:
+          - app
+          - lite
+          - lite-pep723
+
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up mise
+        uses: jdx/mise-action@v5
+        with:
+          version: 2026.10.4 # datasource=github-releases depName=jdx/mise
+
+      - name: Run smoke test
+        env:
+          VARIANT: ${{ matrix.variant }}
+        run: .github/scripts/docker-smoke.sh "${VARIANT}"
