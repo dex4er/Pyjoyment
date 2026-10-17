@@ -44,6 +44,9 @@ examples.
 :mod:`Pyjoyment.Plugin.TOMLConfig`
     TOML configuration files.
 
+:mod:`Pyjoyment.Plugin.YAMLConfig`
+    YAML configuration files.
+
 Events
 ------
 
@@ -58,7 +61,7 @@ Ported from `Mojolicious::Plugins <https://github.com/mojolicious/mojo/blob/v9.4
 of Mojolicious 9.49.
 """
 
-# TODO: the plugins of the list, Mount and NotYAMLConfig, when they are ported
+# TODO: the plugin Mount of the list, when it is ported
 
 import Pyjo.EventEmitter
 import Pyjo.Exception
