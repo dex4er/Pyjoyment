@@ -41,6 +41,9 @@ examples.
 :mod:`Pyjoyment.Plugin.TagHelpers`
     Template specific helper collection, loaded automatically.
 
+:mod:`Pyjoyment.Plugin.TOMLConfig`
+    TOML configuration files.
+
 Events
 ------
 

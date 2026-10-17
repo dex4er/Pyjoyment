@@ -1,0 +1,7 @@
+%# Just a comment
+foo = "bar"
+utf = "утф"
+plugins = [
+  { "PyjoymentTest.Plugin.DeploymentPlugin" = {} },
+  { "PyjoymentTest.Plugin.DeploymentPlugin" = { name = "another_helper", message = "works too!" } },
+]
