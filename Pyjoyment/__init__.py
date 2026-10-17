@@ -198,6 +198,7 @@ import Pyjoyment.Routes
 import Pyjoyment.Sessions
 import Pyjoyment.Static
 import Pyjoyment.Types
+import Pyjoyment.Validator
 
 import functools
 import inspect
@@ -386,7 +387,20 @@ class Pyjoyment_App(Pyjo.App.object):
             app.types.type('twt', 'text/tweet')
         """
 
-        # TODO: validator, when Pyjoyment.Validator is ported
+        self.validator: Pyjoyment.Validator.object = Pyjoyment.Validator.new()
+        """::
+
+            validator = app.validator
+            app.validator = Pyjoyment.Validator.new()
+
+        Validate values, defaults to a :mod:`Pyjoyment.Validator` object. ::
+
+            # Add validation check
+            app.validator.add_check('foo', lambda v, name, value: value != 'foo')
+
+            # Add validation filter
+            app.validator.add_filter('quotemeta', lambda v, name, value: re.escape(value))
+        """
 
         self._mode: str | None = None
         self._secrets: list[str] | None = None

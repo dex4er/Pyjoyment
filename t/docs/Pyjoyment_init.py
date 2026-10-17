@@ -10,6 +10,7 @@ import Pyjoyment.Routes
 import Pyjoyment.Sessions
 import Pyjoyment.Static
 import Pyjoyment.Types
+import Pyjoyment.Validator
 
 from Pyjo.String.Template import t
 from Pyjo.Test import *
@@ -294,6 +295,22 @@ with subtest('types'):
     # Add custom MIME type
     app.types.type('twt', 'text/tweet')
     is_ok(app.types.type('twt'), 'text/tweet', 'custom type')
+
+with subtest('validator'):
+    app = Pyjoyment.new()
+    validator = app.validator
+    isa_ok(validator, Pyjoyment.Validator.object, 'default')
+    app.validator = Pyjoyment.Validator.new()
+
+    # Add validation check
+    app.validator.add_check('foo', lambda v, name, value: value != 'foo')
+
+    # Add validation filter
+    app.validator.add_filter('quotemeta', lambda v, name, value: re.escape(value))
+
+    v = app.validator.validation().set(input={'a': 'bar', 'b': 'a.b'})
+    ok(not v.required('a').foo().is_valid(), 'check')
+    is_ok(v.required('b', 'quotemeta').param(), 'a\\.b', 'filter')
 
 with subtest('ua'):
     app = Pyjoyment.new()

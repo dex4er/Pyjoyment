@@ -68,6 +68,15 @@ with subtest('Description'):
         'default value',
     )
 
+    c = controller()
+    c.req.url.parse('/?age=250')
+    c.validation().required('age').num(0, 150)
+    is_ok(
+        render(c, "%= text_field('age')"),
+        '<input class="field-with-error" name="age" type="text" value="250">\n',
+        'field with error',
+    )
+
     is_ok(
         render(c, "%= text_field('first_name', **{'class': 'user'}, required=None)"),
         '<input class="user" name="first_name" required type="text">\n',
