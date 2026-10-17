@@ -67,6 +67,12 @@ lint:
         - Pyjoyment/resources/public/pyjo/bootstrap/**
         - Pyjoyment/resources/public/pyjo/highlight.js/**
         - Pyjoyment/resources/public/pyjo/pyjo.css
+    # Configuration files of the tests, which are templates of Pyjo.Template
+    # before they are JSON, as those of Mojolicious
+    - linters:
+        - prettier
+      paths:
+        - t/Pyjoyment/json_config_lite_app.json
     # Benchmarks, examples and tests that need other libraries, which are not
     # installed for the project, as the servers of the dependency group
     # "servers"
