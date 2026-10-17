@@ -58,12 +58,15 @@ jobs:
       # Python; fail now instead. Only the tests: setup-python runs pip, whose
       # warnings are not ours. The development mode of Python shows the
       # ResourceWarning of a socket or a file that is not closed, which only
-      # goes to the standard error, so the output is checked for it.
+      # goes to the standard error, so the output is checked for it. The tests
+      # that request remote hosts, which are those of GitHub, run on the Python
+      # of mise.toml only.
       - name: Run tests
         shell: bash
         env:
           PYTHONDEVMODE: "1"
           PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
+          TEST_ONLINE: ${{ matrix.python == 'mise' && '1' || '' }}
         run: |
           python --version
           python -m Pyjo.Prove -l --color -j 4 --timeout 60 --capture-stderr --stderr-lines 1000 -r t 2>&1 | tee prove.log

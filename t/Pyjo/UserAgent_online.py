@@ -29,6 +29,11 @@ from Pyjoyment.Lite import app, get
 # does not load Test::Mojo, which sets MOJO_LOG_LEVEL
 app.log.level = 'fatal'
 
+# Unlike Mojolicious: the remote hosts are those of GitHub, where Mojo requests mojolicious.org, metacpan.org and
+# wikipedia.org, as the runners of GitHub Actions reach them the most reliably; github.com answers a form POST without
+# a CSRF token with 422, where metacpan.org answers it with 200, and redirects from HTTP to HTTPS in one step, where
+# wikipedia.org takes two
+
 
 @get('/remote_address')
 def remote_address(c):
@@ -45,7 +50,7 @@ with subtest('Make sure user agents dont taint the ioloop'):
         result.update(id=tx.connection, code=tx.res.code)
         loop.stop()
 
-    ua.get('http://metacpan.org', cb)
+    ua.get('http://github.com', cb)
     loop.start()
     ua = None
     loop.timer(0.25, lambda loop: loop.stop())
@@ -57,7 +62,7 @@ ua = Pyjo.UserAgent.new()
 
 with subtest('Local address'):
     ua.server.app = app
-    with socket.create_connection(('mojolicious.org', 80)) as sock:
+    with socket.create_connection(('github.com', 80)) as sock:
         address = sock.getsockname()[0]
     isnt_ok(address, '127.0.0.1', 'different address')
     ua.max_connections = 0
@@ -99,7 +104,7 @@ with subtest('Host does not exist'):
 ua = Pyjo.UserAgent.new()
 
 with subtest('Keep-alive'):
-    ua.get('http://mojolicious.org', lambda ua, tx: Pyjo.IOLoop.singleton.stop())
+    ua.get('http://github.com', lambda ua, tx: Pyjo.IOLoop.singleton.stop())
     Pyjo.IOLoop.singleton.start()
     kept_alive = []
 
@@ -107,7 +112,7 @@ with subtest('Keep-alive'):
         Pyjo.IOLoop.singleton.stop()
         kept_alive.append(tx.kept_alive)
 
-    ua.get('http://mojolicious.org', keep_alive)
+    ua.get('http://github.com', keep_alive)
     Pyjo.IOLoop.singleton.start()
     ok(kept_alive[0], 'connection was kept alive')
 
@@ -124,11 +129,11 @@ with subtest('Nested keep-alive'):
                 kept_alive.append(tx.kept_alive)
                 Pyjo.IOLoop.singleton.stop()
 
-            ua.get('http://mojolicious.org', third)
+            ua.get('http://github.com', third)
 
-        ua.get('http://mojolicious.org', second)
+        ua.get('http://github.com', second)
 
-    ua.get('http://mojolicious.org', first)
+    ua.get('http://github.com', first)
     Pyjo.IOLoop.singleton.start()
     is_deeply_ok(kept_alive, [True, True, True], 'connections kept alive')
 
@@ -137,7 +142,7 @@ ua = Pyjo.UserAgent.new()
 with subtest('Custom non-keep-alive request'):
     tx = Pyjo.Transaction.HTTP.new()
     tx.req.method = 'GET'
-    tx.req.url.parse('http://metacpan.org')
+    tx.req.url.parse('http://github.com')
     tx.req.headers.connection = 'close'
     ua.start(tx)
     ok(tx.is_finished, 'transaction is finished')
@@ -145,66 +150,66 @@ with subtest('Custom non-keep-alive request'):
     like_ok(tx.res.headers.connection, r'(?i)close', 'right "Connection" header')
 
 with subtest('One-liner'):
-    is_ok(g('mojolicious.org').code, 200, 'right status')
-    is_ok(h('mojolicious.org').code, 200, 'right status')
-    is_ok(h('mojolicious.org').body, b'', 'no content')
-    is_ok(p('mojolicious.org/lalalala').code, 404, 'right status')
-    is_ok(g('http://mojolicious.org').code, 200, 'right status')
-    res = p('https://metacpan.org/search', form={'q': 'mojolicious'})
-    like_ok(res.body, rb'Mojolicious', 'right content')
-    is_ok(res.code, 200, 'right status')
+    is_ok(g('github.com').code, 200, 'right status')
+    is_ok(h('github.com').code, 200, 'right status')
+    is_ok(h('github.com').body, b'', 'no content')
+    is_ok(p('github.com/mojolicious/lalalala').code, 404, 'right status')
+    is_ok(g('http://github.com').code, 200, 'right status')
+    res = p('https://github.com/search', form={'q': 'mojolicious'})
+    like_ok(res.body, rb'GitHub', 'right content')
+    is_ok(res.code, 422, 'right status')
 
 with subtest('Simple request'):
-    tx = ua.get('metacpan.org')
+    tx = ua.get('github.com')
     is_ok(tx.req.method, 'GET', 'right method')
-    is_ok(str(tx.req.url), 'http://metacpan.org', 'right url')
+    is_ok(str(tx.req.url), 'http://github.com', 'right url')
     is_ok(tx.res.code, 301, 'right status')
 
 with subtest('Simple keep-alive requests'):
-    tx = ua.get('https://www.wikipedia.org')
+    tx = ua.get('https://github.com')
     is_ok(tx.req.method, 'GET', 'right method')
-    is_ok(str(tx.req.url), 'https://www.wikipedia.org', 'right url')
+    is_ok(str(tx.req.url), 'https://github.com', 'right url')
     is_ok(tx.req.body, b'', 'no content')
     is_ok(tx.res.code, 200, 'right status')
     ok(tx.keep_alive, 'connection will be kept alive')
     ok(not tx.kept_alive, 'connection was not kept alive')
-    tx = ua.get('https://www.wikipedia.org')
+    tx = ua.get('https://github.com')
     is_ok(tx.req.method, 'GET', 'right method')
-    is_ok(str(tx.req.url), 'https://www.wikipedia.org', 'right url')
+    is_ok(str(tx.req.url), 'https://github.com', 'right url')
     is_ok(tx.res.code, 200, 'right status')
     ok(tx.keep_alive, 'connection will be kept alive')
     ok(tx.kept_alive, 'connection was kept alive')
-    tx = ua.get('https://www.wikipedia.org')
+    tx = ua.get('https://github.com')
     is_ok(tx.req.method, 'GET', 'right method')
-    is_ok(str(tx.req.url), 'https://www.wikipedia.org', 'right url')
+    is_ok(str(tx.req.url), 'https://github.com', 'right url')
     is_ok(tx.res.code, 200, 'right status')
     ok(tx.keep_alive, 'connection will be kept alive')
     ok(tx.kept_alive, 'connection was kept alive')
 
 with subtest('Simple HTTPS request'):
-    tx = ua.get('https://metacpan.org')
+    tx = ua.get('https://github.com')
     is_ok(tx.req.method, 'GET', 'right method')
-    is_ok(str(tx.req.url), 'https://metacpan.org', 'right url')
+    is_ok(str(tx.req.url), 'https://github.com', 'right url')
     is_ok(tx.res.code, 200, 'right status')
 
 ua = Pyjo.UserAgent.new()
 
 with subtest('Simple keep-alive form POST'):
-    tx = ua.post('https://metacpan.org/search', form={'q': 'mojolicious'})
+    tx = ua.post('https://github.com/search', form={'q': 'mojolicious'})
     is_ok(tx.req.method, 'POST', 'right method')
-    is_ok(str(tx.req.url), 'https://metacpan.org/search', 'right url')
+    is_ok(str(tx.req.url), 'https://github.com/search', 'right url')
     is_ok(tx.req.headers.content_length, '13', 'right content length')
     is_ok(tx.req.body, b'q=mojolicious', 'right content')
-    like_ok(tx.res.body, rb'Mojolicious', 'right content')
-    is_ok(tx.res.code, 200, 'right status')
+    like_ok(tx.res.body, rb'GitHub', 'right content')
+    is_ok(tx.res.code, 422, 'right status')
     ok(tx.keep_alive, 'connection will be kept alive')
-    tx = ua.post('https://metacpan.org/search', form={'q': 'mojolicious'})
+    tx = ua.post('https://github.com/search', form={'q': 'mojolicious'})
     is_ok(tx.req.method, 'POST', 'right method')
-    is_ok(str(tx.req.url), 'https://metacpan.org/search', 'right url')
+    is_ok(str(tx.req.url), 'https://github.com/search', 'right url')
     is_ok(tx.req.headers.content_length, '13', 'right content length')
     is_ok(tx.req.body, b'q=mojolicious', 'right content')
-    like_ok(tx.res.body, rb'Mojolicious', 'right content')
-    is_ok(tx.res.code, 200, 'right status')
+    like_ok(tx.res.body, rb'GitHub', 'right content')
+    is_ok(tx.res.code, 422, 'right status')
     ok(tx.kept_alive, 'connection was kept alive')
     ok(tx.local_address, 'has local address')
     ok(tx.local_port > 0, 'has local port')
@@ -214,16 +219,16 @@ with subtest('Simple keep-alive form POST'):
 
 with subtest('Simple request with redirect'):
     ua.max_redirects = 3
-    tx = ua.get('http://wikipedia.org/wiki/Perl')
+    tx = ua.get('http://github.com/mojolicious')
     ua.max_redirects = 0
     is_ok(tx.req.method, 'GET', 'right method')
-    is_ok(str(tx.req.url), 'https://en.wikipedia.org/wiki/Perl', 'right url')
+    is_ok(str(tx.req.url), 'https://github.com/mojolicious', 'right url')
     is_ok(tx.res.code, 200, 'right status')
     is_ok(tx.previous.req.method, 'GET', 'right method')
-    is_ok(str(tx.previous.req.url), 'https://www.wikipedia.org/wiki/Perl', 'right url')
+    is_ok(str(tx.previous.req.url), 'http://github.com/mojolicious', 'right url')
     is_ok(tx.previous.res.code, 301, 'right status')
     is_ok(tx.redirects()[-1].req.method, 'GET', 'right method')
-    is_ok(str(tx.redirects()[-1].req.url), 'https://www.wikipedia.org/wiki/Perl', 'right url')
+    is_ok(str(tx.redirects()[-1].req.url), 'http://github.com/mojolicious', 'right url')
     is_ok(tx.redirects()[-1].res.code, 301, 'right status')
 
 with subtest('Connect timeout (non-routable address)'):
