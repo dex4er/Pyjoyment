@@ -99,7 +99,7 @@ WHEEL=${wheel} perl -pi -e 's{^(COPY (?:pyproject\.toml|myapp\.py)\b.*) \./$}{$1
 grep -q "^COPY .*${wheel} \./$" Dockerfile || fail "wheel in Dockerfile"
 cat Dockerfile
 
-docker build --quiet --tag "${name}" . >/dev/null
+docker build --progress plain --tag "${name}" .
 docker run --detach --name "${name}" --publish 127.0.0.1::3000 "${name}" >/dev/null
 port=$(docker port "${name}" 3000/tcp | perl -ne 'print $1 and last if /:(\d+)$/')
 url=http://127.0.0.1:${port}
