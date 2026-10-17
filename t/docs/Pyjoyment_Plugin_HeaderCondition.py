@@ -8,8 +8,6 @@ import re
 
 app = Pyjoyment.new()
 app.log.level = 'fatal'
-# TODO: the not found page in HTML, when the bundled templates are ported with Pyjoyment.Plugin.TagHelpers
-app.exception_format = 'txt'
 
 with subtest('Synopsis'):
     # Pyjoyment

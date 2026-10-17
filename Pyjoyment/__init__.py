@@ -202,6 +202,7 @@ import Pyjoyment.Types
 import functools
 import inspect
 import os
+import sys
 
 from collections.abc import Callable
 from pkgutil import extend_path
@@ -419,7 +420,13 @@ class Pyjoyment_App(Pyjo.App.object):
         if not name.startswith('_') and renderer is not None and renderer.get_helper(name) is not None:
             return getattr(self.build_controller(), name)
         package = f'{type(self).__module__}.{type(self).__qualname__}'
-        raise AttributeError(f'Can\'t locate object method "{name}" via package "{package}"', name=name, obj=self)
+
+        # The location of the caller, which croak adds to the message
+        caller = sys._getframe(1)  # pyright: ignore[reportPrivateUsage]
+        at = f'at {caller.f_code.co_filename} line {caller.f_lineno}'
+        raise AttributeError(
+            f'Can\'t locate object method "{name}" via package "{package}" {at}.\n', name=name, obj=self
+        )
 
     @property
     def log(self) -> Pyjo.Log.object:

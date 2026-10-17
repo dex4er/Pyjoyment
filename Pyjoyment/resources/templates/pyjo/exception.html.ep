@@ -1,0 +1,32 @@
+%# Renamed from Mojolicious: the image of the unicat is pyjo/failunicat.png, where Mojo has mojo/failraptor.png, and
+%# its element is #unicat, where Mojo has #raptor
+<!DOCTYPE html>
+<!-- Request ID: <%= c.req.request_id %> -->
+<html>
+  <head>
+    <title>Server Error</title>
+    <style>
+      body {
+        background-color: #caecf6;
+      }
+      #unicat {
+        background: url(<%= url_for_file('/pyjo/failunicat.png') %>);
+        height: 488px;
+        left: 50%;
+        margin-left: -371px;
+        margin-top: -244px;
+        position:absolute;
+        top: 50%;
+        width: 743px;
+      }
+    </style>
+    %= favicon()
+  </head>
+  <body><div id="unicat"></div></body>
+</html>
+<!-- a padding to disable MSIE and Chrome friendly error page -->
+<!-- a padding to disable MSIE and Chrome friendly error page -->
+<!-- a padding to disable MSIE and Chrome friendly error page -->
+<!-- a padding to disable MSIE and Chrome friendly error page -->
+<!-- a padding to disable MSIE and Chrome friendly error page -->
+<!-- a padding to disable MSIE and Chrome friendly error page -->

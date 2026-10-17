@@ -32,6 +32,7 @@ from Pyjo.Util import decamelize, deprecated, encode, gzip, md5_sum
 import io
 import os
 import re
+import sys
 import weakref
 
 from collections.abc import Callable
@@ -46,7 +47,6 @@ if TYPE_CHECKING:
 type Handler = Callable[[Pyjoyment_Renderer, Any, io.StringIO, dict[str, Any]], Any]
 
 # Bundled templates
-# TODO: the bundled templates, with Pyjoyment.Plugin.TagHelpers, whose helpers they use
 _TEMPLATES = Pyjo.File.path(__file__).sibling('resources', 'templates')
 
 
@@ -523,7 +523,13 @@ class Pyjoyment_Renderer_Helpers:
 
     def __getattr__(self, name: str) -> Any:
         package = f'{type(self).__module__}.{type(self).__qualname__}'
-        raise AttributeError(f'Can\'t locate object method "{name}" via package "{package}"', name=name, obj=self)
+
+        # The location of the caller, which croak adds to the message
+        caller = sys._getframe(1)  # pyright: ignore[reportPrivateUsage]
+        at = f'at {caller.f_code.co_filename} line {caller.f_lineno}'
+        raise AttributeError(
+            f'Can\'t locate object method "{name}" via package "{package}" {at}.\n', name=name, obj=self
+        )
 
 
 # The output of a handler, which tells whether the handler wrote any, as Mojo checks that it is defined
