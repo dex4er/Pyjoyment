@@ -52,7 +52,7 @@ with subtest('Synopsis'):
 
 with subtest('Description'):
     app = application(myapp_yml='foo: bar\nbaz: 1', myapp_development_yml='baz: 2')
-    is_deeply_ok(app.plugin('YAMLConfig'), {'foo': 'bar', 'baz': '2'}, 'mode specific')
+    is_deeply_ok(app.plugin('YAMLConfig'), {'foo': 'bar', 'baz': 2}, 'mode specific')
 
     app = application(myapp_yml='plugins:\n  - HeaderCondition: {}\n')
     app.plugin('YAMLConfig')

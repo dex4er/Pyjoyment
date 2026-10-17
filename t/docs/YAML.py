@@ -18,9 +18,19 @@ list:
     is_deeply_ok(documents, ['first', 'second'], 'documents')
 
 with subtest('Description'):
-    # {'foo': ['1', 'true']}
+    # {'foo': [1, True, 'yes', '2']}
     throws_ok(lambda: load('foo: [1, true]'), re.compile(r'^YAML'), 'raises an exception')
-    is_deeply_ok(load('foo:\n  - 1\n  - true\n'), {'foo': ['1', 'true']}, 'strings')
+    is_deeply_ok(load("foo:\n  - 1\n  - true\n  - yes\n  - '2'\n"), {'foo': [1, True, 'yes', '2']}, 'types')
+
+with subtest('Tags'):
+    import datetime
+
+    # {'port': '8080', 'key': b'hello', 'day': datetime.date(2001, 12, 14)}
+    is_deeply_ok(
+        load('port: !!str 8080\nkey: !!binary aGVsbG8=\nday: !!timestamp 2001-12-14\n'),
+        {'port': '8080', 'key': b'hello', 'day': datetime.date(2001, 12, 14)},
+        'standard tags',
+    )
 
 with subtest('load'):
     value = load('foo: bar')
