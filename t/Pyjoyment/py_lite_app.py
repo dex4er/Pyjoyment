@@ -2,6 +2,12 @@
 __DATA__
 @@ layouts/default.html.ep
 <body><%= content() %></body>
+
+@@ both.html.ep
+EP
+
+@@ include.html.ep
+<ul><%= include('item', item='<ep>') %></ul>
 """
 
 import Pyjo.String.HTML
@@ -9,7 +15,7 @@ import Pyjo.Test.Pyjo
 
 from Pyjo.String.Template import t
 from Pyjo.Test import *
-from Pyjoyment.Lite import app, get
+from Pyjoyment.Lite import app, get, template
 
 
 # The templates of the tests are of t() on any Python, as a t-string of Python 3.14 cannot be compiled on an older one;
@@ -66,6 +72,91 @@ def string(c):
     c.render(text=f'{type(output).__name__}: {output}')
 
 
+@template('hello.html')
+def hello(c, name):
+    return t('<p>Hello {name}!</p>')
+
+
+@template('defaults.html')
+def defaults(c, name, greeting='Hello'):
+    return t('<p>{greeting} {name}!</p>')
+
+
+@template('all.html')
+def all_(c, **stash):
+    return t('<p>{names}</p>', names=', '.join(sorted(k for k in stash if k in ('a', 'b'))))
+
+
+@template('layouted.html')
+def layouted(c, name):
+    c.layout('green')
+    c.title('Green')
+    return t('<p>{name}</p>')
+
+
+@template('layouts/green.html')
+def green(c, **stash):
+    return t('<title>{title}</title><body>{content}</body>', title=c.title(), content=c.content())
+
+
+@template('item.html')
+def item(c, item):
+    return t('<li>{item}</li>')
+
+
+@template('items.html')
+def items(c, items):
+    return t('<ul>{list}</ul>', list=[c.include('item', item=item) for item in items])
+
+
+@template('both.html')
+def both(c):
+    return t('py')
+
+
+@template('text.txt')
+def text(c, name):
+    return t('Hello {name}!')
+
+
+@template('markup.html')
+def markup_function(c):
+    return Pyjo.String.HTML.html('<b>markup</b>')
+
+
+@template('plain.html')
+def plain(c):
+    return '<plain>'
+
+
+app.template('lambda.html', lambda c, name: t('<p>{name}</p>', name=name))
+
+get('/hello', {'name': '<Joe>'}, lambda c: c.render('hello'))
+
+get('/hello/:name', lambda c: c.render('hello'))
+
+get('/defaults', lambda c: c.render('defaults', name='Joe'))
+
+get('/all', lambda c: c.render('all', a=1, b=2))
+
+get('/layouted', lambda c: c.render('layouted', name='layouted'))
+
+get('/items', lambda c: c.render('items', items=['<a>', '<b>']))
+
+get('/include', lambda c: c.render('include'))
+
+get('/both', lambda c: c.render('both'))
+
+get('/text', {'format': 'txt'}, lambda c: c.render('text', name='Joe'))
+
+get('/markup_function', lambda c: c.render('markup'))
+
+get('/plain', lambda c: c.render('plain'))
+
+get('/lambda', lambda c: c.render('lambda', name='<lambda>'))
+
+get('/later', lambda c: c.render('later'))
+
 test = Pyjo.Test.Pyjo.new()
 
 with subtest('Inline template string'):
@@ -105,5 +196,53 @@ with subtest('Handler'):
     is_ok(app.renderer.default_handler, 'ep', 'default handler')
     c = app.build_controller()
     isa_ok(c.render_to_string(inline=t('<p>{x}</p>', x='<b>')), Pyjo.String.HTML.object, 'markup')
+
+with subtest('Template of a function'):
+    test.get_ok('/hello').status_is(200).content_type_is('text/html;charset=UTF-8').content_is(
+        '<p>Hello &lt;Joe&gt;!</p>'
+    )
+    test.get_ok('/hello/Jane').status_is(200).content_is('<p>Hello Jane!</p>')
+
+with subtest('Default of a parameter'):
+    test.get_ok('/defaults').status_is(200).content_is('<p>Hello Joe!</p>')
+
+with subtest('All the values of the stash'):
+    test.get_ok('/all').status_is(200).content_is('<p>a, b</p>')
+
+with subtest('Layout of a function'):
+    test.get_ok('/layouted').status_is(200).content_is('<title>Green</title><body><p>layouted</p></body>')
+
+with subtest('Include of a function'):
+    test.get_ok('/items').status_is(200).content_is('<ul><li>&lt;a&gt;</li><li>&lt;b&gt;</li></ul>')
+
+with subtest('Include of a function in an EP template'):
+    test.get_ok('/include').status_is(200).content_is('<ul><li>&lt;ep&gt;</li></ul>\n')
+
+with subtest('Function before the DATA section'):
+    test.get_ok('/both').status_is(200).content_is('py')
+
+with subtest('Another format'):
+    test.get_ok('/text').status_is(200).content_type_is('text/plain;charset=UTF-8').content_is('Hello Joe!')
+
+with subtest('Markup and a string'):
+    test.get_ok('/markup_function').status_is(200).content_is('<b>markup</b>')
+    test.get_ok('/plain').status_is(200).content_is('&lt;plain&gt;')
+
+with subtest('Function of a call'):
+    test.get_ok('/lambda').status_is(200).content_is('<p>&lt;lambda&gt;</p>')
+
+with subtest('Template added after the first request'):
+    test.get_ok('/later').status_is(500)
+    app.template('later.html', lambda c: t('later'))
+    test.get_ok('/later').status_is(200).content_is('later')
+
+with subtest('Registration'):
+    is_ok(app.template('registered.html', hello), hello, 'function returned')
+    is_ok(app.renderer.templates['hello.html'], hello, 'template')
+    is_ok(app.renderer.template_handler({'template': 'hello', 'format': 'html'}), 'py', 'handler')
+    c = app.build_controller()
+    output = c.render_to_string('hello', name='<x>')
+    isa_ok(output, Pyjo.String.HTML.object, 'markup')
+    is_ok(output, '<p>Hello &lt;x&gt;!</p>', 'rendered to a string')
 
 done_testing()

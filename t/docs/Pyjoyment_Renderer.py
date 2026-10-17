@@ -1,6 +1,7 @@
 import Pyjo.Cache
 import Pyjoyment
 
+from Pyjo.String.Template import t
 from Pyjo.Test import *
 
 import os
@@ -91,6 +92,12 @@ with subtest('paths'):
 
     is_ok(renderer.paths[0], '/home/sri/themes/blue/templates', 'higher precedence')
 
+with subtest('templates'):
+    renderer = Pyjoyment.Renderer.new()
+    templates = renderer.templates
+    is_deeply_ok(templates, {}, 'default')
+    renderer.templates = {'index.html': lambda c: t('<p>Hello!</p>')}
+
 with subtest('accepts'):
     app = Pyjoyment.new()
     c = app.build_controller()
@@ -123,6 +130,26 @@ with subtest('add_helper'):
 
     renderer.add_helper('foo', foo)
     is_ok(renderer.get_helper('foo'), foo, 'helper')
+
+with subtest('add_template'):
+    renderer = Pyjoyment.Renderer.new()
+    renderer = renderer.add_template('index.html', lambda c: t('<p>Hello!</p>'))
+
+    @renderer.add_template('index.html')
+    def index(c): ...
+
+    is_ok(renderer.templates['index.html'], index, 'decorator')
+
+    def foo(c, name):
+        return t('<p>Hello {name}!</p>')
+
+    renderer.add_template('foo.html', foo)
+
+    app = Pyjoyment.new()
+    app.log.level = 'fatal'
+    app.renderer.add_template('foo.html', foo)
+    c = app.build_controller()
+    is_ok(c.render_to_string('foo', name='Joe'), '<p>Hello Joe!</p>', 'template')
 
 with subtest('get_data_template'):
     renderer = Pyjoyment.Renderer.new()

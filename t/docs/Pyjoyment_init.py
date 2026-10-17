@@ -11,6 +11,7 @@ import Pyjoyment.Sessions
 import Pyjoyment.Static
 import Pyjoyment.Types
 
+from Pyjo.String.Template import t
 from Pyjo.Test import *
 
 import re
@@ -460,6 +461,26 @@ with subtest('startup'):
             self.started = True
 
     ok(App.new().started, 'called at startup')
+
+with subtest('template'):
+    app = Pyjoyment.new()
+    app.log.level = 'fatal'
+    app.template('index.html', lambda c: t('<p>Hello!</p>'))
+
+    @app.template('index.html')
+    def index(c): ...
+
+    is_ok(app.renderer.templates['index.html'], index, 'decorator')
+
+    # Template
+    @app.template('hello.html')
+    def hello(c, name):
+        return t('<p>Hello {name}!</p>')
+
+    # Controller
+    c = app.build_controller()
+    c.render('hello', name='Joe')
+    is_ok(c.res.text, '<p>Hello Joe!</p>', 'rendered')
 
 with subtest('warmup'):
     app = Pyjoyment.new()

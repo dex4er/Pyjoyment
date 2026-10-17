@@ -15,9 +15,18 @@ with subtest('Synopsis'):
     app.plugin('PyRenderer')
     ok('py' in app.renderer.handlers, 'handler')
 
+    # A template of a function
+    @app.template('index.html')
+    def index(c, name):
+        return t'<p>Hello {name}!</p>'
+
+    c = app.build_controller()
+    c.render('index', name='Joe')
+    is_ok(c.res.text, '<p>Hello Joe!</p>', 'template of a function')
+
     name = 'Joe'
 
-    # A t-string of Python 3.14
+    # An inline t-string of Python 3.14
     c = app.build_controller()
     c.render(inline=t'<p>Hello {name}!</p>')
     is_ok(c.res.text, '<p>Hello Joe!</p>', 't-string')
@@ -38,6 +47,22 @@ with subtest('Description'):
     c = app.build_controller()
     c.render(inline=t('<p>{link}</p>', link=c.link_to('Home', '/')))
     is_ok(c.res.text, '<p><a href="/">Home</a></p>', 'markup')
+
+    # A template with a layout
+    @app.template('hello.html')
+    def hello(c, name):
+        c.layout('default')
+        c.title('Hello')
+        return t'<p>Hello {name}!</p>'
+
+    # The layout, which gets the content and the title
+    @app.template('layouts/default.html')
+    def default(c, **stash):
+        return t'<title>{c.title()}</title><body>{c.content()}</body>'
+
+    c = app.build_controller()
+    c.render('hello', name='Joe')
+    is_ok(c.res.text, '<title>Hello</title><body><p>Hello Joe!</p></body>', 'layout')
 
     c = app.build_controller()
     c.stash(name='stash')

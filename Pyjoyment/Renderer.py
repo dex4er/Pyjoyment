@@ -37,7 +37,7 @@ import sys
 import weakref
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Self, cast
+from typing import TYPE_CHECKING, Any, Self, cast, overload
 
 
 if TYPE_CHECKING:
@@ -184,6 +184,19 @@ class Pyjoyment_Renderer(Pyjo.Base.object):
             renderer.paths.insert(0, '/home/sri/themes/blue/templates')
         """
 
+        # Not in Mojolicious: the templates of functions, for the handler "py"
+        self.templates: dict[str, Callable[..., Any]] = {}
+        """::
+
+            templates = renderer.templates
+            renderer.templates = {'index.html': lambda c: t('<p>Hello!</p>')}
+
+        Registered templates of functions, by the name of the template with
+        its format, as ``index.html``, which the handler ``py`` of
+        :mod:`Pyjoyment.Plugin.PyRenderer` renders, before the templates of
+        :attr:`paths` and :attr:`classes`.
+        """
+
         self._index: dict[str, str] = {}
         self._namespaces: list[type[Pyjoyment_Renderer_Helpers]] = []
         self._proxy: dict[str, type[Pyjoyment_Renderer_Helpers]] = {}
@@ -252,6 +265,41 @@ class Pyjoyment_Renderer(Pyjo.Base.object):
         """
         self.helpers[name] = cb
         self._proxy.clear()
+        return self
+
+    @overload
+    def add_template[F: Callable[..., Any]](self, name: str, cb: None = None) -> Callable[[F], F]: ...
+
+    @overload
+    def add_template(self, name: str, cb: Callable[..., Any]) -> Self: ...
+
+    # Not in Mojolicious: the templates of functions, for the handler "py"
+    def add_template(self, name: str, cb: Callable[..., Any] | None = None) -> Any:
+        """::
+
+            renderer = renderer.add_template('index.html', lambda c: t('<p>Hello!</p>'))
+
+            @renderer.add_template('index.html')
+            def index(c): ...
+
+        Register a template of a function, which gets the controller and
+        returns a template string, see :mod:`Pyjoyment.Plugin.PyRenderer`. ::
+
+            def foo(c, name):
+                return t('<p>Hello {name}!</p>')
+
+            renderer.add_template('foo.html', foo)
+        """
+        if cb is None:
+
+            def decorator(cb: Callable[..., Any]) -> Callable[..., Any]:
+                self.add_template(name, cb)
+                return cb
+
+            return decorator
+        self.templates[name] = cb
+        if self._templates is not None:
+            self.warmup()
         return self
 
     def get_data_template(self, options: dict[str, Any]) -> str | bytes | None:
@@ -481,7 +529,8 @@ class Pyjoyment_Renderer(Pyjo.Base.object):
 
             renderer.warmup()
 
-        Prepare templates from :attr:`classes` for future use.
+        Prepare templates from :attr:`classes` and :attr:`templates` for
+        future use.
         """
         index: dict[str, str] = {}
         templates: dict[str, list[str]] = {}
@@ -502,6 +551,10 @@ class Pyjoyment_Renderer(Pyjo.Base.object):
             for key in reversed(keys):
                 if m := re.search(r'\.(\w+)$', key):
                     templates.setdefault(key[: m.start()], []).insert(0, m[1])
+
+        # Not in Mojolicious: the handler of the templates of functions
+        for key in self.templates:
+            templates.setdefault(key, []).insert(0, 'py')
 
     def _render_template(self, c: 'Pyjoyment.Controller.object', options: dict[str, Any]) -> str | None:
         if not options.get('handler'):

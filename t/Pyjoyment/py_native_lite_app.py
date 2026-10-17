@@ -10,7 +10,7 @@ __DATA__
 import Pyjo.Test.Pyjo
 
 from Pyjo.Test import *
-from Pyjoyment.Lite import get
+from Pyjoyment.Lite import get, template
 
 
 @get('/inline')
@@ -41,6 +41,27 @@ def format_spec(c):
     c.render(inline=t'<p>{price:.2f} {"<b>"!r}</p>')
 
 
+@template('hello.html')
+def hello(c, name):
+    c.layout('default')
+    c.title('Hello')
+    return t'<p>Hello {name}!</p>'
+
+
+@template('layouts/default.html')
+def default(c, **stash):
+    return t'<title>{c.title()}</title><body>{c.content()}</body>'
+
+
+@template('items.html')
+def items(c, items):
+    return t'<ul>{[t"<li>{item}</li>" for item in items]}</ul>'
+
+
+get('/hello', lambda c: c.render('hello', name='<Joe>'))
+
+get('/items', lambda c: c.render('items', items=['<a>', '<b>']))
+
 t = Pyjo.Test.Pyjo.new()
 
 with subtest('Inline t-string'):
@@ -62,5 +83,11 @@ with subtest('Nested t-strings'):
 
 with subtest('Conversion and format specification'):
     t.get_ok('/format_spec').status_is(200).content_is('<p>1.50 &#39;&lt;b&gt;&#39;</p>')
+
+with subtest('Template of a function with a layout'):
+    t.get_ok('/hello').status_is(200).content_is('<title>Hello</title><body><p>Hello &lt;Joe&gt;!</p></body>')
+
+with subtest('Nested t-strings of a function'):
+    t.get_ok('/items').status_is(200).content_is('<ul><li>&lt;a&gt;</li><li>&lt;b&gt;</li></ul>')
 
 done_testing()
