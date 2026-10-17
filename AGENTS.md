@@ -216,14 +216,14 @@ Sphinx does) has no effect. Older test files still wrap their body in
 
 The tests run on the reactor that `Pyjo.Reactor.detect()` gives, the asyncio
 one, where Mojo's tests set `MOJO_REACTOR` to `Mojo::Reactor::Poll`. CI runs
-the tests of the event loop, and of the user agent and the servers, which do
-the most of its I/O, a second time on `Pyjo.Reactor.Poll`, as a reactor
-without asyncio has to pass them too:
+the tests of the event loop, and of the user agent, the WebSockets and the
+servers, which do the most of its I/O, a second time on `Pyjo.Reactor.Poll`,
+as a reactor without asyncio has to pass them too:
 
 ```sh
 PYJO_REACTOR=Pyjo.Reactor.Poll mise exec -- python -m Pyjo.Prove -l -j 4 --capture-stderr --stderr-lines 1000 \
   t/Pyjo/IOLoop*.py t/Pyjo/TLS.py t/Pyjo/Promise*.py t/Pyjo/Subprocess.py t/stdlib/IOLoop*.py \
-  t/Pyjo/UserAgent*.py t/stdlib/UserAgent*.py t/Pyjo/Server_Daemon.py t/stdlib/Server_Daemon.py \
+  t/Pyjo/UserAgent*.py t/stdlib/UserAgent*.py t/Pyjo/WebSocket*.py t/Pyjo/Server_Daemon*.py t/stdlib/Server_Daemon.py \
   t/Pyjo/Server_Hot.py t/stdlib/Server_Hot.py t/Pyjo/Server_Prefork.py t/stdlib/Server_Prefork.py \
   t/Pyjo/Server_Reload.py t/stdlib/Server_Reload.py t/Pyjo/File_download.py
 ```
