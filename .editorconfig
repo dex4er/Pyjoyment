@@ -11,6 +11,11 @@ trim_trailing_whitespace = true
 [*.{css,ep,html,js,json,md,toml,yaml,yml}]
 indent_size = 2
 
+[*.sh]
+indent_size = 2
+simplify = true
+switch_case_indent = true
+
 [{Makefile,*.mk}]
 indent_style = tab
 

@@ -906,11 +906,15 @@ pattern.match_partial(path)`.
 
 [Trunk](https://docs.trunk.io) runs the linters and formatters configured in
 `.trunk/trunk.yaml`: ruff for Python (lint, import order and formatting),
-prettier for Markdown, YAML and JSON, taplo for TOML, yamllint, markdownlint
-and actionlint. The `trunk` launcher is not pinned in `mise.toml` (mise only
-has it as an npm package); install it with `mise use -g trunk` or the
-installer from the Trunk documentation. The launcher downloads the CLI version
-named in `trunk.yaml`.
+prettier for Markdown, YAML and JSON, taplo for TOML, yamllint, markdownlint,
+actionlint, and shellcheck and shfmt for the shell scripts. shellcheck runs
+with all its checks but the ones that `.shellcheckrc` disables, and shfmt
+formats as `.editorconfig` says, with the branches of `case` indented: the
+definition of shfmt in `.trunk/trunk.yaml` runs it without the flags that
+would make it ignore `.editorconfig`. The `trunk` launcher is not pinned in
+`mise.toml` (mise only has it as an npm package); install it with
+`mise use -g trunk` or the installer from the Trunk documentation. The
+launcher downloads the CLI version named in `trunk.yaml`.
 
 ```sh
 trunk fmt          # format changed files
@@ -931,6 +935,14 @@ before the code that depends on it.
 A commit that only reformats code goes into `.git-blame-ignore-revs`, so that
 `git blame` and GitHub's blame view skip it. The trunk action
 `git-blame-ignore-revs` points `blame.ignoreRevsFile` at the file locally.
+
+The workflow Automated trunk upgrade runs `trunk upgrade` every day and keeps
+its changes in the pull request of the branch `automated/trunk-upgrade`, which
+a comment `/rerun` runs again; it works with the token of the workflow, and
+starts Tests and Trunk Check on the branch with `workflow_dispatch`, as Bundle
+Check does. A linter that the upgrade enables is kept or disabled there, with
+its configuration in the root of the repository, where the extensions of the
+editors find it, not in `.trunk/configs`.
 
 The linters are there to keep plain mistakes out, not to enforce PEP 8: the
 project bends Python's conventions on purpose, and a rule that fights its
