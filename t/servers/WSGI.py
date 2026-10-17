@@ -61,6 +61,14 @@ def request(wsgi, tx):
 app = wsgi.to_wsgi_app()
 """
 
+LITE = """
+from Pyjoyment.Lite import app, get
+
+get('/hello', {'text': 'Hello WSGI!'})
+
+application = app.start()
+"""
+
 PYTHON = sys.executable
 UWSGI = shutil.which('uwsgi', path=os.path.dirname(sys.executable))
 SERVERS = [
@@ -131,5 +139,26 @@ with tempfile.TemporaryDirectory() as dir:
                 raise
             finally:
                 server.close()
+
+    # The script of an application of Pyjoyment.Lite, whose command PYJO_WSGI tells, whatever the arguments of the
+    # server are
+    with open(os.path.join(dir, 'lite.py'), 'w') as file:
+        file.write(textwrap.dedent(LITE))
+
+    with subtest('Pyjoyment.Lite on Waitress, detected with PYJO_WSGI'):
+        os.environ['PYJO_WSGI'] = '1'
+        try:
+            server = Server(dir, [PYTHON, '-m', 'waitress', '--listen=127.0.0.1:{port}', 'lite:application'])
+        finally:
+            del os.environ['PYJO_WSGI']
+        try:
+            status, headers, body = server.request('GET', '/hello')
+            is_ok(status, 200, 'right status')
+            is_ok(body, b'Hello WSGI!', 'right content')
+        except Exception:
+            diag(server.output())
+            raise
+        finally:
+            server.close()
 
 done_testing()

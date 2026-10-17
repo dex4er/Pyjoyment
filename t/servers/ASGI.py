@@ -72,6 +72,14 @@ def request(asgi, tx):
 app = asgi.to_asgi_app()
 """
 
+LITE = """
+from Pyjoyment.Lite import app, get
+
+get('/hello', {'text': 'Hello ASGI!'})
+
+application = app.start()
+"""
+
 PYTHON = sys.executable
 LOCAL = ['--host', '127.0.0.1', '--port', '{port}']
 SERVERS = [
@@ -148,5 +156,29 @@ with tempfile.TemporaryDirectory() as dir:
                 raise
             finally:
                 server.close()
+
+    # The script of an application of Pyjoyment.Lite, whose command PYJO_ASGI tells, whatever the arguments of the
+    # server are
+    with open(os.path.join(dir, 'lite.py'), 'w') as file:
+        file.write(textwrap.dedent(LITE))
+
+    with subtest('Pyjoyment.Lite on uvicorn, detected with PYJO_ASGI'):
+        os.environ['PYJO_ASGI'] = '1'
+        try:
+            server = Server(
+                dir,
+                [PYTHON, '-m', 'uvicorn', 'lite:application', '--loop', 'asyncio', '--log-level', 'warning', *LOCAL],
+            )
+        finally:
+            del os.environ['PYJO_ASGI']
+        try:
+            status, headers, body = server.request('GET', '/hello')
+            is_ok(status, 200, 'right status')
+            is_ok(body, b'Hello ASGI!', 'right content')
+        except Exception:
+            diag(server.output())
+            raise
+        finally:
+            server.close()
 
 done_testing()

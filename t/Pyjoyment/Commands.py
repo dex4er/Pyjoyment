@@ -10,7 +10,10 @@ import sys
 import types
 
 
-# TODO: PLACK_ENV, with the commands wsgi and asgi, when they are ported
+# Renamed from Mojolicious: PYJO_WSGI, as WSGI has no environment variable of its own, where Mojo has PLACK_ENV
+os.environ.pop('PYJO_WSGI', None)
+# Not in Mojolicious: PYJO_ASGI, as ASGI has no environment variable of its own
+os.environ.pop('PYJO_ASGI', None)
 # Left out from Mojolicious: MOJO_REACTOR, as the tests run on the reactor of Pyjo.Reactor.detect()
 
 # Renamed from Mojolicious: the modules of the tests are in tt/lib, where Mojo has them in t/mojolicious/lib
@@ -36,6 +39,18 @@ def local(**env):
                 os.environ[name] = value
 
 
+# Not in Mojolicious: local *STDOUT, with the output as bytes, which get writes as Mojo prints them
+@contextlib.contextmanager
+def stdout():
+    buffer = io.BytesIO()
+    wrapper = io.TextIOWrapper(buffer, write_through=True)
+    try:
+        with contextlib.redirect_stdout(wrapper):
+            yield buffer
+    finally:
+        wrapper.detach()
+
+
 # Make sure @ARGV is not changed
 with local(PYJO_MODE=None):
     argv = sys.argv
@@ -52,12 +67,15 @@ with local(PYJO_MODE=None):
 # modules in sys.modules, where the commands find them, after the check of sys.argv, as importing Pyjoyment.Command
 # imports Pyjoyment.Commands
 import Pyjoyment.Command  # noqa: E402
+import Pyjoyment.Command.asgi  # noqa: E402
 import Pyjoyment.Command.cgi  # noqa: E402
 import Pyjoyment.Command.daemon  # noqa: E402
 import Pyjoyment.Command.eval  # noqa: E402
+import Pyjoyment.Command.get  # noqa: E402
 import Pyjoyment.Command.prefork  # noqa: E402
 import Pyjoyment.Command.routes  # noqa: E402
 import Pyjoyment.Command.version  # noqa: E402
+import Pyjoyment.Command.wsgi  # noqa: E402
 
 import PyjoymentTest  # noqa: E402  # pyright: ignore[reportMissingImports]
 
@@ -74,24 +92,33 @@ sys.modules['Pyjoyment.Command.my_test_command'].object = Pyjoyment_Command_my_t
 
 # Environment detection
 commands = Pyjoyment.Commands.new()
-# TODO: the environment of PLACK_ENV, with the commands wsgi and asgi, when they are ported
+with local(PYJO_WSGI='production'):
+    is_ok(commands.detect(), 'wsgi', 'right environment')
+# Not in Mojolicious: ASGI
+with local(PYJO_ASGI='production'):
+    is_ok(commands.detect(), 'asgi', 'right environment')
 with local(PATH_INFO='/test'):
     is_ok(commands.detect(), 'cgi', 'right environment')
 with local(GATEWAY_INTERFACE='CGI/1.1'):
     is_ok(commands.detect(), 'cgi', 'right environment')
-with local(PATH_INFO=None, GATEWAY_INTERFACE=None):
+with local(PYJO_WSGI=None, PYJO_ASGI=None, PATH_INFO=None, GATEWAY_INTERFACE=None):
     is_ok(commands.detect(), None, 'no environment')
-# TODO: the detected environment of PLACK_ENV and PYJO_NO_DETECT, with the commands wsgi and asgi, when they are ported
+with local(PYJO_WSGI='production'):
+    ok(callable(Pyjoyment.Commands.new().run()), 'right reference')
+    with local(PYJO_NO_DETECT='1'):
+        ok(not callable(Pyjoyment.Commands.new().run()), 'not a CODE reference')
 
 # Run command
-# TODO: the command psgi, with the commands wsgi and asgi, when they are ported
+ok(callable(Pyjoyment.Commands.new().run('wsgi')), 'right reference')
+# Not in Mojolicious: ASGI
+ok(callable(Pyjoyment.Commands.new().run('asgi')), 'right reference')
 
 # Start application
 with local(PYJO_APP_LOADER='1'):
     is_ok(type(Pyjoyment.Commands.start_app('PyjoymentTest')), PyjoymentTest.object, 'right class')
 
 # Start application with command
-# TODO: the command psgi, with the commands wsgi and asgi, when they are ported
+ok(callable(Pyjoyment.Commands.start_app('PyjoymentTest', 'wsgi')), 'right reference')
 
 # Start application with application specific commands
 with local(PYJO_APP_LOADER='1'):
@@ -115,7 +142,14 @@ with subtest('Commands starting with a dash are not allowed'), local(PYJO_HARNES
     throws_ok(lambda: app.start('-test2-command'), re.compile(r'Invalid command "-test2-command"\.'), 'not allowed')
 
 # Do not pick up options for detected environments
-# TODO: the environment of PLACK_ENV, with the commands wsgi and asgi, when they are ported
+with local(PYJO_MODE=None, PYJO_WSGI='testing'):
+    argv = sys.argv
+    try:
+        sys.argv = [argv[0], 'wsgi', '-m', 'production']
+        ok(callable(Pyjoyment.Commands.start_app('PyjoymentTest')), 'right reference')
+        is_ok(os.environ.get('PYJO_MODE'), None, 'no mode')
+    finally:
+        sys.argv = argv
 
 # mojo
 is_deeply_ok(commands.namespaces, ['Pyjoyment.Command.Author', 'Pyjoyment.Command'], 'right namespaces')
@@ -147,7 +181,25 @@ with contextlib.redirect_stdout(buffer), local(PYJO_HARNESS_ACTIVE='0'):
 like_ok(buffer.getvalue(), r'Usage: APPLICATION COMMAND \[OPTIONS\]', 'right output')
 
 # get
-# TODO: the command get, when it is ported
+get = Pyjoyment.Command.get.new()
+ok(get.description, 'has a description')
+like_ok(get.usage, r'get', 'has usage information')
+with stdout() as buffer:
+    get.run('/')
+like_ok(buffer.getvalue().decode(), r'Your Pyjoyment is working!', 'right output')
+template = "<p></p><p><%= param('just') %> <%= c.req.headers.header('X-Test') %></p>"
+get.app.plugins.once('before_dispatch', lambda c: c.render(inline=template))
+with stdout() as buffer:
+    get.run('-f', 'just=works', '-H', 'X-Test: fine', '/html', 'p', '1', 'text')
+like_ok(buffer.getvalue().decode(), r'works fine', 'right output')
+get.app.plugins.once('before_dispatch', lambda c: c.render(json={'works': 'too'}))
+with stdout() as buffer:
+    get.run('/json', '/works')
+like_ok(buffer.getvalue().decode(), r'too', 'right output')
+buffer = io.StringIO()
+with contextlib.redirect_stderr(buffer):
+    throws_ok(lambda: get.run('--unknown'), re.compile(r'Usage: APPLICATION get'), 'unknown option')
+like_ok(buffer.getvalue(), r'Unknown option: unknown', 'right output')
 
 # cgi
 cgi = Pyjoyment.Command.cgi.new()
@@ -266,7 +318,14 @@ with subtest('prefork'):
         is_deeply_ok(prefork.trusted_proxies, ['127.0.0.0/8', '10.0.0.0/8'], 'right value')
 
 # psgi
-# TODO: the command psgi, with the commands wsgi and asgi, when they are ported
+# Renamed from Mojolicious: wsgi, where Mojo has psgi
+wsgi = Pyjoyment.Command.wsgi.new()
+ok(wsgi.description, 'has a description')
+like_ok(wsgi.usage, r'wsgi', 'has usage information')
+# Not in Mojolicious: ASGI
+asgi = Pyjoyment.Command.asgi.new()
+ok(asgi.description, 'has a description')
+like_ok(asgi.usage, r'asgi', 'has usage information')
 
 # routes
 routes = Pyjoyment.Command.routes.new()

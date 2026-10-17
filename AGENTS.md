@@ -515,6 +515,13 @@ copy:
   the module, which the class reads with `usage = extract_usage()`. Its
   options are parsed with `getopt` of `Pyjo.Util`, whose targets are a dict,
   as Python has no references to variables.
+- PSGI is WSGI and ASGI: the command `psgi` is `wsgi`, and `asgi` is its
+  counterpart, which return the application of `Pyjo.Server.WSGI` and
+  `Pyjo.Server.ASGI`. `PYJO_WSGI` and `PYJO_ASGI` take the place of
+  `PLACK_ENV`, as WSGI and ASGI have no environment variable of their own: a
+  server imports the script of an application, which ends with
+  `application = app.start()`, with its own arguments in `sys.argv`, so that
+  the command has to be detected.
 - `ojo` is the functions of the package `Pyjo`, which `from Pyjo import *`
   imports, and `perl -Mojo -E` is `python -m Pyjo`. A function imports the
   modules it uses when it is called, as every `import Pyjo.X` runs
