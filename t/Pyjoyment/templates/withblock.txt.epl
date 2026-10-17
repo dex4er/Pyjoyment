@@ -1,0 +1,6 @@
+<% block = begin %>
+<% name = args[0] =%>
+Hello <%= name %>.
+<% end %>
+%= block('Baerbel')
+%= block('Wolfgang')

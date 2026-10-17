@@ -1,0 +1,8 @@
+% self = args[0]
+<!DOCTYPE html>
+<html>
+<head></head>
+<body>
+Same old in green <%= self.content() %>
+</body>
+</html>

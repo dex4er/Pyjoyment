@@ -36,6 +36,18 @@ sys.path.insert(0, Pyjo.File.path(__file__).to_abs().dirname().dirname().dirname
 plugin('JSONConfig')  # with {"plugins": [{"PyjoymentTest.Plugin.DeploymentPlugin": {}}]}
 ```
 
+The applications of `lib/`, as `PyjoymentTest`, would detect `tt` as their
+home, as `Pyjo.Home` takes the directory above `lib`. Mojo detects
+`t/mojolicious` from `t/mojolicious/lib`, the home of the tests of
+`Mojolicious::Lite` too, so a test of them sets `PYJO_HOME` to `t/Pyjoyment`,
+where their templates, static files and configuration files are:
+
+```python
+os.environ['PYJO_HOME'] = Pyjo.File.path(__file__).to_abs().dirname().to_str()
+
+t = Pyjo.Test.Pyjo.new('PyjoymentTest')
+```
+
 The applications of `external/` are scripts with their configuration files,
 templates and static files next to them, as their home is the directory of
 the script; a test mounts one by its path:
