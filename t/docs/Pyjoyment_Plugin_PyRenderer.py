@@ -1,6 +1,7 @@
 # /// script
 # requires-python = ">=3.14"
 # ///
+import Pyjo.File
 import Pyjoyment
 
 from Pyjo.String.Template import t
@@ -63,6 +64,18 @@ with subtest('Description'):
     c = app.build_controller()
     c.render('hello', name='Joe')
     is_ok(c.res.text, '<title>Hello</title><body><p>Hello Joe!</p></body>', 'layout')
+
+    # templates/hello.html.py
+    tmp = Pyjo.File.tempdir()
+    tmp.child('templates').make_path().child('hello.html.py').spew(b"""\
+def render(c, name):
+    return t'<p>Hello {name}!</p>'
+""")
+    other = Pyjoyment.new(home=tmp)
+    other.log.level = 'fatal'
+    c = other.build_controller()
+    c.render('hello', name='Joe')
+    is_ok(c.res.text, '<p>Hello Joe!</p>', 'template of a file')
 
     c = app.build_controller()
     c.stash(name='stash')

@@ -21,10 +21,13 @@ if not Pyjo.IOLoop.TLS.object.can_tls():
     plan(skip_all='TLS support required for this test!')
 # Left out from Mojolicious: Mozilla::CA, as ssl takes the certificate authorities of the system
 
+from Pyjo import g, h, p
 from Pyjoyment.Lite import app, get
 
 
-# TODO: the functions of ojo, when it is ported
+# Not in Mojolicious: the application logs nothing, where Mojo logs the requests of its server to STDERR, as the test
+# does not load Test::Mojo, which sets MOJO_LOG_LEVEL
+app.log.level = 'fatal'
 
 
 @get('/remote_address')
@@ -141,7 +144,15 @@ with subtest('Custom non-keep-alive request'):
     is_ok(tx.res.code, 301, 'right status')
     like_ok(tx.res.headers.connection, r'(?i)close', 'right "Connection" header')
 
-# TODO: the subtest "One-liner", when ojo is ported
+with subtest('One-liner'):
+    is_ok(g('mojolicious.org').code, 200, 'right status')
+    is_ok(h('mojolicious.org').code, 200, 'right status')
+    is_ok(h('mojolicious.org').body, b'', 'no content')
+    is_ok(p('mojolicious.org/lalalala').code, 404, 'right status')
+    is_ok(g('http://mojolicious.org').code, 200, 'right status')
+    res = p('https://metacpan.org/search', form={'q': 'mojolicious'})
+    like_ok(res.body, rb'Mojolicious', 'right content')
+    is_ok(res.code, 200, 'right status')
 
 with subtest('Simple request'):
     tx = ua.get('metacpan.org')

@@ -174,6 +174,12 @@ does not start fails the test instead of hanging it.
   are skipped.
 - `t/lib/` holds helpers shared by the tests. Run on their own, they skip with
   `plan(skip_all=...)`, so `-r t` reports them as skipped instead of failing.
+- `tt/` holds the Python files that the tests use as data, as the templates
+  of files of `Pyjoyment.Plugin.PyRenderer`, outside `t/`, as `-r t` runs
+  every Python file there. `tt/templates_native` holds the ones with the
+  t-strings of Python 3.14, which only the tests of 3.14 render, and which
+  ruff and pyright check as Python 3.14. A test does not write files into
+  `t/` or `tt/`: what it makes goes to a temporary directory.
 
 A test script imports the test functions and groups its tests in subtests,
 like Mojo's tests do; Python keywords give some functions an `_ok` suffix

@@ -10,6 +10,7 @@ EP
 <ul><%= include('item', item='<ep>') %></ul>
 """
 
+import Pyjo.File
 import Pyjo.String.HTML
 import Pyjo.Test.Pyjo
 
@@ -157,6 +158,21 @@ get('/lambda', lambda c: c.render('lambda', name='<lambda>'))
 
 get('/later', lambda c: c.render('later'))
 
+# The templates of files, in tt, as the harness runs every Python file in t
+app.renderer.paths.append(app.home.dirname().dirname().child('tt', 'templates').to_str())
+
+get('/files/hello', lambda c: c.render('files/hello', name='<Joe>'))
+
+get('/files/items', lambda c: c.render('files/items', items=['<a>', '<b>']))
+
+get('/files/text', {'format': 'txt'}, lambda c: c.render('files/text', name='Joe'))
+
+get('/files/dies', lambda c: c.render('files/dies'))
+
+get('/files/no_render', lambda c: c.render('files/no_render'))
+
+get('/files/broken', lambda c: c.render('broken'))
+
 test = Pyjo.Test.Pyjo.new()
 
 with subtest('Inline template string'):
@@ -235,6 +251,43 @@ with subtest('Template added after the first request'):
     test.get_ok('/later').status_is(500)
     app.template('later.html', lambda c: t('later'))
     test.get_ok('/later').status_is(200).content_is('later')
+
+with subtest('Template of a file with a layout'):
+    (
+        test.get_ok('/files/hello')
+        .status_is(200)
+        .content_type_is('text/html;charset=UTF-8')
+        .content_is('<title>Hello</title><body><p>Hello &lt;Joe&gt;!</p></body>')
+    )
+    is_ok(app.renderer.template_handler({'template': 'files/hello', 'format': 'html'}), 'py', 'handler')
+
+with subtest('Cached template of a file'):
+    test.get_ok('/files/hello').status_is(200).content_is('<title>Hello</title><body><p>Hello &lt;Joe&gt;!</p></body>')
+
+with subtest('Include of a file'):
+    test.get_ok('/files/items').status_is(200).content_is('<ul><li>&lt;a&gt;</li><li>&lt;b&gt;</li></ul>')
+
+with subtest('File of another format'):
+    test.get_ok('/files/text').status_is(200).content_type_is('text/plain;charset=UTF-8').content_is('Hello Joe!')
+
+with subtest('Exception in a file, with the line of the file'):
+    (
+        test.get_ok('/files/dies')
+        .status_is(500)
+        .content_like(r'dead file template!')
+        .content_like(r'raise Exception\(&#39;dead file template!&#39;\)')
+    )
+
+with subtest('File without a function "render"'):
+    test.get_ok('/files/no_render').status_is(500).content_like(r'has no function &quot;render&quot;')
+
+with subtest('Syntax error in a file, with the line of the file'):
+    tmp = Pyjo.File.tempdir()
+    tmp.child('broken.html.py').spew(b'def render(c):\n    return (\n')
+    app.renderer.paths.append(tmp.to_str())
+    app.renderer.warmup()
+    (test.get_ok('/files/broken').status_is(500).content_like(r'broken\.html\.py line \d').content_like(r'return \('))
+    app.renderer.paths.pop()
 
 with subtest('Registration'):
     is_ok(app.template('registered.html', hello), hello, 'function returned')
