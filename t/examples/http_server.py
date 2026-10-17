@@ -13,7 +13,7 @@ ServerProcess = importlib.import_module('ServerProcess')
 script = curfile().dirname().dirname().sibling('examples', 'http_server.py').to_str()
 
 with tempfile.TemporaryDirectory() as dir:
-    server = ServerProcess.Server(dir, [sys.executable, script, 'address=127.0.0.1', 'port={port}'])
+    server = ServerProcess.Server(dir, [sys.executable, script, '--address', '127.0.0.1', '--port', '{port}'])
     try:
         with subtest('Embedded template file'):
             status, headers, body = server.request('GET', '/foo')

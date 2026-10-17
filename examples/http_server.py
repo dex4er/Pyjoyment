@@ -17,13 +17,12 @@ __DATA__
 """
 
 import Pyjo.App
+import Pyjo.GetOpt
 import Pyjo.Server.Daemon
 import Pyjo.Template
 import Pyjo.URL
 
 from Pyjo.Loader import data_section
-
-import sys
 
 
 class MyApp(Pyjo.App.object):
@@ -45,8 +44,11 @@ class MyApp(Pyjo.App.object):
         tx.resume()
 
 
-opts = {'address': '0.0.0.0', 'port': '3000'} | dict(a.split('=', 1) for a in sys.argv[1:])
+# Options --address and --port
+opts = Pyjo.GetOpt.new().option('a|address=s', default='0.0.0.0').option('p|port=i', default=3000).parse()
+if not opts:
+    raise SystemExit('Usage: http_server.py [--address ADDRESS] [--port PORT]')
 
-url = Pyjo.URL.new().set(scheme='http', host=opts['address'], port=opts['port'])
+url = Pyjo.URL.new().set(scheme='http', host=opts.address, port=opts.port)
 
 Pyjo.Server.Daemon.new(app=MyApp.new(), listen=[url]).run()
