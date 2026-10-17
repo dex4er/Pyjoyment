@@ -12,8 +12,7 @@ Pyjoyment.Command.Author.generate.lite_app - Lite app generator command
       -h, --help   Show this summary of available options
 
 :mod:`Pyjoyment.Command.Author.generate.lite_app` generate fully functional
-:mod:`Pyjoyment.Lite` applications. The script declares its dependencies in
-the inline metadata of PEP 723, so that ``uv run foo.py daemon`` runs it.
+:mod:`Pyjoyment.Lite` applications.
 
 This is a core command, that means it is always enabled and its code a good
 example for learning to build new commands, you're welcome to fork it.
@@ -37,7 +36,6 @@ Classes
 import Pyjoyment.Command
 
 from Pyjo.Util import extract_usage
-from Pyjoyment.Command.Author.generate.pyproject import _requirement  # pyright: ignore[reportPrivateUsage]
 
 
 class Pyjoyment_Command_Author_generate_lite_app(Pyjoyment.Command.object):
@@ -73,8 +71,7 @@ class Pyjoyment_Command_Author_generate_lite_app(Pyjoyment.Command.object):
         Run this command.
         """
         name = name or 'myapp.py'
-        # Not in Mojolicious: the dependency of the inline metadata of PEP 723
-        self.render_to_rel_file('liteapp', name, {'requirement': _requirement()})
+        self.render_to_rel_file('liteapp', name)
         self.chmod_rel_file(name, 0o744)
 
 
@@ -84,10 +81,6 @@ object = Pyjoyment_Command_Author_generate_lite_app
 __DATA__ = r'''
 @@ liteapp
 #!/usr/bin/env python
-# /// script
-# requires-python = ">=3.12"
-# dependencies = ["<%= requirement %>"]
-# ///
 """
 <% %>__DATA__
 

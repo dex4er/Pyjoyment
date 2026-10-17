@@ -9,7 +9,6 @@ import io
 import os
 import subprocess
 import sys
-import tomllib
 
 
 # The modules of the checkout for the generated application, which runs in a process of its own
@@ -46,9 +45,6 @@ with subtest('Description'):
             app.run('foo.py')
     finally:
         os.chdir(cwd)
-    script = tmp.child('foo.py').slurp().decode()
-    metadata = '\n'.join(line[2:] for line in script.split('# /// script\n', 1)[1].split('# ///\n', 1)[0].splitlines())
-    like_ok(tomllib.loads(metadata)['dependencies'][0], r'^Pyjoyment', 'inline metadata')
     result = subprocess.run(
         [sys.executable, 'foo.py', 'get', '/'], cwd=tmp.to_str(), env=env, capture_output=True, text=True
     )

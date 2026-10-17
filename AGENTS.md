@@ -530,8 +530,10 @@ copy:
   `pyproject.toml` has no build system, as `uv init --app` makes it, since
   `Pyjo.Home` finds `templates` and `public` next to the package, which a
   wheel would leave behind; `MyApp/__main__.py` takes the place of
-  `script/my_app`. A script of `Pyjoyment.Lite` declares its dependencies in
-  the inline metadata of PEP 723. A plugin is a distribution, built with
+  `script/my_app`. A script of `Pyjoyment.Lite` has its dependencies in the
+  `pyproject.toml` of `generate pyproject` next to it, as in Mojo, or in the
+  inline metadata of PEP 723, which `generate dockerfile` installs where
+  there is no `pyproject.toml`. A plugin is a distribution, built with
   hatchling, whose wheel has only its module, without the `__init__.py` of
   the namespace `Pyjoyment.Plugin`, which `extend_path` keeps open. A
   namespace finds its parts through the `__path__` of its parent package, so

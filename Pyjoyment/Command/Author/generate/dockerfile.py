@@ -18,14 +18,15 @@ Pyjoyment.Command.Author.generate.dockerfile - Dockerfile generator command
 and ``.dockerignore`` for applications.
 
 The image is built in two stages. The first one installs the dependencies
-with uv into ``.venv``: the ones of ``pyproject.toml``, locked with
+with uv into ``.venv``: the ones of ``pyproject.toml``, which
+:mod:`Pyjoyment.Command.Author.generate.pyproject` generates, locked with
 ``uv.lock`` if there is one, or the ones of the inline metadata of PEP 723 of
-a :mod:`Pyjoyment.Lite` script, locked with its ``.lock`` file if there is
-one. The second one has Python, ``.venv`` and the application only, and its
-command runs the pre-forking server without uv, so that the signals of
-``docker stop`` go straight to the server, which stops gracefully on ``TERM``.
-The images of Python and of uv are those of the versions that run the
-generator.
+a :mod:`Pyjoyment.Lite` script that has it and no ``pyproject.toml``, locked
+with its ``.lock`` file if there is one. The second one has Python, ``.venv``
+and the application only, and its command runs the pre-forking server without
+uv, so that the signals of ``docker stop`` go straight to the server, which
+stops gracefully on ``TERM``. The images of Python and of uv are those of the
+versions that run the generator.
 
 This is a core command, that means it is always enabled and its code a good
 example for learning to build new commands, you're welcome to fork it.
@@ -100,11 +101,12 @@ class Pyjoyment_Command_Author_generate_dockerfile(Pyjoyment.Command.object):
         name = self.app.moniker
 
         # Unlike Mojolicious: the script of Pyjoyment.Lite or the package of the application, which python runs, where
-        # Mojo runs the script, and the dependencies of the inline metadata of the script, where pyproject.toml has none
+        # Mojo runs the script, and the dependencies of the inline metadata of PEP 723 of the script, if it has them and
+        # there is no pyproject.toml
         exe = os.environ.get('PYJO_EXE')
         script = Pyjo.File.path(exe).to_rel(self.app.home).to_str() if exe else None
         cmd = ['python', script] if script else ['python', '-m', type(self.app).__module__]
-        project = os.path.isfile(self.rel_file('pyproject.toml')) or not script
+        project = os.path.isfile(self.rel_file('pyproject.toml')) or not exe or not _metadata(Pyjo.File.path(exe))
         lock = 'uv.lock' if project else f'{script}.lock'
         values = {
             'cmd': json.dumps([*cmd, 'prefork']),
@@ -119,6 +121,14 @@ class Pyjoyment_Command_Author_generate_dockerfile(Pyjoyment.Command.object):
 
         # Not in Mojolicious: .dockerignore, as the .venv of the host is not the one of the image
         self.render_to_rel_file('dockerignore', '.dockerignore')
+
+
+# Not in Mojolicious: whether the script has the inline metadata of PEP 723
+def _metadata(path: Pyjo.File.object) -> bool:
+    try:
+        return re.search(r'(?m)^# /// script\r?$', str(path.slurp('UTF-8') or '')) is not None
+    except OSError:
+        return False
 
 
 # Not in Mojolicious: the version of uv, for its image

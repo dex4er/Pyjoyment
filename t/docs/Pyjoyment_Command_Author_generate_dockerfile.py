@@ -61,8 +61,7 @@ with subtest('Synopsis'):
         content = generate(tmp)
     finally:
         os.environ.pop('PYJO_EXE', None)
-    like_ok(content, r'(?m)^COPY myapp\.py \./$', 'script')
-    like_ok(content, r'(?m)^RUN uv venv && uv sync --script myapp\.py --active$', 'dependencies of the script')
+    like_ok(content, r'(?m)^COPY pyproject\.toml \./$', 'pyproject.toml of the script')
     like_ok(content, r'(?m)^CMD \["python", "myapp\.py", "prefork"\]$', 'script of the application')
 
 with subtest('Description'):
@@ -81,7 +80,7 @@ with subtest('Description'):
     like_ok(tmp.child('.dockerignore').slurp().decode(), r'(?m)^\.venv$', '.dockerignore')
 
     tmp = Pyjo.File.tempdir()
-    tmp.child('myapp.py').spew('')
+    tmp.child('myapp.py').spew('# /// script\n# dependencies = ["Pyjoyment"]\n# ///\n')
     tmp.child('myapp.py.lock').spew('')
     application.home = Pyjo.Home.new(tmp.to_str())
     os.environ['PYJO_EXE'] = tmp.child('myapp.py').to_str()
