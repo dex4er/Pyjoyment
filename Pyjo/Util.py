@@ -991,8 +991,9 @@ def xml_escape(string: str | Markup | None) -> str:
     """
     # Unlike Mojolicious: markup is what has __html__, not every Pyjo.String.Unicode, as Mojo leaves every
     # Mojo::ByteStream, which u() and Pyjo.Collection.join make of any string
+    # The markup as a plain string, which a string joins as it is, where the markup itself would escape the string
     if (markup := getattr(string, '__html__', None)) is not None:
-        return markup()
+        return str(markup())
     string = str(string) if string is not None else ''
     return re.sub(r'[&<>"\']', lambda m: XML[m[0]], string)
 
