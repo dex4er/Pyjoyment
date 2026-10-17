@@ -129,6 +129,18 @@ with subtest('escape'):
     # "&lt;b&gt;<i>"
     is_ok(escape(['<b>', html('<i>')]), '&lt;b&gt;<i>', 'escaped')
 
+with subtest('is_template'):
+    from Pyjo.String.Template import is_template
+
+    boolean = is_template(t'<p>{name}</p>')
+    ok(boolean, 'boolean')
+
+    # True
+    ok(is_template(t('<p>{name}</p>')), 'template')
+
+    # False
+    ok(not is_template('<p>{name}</p>'), 'string')
+
 with subtest('raw'):
     from Pyjo.String.Template import raw
 
