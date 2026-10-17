@@ -4,6 +4,24 @@ Examples
 Quick start
 -----------
 
+A whole web application of ``Pyjoyment.Lite``:
+
+    .. include:: ../examples/hello.py
+       :code: python
+
+
+Duct tape for the HTML5 web
+---------------------------
+
+A WebSocket service used by the template to extract the title from a website:
+
+    .. include:: ../examples/title.py
+       :code: python
+
+
+Servers
+-------
+
 ``Pyjo.HelloWorld`` natively, on the web server of Pyjoyment:
 
     .. include:: ../examples/hello_world.py
