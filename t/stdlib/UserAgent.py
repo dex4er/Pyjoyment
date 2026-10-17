@@ -1,8 +1,10 @@
 import Pyjo.IOLoop
+import Pyjo.Reactor.Asyncio
 import Pyjo.UserAgent
 
 from Pyjo.Test import *
 
+import asyncio
 import gzip
 import http.server
 import json
@@ -10,6 +12,7 @@ import os
 import socket
 import ssl
 import threading
+import warnings
 
 from http.cookies import SimpleCookie
 from urllib.parse import urlsplit
@@ -167,6 +170,33 @@ with subtest('A callback as a keyword argument'):
 
     isa_ok(ws, str, 'the decorated name is the id of the connection')
     Pyjo.IOLoop.start()
+
+with subtest('Blocking request in a running event loop of asyncio'):
+    # The asyncio reactor, whatever PYJO_REACTOR says, as the event loop of asyncio runs the requests
+    reactor = Pyjo.IOLoop.singleton.reactor
+    Pyjo.IOLoop.singleton.reactor = Pyjo.Reactor.Asyncio.new()
+
+    async def blocking():
+        ioloop = Pyjo.IOLoop.new(reactor=Pyjo.Reactor.Asyncio.new())
+        with Pyjo.UserAgent.new(ioloop=ioloop) as ua, warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter('always')
+            tx = ua.get(f'{url}/blocking')
+        return tx, caught
+
+    tx, caught = asyncio.run(blocking())
+    is_ok(tx.res.code, None, 'no response')
+    is_ok(len(caught), 1, 'one warning')
+    is_ok(caught[0].category, RuntimeWarning, 'RuntimeWarning')
+    like_ok(str(caught[0].message), r'await a promise of a request', 'right message')
+    is_ok(caught[0].filename, __file__, 'location of the request')
+
+    async def awaited():
+        with Pyjo.UserAgent.new() as ua:
+            return await ua.get_p(f'{url}/awaited')
+
+    tx = asyncio.run(awaited())
+    is_ok(tx.res.json()['path'], '/awaited', 'awaited request')
+    Pyjo.IOLoop.singleton.reactor = reactor
 
 with subtest('TLS of ssl'):
     certs = os.path.join(os.path.dirname(__file__), '..', 'certs')
