@@ -1,0 +1,7 @@
+% self = args[0]
+%# Unlike Mojolicious: the first line of the exception, with the location that Perl's die adds to the message
+% if self.app.mode == 'development':
+%= self.stash('exception').to_str().split('\n')[0]
+% else:
+Not development mode error!
+% end

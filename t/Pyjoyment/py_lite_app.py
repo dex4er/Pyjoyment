@@ -158,8 +158,9 @@ get('/lambda', lambda c: c.render('lambda', name='<lambda>'))
 
 get('/later', lambda c: c.render('later'))
 
-# The templates of files, in tt, as the harness runs every Python file in t
-app.renderer.paths.append(app.home.dirname().dirname().child('tt', 'templates').to_str())
+# The templates of files, in tt, as the harness runs every Python file in t, and not the ones of the tests of Mojolicious
+# in t/Pyjoyment/templates, whose exception.html.epl would replace the page of the exceptions
+app.renderer.paths[:] = [app.home.dirname().dirname().child('tt', 'templates').to_str()]
 
 get('/files/hello', lambda c: c.render('files/hello', name='<Joe>'))
 
