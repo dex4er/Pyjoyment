@@ -10,7 +10,7 @@ __DATA__
 import Pyjo.Test.Pyjo
 
 from Pyjo.Test import *
-from Pyjoyment.Lite import get, template
+from Pyjoyment.Lite import app, get, template
 
 
 @get('/inline')
@@ -62,6 +62,11 @@ get('/hello', lambda c: c.render('hello', name='<Joe>'))
 
 get('/items', lambda c: c.render('items', items=['<a>', '<b>']))
 
+# The templates of files, in tt, as the harness runs every Python file in t
+app.renderer.paths.append(app.home.dirname().dirname().child('tt', 'templates_native').to_str())
+
+get('/native', lambda c: c.render('native', items=['<a>', '<b>']))
+
 t = Pyjo.Test.Pyjo.new()
 
 with subtest('Inline t-string'):
@@ -89,5 +94,8 @@ with subtest('Template of a function with a layout'):
 
 with subtest('Nested t-strings of a function'):
     t.get_ok('/items').status_is(200).content_is('<ul><li>&lt;a&gt;</li><li>&lt;b&gt;</li></ul>')
+
+with subtest('Template of a file with t-strings'):
+    t.get_ok('/native').status_is(200).content_is('<ul><li>&lt;a&gt;</li><li>&lt;b&gt;</li></ul>')
 
 done_testing()

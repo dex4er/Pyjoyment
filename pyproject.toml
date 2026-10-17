@@ -86,6 +86,7 @@ include = [
   "/Pyjo",
   "/Pyjoyment",
   "/t",
+  "/tt",
   "/examples",
   "/docs",
   "/.proverc",
@@ -98,12 +99,14 @@ line-length = 120
 target-version = "py312"
 
 # The tests of t-strings (PEP 750), which only Python 3.14 compiles; Pyjo.Prove
-# skips them on an older Python, as their requires-python of PEP 723 says.
+# skips them on an older Python, as their requires-python of PEP 723 says. The
+# templates of files in tt/templates_native are rendered by such tests only.
 [tool.ruff.per-file-target-version]
 "t/Pyjo/String_Template_native.py" = "py314"
 "t/docs/String_Template.py" = "py314"
 "t/Pyjoyment/py_native_lite_app.py" = "py314"
 "t/docs/Pyjoyment_Plugin_PyRenderer.py" = "py314"
+"tt/templates_native/**" = "py314"
 
 [tool.ruff.format]
 quote-style = "single"
@@ -177,6 +180,9 @@ executionEnvironments = [
     ".",
   ] },
   { root = "t/docs/Pyjoyment_Plugin_PyRenderer.py", pythonVersion = "3.14", extraPaths = [
+    ".",
+  ] },
+  { root = "tt/templates_native", pythonVersion = "3.14", extraPaths = [
     ".",
   ] },
   { root = "." },

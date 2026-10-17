@@ -56,6 +56,18 @@ that the renderer reads, as a layout. ::
     def default(c, **stash):
         return t'<title>{c.title()}</title><body>{c.content()}</body>'
 
+A template can also be a file in
+:attr:`Pyjoyment.Renderer.Pyjoyment_Renderer.paths` with the extension ``py``,
+as ``templates/index.html.py``, a module of Python whose function ``render``
+is the function of the template. The file is
+compiled once and kept in the cache of the renderer, without the bytecode
+that an import writes next to it, and an exception in it shows the lines of
+the file. ::
+
+    # templates/hello.html.py
+    def render(c, name):
+        return t'<p>Hello {name}!</p>'
+
 An inline template that is a template string is rendered by it, unless
 another handler is given. Its values are evaluated where it is written, so it
 gets the values of the stash as the code around it does, ``c.stash('name')``,
@@ -76,15 +88,16 @@ Inspired by `Mojolicious::Plugin::EPLRenderer
 <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojolicious/Plugin/EPLRenderer.pm>`_ of Mojolicious 9.49.
 """
 
-# TODO: the templates of files, as "index.html.py", in the next step of the renderer of t-strings
-
+import Pyjo.Exception
+import Pyjo.File
 import Pyjo.String.Template
 import Pyjoyment.Plugin
 
-from Pyjo.Util import encode, md5_sum
+from Pyjo.Util import decode, encode, md5_sum
 
 import inspect
 import io
+import types
 
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
@@ -131,14 +144,50 @@ def _handler(
         output.write(template.render())
         return
 
-    # Function
     if (name := renderer.template_name(options)) is None:
         return
-    if (cb := renderer.templates.get(name.removesuffix('.py'))) is None:
+
+    # Function
+    if (cb := renderer.templates.get(name.removesuffix('.py'))) is not None:
+        log.trace(f'Rendering template "{name}" of a function')
+
+    # File
+    elif (path := renderer.template_path(options)) is not None:
+        key = md5_sum(encode('UTF-8', f'py:{path}'))
+        if (cb := renderer.cache.get(key)) is not None:
+            log.trace(f'Rendering cached template "{name}"')
+        else:
+            log.trace(f'Rendering template "{name}"')
+            renderer.cache.set(key, cb := _load(path, key, renderer.encoding))
+
+    # No template
+    else:
         log.debug(f'Template "{name}" not found')
         return
-    log.trace(f'Rendering template "{name}" of a function')
+
     output.write(Pyjo.String.Template.escape(_call(cb, c, c.stash())))
+
+
+# The function "render" of a file, which is compiled from its source, as importlib would write its bytecode next to it,
+# with the path of the file, from which a traceback reads the lines of the template
+def _load(path: str, key: str, encoding: str | None) -> Callable[..., Any]:
+    data = Pyjo.File.path(path).slurp()
+    assert isinstance(data, bytes)
+    if encoding is None:
+        source = data.decode('latin-1')
+    elif (source := decode(encoding, data)) is None:
+        raise Pyjo.Exception.new(f'Template "{path}" has invalid encoding')
+    try:
+        code = compile(source, path, 'exec', dont_inherit=True)
+    except SyntaxError as e:
+        raise Pyjo.Exception.new(f'{e.msg} at {path} line {e.lineno}.\n') from None
+
+    module = types.ModuleType(f'{__name__}.{key}')
+    module.__file__ = path
+    exec(code, module.__dict__)
+    if not callable(cb := module.__dict__.get('render')):
+        raise Pyjo.Exception.new(f'Template "{path}" has no function "render"')
+    return cb
 
 
 # The controller and the values of the stash that the function names, or all of them for **
