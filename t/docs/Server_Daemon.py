@@ -124,6 +124,12 @@ with subtest('listen'):
     # Listen on two ports with HTTP and HTTPS at the same time
     daemon.listen = ['http://*:3000', 'https://*:4000']
 
+    # Location of a URL object
+    import Pyjo.URL
+
+    daemon.listen = [Pyjo.URL.new().set(scheme='http', host='127.0.0.1', port=3000)]
+    is_ok(str(daemon.listen[0]), 'http://127.0.0.1:3000', 'URL object')
+
     # Use a custom certificate and key
     daemon.listen = ['https://*:3000?cert=/x/server.crt&key=/y/server.key']
 
