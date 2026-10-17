@@ -49,9 +49,19 @@ A standard tag gives a scalar its type: ``!!str``, ``!!int``, ``!!float``,
     # {'port': '8080', 'key': b'hello', 'day': datetime.date(2001, 12, 14)}
     load('port: !!str 8080\\nkey: !!binary aGVsbG8=\\nday: !!timestamp 2001-12-14\\n')
 
-Anchors, aliases, other tags, complex keys and the indicator of the
-indentation of a block scalar are not supported, and raise an error, as do
-lines that the subset does not know.
+An anchor ``&name`` names a node, a value or a key, in a block or a flow
+collection, and an alias ``*name`` after it in the same document is the same
+object; an anchor defined again names the node of the aliases after it. The
+merge key ``<<`` of YAML 1.1 puts the keys of the mapping that it names, or of
+a sequence of mappings, the earlier ones first, into the mapping, under the
+keys of the mapping itself. ::
+
+    # {'base': {'a': 1, 'b': 1}, 'copy': {'a': 1, 'b': 2}}
+    load('base: &base\\n  a: 1\\n  b: 1\\ncopy:\\n  <<: *base\\n  b: 2\\n')
+
+Other tags, complex keys and the indicator of the indentation of a block
+scalar are not supported, and raise an error, as do lines that the subset
+does not know.
 
 See also
 --------
@@ -71,7 +81,7 @@ import datetime
 import re
 
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 
 # The regular expressions of CPAN::Meta::YAML
@@ -87,6 +97,11 @@ _RE_KEY_DOUBLE = re.compile(rf'^\s*{_DOUBLE_QUOTED}{_KEY_VALUE_SEPARATOR}')
 _RE_KEY_SINGLE = re.compile(rf'^\s*{_SINGLE_QUOTED}{_KEY_VALUE_SEPARATOR}')
 _RE_KEY_UNQUOTED = re.compile(rf'^\s*{_UNQUOTED_KEY}{_KEY_VALUE_SEPARATOR}')
 _RE_BLANK = re.compile(r'^\s*(?:#.*)?\Z')
+
+# Not in CPAN::Meta::YAML: the name of an anchor or an alias, an anchor of a key and an alias as a key
+_ANCHOR = r'[^\s,\[\]{}]+'
+_RE_KEY_ALIAS = re.compile(rf'^\s*\*({_ANCHOR}){_KEY_VALUE_SEPARATOR}')
+_RE_KEY_ANCHOR = re.compile(rf'^(\s*)&({_ANCHOR})\s+')
 
 _ESCAPES = {
     '0': '\x00',
@@ -226,11 +241,17 @@ def _unquote_single(string: str) -> str:
 
 class _Loader:
     def __init__(self, string: str) -> None:
+        self.anchors: dict[str, Any] = {}
         self.lines = re.split(r'\r\r?\n|\r|\n', string.removeprefix('\ufeff'))
 
         # The line break at the end ends the last line, it does not start an empty one
         if self.lines[-1] == '':
             self.lines.pop()
+
+    def alias(self, name: str) -> Any:
+        if name not in self.anchors:
+            raise _error(f"found an unknown alias '*{name}'")
+        return self.anchors[name]
 
     def block(self, string: str, indent: int | None) -> str:
         if not (m := re.search(r'^([|>])([+-]?)\s*(?:#.*)?\Z', string)):
@@ -270,6 +291,9 @@ class _Loader:
             lines.pop(0)
 
         while self.skip():
+            # The anchors of a document are its own
+            self.anchors = {}
+
             # The start of a document, with a scalar after it
             if m := re.search(r'^---\s*(?:(.+?)\s*)?\Z', lines[0]):
                 lines.pop(0)
@@ -323,10 +347,11 @@ class _Loader:
                 text += ' ' + line.strip()
         if (rest := text[end:].strip()) and not rest.startswith('#'):
             raise _error(f"found illegal characters after the flow collection '{text}'")
-        return _Flow(text[:end]).value()
+        return _Flow(text[:end], self).value()
 
     def mapping(self, indent: int, outer: int | None = None) -> dict[Any, Any]:
         mapping: dict[Any, Any] = {}
+        merges: list[Any] = []
         lines = self.lines
         while not self.end_of_document():
             if (depth := _indent(lines[0])) < indent:
@@ -334,9 +359,20 @@ class _Loader:
             if depth > indent:
                 raise _error(f"found bad indenting in line '{lines[0]}'")
 
-            # The key, quoted or not, and the rest of the line
+            # Not in CPAN::Meta::YAML: the anchor of the key
             line = lines[0]
-            if m := _key(line):
+            anchor = None
+            if m := _RE_KEY_ANCHOR.search(line):
+                anchor = m[2]
+                line = m[1] + line[m.end() :]
+
+            # The key, quoted or not, or an alias, and the rest of the line
+            if m := _RE_KEY_ALIAS.search(line):
+                quote = '*'
+                key = self.alias(m[1])
+            elif re.search(r'^\s*[!&*]', line):
+                raise _error(f"does not support a feature in line '{line}'")
+            elif m := _key(line):
                 quote = line.lstrip()[:1]
                 if quote == "'":
                     key = _unquote_single(m[1])
@@ -350,14 +386,21 @@ class _Loader:
                 raise _error(f"failed to classify line '{line}'")
             rest = line[m.end() :]
             lines.pop(0)
+            try:
+                hash(key)
+            except TypeError:
+                raise _error(f"found a key that is not hashable in line '{line}'") from None
+            if anchor is not None:
+                self.anchors[anchor] = key
 
             # A value on the line, or below it, or none
-            if rest:
-                mapping[key] = self.scalar(rest, indent)
+            value = self.scalar(rest, indent) if rest else self.value(indent)
+            if key == '<<' and quote not in ("'", '"', '*'):
+                merges.append(value)
             else:
-                mapping[key] = self.value(indent)
+                mapping[key] = value
 
-        return mapping
+        return _merge(mapping, merges)
 
     def plain(self, string: str, indent: int | None) -> str:
         if re.search(r'^(?:-(?:\s|$)|[@%`])', string) or re.search(r':(?:\s|$)', string):
@@ -408,21 +451,47 @@ class _Loader:
             empty = 0
         return _unquote_double(m[1]) if double else _unquote_single(m[1])
 
-    def scalar(self, string: str, indent: int | None) -> Any:
+    def scalar(self, string: str, indent: int | None, item: bool = False) -> Any:
         string = string.rstrip()
 
-        # Not in CPAN::Meta::YAML: a standard tag of a scalar, which gives it its type
-        if m := re.search(r'^!!(\w+)(?:\s+|\Z)', string):
-            rest = string[m.end() :]
-            if (tag := _TAGS.get(m[1])) is None or rest.startswith(('[', '{')):
-                raise _error(f"does not support a feature in line '{string}'")
-            value = self.text(rest, indent, False)
-            try:
-                return tag(value)
-            except ValueError:
-                raise _error(f"found an invalid value of the tag !!{m[1]}: '{value}'") from None
+        # Not in CPAN::Meta::YAML: an alias, the node of its anchor
+        if string.startswith('*'):
+            if not (m := re.search(rf'^\*({_ANCHOR})(?:\s+#.*)?\Z', string)):
+                raise _error(f"found illegal characters after the alias '{string}'")
+            return self.alias(m[1])
 
-        return self.text(string, indent, True)
+        # Not in CPAN::Meta::YAML: the properties of a node, an anchor and a standard tag, in either order
+        anchor = tag = None
+        while m := re.search(rf'^(?:&({_ANCHOR})|!!(\w+))(?:\s+|\Z)', string):
+            if m[1] is not None and anchor is None:
+                anchor = m[1]
+            elif m[2] is not None and tag is None:
+                tag = m[2]
+            else:
+                raise _error(f"found a property twice in line '{string}'")
+            string = string[m.end() :]
+
+        # A node below the anchor
+        if anchor is not None and tag is None and (not string or string.startswith('#')):
+            value = self.value(-1 if indent is None else indent, item)
+
+        # The tag, which gives a scalar its type
+        elif tag is not None:
+            if (convert := _TAGS.get(tag)) is None or string.startswith(('[', '{')):
+                raise _error(f"does not support a feature in line '!!{tag} {string}'")
+            text = self.text(string, indent, False)
+            try:
+                value = convert(text)
+            except ValueError:
+                raise _error(f"found an invalid value of the tag !!{tag}: '{text}'") from None
+
+        else:
+            value = self.text(string, indent, True)
+
+        # Unlike PyYAML: an anchor can be defined again, as in YAML 1.2, and an alias is the node of the last one
+        if anchor is not None:
+            self.anchors[anchor] = value
+        return value
 
     def sequence(self, indent: int, outer: int | None = None) -> list[Any]:
         sequence: list[Any] = []
@@ -434,7 +503,7 @@ class _Loader:
                 raise _error(f"found bad indenting in line '{lines[0]}'")
 
             # A mapping that starts on the line of the item
-            if (m := re.search(r'^(\s*-\s+)(?![\[{!&*|>])', lines[0])) and _is_key(lines[0][m.end() :]):
+            if (m := re.search(r'^(\s*-\s+)(?![\[{!|>])', lines[0])) and _is_key(lines[0][m.end() :]):
                 lines[0] = lines[0].replace('-', ' ', 1)
                 sequence.append(self.mapping(len(m[1]), indent))
 
@@ -446,7 +515,7 @@ class _Loader:
             # An item with a value
             elif m := re.search(r'^\s*-\s+(.+?)\s*\Z', lines[0]):
                 lines.pop(0)
-                sequence.append(self.scalar(m[1], indent))
+                sequence.append(self.scalar(m[1], indent, True))
 
             # The key of a mapping after a sequence at its indentation
             elif outer is not None and indent == outer:
@@ -498,8 +567,9 @@ class _Loader:
 
 
 class _Flow:
-    # A flow collection, in one string
-    def __init__(self, text: str) -> None:
+    # A flow collection, in one string, with the anchors of its document
+    def __init__(self, text: str, loader: _Loader) -> None:
+        self.loader = loader
         self.text = text
         self.pos = 0
 
@@ -507,7 +577,7 @@ class _Flow:
         # A node, or a pair of a key and a value, as a mapping is an entry of a sequence
         if (c := self.peek()) in ('"', "'"):
             key: Any = self.quoted()
-        elif c in ('[', '{'):
+        elif c in ('[', '{', '*', '&'):
             return self.node(), False
         else:
             key = self.plain(end)
@@ -522,23 +592,40 @@ class _Flow:
 
     def mapping(self) -> dict[Any, Any]:
         mapping: dict[Any, Any] = {}
+        merges: list[Any] = []
         self.pos += 1
         while (c := self.peek()) != '}':
             key = self.quoted() if c in ('"', "'") else _resolve(self.plain('}'))
+            value = None
             if self.peek() == ':':
                 self.pos += 1
-                mapping[key] = None if self.peek() in (',', '}') else self.node()
+                value = None if self.peek() in (',', '}') else self.node()
+            if key == '<<' and c not in ('"', "'"):
+                merges.append(value)
             else:
-                mapping[key] = None
+                mapping[key] = value
             if self.peek() == ',':
                 self.pos += 1
             elif self.peek() != '}':
                 raise self.error()
         self.pos += 1
-        return mapping
+        return _merge(mapping, merges)
+
+    def name(self) -> str:
+        # The name of an anchor or an alias, after its indicator
+        if not (m := re.compile(_ANCHOR).match(self.text, self.pos + 1)):
+            raise self.error()
+        self.pos = m.end()
+        return m[0]
 
     def node(self) -> Any:
         c = self.peek()
+        if c == '*':
+            return self.loader.alias(self.name())
+        if c == '&':
+            anchor = self.name()
+            self.loader.anchors[anchor] = value = self.node()
+            return value
         if c == '[':
             return self.sequence()
         if c == '{':
@@ -596,6 +683,22 @@ class _Flow:
         return value
 
 
+# Not in CPAN::Meta::YAML: the merge keys of a mapping, << of YAML 1.1, which PyYAML reads too: the keys of the
+# mappings that they name, of the earlier ones first, with the keys of the mapping itself over them
+def _merge(mapping: dict[Any, Any], merges: list[Any]) -> dict[Any, Any]:
+    if not merges:
+        return mapping
+    merged: dict[Any, Any] = {}
+    for merge in merges:
+        sources: list[Any] = cast(list[Any], merge) if isinstance(merge, list) else [merge]
+        for source in reversed(sources):
+            if not isinstance(source, dict):
+                raise _error('found a merge key with a value that is not a mapping or a sequence of mappings')
+            merged.update(cast(dict[Any, Any], source))
+    merged.update(mapping)
+    return merged
+
+
 # The key at the start of a line, quoted, which only the pattern of its quotes reads, or not
 def _key(line: str) -> re.Match[str] | None:
     if (stripped := line.lstrip()).startswith("'"):
@@ -606,7 +709,8 @@ def _key(line: str) -> re.Match[str] | None:
 
 
 def _is_key(line: str) -> bool:
-    return _key(line) is not None
+    line = _RE_KEY_ANCHOR.sub(r'\1', line, count=1)
+    return _key(line) is not None or _RE_KEY_ALIAS.search(line) is not None
 
 
 # The end of the flow collection at the start of a string, after its closing bracket, or None while it is open

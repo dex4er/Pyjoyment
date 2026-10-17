@@ -20,7 +20,7 @@ list:
 with subtest('Description'):
     # {'foo': [1, True, 'yes', '2']}
     is_deeply_ok(load("foo:\n  - 1\n  - true\n  - yes\n  - '2'\n"), {'foo': [1, True, 'yes', '2']}, 'types')
-    throws_ok(lambda: load('foo: &anchor bar'), re.compile(r'^YAML does not support a feature'), 'anchor')
+    throws_ok(lambda: load('foo: !tag bar'), re.compile(r'^YAML does not support a feature'), 'other tag')
 
 with subtest('Tags'):
     import datetime
@@ -30,6 +30,14 @@ with subtest('Tags'):
         load('port: !!str 8080\nkey: !!binary aGVsbG8=\nday: !!timestamp 2001-12-14\n'),
         {'port': '8080', 'key': b'hello', 'day': datetime.date(2001, 12, 14)},
         'standard tags',
+    )
+
+with subtest('Anchors'):
+    # {'base': {'a': 1, 'b': 1}, 'copy': {'a': 1, 'b': 2}}
+    is_deeply_ok(
+        load('base: &base\n  a: 1\n  b: 1\ncopy:\n  <<: *base\n  b: 2\n'),
+        {'base': {'a': 1, 'b': 1}, 'copy': {'a': 1, 'b': 2}},
+        'anchor, alias and merge key',
     )
 
 with subtest('load'):

@@ -190,12 +190,53 @@ with subtest('Documents'):
     is_ok(load(''), None, 'empty')
     is_ok(load('   \n'), None, 'blank')
 
+with subtest('Anchors and aliases'):
+    is_deeply_ok(load('a: &x 1\nb: *x\n'), {'a': 1, 'b': 1}, 'scalar')
+    is_deeply_ok(load('a: &x\n  b: 1\nc: *x\n'), {'a': {'b': 1}, 'c': {'b': 1}}, 'mapping')
+    is_deeply_ok(load('a: &x\n  - 1\n  - 2\nb: *x\n'), {'a': [1, 2], 'b': [1, 2]}, 'sequence')
+    is_deeply_ok(load('a: &x\n- 1\nb: *x\n'), {'a': [1], 'b': [1]}, 'sequence at the indentation of the key')
+    is_deeply_ok(load('- &x one\n- *x\n'), ['one', 'one'], 'items')
+    is_deeply_ok(load('- &x\n  a: 1\n- *x\n'), [{'a': 1}, {'a': 1}], 'mapping in an item')
+    is_deeply_ok(load('a: &x |\n  text\nb: *x\n'), {'a': 'text\n', 'b': 'text\n'}, 'block scalar')
+    is_deeply_ok(load('a: &x "quoted"\nb: *x # comment\n'), {'a': 'quoted', 'b': 'quoted'}, 'quoted')
+    is_deeply_ok(load('a: &x !!str 1\nb: !!str &y 2\nc: [*x, *y]\n'), {'a': '1', 'b': '2', 'c': ['1', '2']}, 'tags')
+    is_deeply_ok(load('a: &x [1, &y 2]\nb: {c: *x, d: *y}\n'), {'a': [1, 2], 'b': {'c': [1, 2], 'd': 2}}, 'flow')
+    is_deeply_ok(load('a: &x\nb: *x\n'), {'a': None, 'b': None}, 'empty')
+    is_deeply_ok(load('a: &x 1\nb: &x 2\nc: *x\n'), {'a': 1, 'b': 2, 'c': 2}, 'anchor again')
+    data = load('a: &x\n  b: 1\nc: *x\n')
+    ok(data['a'] is data['c'], 'same object')
+    is_deeply_ok(load_all('a: &x 1\nb: *x\n---\nc: &x 2\nd: *x\n'), [{'a': 1, 'b': 1}, {'c': 2, 'd': 2}], 'documents')
+    is_deeply_ok(load('&a foo: bar\nb: *a\n'), {'foo': 'bar', 'b': 'foo'}, 'key')
+    is_deeply_ok(load('x:\n  &a k: v\n  b: *a\n'), {'x': {'k': 'v', 'b': 'k'}}, 'nested key')
+    is_deeply_ok(load('- &a k: v\n- *a\n'), [{'k': 'v'}, 'k'], 'key in an item')
+    is_deeply_ok(load('a: &k key\n*k : v\n'), {'a': 'key', 'key': 'v'}, 'alias as a key')
+    throws_ok(
+        lambda: load('a: &x [1]\n*x : v\n'), re.compile(r'^YAML found a key that is not hashable'), 'list as a key'
+    )
+    throws_ok(
+        lambda: load_all('a: &x 1\n---\nb: *x\n'), re.compile(r"^YAML found an unknown alias '\*x'"), 'per document'
+    )
+
+with subtest('Merge keys'):
+    is_deeply_ok(load('a: &x\n  b: 1\n  c: 2\nd:\n  <<: *x\n  c: 3\n')['d'], {'b': 1, 'c': 3}, 'mapping')
+    is_deeply_ok(load('a: &x {b: 1}\nd:\n  c: 3\n  <<: *x\n')['d'], {'b': 1, 'c': 3}, 'explicit keys first')
+    is_deeply_ok(
+        load('a: &x {b: 1, c: 1}\ne: &y {c: 2, d: 2}\nf:\n  <<: [*x, *y]\n')['f'],
+        {'c': 1, 'd': 2, 'b': 1},
+        'earlier mappings first',
+    )
+    is_deeply_ok(load('a: &x {b: 1}\nc: {<<: *x, d: 2}\n')['c'], {'b': 1, 'd': 2}, 'flow')
+    is_deeply_ok(load('a: &x {b: 1}\nc:\n  - <<: *x\n    d: 2\n')['c'], [{'b': 1, 'd': 2}], 'item')
+    is_deeply_ok(load('"<<": 1\n'), {'<<': 1}, 'quoted key')
+    throws_ok(lambda: load('a: &x 1\nb:\n  <<: *x\n'), re.compile(r'^YAML found a merge key'), 'not a mapping')
+    throws_ok(lambda: load('a: &x 1\nb:\n  <<: [*x]\n'), re.compile(r'^YAML found a merge key'), 'not mappings')
+
 with subtest('Errors'):
     throws_ok(
         lambda: load('a: b\n  c: d\n'), re.compile(r"^YAML found illegal characters in plain scalar: 'c: d'"), 'indent'
     )
     throws_ok(lambda: load('? complex\n'), re.compile(r'^YAML does not support a feature'), 'complex key')
-    throws_ok(lambda: load('foo: &anchor bar\n'), re.compile(r'^YAML does not support a feature'), 'anchor')
+    throws_ok(lambda: load('!!str foo: bar\n'), re.compile(r'^YAML does not support a feature'), 'tag of a key')
     throws_ok(lambda: load('foo: !tag bar\n'), re.compile(r'^YAML does not support a feature'), 'local tag')
     throws_ok(lambda: load('foo: - bar\n'), re.compile(r'^YAML found illegal characters'), 'dash')
     throws_ok(lambda: load('foo: @bar\n'), re.compile(r'^YAML found illegal characters'), 'reserved')
@@ -207,7 +248,8 @@ with subtest('Errors'):
     throws_ok(lambda: load('foo: "open\n'), re.compile(r'^YAML failed to find the end of the quoted scalar'), 'quote')
     throws_ok(lambda: load('foo: |2\n  x\n'), re.compile(r'^YAML does not support a feature'), 'indentation indicator')
 
-    # Not in CPAN::Meta::YAML: an alias is an error, not a string
-    throws_ok(lambda: load('foo: *alias\n'), re.compile(r'^YAML does not support a feature'), 'alias')
+    # Not in CPAN::Meta::YAML: an unknown alias is an error, not a string
+    throws_ok(lambda: load('foo: *alias\n'), re.compile(r"^YAML found an unknown alias '\*alias'"), 'alias')
+    throws_ok(lambda: load('foo: *alias bar\n'), re.compile(r'^YAML found illegal characters after the alias'), 'after')
 
 done_testing()
