@@ -805,6 +805,16 @@ pattern.match_partial(path)`.
   `favicon.svg` at 48, 32 and 16 pixels. The text in them is set in Fredoka,
   under the SIL Open Font License, and converted to paths, so that the SVG
   needs no font.
+- The libraries that the bundled templates use, Bootstrap, Popper and
+  highlight.js, are in the versions that the target Mojolicious bundles, each
+  with the text of its license in a `LICENSE` next to it, and the stylesheet
+  `mojo/mojo.css` is `pyjo/pyjo.css`. Trunk does not lint or format them, so
+  that a newer version replaces them as they are. The build of highlight.js of
+  Mojolicious has no Python, so `python.min.js` of the same release of
+  highlight.js is next to it, and `pyjoyment.min.js`, the language of the
+  templates, is `mojolicious.min.js` with Python in the place of Perl. The links
+  of the pages are those of Pyjoyment. A bundled template has its markers as
+  comments of the template, as `%# Renamed from Mojolicious:`.
 
 ## Linting and Formatting
 
