@@ -27,6 +27,7 @@ import Pyjo.File
 import Pyjo.Loader
 
 from Pyjo.JSON import encode_json
+from Pyjo.String.Template import is_template
 from Pyjo.Util import decamelize, deprecated, encode, gzip, md5_sum
 
 import io
@@ -122,7 +123,10 @@ class Pyjoyment_Renderer(Pyjo.Base.object):
             renderer.default_handler = 'ep'
 
         The default template handler to use for rendering in cases where
-        auto-detection doesn't work, like for ``inline`` templates.
+        auto-detection doesn't work, like for ``inline`` templates. An
+        ``inline`` template that is a template string of
+        :mod:`Pyjo.String.Template` is rendered by the handler ``py`` of
+        :mod:`Pyjoyment.Plugin.PyRenderer`.
         """
 
         self.encoding: str | None = 'UTF-8'
@@ -314,7 +318,8 @@ class Pyjoyment_Renderer(Pyjo.Base.object):
         }
         inline = options['inline'] = stash.pop('inline', None)
         if inline is not None and options['handler'] is None:
-            options['handler'] = self.default_handler
+            # Not in Mojolicious: an inline template string, which the handler "py" renders
+            options['handler'] = 'py' if is_template(inline) else self.default_handler
         options['format'] = stash.get('format') or self.default_format
 
         # Data

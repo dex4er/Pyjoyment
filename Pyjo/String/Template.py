@@ -174,7 +174,7 @@ class Pyjo_String_Template(Pyjo.Base.object, Pyjo.String.Mixin.object):
         with a string into :mod:`Pyjo.String.HTML`, escaping the string unless
         it is markup.
         """
-        if _is_template(other):
+        if is_template(other):
             return self.new(*self, *other)
         if isinstance(other, str) or hasattr(other, '__html__'):
             return self.render() + other
@@ -214,7 +214,7 @@ class Pyjo_String_Template(Pyjo.Base.object, Pyjo.String.Mixin.object):
         rendered template into :mod:`Pyjo.String.HTML`, escaping the string
         unless it is markup.
         """
-        if _is_template(other):
+        if is_template(other):
             return self.new(*other, *self)
         if isinstance(other, str) or hasattr(other, '__html__'):
             return self.render().__radd__(other)
@@ -293,6 +293,27 @@ def escape(value: Anything) -> str:
     return _value(value, None, '')
 
 
+def is_template(value: Anything) -> TypeGuard[Iterable[str | Interpolation[Any]]]:
+    """::
+
+        boolean = is_template(value)
+
+    Check if a value is a template, of :mod:`Pyjo.String.Template` or a
+    t-string of Python 3.14. ::
+
+        # True
+        is_template(t('<p>{name}</p>'))
+
+        # False
+        is_template('<p>{name}</p>')
+    """
+    if isinstance(value, Pyjo_String_Template):
+        return True
+    if sys.version_info >= (3, 14):
+        return isinstance(value, Template)
+    return False
+
+
 def raw(value: Anything) -> str:
     """::
 
@@ -327,7 +348,7 @@ def t(template: Anything, /, **values: Anything) -> Pyjo_String_Template:
         raise TypeError('t() takes keyword arguments only with a string')
     if isinstance(template, Pyjo_String_Template):
         return template
-    if _is_template(template):
+    if is_template(template):
         return Pyjo_String_Template(*template)
     raise TypeError(f't() takes a string or a template, not {type(template).__name__}')
 
@@ -346,14 +367,6 @@ def _convert(value: Anything, conversion: str | None) -> Anything:
     if conversion == 'a':
         return ascii(value)
     return value
-
-
-def _is_template(value: Anything) -> TypeGuard[Iterable[str | Interpolation[Any]]]:
-    if isinstance(value, Pyjo_String_Template):
-        return True
-    if sys.version_info >= (3, 14):
-        return isinstance(value, Template)
-    return False
 
 
 def _iterable(value: Anything) -> bool:

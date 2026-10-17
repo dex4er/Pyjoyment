@@ -4,7 +4,7 @@ import Pyjo.String.Template
 
 from Pyjo.Collection import c
 from Pyjo.String.HTML import html
-from Pyjo.String.Template import Interpolation, escape, raw, t
+from Pyjo.String.Template import Interpolation, escape, is_template, raw, t
 from Pyjo.String.Unicode import u
 from Pyjo.Test import *
 from Pyjo.Util import xml_escape
@@ -203,6 +203,12 @@ with subtest('escape and raw'):
     is_ok(escape(['<b>', html('<i>'), None, t('{x}', x='<s>')]), '&lt;b&gt;<i>&lt;s&gt;', 'escaped')
     is_ok(raw(['<b>', html('<i>'), None, t('{x}', x='<s>')]), '<b><i>&lt;s&gt;', 'not escaped')
     is_ok(raw(1.5), '1.5', 'number')
+
+with subtest('is_template'):
+    ok(is_template(t('<p>{name}</p>')), 'template')
+    ok(not is_template('<p>{name}</p>'), 'string')
+    ok(not is_template(html('<p>')), 'markup')
+    ok(not is_template(None), 'None')
 
 with subtest('Template'):
     template = t('<p>{name}</p>')

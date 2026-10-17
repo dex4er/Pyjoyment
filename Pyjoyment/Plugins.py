@@ -29,6 +29,9 @@ examples.
 :mod:`Pyjoyment.Plugin.HeaderCondition`
     Route condition for all kinds of headers, loaded automatically.
 
+:mod:`Pyjoyment.Plugin.PyRenderer`
+    Renderer for template strings, loaded automatically.
+
 :mod:`Pyjoyment.Plugin.TagHelpers`
     Template specific helper collection, loaded automatically.
 
