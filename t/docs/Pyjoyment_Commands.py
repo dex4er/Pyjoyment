@@ -64,10 +64,24 @@ with subtest('detect'):
         is_ok(commands.detect(), 'cgi', 'CGI')
     finally:
         del os.environ['GATEWAY_INTERFACE']
+    for name in ('wsgi', 'asgi'):
+        os.environ[f'PYJO_{name.upper()}'] = '1'
+        try:
+            is_ok(commands.detect(), name, name.upper())
+        finally:
+            del os.environ[f'PYJO_{name.upper()}']
 
 with subtest('run'):
     commands = Pyjoyment.Commands.new()
     is_ok(commands.run(), True, 'list hidden from the tests')
+
+    # The WSGI application of a script, for PYJO_WSGI=1 gunicorn myapp:application
+    os.environ['PYJO_WSGI'] = '1'
+    try:
+        application = Pyjoyment.new().start()
+    finally:
+        del os.environ['PYJO_WSGI']
+    ok(callable(application), 'WSGI application')
 
 with subtest('start_app'):
     os.environ['PYJO_APP_LOADER'] = '1'

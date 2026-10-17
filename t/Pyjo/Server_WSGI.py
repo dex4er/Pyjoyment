@@ -1,4 +1,5 @@
 import Pyjo.Server.WSGI
+import Pyjoyment.Command.wsgi
 
 from Pyjo.JSON import decode_json
 from Pyjo.Test import *
@@ -50,8 +51,6 @@ def proxy(c):
     reverse = ':'.join(part for part in (c.tx.remote_address, c.req.url.to_abs().protocol) if part)
     c.render(text=reverse)
 
-
-# TODO: Mojolicious::Command::psgi, which turns the application into a WSGI application as here, when it is ported
 
 with subtest('Reverse proxy'):
     ok(not Pyjo.Server.WSGI.new().reverse_proxy, 'no reverse proxy')
@@ -122,7 +121,7 @@ with subtest('Command'):
         'wsgi.multiprocess': True,
         'wsgi.run_once': False,
     }
-    wsgi_app = Pyjo.Server.WSGI.new(app=app).to_wsgi_app()
+    wsgi_app = Pyjoyment.Command.wsgi.new(app=app).run()
     res = call(wsgi_app, env)
     is_ok(res[0], '200 OK', 'right status')
     headers = dict(res[1])
@@ -157,7 +156,7 @@ with subtest('Simple'):
         'wsgi.multiprocess': True,
         'wsgi.run_once': False,
     }
-    wsgi_app = Pyjo.Server.WSGI.new(app=app).to_wsgi_app()
+    wsgi_app = Pyjoyment.Command.wsgi.new(app=app).run()
     res = call(wsgi_app, env)
     is_ok(res[0], '200 OK', 'right status')
     headers = dict(res[1])
@@ -187,7 +186,7 @@ with subtest('HEAD request'):
         'wsgi.multiprocess': True,
         'wsgi.run_once': False,
     }
-    wsgi_app = Pyjo.Server.WSGI.new(app=app).to_wsgi_app()
+    wsgi_app = Pyjoyment.Command.wsgi.new(app=app).run()
     res = call(wsgi_app, env)
     is_ok(res[0], '200 OK', 'right status')
     headers = dict(res[1])
@@ -218,7 +217,7 @@ with subtest('Cookies'):
         'wsgi.multiprocess': True,
         'wsgi.run_once': False,
     }
-    wsgi_app = Pyjo.Server.WSGI.new(app=app).to_wsgi_app()
+    wsgi_app = Pyjoyment.Command.wsgi.new(app=app).run()
     res = call(wsgi_app, env)
     is_ok(res[0], '200 OK', 'right status')
     # Unlike Mojolicious: the headers of WSGI are pairs, where PSGI has a flat list of names and values
@@ -248,7 +247,7 @@ with subtest('Reverse proxy'):
         'wsgi.run_once': False,
     }
     with patch.dict(os.environ, {'PYJO_REVERSE_PROXY': '1'}):
-        wsgi_app = Pyjo.Server.WSGI.new(app=app).to_wsgi_app()
+        wsgi_app = Pyjoyment.Command.wsgi.new(app=app).run()
         res = call(wsgi_app, env)
     is_ok(res[0], '200 OK', 'right status')
     headers = dict(res[1])
@@ -282,7 +281,7 @@ with subtest('Trusted proxies'):
         'wsgi.run_once': False,
     }
     with patch.dict(os.environ, {'PYJO_TRUSTED_PROXIES': '127.0.0.0/8, 192.0.0.0/8'}):
-        wsgi_app = Pyjo.Server.WSGI.new(app=app).to_wsgi_app()
+        wsgi_app = Pyjoyment.Command.wsgi.new(app=app).run()
         res = call(wsgi_app, env)
     is_ok(res[0], '200 OK', 'right status')
     headers = dict(res[1])
@@ -315,7 +314,7 @@ with subtest('Trusted proxies (no REMOTE_ADDR)'):
         'wsgi.run_once': False,
     }
     with patch.dict(os.environ, {'PYJO_TRUSTED_PROXIES': '127.0.0.0/8, 192.0.0.0/8'}):
-        wsgi_app = Pyjo.Server.WSGI.new(app=app).to_wsgi_app()
+        wsgi_app = Pyjoyment.Command.wsgi.new(app=app).run()
         res = call(wsgi_app, env)
     is_ok(res[0], '200 OK', 'right status')
     headers = dict(res[1])

@@ -11,8 +11,8 @@ Pyjoyment.Commands - Command line interface
       ./myapp.py get /foo
       ./myapp.py routes -v
 
-    Tip: CGI environments can be automatically detected very often and work
-         without commands.
+    Tip: CGI environments, and WSGI and ASGI ones with PYJO_WSGI and PYJO_ASGI,
+         can be automatically detected very often and work without commands.
 
     Options (for all commands):
       -h, --help          Get more information on a specific command
@@ -32,6 +32,15 @@ Commands
 --------
 
 These commands are available by default.
+
+asgi
+~~~~
+::
+
+    application = app.start('asgi')
+
+Use :mod:`Pyjoyment.Command.asgi` to start application with ASGI backend,
+auto detected with the ``PYJO_ASGI`` environment variable.
 
 cgi
 ~~~
@@ -58,6 +67,16 @@ eval
     $ ./myapp.py eval 'print(app.home)'
 
 Use :mod:`Pyjoyment.Command.eval` to run code against application.
+
+get
+~~~
+::
+
+    $ pyjo get https://mojolicious.org
+    $ ./myapp.py get /foo
+
+Use :mod:`Pyjoyment.Command.get` to perform requests to remote host or local
+application.
 
 help
 ~~~~
@@ -101,6 +120,15 @@ version
 Use :mod:`Pyjoyment.Command.version` to show version information for
 available core and optional modules, very useful for debugging.
 
+wsgi
+~~~~
+::
+
+    application = app.start('wsgi')
+
+Use :mod:`Pyjoyment.Command.wsgi` to start application with WSGI backend,
+auto detected with the ``PYJO_WSGI`` environment variable.
+
 See also
 --------
 
@@ -113,7 +141,8 @@ Classes
 -------
 """
 
-# TODO: the commands cpanify, generate, get, inflate and psgi, when they are ported
+# TODO: the commands generate and inflate, when they are ported
+# Left out from Mojolicious: the command cpanify, as uv publish uploads distributions to PyPI
 
 import Pyjo.Exception
 import Pyjo.Loader
@@ -187,7 +216,15 @@ class Pyjoyment_Commands(Pyjoyment.Command.object):
         Try to detect environment, or return ``None`` if none could be
         detected.
         """
-        # TODO: the WSGI and the ASGI of PSGI, when the commands wsgi and asgi are ported
+        # WSGI
+        # Renamed from Mojolicious: PYJO_WSGI, as WSGI has no environment variable of its own, where Mojo detects PSGI
+        # with PLACK_ENV
+        if os.environ.get('PYJO_WSGI') is not None:
+            return 'wsgi'
+
+        # Not in Mojolicious: ASGI, with PYJO_ASGI
+        if os.environ.get('PYJO_ASGI') is not None:
+            return 'asgi'
 
         # CGI
         if os.environ.get('PATH_INFO') is not None or os.environ.get('GATEWAY_INTERFACE') is not None:
@@ -203,7 +240,14 @@ class Pyjoyment_Commands(Pyjoyment.Command.object):
             commands.run(*sys.argv[1:])
 
         Load and run commands. Automatic deployment environment detection can
-        be disabled with the ``PYJO_NO_DETECT`` environment variable.
+        be disabled with the ``PYJO_NO_DETECT`` environment variable. A
+        detected environment, CGI, or WSGI and ASGI with the ``PYJO_WSGI``
+        and ``PYJO_ASGI`` environment variables, runs its command, whatever
+        the arguments are, as a WSGI or an ASGI server imports the script of
+        the application with its own arguments. ::
+
+            # The WSGI application of a script, for PYJO_WSGI=1 gunicorn myapp:application
+            application = app.start()
         """
         # Application loader
         # Not in Mojolicious: the application for Pyjo.Server.load_app, which Mojo returns from the script
