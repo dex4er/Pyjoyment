@@ -95,14 +95,14 @@ with subtest('csrf_protect'):
 with subtest('error'):
     v = validation(foo='bar').required('foo').size(1, 2)
     err = v.error('foo')
-    is_deeply_ok(err, ['size', 1, 1, 2], 'error')
+    is_deeply_ok(err, ['size', True, 1, 2], 'error')
     v = v.error('foo', ['custom_check'])
-    check, result, *args = ['size', 1, 1, 2]
+    check, result, *args = ['size', True, 1, 2]
     v = v.error('foo', [check, result, *args])
 
     # Details about failed validation
     check, result, *args = v.error('foo')
-    is_deeply_ok([check, result, args], ['size', 1, [1, 2]], 'details')
+    is_deeply_ok([check, result, args], ['size', True, [1, 2]], 'details')
 
     # Force validation to fail for a field without performing a check
     v.error('foo', ['some_made_up_check_name'])

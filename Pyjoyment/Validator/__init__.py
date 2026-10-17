@@ -117,7 +117,7 @@ from typing import Any, Self, overload
 type Anything = builtins.object
 
 # A check gets the validation, the name and a value of the field, and the arguments of the check, and returns a true
-# value when the value fails, 1 for the checks of the validator, as Perl gives it
+# value when the value fails
 type Check = Callable[..., Any]
 
 # A filter gets the validation, the name and a value of the field, and returns the value, or a tuple of several values
@@ -251,44 +251,42 @@ def _comma_separated(v: Anything, name: str, value: Anything) -> tuple[str, ...]
     return tuple(str(part) for part in Pyjo.String.Unicode.new(str(value)).split(r'\s*,\s*', -1))
 
 
-def _equal_to(v: 'Pyjoyment.Validator.Validation.object', name: str, value: Anything, to: str) -> int:
+def _equal_to(v: 'Pyjoyment.Validator.Validation.object', name: str, value: Anything, to: str) -> bool:
     if (other := v.input.get(to)) is None:
-        return 1
-    return int(str(value) != str(other))
+        return True
+    return str(value) != str(other)
 
 
-def _in(v: Anything, name: str, value: Anything, *values: Anything) -> int | None:
-    if any(str(value) == str(item) for item in values):
-        return None
-    return 1
+def _in(v: Anything, name: str, value: Anything, *values: Anything) -> bool:
+    return not any(str(value) == str(item) for item in values)
 
 
-def _like(v: Anything, name: str, value: Anything, regex: str | re.Pattern[str]) -> int:
-    return int(not re.search(regex, str(value)))
+def _like(v: Anything, name: str, value: Anything, regex: str | re.Pattern[str]) -> bool:
+    return not re.search(regex, str(value))
 
 
 def _not_empty(v: Anything, name: str, value: Anything) -> Anything:
     return value if value is not None and len(str(value)) else ()
 
 
-def _num(v: Anything, name: str, value: Anything, min: int | None = None, max: int | None = None) -> int:
+def _num(v: Anything, name: str, value: Anything, min: int | None = None, max: int | None = None) -> bool:
     if not re.search(r'^-?[0-9]+$', string := str(value)):
-        return 1
+        return True
     number = int(string)
-    return int(min is not None and min > number or max is not None and max < number)
+    return min is not None and min > number or max is not None and max < number
 
 
-def _size(v: Anything, name: str, value: Anything, min: int | None = None, max: int | None = None) -> int:
+def _size(v: Anything, name: str, value: Anything, min: int | None = None, max: int | None = None) -> bool:
     length = value.size if isinstance(value, Pyjo.Upload.object) else len(str(value))
-    return int((min is not None and length < min) or (max is not None and length > max))
+    return (min is not None and length < min) or (max is not None and length > max)
 
 
 def _trim(v: Anything, name: str, value: Anything) -> str | None:
     return trim(str(value)) if value is not None else None
 
 
-def _upload(v: Anything, name: str, value: Anything) -> int:
-    return int(not isinstance(value, Pyjo.Upload.object))
+def _upload(v: Anything, name: str, value: Anything) -> bool:
+    return not isinstance(value, Pyjo.Upload.object)
 
 
 new = Pyjoyment_Validator.new

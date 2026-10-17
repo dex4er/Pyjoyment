@@ -141,11 +141,11 @@ with subtest('Equal to'):
     ok(not v.optional('baz').equal_to('does_not_exist').is_valid(), 'not valid')
     is_deeply_ok(v.output, {'foo': 'bar'}, 'right result')
     ok(v.has_error(), 'has error')
-    is_deeply_ok(v.error('baz'), ['equal_to', 1, 'does_not_exist'], 'right error')
+    is_deeply_ok(v.error('baz'), ['equal_to', True, 'does_not_exist'], 'right error')
     ok(not v.optional('yada').equal_to('foo').is_valid(), 'not valid')
     is_deeply_ok(v.output, {'foo': 'bar'}, 'right result')
     ok(v.has_error(), 'has error')
-    is_deeply_ok(v.error('yada'), ['equal_to', 1, 'foo'], 'right error')
+    is_deeply_ok(v.error('yada'), ['equal_to', True, 'foo'], 'right error')
     is_deeply_ok(v.failed, ['baz', 'yada'], 'right names')
 
 with subtest('In'):
@@ -158,7 +158,7 @@ with subtest('In'):
     ok(not v.required('baz').in_('yada', 'whatever').is_valid(), 'not valid')
     is_deeply_ok(v.output, {'foo': ['bar', 'whatever']}, 'right result')
     ok(v.has_error(), 'has error')
-    is_deeply_ok(v.error('baz'), ['in', 1, 'yada', 'whatever'], 'right error')
+    is_deeply_ok(v.error('baz'), ['in', True, 'yada', 'whatever'], 'right error')
     is_deeply_ok(v.failed, ['baz'], 'right names')
 
 with subtest('Like'):
@@ -170,7 +170,7 @@ with subtest('Like'):
     ok(not v.required('baz').like(re_).is_valid(), 'not valid')
     is_deeply_ok(v.output, {'foo': 'bar'}, 'right result')
     ok(v.has_error(), 'has error')
-    is_deeply_ok(v.error('baz'), ['like', 1, re_], 'right error')
+    is_deeply_ok(v.error('baz'), ['like', True, re_], 'right error')
 
 with subtest('Num'):
     v = t.app.validation().set(input={'foo': 23, 'bar': 0, 'baz': 'fail'})
@@ -180,7 +180,7 @@ with subtest('Num'):
     is_deeply_ok(v.output, {'foo': 23, 'bar': 0}, 'right result')
     ok(not v.has_error(), 'no error')
     ok(not v.required('baz').num().is_valid(), 'not valid')
-    is_deeply_ok(v.error('baz'), ['num', 1], 'right error')
+    is_deeply_ok(v.error('baz'), ['num', True], 'right error')
     is_deeply_ok(v.failed, ['baz'], 'right names')
     v = t.app.validation().set(input={'foo': 23})
     ok(v.required('foo').num(22, 24).is_valid(), 'valid')
@@ -191,7 +191,7 @@ with subtest('Num'):
     v = t.app.validation().set(input={'foo': 23})
     ok(not v.required('foo').num(24, 25).is_valid(), 'not valid')
     ok(v.has_error(), 'has error')
-    is_deeply_ok(v.error('foo'), ['num', 1, 24, 25], 'right error')
+    is_deeply_ok(v.error('foo'), ['num', True, 24, 25], 'right error')
     v = t.app.validation().set(input={'foo': 23})
     ok(v.required('foo').num(22, None).is_valid(), 'valid')
     v = t.app.validation().set(input={'foo': 23})
@@ -199,7 +199,7 @@ with subtest('Num'):
     v = t.app.validation().set(input={'foo': 23})
     ok(not v.required('foo').num(24, None).is_valid(), 'not valid')
     ok(v.has_error(), 'has error')
-    is_deeply_ok(v.error('foo'), ['num', 1, 24, None], 'right error')
+    is_deeply_ok(v.error('foo'), ['num', True, 24, None], 'right error')
     v = t.app.validation().set(input={'foo': 23})
     ok(v.required('foo').num(None, 24).is_valid(), 'valid')
     v = t.app.validation().set(input={'foo': 23})
@@ -207,7 +207,7 @@ with subtest('Num'):
     v = t.app.validation().set(input={'foo': 23})
     ok(not v.required('foo').num(None, 22).is_valid(), 'not valid')
     ok(v.has_error(), 'has error')
-    is_deeply_ok(v.error('foo'), ['num', 1, None, 22], 'right error')
+    is_deeply_ok(v.error('foo'), ['num', True, None, 22], 'right error')
     v = t.app.validation().set(input={'foo': -5})
     ok(v.required('foo').num().is_valid(), 'valid')
     ok(v.required('foo').num(None, -1).is_valid(), 'valid')
@@ -222,13 +222,13 @@ with subtest('Size'):
     ok(not v.required('baz').size(1, 3).is_valid(), 'not valid')
     is_deeply_ok(v.output, {'foo': 'bar'}, 'right result')
     ok(v.has_error(), 'has error')
-    is_deeply_ok(v.error('baz'), ['size', 1, 1, 3], 'right error')
+    is_deeply_ok(v.error('baz'), ['size', True, 1, 3], 'right error')
     ok(not v.required('yada').size(5, 10).is_valid(), 'not valid')
     is_ok(v.topic, 'yada', 'right topic')
     ok(v.has_error('baz'), 'has error')
     is_deeply_ok(v.output, {'foo': 'bar'}, 'right result')
     ok(v.has_error(), 'has error')
-    is_deeply_ok(v.error('yada'), ['size', 1, 5, 10], 'right error')
+    is_deeply_ok(v.error('yada'), ['size', True, 5, 10], 'right error')
     ok(v.required('foo').size(1, None).is_valid(), 'valid')
     ok(not v.required('foo').size(4, None).is_valid(), 'not valid')
     ok(v.required('foo').size(None, 4).is_valid(), 'valid')
@@ -249,7 +249,7 @@ with subtest('Upload'):
     ok(not v.has_error(), 'no error')
     ok(not v.upload().is_valid(), 'not valid')
     ok(v.has_error(), 'has error')
-    is_deeply_ok(v.error('baz'), ['upload', 1], 'right error')
+    is_deeply_ok(v.error('baz'), ['upload', True], 'right error')
     is_deeply_ok(v.failed, ['baz'], 'right names')
 
 with subtest('Upload size'):
@@ -263,7 +263,7 @@ with subtest('Upload size'):
     ok(not v.has_error(), 'no error')
     ok(not v.required('bar').upload().size(1, 6).is_valid(), 'not valid')
     ok(v.has_error(), 'has error')
-    is_deeply_ok(v.error('bar'), ['size', 1, 1, 6], 'right error')
+    is_deeply_ok(v.error('bar'), ['size', True, 1, 6], 'right error')
     is_deeply_ok(v.failed, ['bar'], 'right names')
 
 with subtest('Trim'):
@@ -416,7 +416,7 @@ with subtest('Validation failed for required fields'):
     (
         t.post_ok('/', form={'foo': 'no'})
         .status_is(200)
-        .text_like('div:root', (r'in.+1', 's'))
+        .text_like('div:root', (r'in.+True', 's'))
         .text_is('label.custom.field-with-error[for="foo"]', '<Foo>')
         .element_exists('input.custom.field-with-error[type="text"][value="no"]')
         .element_exists_not('textarea.field-with-error')
