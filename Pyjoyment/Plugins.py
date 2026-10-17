@@ -35,6 +35,9 @@ examples.
 :mod:`Pyjoyment.Plugin.JSONConfig`
     JSON configuration files.
 
+:mod:`Pyjoyment.Plugin.Mount`
+    Mount whole :mod:`Pyjoyment` applications.
+
 :mod:`Pyjoyment.Plugin.PyRenderer`
     Renderer for template strings, loaded automatically.
 
@@ -60,8 +63,6 @@ See also
 Ported from `Mojolicious::Plugins <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojolicious/Plugins.pm>`_
 of Mojolicious 9.49.
 """
-
-# TODO: the plugin Mount of the list, when it is ported
 
 import Pyjo.EventEmitter
 import Pyjo.Exception

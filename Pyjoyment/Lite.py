@@ -395,7 +395,6 @@ def _import(caller: str, file: str | None) -> dict[str, Any]:
         if not home and exe:
             os.environ['PYJO_HOME'] = Pyjo.File.path(exe).to_abs().dirname().to_str()
 
-        # Left out from Mojolicious: the package that uses it as a subclass of Mojolicious, as a module is not a class
         # Generate moniker based on filename
         moniker = Pyjo.File.path(exe).basename('.py') if exe else 'pyjoyment'
         app = Pyjoyment_Lite.new(moniker=moniker)
@@ -408,6 +407,15 @@ def _import(caller: str, file: str | None) -> dict[str, Any]:
     routes.namespaces = []
     app.static.classes[0] = app.renderer.classes[0] = caller
 
+    # Unlike Mojolicious: Mojo makes the package that uses it a subclass of Mojolicious, with the functions new and app
+    # that return the application, and a module is not a class, so the class is kept with the functions of the module,
+    # where the routes find it by the name of the module
+    cls = type(
+        'Pyjoyment_Lite',
+        (Pyjoyment_Lite,),
+        {'__module__': caller, 'new': classmethod(lambda cls, *args, **kwargs: app)},
+    )
+
     # The Pyjoyment.Lite DSL
     dsl = _DSL(app, routes)
     functions: dict[str, Any] = {
@@ -415,6 +423,7 @@ def _import(caller: str, file: str | None) -> dict[str, Any]:
     }
     functions['delete'] = functions['del_'] = dsl.route('delete')
     functions.update(app=app, group=dsl.group, helper=app.helper, hook=app.hook, plugin=app.plugin, under=dsl.under)
+    functions['class'] = cls
 
     # Not in Mojolicious: the templates of functions, for the handler "py"
     functions['template'] = app.template

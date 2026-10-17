@@ -1,0 +1,16 @@
+#!/usr/bin/env python
+
+import Pyjo.File
+
+import sys
+
+
+sys.path.insert(0, Pyjo.File.path(__file__).to_abs().dirname().sibling('lib').to_str())
+
+# The module is in the directory that the line above puts in sys.path
+import MyApp  # noqa: E402  # pyright: ignore[reportMissingImports]
+
+
+# Start command line interface for application
+# TODO: Pyjoyment.Commands.start_app('MyApp'), when Pyjoyment.Commands is ported
+MyApp.new().start()

@@ -9,6 +9,7 @@ outside of it.
 | `templates/`        | templates of files of `Pyjoyment.Plugin.PyRenderer`, as `files/hello.html.py`                        |
 | `templates_native/` | the same with the t-strings of Python 3.14, checked by ruff and pyright as Python 3.14               |
 | `lib/`              | modules of the tests, as `PyjoymentTest.Plugin.DeploymentPlugin`, where Mojo has `t/mojolicious/lib` |
+| `external/`         | applications that `Pyjoyment.Plugin.Mount` mounts, where Mojo has `t/mojolicious/external`           |
 
 A test adds a directory to the paths of the renderer of its application, and
 renders a template by its name:
@@ -33,6 +34,15 @@ A test of the modules of `lib/` puts the directory in front of `sys.path`:
 sys.path.insert(0, Pyjo.File.path(__file__).to_abs().dirname().dirname().dirname().child('tt', 'lib').to_str())
 
 plugin('JSONConfig')  # with {"plugins": [{"PyjoymentTest.Plugin.DeploymentPlugin": {}}]}
+```
+
+The applications of `external/` are scripts with their configuration files,
+templates and static files next to them, as their home is the directory of
+the script; a test mounts one by its path:
+
+```python
+external = Pyjo.File.path(__file__).to_abs().dirname().dirname().dirname().child('tt', 'external', 'myapp.py')
+plugin('Mount', {'/x/1': external})
 ```
 
 The files are read, never written: a test that needs a file of its own, as a

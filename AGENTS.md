@@ -181,7 +181,8 @@ does not start fails the test instead of hanging it.
 - `t/lib/` holds helpers shared by the tests. Run on their own, they skip with
   `plan(skip_all=...)`, so `-r t` reports them as skipped instead of failing.
 - `tt/` holds the Python files that the tests use as data, as the templates
-  of files of `Pyjoyment.Plugin.PyRenderer`, and the modules of `tt/lib`,
+  of files of `Pyjoyment.Plugin.PyRenderer`, the modules of `tt/lib` and the
+  applications of `tt/external`, which `Pyjoyment.Plugin.Mount` mounts,
   outside `t/`, as `-r t` runs every Python file there. `tt/templates_native` holds the ones with the
   t-strings of Python 3.14, which only the tests of 3.14 render, and which
   ruff and pyright check as Python 3.14. A test does not write files into
@@ -553,7 +554,11 @@ sub {...}` is `get('/foo', cb)` or the decorator `@get('/foo')`, as a route
   is a decorator of its callback, `group {...}` is `with group():`, and
   `app->start` is `app.start()`. The templates of the `__DATA__` section of
   a Lite script are in its docstring after a line `__DATA__`, as a variable
-  at the end of the script comes after the code that serves them.
+  at the end of the script comes after the code that serves them. Mojo makes
+  the package a subclass of `Mojolicious` whose `new` returns its application,
+  so that a route embeds it by its name, as `to('EmbeddedTestApp')`; Lite
+  keeps such a class with the functions of the module, where the routes find
+  it by the name of the module.
 - `Test::Mojo` is `Pyjo.Test.Pyjo`, with the chains of methods of Mojo:
   `$t->get_ok('/')->status_is(200)` is `t.get_ok('/').status_is(200)`. Its
   attributes are attributes, so `$t->success(0)->or(...)` is an assignment
@@ -645,7 +650,10 @@ sub {...}` is `get('/foo', cb)` or the decorator `@get('/foo')`, as a route
   package like `Mojo::` from every directory of `sys.path`. The modules of
   `t/mojolicious/lib`, the test applications and plugins of the framework,
   are in `tt/lib`, with `PyjoymentTest` for `MojoliciousTest`, and a test
-  puts `tt/lib` in front of `sys.path`.
+  puts `tt/lib` in front of `sys.path`. The packages of a Mojo test that use
+  `Mojolicious::Lite`, as `TestApp` of `embedded_lite_app.t`, are modules of
+  `tt/lib` too, as an application of `Pyjoyment.Lite` is one of a module. The
+  applications of `t/mojolicious/external` are in `tt/external`.
 - A stack trace, Perl's `caller` frames, is a list of
   `traceback.FrameSummary`, the most recent first, as Mojo keeps it.
 - `like` of `Test::More` stringifies what it checks, `like_ok` does not:

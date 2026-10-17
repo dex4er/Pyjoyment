@@ -48,6 +48,7 @@ from Pyjo.Util import camelize
 from Pyjoyment.Routes.Route import Pyjoyment_Routes_Route
 
 import re
+import sys
 
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Self, cast
@@ -370,7 +371,11 @@ class Pyjoyment_Routes(Pyjoyment_Routes_Route):
             return loaded
         if isinstance(e := Pyjo.Loader.load_class(name), Exception):
             raise e
-        if (cls := Pyjo.Loader._class(name)) is None:  # pyright: ignore[reportPrivateUsage]
+
+        # Not in Mojolicious: the class of the application of a module of Pyjoyment.Lite, which Lite keeps with the
+        # functions of the module, as a module is not a class
+        lite: dict[str, Any] | None = getattr(sys.modules.get(name), '__pyjoyment_lite__', None)
+        if (cls := lite['class'] if lite else Pyjo.Loader._class(name)) is None:  # pyright: ignore[reportPrivateUsage]
             return None
 
         # Check base classes
