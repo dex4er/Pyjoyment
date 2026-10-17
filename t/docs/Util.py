@@ -90,10 +90,48 @@ with subtest('dumper'):
 
     is_ok(dumper({'some': 'data'}), "{'some': 'data'}\n", 'Python data structure')
 
+with subtest('extract_usage'):
+    from Pyjo.File import tempdir
+    from Pyjo.Util import extract_usage
+
+    # The module of the example, in a temporary directory, as a test writes nothing into t
+    file = (
+        tempdir()
+        .child('test.py')
+        .spew(b'''\
+"""
+Test command
+============
+::
+
+    Usage: APPLICATION test [OPTIONS]
+"""
+''')
+    )
+    is_ok(extract_usage(file.to_str()), 'Usage: APPLICATION test [OPTIONS]\n', 'usage')
+
 with subtest('generate_secret'):
     from Pyjo.Util import generate_secret
 
     like_ok(generate_secret(), r'^[A-Za-z0-9_-]{171}$', 'random secret')
+
+with subtest('getopt'):
+    from Pyjo.Util import getopt
+
+    args = ['-H', 'X-A: 1', '--timeout', '3', '-v', 'url']
+    headers = []
+    opts = getopt(args, {'H|headers=s': headers, 't|timeout=i': None, 'v|verbose': None})
+    is_deeply_ok(headers, ['X-A: 1'], 'list')
+    is_ok(opts.timeout, 3, 'value')
+    ok(opts.verbose, 'flag')
+    is_deeply_ok(args, ['url'], 'arguments')
+    args = ['-t', '3', '-x']
+    opts = getopt(args, {'H|headers=s': headers, 't|timeout=i': None}, pass_through=True)
+    is_deeply_ok(args, ['-x'], 'pass through')
+
+    # Extract "charset" option
+    opts = getopt(['--charset', 'UTF-8'], {'charset=s': None})
+    is_ok(opts.charset, 'UTF-8', 'charset')
 
 with subtest('header_params'):
     from Pyjo.Util import header_params
