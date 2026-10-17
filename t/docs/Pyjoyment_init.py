@@ -468,8 +468,23 @@ with subtest('server'):
     is_ok(servers[0], server, 'hook emitted')
 
 with subtest('start'):
+    import contextlib
+    import io
+    import os
+
     app = Pyjoyment.new()
-    is_ok(app.start(), app, 'started')
+    os.environ['PYJO_HARNESS_ACTIVE'] = '1'
+    is_ok(app.start(), True, 'started, without the list of the commands')
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        app.start('routes')
+    is_ok(buffer.getvalue(), '', 'no routes')
+    os.environ['PYJO_APP_LOADER'] = '1'
+    try:
+        is_ok(app.start(), app, 'application loader')
+        is_ok(Pyjo.Server.loaded_app, app, 'kept for the server')
+    finally:
+        del os.environ['PYJO_APP_LOADER']
 
 with subtest('startup'):
 

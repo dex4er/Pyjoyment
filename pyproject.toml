@@ -48,6 +48,7 @@ classifiers = [
 ]
 
 [project.scripts]
+pyjo = "Pyjoyment.Commands:main"
 pyjo-prove = "Pyjo.Prove:main"
 pyjo-hot = "Pyjo.Server.Hot:main"
 pyjo-reload = "Pyjo.Server.Reload:main"
@@ -271,6 +272,15 @@ strict = [
   "Pyjo/WebSocket.py",
   "Pyjo/YAML.py",
   "Pyjoyment/__init__.py",
+  "Pyjoyment/__main__.py",
+  "Pyjoyment/Command/__init__.py",
+  "Pyjoyment/Command/cgi.py",
+  "Pyjoyment/Command/daemon.py",
+  "Pyjoyment/Command/eval.py",
+  "Pyjoyment/Command/prefork.py",
+  "Pyjoyment/Command/routes.py",
+  "Pyjoyment/Command/version.py",
+  "Pyjoyment/Commands.py",
   "Pyjoyment/Controller.py",
   "Pyjoyment/HelloWorld.py",
   "Pyjoyment/Lite.py",

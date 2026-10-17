@@ -2,12 +2,21 @@ import Pyjo.UserAgent
 
 from Pyjo.Test import *
 
+import contextlib
+import io
+import os
+
 
 with subtest('Synopsis'):
     import Pyjoyment.HelloWorld
 
     hello = Pyjoyment.HelloWorld.new()
-    is_ok(hello.start(), hello, 'started')
+    os.environ['PYJO_HARNESS_ACTIVE'] = '1'
+    is_ok(hello.start(), True, 'started, without the list of the commands')
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        hello.start('routes')
+    like_ok(buffer.getvalue(), r'/\*whatever', 'command')
 
 with subtest('startup'):
     hello = Pyjoyment.HelloWorld.new()

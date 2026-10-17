@@ -126,6 +126,10 @@ Environment
 
     ``prove`` reads its options from ``.proverc`` instead.
 
+``PYJO_HARNESS_ACTIVE``
+    Set to ``1`` for the test scripts, as ``prove`` sets ``HARNESS_ACTIVE``,
+    which tells :mod:`Pyjoyment.Commands` not to list the commands.
+
 Functions
 ---------
 """
@@ -406,7 +410,9 @@ async def run(
     """
     command = list(command or [sys.executable])
     env = dict(os.environ if env is None else env)
-    # Not in prove: PYJO_HARNESS_IS_VERBOSE, where prove sets HARNESS_IS_VERBOSE
+    # Not in prove: PYJO_HARNESS_ACTIVE and PYJO_HARNESS_IS_VERBOSE, where prove sets HARNESS_ACTIVE and
+    # HARNESS_IS_VERBOSE
+    env['PYJO_HARNESS_ACTIVE'] = '1'
     if verbose:
         env['PYJO_HARNESS_IS_VERBOSE'] = '1'
     width = max((len(s) for s in scripts), default=0) + 3
