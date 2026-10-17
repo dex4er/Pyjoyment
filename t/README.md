@@ -59,6 +59,13 @@ PYTHONDEVMODE=1 PYTHONWARNINGS=error::SyntaxWarning,error::DeprecationWarning \
   mise exec -- python -m Pyjo.Prove -l -j 4 --timeout 60 --capture-stderr -r t
 ```
 
+With the tests that request remote hosts, which are those of GitHub, as CI
+runs them on the Python of `mise.toml`:
+
+```sh
+TEST_ONLINE=1 mise exec -- python -m Pyjo.Prove -l -j 4 -r t
+```
+
 On the reactor without asyncio:
 
 ```sh
