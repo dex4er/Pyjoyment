@@ -42,7 +42,10 @@ bench() {
   fi
   drain
   (cd "$B" && exec env PYTHONPATH="$R:$B" "$@" >"$OUT/$name.log" 2>&1 &)
-  for _ in $(seq 100); do curl -s -m 1 -o /dev/null "http://127.0.0.1:$port/" && break; sleep 0.1; done
+  for _ in $(seq 100); do
+    curl -s -m 1 -o /dev/null "http://127.0.0.1:$port/" && break
+    sleep 0.1
+  done
   echo "== $name: $(curl -s "http://127.0.0.1:$port/")"
   if [ "$ka" = yes ]; then
     for _ in 1 2 3; do WARMUP=$warmup timeout 300 "$PY" "$B/ka.py" "$port" 20000 2>&1 | tail -1; done

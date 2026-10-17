@@ -12,9 +12,9 @@ pairs=6
 reactors=()
 while getopts n:r: opt; do
   case $opt in
-  n) pairs=$OPTARG ;;
-  r) reactors+=("$OPTARG") ;;
-  *) exit 2 ;;
+    n) pairs=$OPTARG ;;
+    r) reactors+=("$OPTARG") ;;
+    *) exit 2 ;;
   esac
 done
 shift $((OPTIND - 1))
@@ -31,7 +31,10 @@ run() {
   local port=$1 root=$2 reactor=$3
   PYJO_REACTOR=Pyjo.Reactor.$reactor PYTHONPATH=$root "$PY" "$B/pyjo_daemon.py" "$port" >/dev/null 2>&1 &
   local pid=$!
-  for _ in $(seq 100); do curl -s -m 1 -o /dev/null "http://127.0.0.1:$port/" && break; sleep 0.1; done
+  for _ in $(seq 100); do
+    curl -s -m 1 -o /dev/null "http://127.0.0.1:$port/" && break
+    sleep 0.1
+  done
   "$PY" "$B/ka.py" "$port" 20000 | awk '{print $2}'
   kill -TERM $pid
   wait $pid
