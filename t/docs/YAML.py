@@ -19,8 +19,8 @@ list:
 
 with subtest('Description'):
     # {'foo': [1, True, 'yes', '2']}
-    throws_ok(lambda: load('foo: [1, true]'), re.compile(r'^YAML'), 'raises an exception')
     is_deeply_ok(load("foo:\n  - 1\n  - true\n  - yes\n  - '2'\n"), {'foo': [1, True, 'yes', '2']}, 'types')
+    throws_ok(lambda: load('foo: &anchor bar'), re.compile(r'^YAML does not support a feature'), 'anchor')
 
 with subtest('Tags'):
     import datetime

@@ -6,8 +6,9 @@ import re
 
 
 # Not in Mojolicious: Pyjo.YAML, the YAML that Mojolicious::Plugin::NotYAMLConfig reads with CPAN::Meta::YAML; the
-# results are those of CPAN::Meta::YAML, except for the aliases and the flow collections, which it reads as strings,
-# and for the types of the plain scalars, which it keeps as strings
+# results are those of YAML 1.2, as of PyYAML for its YAML 1.1 where the two agree, where CPAN::Meta::YAML keeps the
+# plain scalars as strings, reads the aliases and the flow collections as strings, and drops the empty lines and the
+# comments of the block scalars
 
 with subtest('Mappings'):
     is_deeply_ok(load('foo: bar\n'), {'foo': 'bar'}, 'one key')
@@ -75,7 +76,7 @@ with subtest('Types'):
     is_deeply_ok(load('- \'1\'\n- "true"\n'), ['1', 'true'], 'quoted')
     is_deeply_ok(load('- 1.2.3\n- 0x\n- 12abc\n- tRuE\n'), ['1.2.3', '0x', '12abc', 'tRuE'], 'not numbers')
     is_deeply_ok(load('foo: |\n  1\n'), {'foo': '1\n'}, 'block scalar')
-    is_deeply_ok(load('1: one\ntrue: yes\n'), {'1': 'one', 'true': 'yes'}, 'keys')
+    is_deeply_ok(load('404: one\ntrue: yes\n"2": two\n'), {404: 'one', True: 'yes', '2': 'two'}, 'keys')
     is_ok(load('--- 42\n'), 42, 'document')
 
 with subtest('Tags'):
@@ -119,6 +120,58 @@ with subtest('Block scalars'):
     is_deeply_ok(load('foo: >\n  folded\n  text\n'), {'foo': 'folded text\n'}, 'folded')
     is_deeply_ok(load('foo: >-\n  folded\n  text\n'), {'foo': 'folded text'}, 'folded chomped')
 
+with subtest('Block scalars with empty lines and comments'):
+    is_ok(load('k: |\n  a\n\n  b\n')['k'], 'a\n\nb\n', 'empty line')
+    is_ok(load('k: |\n  a\n  # not a comment\n  b\n')['k'], 'a\n# not a comment\nb\n', 'comment')
+    is_ok(load('k: |\n\n  a\n')['k'], '\na\n', 'leading empty line')
+    is_ok(load('k: |\n  a\n\n')['k'], 'a\n', 'clip')
+    is_ok(load('k: |-\n  a\n\n')['k'], 'a', 'strip')
+    is_ok(load('k: |+\n  a\n\n\nnext: 1\n')['k'], 'a\n\n\n', 'keep')
+    is_ok(load('k: >+\n  a\n\n')['k'], 'a\n\n', 'keep at the end')
+    is_ok(load('k: >\n  a\n  b\n\n  c\n   d\n  e\n')['k'], 'a b\nc\n d\ne\n', 'folding')
+    is_deeply_ok(load('foo: |\nbar: x\n'), {'foo': '', 'bar': 'x'}, 'empty block')
+    is_deeply_ok(load('a:\n  run: |-\n    one\n\n    two\n  b: 1\n'), {'a': {'run': 'one\n\ntwo', 'b': 1}}, 'nested')
+
+with subtest('Multi-line scalars'):
+    is_deeply_ok(load('k: some\n  text\nnext: 1\n'), {'k': 'some text', 'next': 1}, 'plain')
+    is_deeply_ok(load('k:\n  value below\n  more\n'), {'k': 'value below more'}, 'plain below its key')
+    is_deeply_ok(load('- a\n  b\n- c\n'), ['a b', 'c'], 'plain item')
+    is_deeply_ok(load('- a\n  - b\n'), ['a - b'], 'plain item with a dash')
+    is_ok(load('k: first\n\n  second\n')['k'], 'first\nsecond', 'plain with an empty line')
+    is_ok(load('r: ${{ x\n  && y }}\n')['r'], '${{ x && y }}', 'expression of a workflow')
+    is_ok(load('k: "multi\n  line"\n')['k'], 'multi line', 'double quoted')
+    is_ok(load("k: 'multi\n\n  line'\n")['k'], 'multi\nline', 'single quoted with an empty line')
+    is_ok(load('k: "a\\\n  b"\n')['k'], 'ab', 'escaped line break')
+    is_ok(load('k: 1\n  2\n')['k'], '1 2', 'not a number')
+
+with subtest('Flow collections'):
+    is_deeply_ok(load('labels: [bug]\n'), {'labels': ['bug']}, 'sequence')
+    is_deeply_ok(load('x: ["{|}"]\n'), {'x': ['{|}']}, 'quoted item')
+    is_deeply_ok(
+        load('x: [a, [b, c], {d: e, f: [1, 2.5, true, null]}]\n'),
+        {'x': ['a', ['b', 'c'], {'d': 'e', 'f': [1, 2.5, True, None]}]},
+        'nested',
+    )
+    is_deeply_ok(load("x: ['it''s', \"q\\\"\", 'a,b']\n"), {'x': ["it's", 'q"', 'a,b']}, 'quotes')
+    is_deeply_ok(load('x: [\n  a,\n  b,\n]\n'), {'x': ['a', 'b']}, 'lines')
+    is_deeply_ok(load('x: {a: 1,\n  b: 2}\n'), {'x': {'a': 1, 'b': 2}}, 'mapping in lines')
+    is_deeply_ok(load('x: []\ny: {}\n'), {'x': [], 'y': {}}, 'empty')
+    is_deeply_ok(load('[1, 2]\n'), [1, 2], 'document')
+    is_deeply_ok(load('{a: b}\n'), {'a': 'b'}, 'mapping document')
+    is_deeply_ok(load('x: [a: 1, b]\n'), {'x': [{'a': 1}, 'b']}, 'pair')
+    is_deeply_ok(load('x: {a, b: 2}\n'), {'x': {'a': None, 'b': 2}}, 'key without a value')
+    is_deeply_ok(load('x: [http://a.b:80/c, d]\n'), {'x': ['http://a.b:80/c', 'd']}, 'colons')
+    is_deeply_ok(load('x: [a b, c] # comment\n'), {'x': ['a b', 'c']}, 'spaces and a comment')
+    is_deeply_ok(load('x: {200: ok}\n'), {'x': {200: 'ok'}}, 'key with a type')
+    is_deeply_ok(load('- {a: 1}\n- [b]\n'), [{'a': 1}, ['b']], 'items')
+
+with subtest('Mappings in items'):
+    is_deeply_ok(
+        load('- generic [ref=e1]:\n  - text: hi\n'), [{'generic [ref=e1]': [{'text': 'hi'}]}], 'key with spaces'
+    )
+    is_deeply_ok(load('- "q: x"\n- \'{"a": 1}\'\n'), ['q: x', '{"a": 1}'], 'quoted items')
+    is_deeply_ok(load("- 'k': v\n"), [{'k': 'v'}], 'quoted key')
+
 with subtest('Comments and lines'):
     is_deeply_ok(load('foo: bar # comment\n'), {'foo': 'bar'}, 'trailing comment')
     is_deeply_ok(load('# comment\nfoo: bar\n\n# another\n'), {'foo': 'bar'}, 'comment lines')
@@ -138,20 +191,23 @@ with subtest('Documents'):
     is_ok(load('   \n'), None, 'blank')
 
 with subtest('Errors'):
-    throws_ok(lambda: load('a: b\n  c: d\n'), re.compile(r"^YAML found bad indenting in line '  c: d'"), 'indent')
+    throws_ok(
+        lambda: load('a: b\n  c: d\n'), re.compile(r"^YAML found illegal characters in plain scalar: 'c: d'"), 'indent'
+    )
     throws_ok(lambda: load('? complex\n'), re.compile(r'^YAML does not support a feature'), 'complex key')
     throws_ok(lambda: load('foo: &anchor bar\n'), re.compile(r'^YAML does not support a feature'), 'anchor')
     throws_ok(lambda: load('foo: !tag bar\n'), re.compile(r'^YAML does not support a feature'), 'local tag')
     throws_ok(lambda: load('foo: - bar\n'), re.compile(r'^YAML found illegal characters'), 'dash')
     throws_ok(lambda: load('foo: @bar\n'), re.compile(r'^YAML found illegal characters'), 'reserved')
     throws_ok(lambda: load('foo: a: b\n'), re.compile(r'^YAML found illegal characters'), 'colon')
-    throws_ok(lambda: load('foo: |\nbar: x\n'), re.compile(r'^YAML found bad indenting'), 'block scalar')
     throws_ok(lambda: load('--- foo\nbar: baz\n'), re.compile(r'^YAML failed to classify the line'), 'second document')
-    throws_ok(lambda: load('- a\n  - b\n'), re.compile(r'^YAML found bad indenting'), 'nested without item')
-    throws_ok(lambda: load('foo: {a: 1}\n'), re.compile(r'^YAML found illegal characters'), 'flow mapping')
+    throws_ok(lambda: load('foo: [a, b\n'), re.compile(r'^YAML failed to find the end of the flow collection'), 'flow')
+    throws_ok(lambda: load('foo: [a, b] c\n'), re.compile(r'^YAML found illegal characters after the flow'), 'after')
+    throws_ok(lambda: load('foo: [a b c, ]x]\n'), re.compile(r'^YAML'), 'flow syntax')
+    throws_ok(lambda: load('foo: "open\n'), re.compile(r'^YAML failed to find the end of the quoted scalar'), 'quote')
+    throws_ok(lambda: load('foo: |2\n  x\n'), re.compile(r'^YAML does not support a feature'), 'indentation indicator')
 
-    # Not in CPAN::Meta::YAML: an alias and a flow sequence are errors, not strings
+    # Not in CPAN::Meta::YAML: an alias is an error, not a string
     throws_ok(lambda: load('foo: *alias\n'), re.compile(r'^YAML does not support a feature'), 'alias')
-    throws_ok(lambda: load('foo: [1, 2]\n'), re.compile(r'^YAML found illegal characters'), 'flow sequence')
 
 done_testing()
