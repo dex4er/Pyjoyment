@@ -1,0 +1,2 @@
+% c = args[0]
+Hello Mojo from the other template <%= c.url_for() %>!
