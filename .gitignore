@@ -3,6 +3,7 @@
 .DS_Store
 .vscode
 .venv
+.venv-*
 benchmarks/venv/
 .ruff_cache
 __pycache__
