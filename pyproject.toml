@@ -205,6 +205,11 @@ executionEnvironments = [
   { root = "tt/templates_native", pythonVersion = "3.14", extraPaths = [
     ".",
   ] },
+  # The stages of the guide Growing, which import the model of its final application
+  { root = "docs/guides/growing", extraPaths = [
+    ".",
+    "docs/guides/growing/login",
+  ] },
   { root = "." },
 ]
 typeCheckingMode = "off"

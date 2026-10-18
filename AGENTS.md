@@ -1132,7 +1132,14 @@ application is a file of its own, in a directory with the name of the page,
 as `docs/guides/tutorial/`, which the page includes with `literalinclude`
 and the test of the guide in `t/docs` loads, so that what the reader sees is
 what is tested; a short snippet stays in the page, and the test has a copy of
-it. The names of the files are not those of modules of the standard library,
+it. A guide that grows an application of several files, as `growing.rst`,
+has a directory for each stage, with only the files that the stage adds or
+changes, and the final application whole, in `docs/guides/growing/login`:
+its test copies the stages over each other into a temporary directory and
+runs the commands of the guide there, as `inflate` and the moves of the
+templates, so that each stage is tested as the reader has it, and pyright
+finds the modules of the final application from the other stages with
+`extraPaths` in `pyproject.toml`. The names of the files are not those of modules of the standard library,
 as the directory of a script is the first one of `sys.path`. A link to a
 guide that is not ported yet goes to the one of Mojolicious. An example of
 Mojolicious that does not do what its guide says at the tag of the release,
