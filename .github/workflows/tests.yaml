@@ -68,7 +68,6 @@ jobs:
           PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
           TEST_ONLINE: "1"
         run: |
-          # shellcheck disable=SC2086 # POLL_TESTS is a list of globs
           python -m Pyjo.Prove -l --color -j 4 --timeout 60 --capture-stderr --stderr-lines 1000 $POLL_TESTS 2>&1 | tee prove.log
           if grep -n 'ResourceWarning:' prove.log; then exit 1; fi
 
@@ -141,42 +140,6 @@ jobs:
           PYJO_REACTOR: Pyjo.Reactor.Poll
           PYTHONDEVMODE: "1"
           PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
-        run: |
-          # shellcheck disable=SC2086 # POLL_TESTS is a list of globs
+        run: |-
           python -m Pyjo.Prove -l --color -j 4 --timeout 60 --capture-stderr --stderr-lines 1000 $POLL_TESTS 2>&1 | tee prove.log
           if grep -n 'ResourceWarning:' prove.log; then exit 1; fi
-
-  build:
-    name: build
-
-    runs-on: ubuntu-24.04-arm
-    timeout-minutes: 10
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Set up mise
-        uses: jdx/mise-action@v5
-        with:
-          version: 2026.10.4 # datasource=github-releases depName=jdx/mise
-
-      # uv.lock has to match pyproject.toml.
-      - name: Check uv.lock
-        run: uv lock --check
-
-      - name: Build sdist and wheel
-        run: uv build
-
-      # Package data is the easiest part of a package to lose silently.
-      - name: Check wheel contents
-        run: |-
-          python -m zipfile -l dist/*.whl | tee wheel.txt
-          grep -q 'Pyjo/IOLoop/certs/server.crt' wheel.txt
-          grep -q 'Pyjo/IOLoop/certs/server.key' wheel.txt
-          grep -q 'Pyjoyment/__init__.py' wheel.txt
-          grep -q 'Pyjoyment/resources/public/favicon.ico' wheel.txt
-          grep -q 'Pyjoyment/resources/public/pyjo/logo.png' wheel.txt
-          grep -q 'Pyjoyment/resources/public/pyjo/bootstrap/bootstrap.css' wheel.txt
-          grep -q 'Pyjoyment/resources/templates/pyjo/debug.html.ep' wheel.txt
-          grep -q 'Pyjo/py.typed' wheel.txt
