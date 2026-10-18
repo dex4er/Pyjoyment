@@ -75,8 +75,11 @@ string is plain where it reads back as the same string, quoted otherwise, and
 a literal block scalar when it has several lines. :class:`bytes` and dates
 have the tags ``!!binary`` and ``!!timestamp``, and another object is what
 :mod:`Pyjo.JSON` encodes, the value of its method ``__json__`` or its string.
-A collection that is there twice is written twice, without anchors, and one
-inside itself raises an error. ::
+A :class:`dict` or a :class:`list` that is there more than once has an anchor
+where it is first and an alias after it, which the loader reads back as the
+same object, and one inside itself raises an error, as the loader cannot read
+it back; a :class:`tuple` has no identity of its own, as the compiler can
+share one that is a constant, and it is written again. ::
 
     # 'name: Pyjoyment\\nlist:\\n  - one\\n  - 2\\nrun: |\\n  make\\n'
     dump({'name': 'Pyjoyment', 'list': ['one', 2], 'run': 'make\\n'})
@@ -152,6 +155,7 @@ def dump(
     multiline: bool = True,
     explicit_start: bool = False,
     version: Literal['1.1', '1.2'] = '1.1',
+    anchors: bool = True,
 ) -> str:
     """::
 
@@ -180,7 +184,14 @@ def dump(
       default quotes also the strings that YAML 1.1 reads as other types,
       as ``yes``, ``off``, ``1_000``, ``12:30`` and ``2001-12-14``, which
       PyYAML reads so, and ``'1.2'`` only those of the core schema of YAML
-      1.2, as ``true``, ``null`` and ``1.5``. ::
+      1.2, as ``true``, ``null`` and ``1.5``;
+    * ``anchors``, whether a :class:`dict` or a :class:`list` that is there
+      more than once has an anchor where it is first and an alias after it,
+      ``True`` by default, or is written again; an anchor has the name of the
+      key of the collection, or of the sequence of the item, with the
+      characters that are not ``A-Z``, ``a-z``, ``0-9``, ``_`` and ``-`` as
+      ``_``, ``id`` without a key, and a number from ``2`` for another
+      anchor of the same name. ::
 
         # 'foo:\n- "bar"\n'
         dump({'foo': ['bar']}, indent_sequences=False, quote='"')
@@ -194,6 +205,7 @@ def dump(
         multiline=multiline,
         explicit_start=explicit_start,
         version=version,
+        anchors=anchors,
     )
 
 
@@ -207,6 +219,7 @@ def dump_all(
     multiline: bool = True,
     explicit_start: bool = False,
     version: Literal['1.1', '1.2'] = '1.1',
+    anchors: bool = True,
 ) -> str:
     """::
 
@@ -219,7 +232,7 @@ def dump_all(
         # '--- first\n--- second\n'
         dump_all(['first', 'second'])
     """
-    dumper = _Dumper(indent, indent_sequences, quote, quote_keys, multiline, version)
+    dumper = _Dumper(indent, indent_sequences, quote, quote_keys, multiline, version, anchors)
     lines: list[str] = []
     for i, value in enumerate(values):
         lines += dumper.document(value, explicit_start or i > 0)
@@ -931,6 +944,7 @@ class _Dumper:
         quote_keys: str | None,
         multiline: bool,
         version: str,
+        anchors: bool,
     ) -> None:
         if indent < 1:
             raise ValueError(f'indent must be 1 or more, not {indent}')
@@ -939,15 +953,18 @@ class _Dumper:
                 raise ValueError(f"""{name} must be "'", '"' or None, not {value!r}""")
         if version not in ('1.1', '1.2'):
             raise ValueError(f"version must be '1.1' or '1.2', not {version!r}")
+        self.anchors = anchors
+        self.counts: dict[int, int] = {}
         self.indent = indent
         self.indent_sequences = indent_sequences
         self.multiline = multiline
+        self.names: dict[int, str] = {}
         self.parents: set[int] = set()
         self.quote = quote
         self.quote_keys = quote_keys
         self.yaml11 = version == '1.1'
 
-    def collection(self, value: Any, column: int) -> list[str] | None:
+    def collection(self, value: Any, column: int, name: str) -> list[str] | None:
         # The lines of a collection that is not empty, which is not a scalar, or None
         if not value or not isinstance(value, (dict, list, tuple)):
             return None
@@ -958,12 +975,30 @@ class _Dumper:
         if isinstance(collection, dict):
             lines = self.mapping(collection, column)
         else:
-            lines = self.sequence(collection, column)
+            lines = self.sequence(collection, column, name)
         self.parents.remove(id(collection))
         return lines
 
+    def count(self, value: Any) -> None:
+        # The times that each dict and list is there, and the ones inside it, the first time
+        if isinstance(value, tuple):
+            for item in cast(tuple[Any, ...], value):
+                self.count(item)
+        elif isinstance(value, (dict, list)):
+            collection = cast(dict[Any, Any] | list[Any], value)
+            self.counts[id(collection)] = count = self.counts.get(id(collection), 0) + 1
+            if count == 1:
+                for item in collection.values() if isinstance(collection, dict) else collection:
+                    self.count(item)
+
     def document(self, value: Any, start: bool) -> list[str]:
-        if (lines := self.collection(value := _data(value), 0)) is not None:
+        # The anchors of a document are its own
+        self.counts = {}
+        self.names = {}
+        if self.anchors:
+            self.count(value)
+
+        if (lines := self.collection(value := _data(value), 0, 'id')) is not None:
             return ['---', *lines] if start else lines
 
         # A scalar after the start of its document, where the loader reads it
@@ -997,14 +1032,17 @@ class _Dumper:
     def mapping(self, mapping: dict[Any, Any], column: int) -> list[str]:
         lines: list[str] = []
         for key, value in mapping.items():
-            prefix = ' ' * column + self.key(key) + ':'
+            prefix = ' ' * column + (text := self.key(key)) + ':'
+            name = key if isinstance(key, str) else text
             value = _data(value)
             nested = column + self.indent if isinstance(value, dict) or self.indent_sequences else column
-            if (below := self.collection(value, nested)) is not None:
-                lines += [prefix, *below]
+            if (reference := self.reference(value, name)).startswith('*'):
+                lines.append(f'{prefix} {reference}')
+            elif (below := self.collection(value, nested, name)) is not None:
+                lines += [f'{prefix} {reference}' if reference else prefix, *below]
             else:
                 text, block = self.scalar(value, column)
-                lines += [f'{prefix} {text}', *block]
+                lines += [f'{prefix} {reference} {text}' if reference else f'{prefix} {text}', *block]
         return lines
 
     def plain(self, string: str, key: bool) -> bool:
@@ -1018,6 +1056,23 @@ class _Dumper:
         if not isinstance(_resolve(string), str):
             return False
         return not (self.yaml11 and _RE_YAML11.fullmatch(string))
+
+    def reference(self, value: Any, name: str) -> str:
+        # The anchor of a dict or a list that is there more than once, where it is first, with the name of its key and
+        # a number for another one of the name, and its alias after it
+        if not isinstance(value, (dict, list)) or self.counts.get(key := id(cast(Any, value)), 0) < 2:
+            return ''
+        if (anchor := self.names.get(key)) is None:
+            anchor = name = re.sub(r'[^0-9A-Za-z_-]+', '_', name).strip('_') or 'id'
+            number = 1
+            while anchor in self.names.values():
+                number += 1
+                anchor = f'{name}{number}'
+            self.names[key] = anchor
+            return f'&{anchor}'
+        if key in self.parents:
+            raise _error('found a collection inside itself')
+        return f'*{anchor}'
 
     def scalar(self, value: Any, column: int) -> tuple[str, list[str]]:
         if isinstance(value, str):
@@ -1034,16 +1089,22 @@ class _Dumper:
             return '!!timestamp ' + value.isoformat(), []
         raise _error(f"does not support a value of the type '{type(value).__name__}'")
 
-    def sequence(self, sequence: list[Any] | tuple[Any, ...], column: int) -> list[str]:
+    def sequence(self, sequence: list[Any] | tuple[Any, ...], column: int, name: str) -> list[str]:
         lines: list[str] = []
         pad = ' ' * column
         for item in sequence:
-            # A collection that starts on the line of the item
-            if (nested := self.collection(item := _data(item), column + 2)) is not None:
-                lines += [f'{pad}- {nested[0][column + 2 :]}', *nested[1:]]
+            # A collection that starts on the line of the item, or below its anchor
+            item = _data(item)
+            if (reference := self.reference(item, name)).startswith('*'):
+                lines.append(f'{pad}- {reference}')
+            elif (nested := self.collection(item, column + 2, name)) is not None:
+                if reference:
+                    lines += [f'{pad}- {reference}', *nested]
+                else:
+                    lines += [f'{pad}- {nested[0][column + 2 :]}', *nested[1:]]
             else:
                 text, block = self.scalar(item, column)
-                lines += [f'{pad}- {text}', *block]
+                lines += [f'{pad}- {reference} {text}' if reference else f'{pad}- {text}', *block]
         return lines
 
     def string(

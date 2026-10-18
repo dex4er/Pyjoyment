@@ -420,8 +420,38 @@ with subtest('Dump objects'):
     recursive: list[object] = []
     recursive.append(recursive)
     throws_ok(lambda: dump(recursive), re.compile(r'^YAML found a collection inside itself'), 'recursion')
+    inner: list[object] = []
+    inner.append({'a': inner})
+    throws_ok(lambda: dump({'b': inner}), re.compile(r'^YAML found a collection inside itself'), 'deeper recursion')
+
+with subtest('Dump anchors'):
     shared = ['x']
-    is_ok(dump([shared, shared]), '- - x\n- - x\n', 'same object twice')
+    is_ok(dump([shared, shared]), '- &id\n  - x\n- *id\n', 'sequence')
+    is_ok(dump([shared, shared], anchors=False), '- - x\n- - x\n', 'without anchors')
+    mapping = {'a': 1}
+    is_ok(dump({'b': mapping, 'c': [mapping]}), 'b: &b\n  a: 1\nc:\n  - *b\n', 'mapping')
+    is_ok(dump({'steps': [mapping, mapping]}), 'steps:\n  - &steps\n    a: 1\n  - *steps\n', 'items')
+    is_ok(dump({'a': shared, 'b': shared}, indent_sequences=False), 'a: &a\n- x\nb: *a\n', 'not indented')
+    empty: list[object] = []
+    is_ok(dump({'a': empty, 'b': empty}), 'a: &a []\nb: *a\n', 'empty')
+    is_ok(dump([mapping, shared, mapping, shared]), '- &id\n  a: 1\n- &id2\n  - x\n- *id\n- *id2\n', 'two')
+    other = {'b': 2}
+    is_ok(
+        dump({'a': mapping, 'x': {'a': other}, 'c': mapping, 'd': other}),
+        'a: &a\n  a: 1\nx:\n  a: &a2\n    b: 2\nc: *a\nd: *a2\n',
+        'name of a key again',
+    )
+    is_ok(
+        dump({'key with spaces': mapping, 'ü': other, 404: shared, 'k': [mapping, other, shared]}),
+        'key with spaces: &key_with_spaces\n  a: 1\nü: &id\n  b: 2\n404: &404\n  - x\n'
+        + 'k:\n  - *key_with_spaces\n  - *id\n  - *404\n',
+        'characters of the names',
+    )
+    is_ok(dump_all([[shared, shared], [shared]]), '- &id\n  - x\n- *id\n---\n- - x\n', 'documents')
+    pair = ('x',)
+    is_ok(dump([pair, pair]), '- - x\n- - x\n', 'tuple')
+    data = load(dump({'b': mapping, 'c': [mapping]}))
+    ok(data['b'] is data['c'][0], 'same object')
 
 with subtest('Dump round trip'):
     data = {
