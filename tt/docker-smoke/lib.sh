@@ -9,12 +9,17 @@ root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 work=$(mktemp -d)
 name=pyjo-smoke-$(basename "$0" .sh)
 
+# The containers, images and networks that a variant adds, which cleanup
+# removes too
+extra_cleanup() { :; }
+
 cleanup() {
   status=$?
   if [[ ${status} -ne 0 ]] && docker inspect "${name}" >/dev/null 2>&1; then
     echo "--- logs of ${name}"
     docker logs "${name}" 2>&1 || true
   fi
+  extra_cleanup
   docker rm -f "${name}" >/dev/null 2>&1 || true
   docker rmi -f "${name}" >/dev/null 2>&1 || true
   rm -rf "${work}"
@@ -54,6 +59,17 @@ lock() {
 }
 
 # The image of "generate dockerfile", with the wheel copied with the files of
+# the dependencies, the only change of the generated Dockerfile
+build_dockerfile() {
+  [[ -f .dockerignore ]] || fail ".dockerignore"
+  WHEEL=${wheel} perl -pi -e 's{^(COPY (?:pyproject\.toml|myapp\.py)\b.*) \./$}{$1 $ENV{WHEEL} ./}' Dockerfile
+  grep -q "^COPY .*${wheel} \./$" Dockerfile || fail "wheel in Dockerfile"
+  cat Dockerfile
+
+  docker build --progress plain --tag "${name}" .
+}
+
+# The image of "generate dockerfile", with the wheel copied with the files of
 # the dependencies, the only change of the generated Dockerfile, which exposes
 # its port, serves the pages and stops gracefully on the TERM of docker stop
 #
@@ -80,12 +96,7 @@ smoke_dockerfile() {
     shift 2
   done
 
-  [[ -f .dockerignore ]] || fail ".dockerignore"
-  WHEEL=${wheel} perl -pi -e 's{^(COPY (?:pyproject\.toml|myapp\.py)\b.*) \./$}{$1 $ENV{WHEEL} ./}' Dockerfile
-  grep -q "^COPY .*${wheel} \./$" Dockerfile || fail "wheel in Dockerfile"
-  cat Dockerfile
-
-  docker build --progress plain --tag "${name}" .
+  build_dockerfile
   local exposed
   exposed=$(docker inspect --format '{{range $port, $_ := .Config.ExposedPorts}}{{$port}} {{end}}' "${name}")
   [[ ${exposed} == "${expose}/tcp " ]] || fail "exposed ${exposed}"
@@ -118,8 +129,12 @@ smoke_dockerfile() {
     echo "ok - user ${config}"
   fi
 
-  # TERM of docker stop is a graceful shutdown, well before the KILL after 10
-  # seconds
+  stop_gracefully
+}
+
+# TERM of docker stop is a graceful shutdown, well before the KILL after 10
+# seconds
+stop_gracefully() {
   local start elapsed code
   start=${SECONDS}
   docker stop --time 10 "${name}" >/dev/null
