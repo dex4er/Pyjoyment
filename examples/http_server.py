@@ -32,17 +32,16 @@ class MyApp(Pyjo.App.object):
 
     # All the complexities of CGI, WSGI, ASGI, HTTP and WebSockets get reduced to a single method call!
     def handler(self, tx):
-        # Request
-        method = tx.req.method
-        path = tx.req.url.path
+        # Resume transaction at the end of the block
+        with tx:
+            # Request
+            method = tx.req.method
+            path = tx.req.url.path
 
-        # Response
-        tx.res.code = 200
-        tx.res.headers.content_type = 'text/html; charset=utf-8'
-        tx.res.body = self.template.process({'method': method, 'path': path}).encode()
-
-        # Resume transaction
-        tx.resume()
+            # Response
+            tx.res.code = 200
+            tx.res.headers.content_type = 'text/html; charset=utf-8'
+            tx.res.body = self.template.process({'method': method, 'path': path}).encode()
 
 
 # Options --address and --port

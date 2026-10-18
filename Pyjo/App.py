@@ -11,17 +11,17 @@ Pyjo.App - Duct tape for the HTML5 web
         # reduced to a single method call!
         def handler(self, tx):
 
-            # Request
-            method = tx.req.method
-            path = tx.req.url.path
+            # Resume transaction at the end of the block
+            with tx:
 
-            # Response
-            tx.res.code = 200
-            tx.res.headers.content_type = 'text/plain'
-            tx.res.body = f'{method} request for {path}!'.encode()
+                # Request
+                method = tx.req.method
+                path = tx.req.url.path
 
-            # Resume transaction
-            tx.resume()
+                # Response
+                tx.res.code = 200
+                tx.res.headers.content_type = 'text/plain'
+                tx.res.body = f'{method} request for {path}!'.encode()
 
 :mod:`Pyjo.App` is the base class of applications of :mod:`Pyjo`, a flexible
 runtime environment for real-time web frameworks, with all the basic tools and
