@@ -649,7 +649,7 @@ class Pyjoyment_Controller(Pyjo.Base.object):
         """
         return self.render(template, **args, **{'mojo.string': True})
 
-    def rendered(self, status: int | None = None) -> Self:
+    def rendered(self, status: int | str | None = None) -> Self:
         """::
 
             c = c.rendered()
@@ -665,7 +665,7 @@ class Pyjoyment_Controller(Pyjo.Base.object):
         """
         # Make sure we have a status
         if status:
-            self.res.code = status
+            self.res.code = int(status)
 
         # Finish transaction
         stash = self.stash()
