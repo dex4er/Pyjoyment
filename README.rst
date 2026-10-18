@@ -33,6 +33,12 @@ web framework:
 The ``Pyjoyment`` package is the web framework itself: routes, controllers,
 renderer, plugins, ``Pyjoyment.Lite`` and the command line interface.
 
+Both are cloud native: ``generate dockerfile`` writes the image of an
+application, whose server stops gracefully on the ``TERM`` of its container
+and listens on the port of ``PORT``, as Knative, Cloud Run, Render, Koyeb and
+Heroku set it, and an application runs as an event function of AWS Lambda
+too.
+
 Pyjoyment requires Python 3.12 or newer and runs on PyPy on a best-effort
 basis. It needs nothing besides the Python standard library.
 
