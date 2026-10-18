@@ -27,7 +27,8 @@ Pyjoyment.Command.daemon - Daemon command
                                            value of PYJO_KEEP_ALIVE_TIMEOUT or 5
       -l, --listen <location>              One or more locations you want to
                                            listen on, defaults to the value of
-                                           PYJO_LISTEN or "http://*:3000"
+                                           PYJO_LISTEN, the port of PORT or
+                                           "http://*:3000"
       -m, --mode <name>                    Operating mode for your application,
                                            defaults to the value of
                                            PYJO_MODE or "development"

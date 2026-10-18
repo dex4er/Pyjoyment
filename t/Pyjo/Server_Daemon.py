@@ -58,11 +58,24 @@ with subtest('Timeouts'):
 with subtest('Listen'):
     with patch.dict(os.environ):
         os.environ.pop('PYJO_LISTEN', None)
+        # Not in Mojolicious: PORT, which is not set for the test
+        os.environ.pop('PORT', None)
         is_deeply_ok(Pyjo.Server.Daemon.new().listen, ['http://*:3000'], 'right value')
         os.environ['PYJO_LISTEN'] = 'http://127.0.0.1:8080'
         is_deeply_ok(Pyjo.Server.Daemon.new().listen, ['http://127.0.0.1:8080'], 'right value')
         os.environ['PYJO_LISTEN'] = 'http://*:80,https://*:443'
         is_deeply_ok(Pyjo.Server.Daemon.new().listen, ['http://*:80', 'https://*:443'], 'right value')
+
+        # Not in Mojolicious: PORT, of the platforms that tell the port to listen on, as Knative, Cloud Run and Heroku,
+        # after PYJO_LISTEN
+        os.environ['PORT'] = '8080'
+        is_deeply_ok(Pyjo.Server.Daemon.new().listen, ['http://*:80', 'https://*:443'], 'PYJO_LISTEN first')
+        os.environ.pop('PYJO_LISTEN')
+        is_deeply_ok(Pyjo.Server.Daemon.new().listen, ['http://*:8080'], 'port of PORT')
+        os.environ['PORT'] = ''
+        is_deeply_ok(Pyjo.Server.Daemon.new().listen, ['http://*:3000'], 'empty PORT')
+        os.environ['PORT'] = 'http'
+        is_deeply_ok(Pyjo.Server.Daemon.new().listen, ['http://*:3000'], 'PORT that is not a port')
 
 with subtest('Reverse proxy'):
     ok(not Pyjo.Server.Daemon.new().reverse_proxy, 'no reverse proxy')

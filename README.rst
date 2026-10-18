@@ -33,6 +33,12 @@ web framework:
 The ``Pyjoyment`` package is the web framework itself: routes, controllers,
 renderer, plugins, ``Pyjoyment.Lite`` and the command line interface.
 
+Both are cloud native: ``generate dockerfile`` writes the image of an
+application, whose server stops gracefully on the ``TERM`` of its container
+and listens on the port of ``PORT``, as Knative, Cloud Run, Render, Koyeb and
+Heroku set it, and an application runs as an event function of AWS Lambda
+too.
+
 Pyjoyment requires Python 3.12 or newer and runs on PyPy on a best-effort
 basis. It needs nothing besides the Python standard library.
 
@@ -191,6 +197,16 @@ or on `Werkzeug <https://werkzeug.palletsprojects.com/>`_, a WSGI server
 and answers on port 3000: ::
 
     curl http://localhost:3000/
+
+On a platform that tells the server the port to listen on with the ``PORT``
+environment variable, as `Knative <https://knative.dev/>`_,
+`Cloud Run <https://cloud.google.com/run>`_, `Render <https://render.com/>`_,
+`Koyeb <https://www.koyeb.com/>`_ or `Heroku <https://www.heroku.com/>`_, the
+web server of Pyjoyment listens on that port, and ``generate dockerfile``
+writes the ``Dockerfile`` of the image of an application, with the port that
+the image exposes: ::
+
+    ./myapp.py generate dockerfile --port 8080
 
 On `AWS Lambda <https://aws.amazon.com/lambda/>`_, it is an event function,
 whose handler ``hello_world_lambda.handler`` answers the events of API

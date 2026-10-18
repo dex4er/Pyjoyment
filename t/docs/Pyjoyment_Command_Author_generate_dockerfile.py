@@ -36,6 +36,7 @@ with subtest('Synopsis'):
         'usage',
     )
     like_ok(dockerfile.usage, r'-u, --user <name>', 'option')
+    like_ok(dockerfile.usage, r'-p, --port <port>', 'option of the port')
 
     # python -m MyApp generate dockerfile
     tmp = Pyjo.File.tempdir()
@@ -51,6 +52,12 @@ with subtest('Synopsis'):
     tmp.child('pyproject.toml').spew('[project]\nname = "my_app"\n')
     content = generate(tmp, '--user', 'app')
     like_ok(content, r'(?m)^RUN useradd --system app\nUSER app$', 'user')
+
+    # python -m MyApp generate dockerfile --port 8080
+    tmp = Pyjo.File.tempdir()
+    tmp.child('pyproject.toml').spew('[project]\nname = "my_app"\n')
+    content = generate(tmp, '--port', '8080')
+    like_ok(content, r'(?m)^ARG PORT=8080\nENV PORT=\$\{PORT\}\nEXPOSE \$\{PORT\}$', 'port')
 
     # ./myapp.py generate dockerfile
     tmp = Pyjo.File.tempdir()

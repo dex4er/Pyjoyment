@@ -282,8 +282,9 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
 
         List of one or more locations to listen on, as strings or
         :mod:`Pyjo.URL` objects, defaults to the value of the ``PYJO_LISTEN``
-        environment variable or ``http://*:3000`` (shortcut for
-        ``http://0.0.0.0:3000``). ::
+        environment variable, to ``http://*:`` with the port of the ``PORT``
+        environment variable, which platforms as Knative, Cloud Run and Heroku
+        set, or to ``http://*:3000`` (shortcut for ``http://0.0.0.0:3000``). ::
 
             # Listen on all IPv4 interfaces
             daemon.listen = ['http://*:3000']
@@ -396,9 +397,10 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
             TLS protocol version.
         """
         if self._locations is None:
-            self._locations = [
-                location or '' for location in split(',', os.environ.get('PYJO_LISTEN') or 'http://*:3000')
-            ]
+            # Not in Mojolicious: the port of PORT, which the platform that runs the server tells it to listen on
+            port = os.environ.get('PORT') or ''
+            default = f'http://*:{port}' if re.fullmatch(r'\d+', port) else 'http://*:3000'
+            self._locations = [location or '' for location in split(',', os.environ.get('PYJO_LISTEN') or default)]
         return self._locations
 
     @listen.setter
