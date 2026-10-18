@@ -50,6 +50,26 @@ with subtest('Synopsis'):
     is_deeply_ok(decode_json(tx.res.body), {'hello': 'sri'}, 'action')
     is_ok(tx.res.headers.cache_control, 'max-age=1, no-cache', 'header')
 
+with subtest('Context manager'):
+
+    class MyApp_Controller_Later(Pyjoyment.Controller.object):
+        # Exception in a callback of a delayed response
+        def later(self):
+            @Pyjo.IOLoop.next_tick
+            def tick(loop):
+                with self:
+                    self.render(text=self.param('name').upper())
+
+    sys.modules['MyApp_Controller_Later'] = types.ModuleType('MyApp_Controller_Later')
+    sys.modules['MyApp_Controller_Later'].object = MyApp_Controller_Later
+    app = Pyjoyment.new()
+    app.log.level = 'fatal'
+    app.exception_format = 'txt'
+    app.routes.get('/later').to('MyApp_Controller_Later#later', namespace='')
+    t = Pyjo.Test.Pyjo.new(app)
+    t.get_ok('/later?name=sri').status_is(200).content_is('SRI')
+    t.get_ok('/later').status_is(500).content_like(r"'NoneType' object has no attribute 'upper'")
+
 with subtest('Helpers'):
     app, c = controller()
 
