@@ -139,5 +139,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |-
           gh workflow run bundle-check.yaml --ref "$BRANCH"
+          gh workflow run build.yaml --ref "$BRANCH"
           gh workflow run tests.yaml --ref "$BRANCH"
           gh workflow run trunk-check.yaml --ref "$BRANCH"
