@@ -27,7 +27,9 @@ Pyjo.Server.Daemon - Non-blocking I/O HTTP and WebSocket server
 
 :mod:`Pyjo.Server.Daemon` is a full featured, highly portable non-blocking
 I/O HTTP and WebSocket server, with IPv6, TLS, SNI, Comet (long polling),
-keep-alive and multiple event loop support.
+keep-alive and multiple event loop support. It also speaks FastCGI to a web
+server in front of it, on the listen locations ``fcgi://`` and
+``fcgi+unix://``, with :mod:`Pyjo.Server.FastCGI`.
 
 TLS support comes from :mod:`ssl` of the standard library, and can be
 disabled with the ``PYJO_NO_TLS`` environment variable, as name resolution
@@ -93,6 +95,7 @@ import Pyjo.IOLoop.Stream
 import Pyjo.IOLoop.TLS
 import Pyjo.Reactor
 import Pyjo.Server
+import Pyjo.Server.FastCGI
 import Pyjo.Transaction
 import Pyjo.Transaction.HTTP
 import Pyjo.Transaction.WebSocket
@@ -300,6 +303,12 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
 
             # Listen on UNIX domain socket "/tmp/myapp.sock" (percent encoded slash)
             daemon.listen = ['http+unix://%2Ftmp%2Fmyapp.sock']
+
+            # FastCGI for a web server in front of the application
+            daemon.listen = ['fcgi://127.0.0.1:9000']
+
+            # FastCGI on UNIX domain socket "/tmp/myapp.sock"
+            daemon.listen = ['fcgi+unix://%2Ftmp%2Fmyapp.sock']
 
             # File descriptor, as used by systemd
             daemon.listen = ['http://127.0.0.1?fd=3']
@@ -586,6 +595,8 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
         self._servers = {}
 
     def _close(self, id: str) -> None:
+        if (fcgi := self._connections.get(id, {}).get('fcgi')) is not None:
+            fcgi.closed()
         if (tx := self._connections.get(id, {}).get('tx')) is not None:
             tx.closed()
         self._connections.pop(id, None)
@@ -636,8 +647,10 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
         # A Pyjo.URL stringifies, as a Mojo::URL does for Mojo::URL->new
         url = Pyjo.URL.new(str(listen))
         proto = url.protocol
-        if proto not in ('http', 'https', 'http+unix'):
+        # Not in Mojolicious: FastCGI, with Pyjo.Server.FastCGI
+        if proto not in ('http', 'https', 'http+unix', 'fcgi', 'fcgi+unix'):
             raise Pyjo.Exception.new(f'Invalid listen location "{listen}"')
+        fcgi = proto.startswith('fcgi')
 
         query = url.query
         options: dict[str, Any] = {'backlog': self.backlog}
@@ -645,7 +658,7 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
             options['fd'] = int(fd)
         for name in ('single_accept', 'reuse'):
             options[name] = (value := query.param(name)) is not None and value not in ('', '0')
-        if proto == 'http+unix':
+        if proto in ('http+unix', 'fcgi+unix'):
             options['path'] = url.host
         else:
             if (host := url.host) != '*':
@@ -684,6 +697,9 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
             if (this := ref()) is None:
                 return
             this._connections[id] = {'tls': tls}
+            # Not in Mojolicious: FastCGI, whose records Pyjo.Server.FastCGI reads and writes
+            if fcgi:
+                this._connections[id]['fcgi'] = Pyjo.Server.FastCGI.new(this, id)
             if DEBUG:
                 warn(f'-- Accept {id} ({_peer(stream.handle)})\n')
             stream.timeout = this.inactivity_timeout
@@ -724,6 +740,8 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
     def _read(self, id: str, chunk: bytes) -> None:
         # Make sure we have a transaction
         c = self._connections[id]
+        if (fcgi := c.get('fcgi')) is not None:
+            return fcgi.read(chunk)
         if (tx := c.get('tx')) is None:
             tx = c['tx'] = self._build_tx(id, c)
         if DEBUG:

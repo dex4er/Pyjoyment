@@ -227,7 +227,7 @@ as a reactor without asyncio has to pass them too:
 PYJO_REACTOR=Pyjo.Reactor.Poll mise exec -- python -m Pyjo.Prove -l -j 4 --capture-stderr --stderr-lines 1000 \
   t/Pyjo/IOLoop*.py t/Pyjo/TLS.py t/Pyjo/Promise*.py t/Pyjo/Subprocess.py t/stdlib/IOLoop*.py \
   t/Pyjo/UserAgent*.py t/stdlib/UserAgent*.py t/Pyjo/WebSocket*.py t/Pyjo/Server_Daemon*.py t/stdlib/Server_Daemon.py \
-  t/Pyjo/Server_Hot.py t/stdlib/Server_Hot.py t/Pyjo/Server_Prefork.py t/stdlib/Server_Prefork.py \
+  t/Pyjo/Server_FastCGI.py t/Pyjo/Server_Hot.py t/stdlib/Server_Hot.py t/Pyjo/Server_Prefork.py t/stdlib/Server_Prefork.py \
   t/Pyjo/Server_Reload.py t/stdlib/Server_Reload.py t/Pyjo/File_download.py
 ```
 
@@ -269,7 +269,11 @@ which exposes its port, and the one with the inline metadata on the port of
 of `generate dockerfile --graceful-timeout`, whose workers stop with it. Its
 variant `lambda` runs a Lite script that ends with `handler = app.start()` as
 an event function in the image of AWS Lambda for Python, whose emulator of the
-Runtime API it invokes with the events of the payload formats 2.0 and 1.0.
+Runtime API it invokes with the events of the payload formats 2.0 and 1.0,
+and its variant `fastcgi` runs a Lite script that listens for FastCGI, with
+`PYJO_LISTEN`, behind Caddy in a container of its own on the same network,
+whose image `Dockerfile.caddy` pins, so that Renovate bumps it, and checks the
+pages through Caddy.
 The image gets the wheel of the checkout, as the version that is tested is not
 on PyPI, which is the only change of the generated `Dockerfile`. The workflow
 runs only `tt/docker-smoke/smoke.sh`, which runs the script of a variant, as
@@ -375,6 +379,11 @@ targets of the options), `Pyjo.IOLoop.Datagram` (inspired by `dgram` of Node.js)
 one of Mojolicious, which `Pyjoyment.HelloWorld` ports), `Pyjo.Server.Lambda`
 and `Pyjoyment.Command.lambda` (the server and the command of the event
 functions of AWS Lambda, inspired by `Pyjo.Server.WSGI` and its command),
+`Pyjo.Server.FastCGI` and `Pyjoyment.Command.fastcgi` (FastCGI on the
+connections of the listen locations `fcgi://` and `fcgi+unix://` of
+`Pyjo.Server.Daemon`, written from the specification of FastCGI 1.0, and the
+command of a web server that starts the application with its listen socket
+as the file descriptor 0, inspired by `Pyjo.Server.CGI` and its command),
 `Pyjoyment.Plugin.PyRenderer` (the renderer of template strings, inspired by
 `Mojolicious::Plugin::EPLRenderer`), `Pyjoyment.Plugin.TOMLConfig` (inspired
 by `Mojolicious::Plugin::NotYAMLConfig`, for the format of configuration of

@@ -594,6 +594,51 @@ such as seen in `Istio
 examples, visit the `Envoy documentation
 <https://www.envoyproxy.io/docs/envoy/latest/start/start>`_.
 
+FastCGI
+~~~~~~~
+
+`FastCGI <https://fastcgi-archives.github.io/FastCGI_Specification.html>`__
+is the protocol of web servers that are not reverse proxies of HTTP, or are
+configured as such, and all built-in web servers speak it on the listen
+locations ``fcgi://`` and ``fcgi+unix://``, see :mod:`Pyjo.Server.FastCGI`.
+The web server speaks HTTP to the clients, so WebSockets are not available.
+
+.. code-block:: console
+
+    $ ./myapp.py prefork -m production -l fcgi+unix://%2Ftmp%2Fmyapp.sock
+
+The web server only has to send the requests to that socket, as nginx does
+with this configuration.
+
+.. code-block:: nginx
+
+    server {
+      listen 80;
+      server_name localhost;
+      location / {
+        include fastcgi_params;
+        fastcgi_pass unix:/tmp/myapp.sock;
+        fastcgi_keep_conn on;
+      }
+    }
+
+Some web servers, as Apache with ``mod_fcgid`` and lighttpd, start the
+FastCGI application themselves, which the command
+:mod:`Pyjoyment.Command.fastcgi` detects, so the script of the application
+needs no command.
+
+.. code-block:: apache
+
+    <VirtualHost *:80>
+      ServerName localhost
+      ScriptAlias / /home/sri/myapp/myapp.py/
+      <Directory /home/sri/myapp>
+        SetHandler fcgid-script
+        Options +ExecCGI
+        Require all granted
+      </Directory>
+    </VirtualHost>
+
 WSGI and ASGI
 ~~~~~~~~~~~~~
 
@@ -611,14 +656,6 @@ environment variable is set.
 
     $ PYJO_WSGI=1 gunicorn myapp:application
     $ PYJO_ASGI=1 uvicorn myapp:application
-
-WSGI servers provide many protocols for you to choose from, such as
-``FastCGI``, which `uWSGI <https://uwsgi-docs.readthedocs.io>`_ speaks to a web
-server in front of it, as its ``mod_proxy_fcgi`` speaks to Apache.
-
-.. code-block:: console
-
-    $ PYJO_WSGI=1 uwsgi --fastcgi-socket /tmp/myapp.sock --wsgi-file myapp.py
 
 The ``PYJO_REVERSE_PROXY`` environment variable can be used to enable proxy
 support, this allows :mod:`Pyjoyment` to automatically pick up the

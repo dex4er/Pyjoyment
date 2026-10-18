@@ -10,6 +10,7 @@ Pyjoyment.Command.daemon - Daemon command
       ./myapp.py daemon -l http://127.0.0.1:8080 -l https://[::]:8081
       ./myapp.py daemon -l 'https://*:443?cert=./server.crt&key=./server.key'
       ./myapp.py daemon -l http+unix://%2Ftmp%2Fmyapp.sock
+      ./myapp.py daemon -l fcgi://127.0.0.1:9000
       ./myapp.py daemon -l http://127.0.0.1:8080 -p 127.0.0.0/8 -p fc00::/7
 
     Options:

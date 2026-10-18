@@ -115,6 +115,12 @@ with subtest('listen'):
     # Listen on UNIX domain socket "/tmp/myapp.sock" (percent encoded slash)
     daemon.listen = ['http+unix://%2Ftmp%2Fmyapp.sock']
 
+    # FastCGI for a web server in front of the application
+    daemon.listen = ['fcgi://127.0.0.1:9000']
+
+    # FastCGI on UNIX domain socket "/tmp/myapp.sock"
+    daemon.listen = ['fcgi+unix://%2Ftmp%2Fmyapp.sock']
+
     # File descriptor, as used by systemd
     daemon.listen = ['http://127.0.0.1?fd=3']
 
