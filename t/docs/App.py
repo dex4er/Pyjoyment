@@ -14,17 +14,16 @@ with subtest('Synopsis'):
         # All the complexities of CGI, WSGI, ASGI, HTTP and WebSockets get
         # reduced to a single method call!
         def handler(self, tx):
-            # Request
-            method = tx.req.method
-            path = tx.req.url.path
+            # Resume transaction at the end of the block
+            with tx:
+                # Request
+                method = tx.req.method
+                path = tx.req.url.path
 
-            # Response
-            tx.res.code = 200
-            tx.res.headers.content_type = 'text/plain'
-            tx.res.body = f'{method} request for {path}!'.encode()
-
-            # Resume transaction
-            tx.resume()
+                # Response
+                tx.res.code = 200
+                tx.res.headers.content_type = 'text/plain'
+                tx.res.body = f'{method} request for {path}!'.encode()
 
     ua = Pyjo.UserAgent.new()
     ua.server.app = MyApp.new()
