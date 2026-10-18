@@ -168,6 +168,11 @@ does not start fails the test instead of hanging it.
   script of its own, and the test checks its output and exit status.
   A test of a guide, as `guides_tutorial.py`, loads the applications of
   its examples from their files and checks what the guide says of them.
+  `usages.py` checks the usages of the commands and of the scripts of the
+  servers: their options are the ones that they pass to `getopt`, which it
+  captures by running them with an unknown option in a temporary directory,
+  and their blocks of options are laid out as `format_usage` of
+  `Pyjo.GetOpt` lays them out, which a failure shows to paste.
 - `t/stdlib/` checks the interaction with the Python standard library,
   written for Pyjoyment, as Mojolicious has no counterpart.
 - `t/examples/` checks the code of some scripts of `examples/` with assertions,
@@ -554,7 +559,9 @@ copy:
   the package `Pyjoyment.Command` with the name of the command, as
   `Pyjoyment.Command.daemon`, and its usage, which Mojo extracts from the
   section SYNOPSIS of its POD, is the first literal block of the docstring of
-  the module, which the class reads with `usage = extract_usage()`. Its
+  the module, which the class reads with `usage = extract_usage()`, with its
+  options in a block that `format_usage` of `Pyjo.GetOpt` lays out, so that
+  a new option needs no alignment by hand. Its
   options are parsed with `getopt` of `Pyjo.Util`, whose targets are a dict,
   as Python has no references to variables. The commands of the servers,
   `daemon` and `prefork`, parse them with `env_prefix='PYJO_'`, so that an
