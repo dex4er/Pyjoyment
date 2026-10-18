@@ -199,6 +199,65 @@ with subtest('Environment variables as targets'):
     getopt.parse([])
     is_ok(os.environ.get('PYJO_TEST_MODE'), None, 'not set without the option')
 
+with subtest('Usage'):
+    usage = """Usage: APPLICATION test [OPTIONS]
+
+  ./myapp.py test -v
+
+Options:
+  -h, --help   Show this summary of available options
+      --home <path>  Path to home directory of your application, defaults to the value of PYJO_HOME or
+      auto-detection
+  -p, --proxy [<network>]       Activate reverse proxy support
+  -V      Print returned data structure
+  -v, --verbose
+          Print return value
+
+Options (for all commands):
+  -m, --mode <name>   Operating mode
+
+Text after the options.
+"""
+    formatted = Pyjo.GetOpt.format_usage(usage)
+    is_ok(
+        formatted,
+        """Usage: APPLICATION test [OPTIONS]
+
+  ./myapp.py test -v
+
+Options:
+  -h, --help                Show this summary of available options
+      --home <path>         Path to home directory of your application,
+                            defaults to the value of PYJO_HOME or
+                            auto-detection
+  -p, --proxy [<network>]   Activate reverse proxy support
+  -V                        Print returned data structure
+  -v, --verbose             Print return value
+
+Options (for all commands):
+  -m, --mode <name>   Operating mode
+
+Text after the options.
+""",
+        'laid out',
+    )
+    is_ok(Pyjo.GetOpt.format_usage(formatted), formatted, 'idempotent')
+    is_ok(
+        Pyjo.GetOpt.format_usage('Usage: test\n\n  -h   Not options\n'),
+        'Usage: test\n\n  -h   Not options\n',
+        'no block',
+    )
+    like_ok(
+        Pyjo.GetOpt.format_usage(usage, width=50),
+        r'\n      --home <path>         Path to home directory\n                            of your application,\n',
+        'width',
+    )
+    like_ok(
+        Pyjo.GetOpt.format_usage('Options:\n  -x   ' + 'a' * 100 + ' b\n'),
+        r'^Options:\n  -x   a{100}\n       b\n$',
+        'long word not broken',
+    )
+
 with subtest('Environment'):
     env = {
         'TEST_MODE': 'production',
