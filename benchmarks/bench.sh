@@ -59,7 +59,7 @@ bench() {
 
 selected=("$@")
 
-# Pyjo
+# Pyjo, Pyjo.HelloWorld
 bench pyjo-reload-asyncio 38411 yes 1000 env PYJO_REACTOR=Pyjo.Reactor.Asyncio "$PY" -m Pyjo.Server.Reload -l http://127.0.0.1:38411 -w none hello.py
 bench pyjo-reload-poll 38412 yes 1000 env PYJO_REACTOR=Pyjo.Reactor.Poll "$PY" -m Pyjo.Server.Reload -l http://127.0.0.1:38412 -w none hello.py
 bench pyjo-daemon-asyncio 38426 yes 1000 env PYJO_REACTOR=Pyjo.Reactor.Asyncio "$PY" pyjo_daemon.py 38426
@@ -69,6 +69,17 @@ bench pypy-pyjo-daemon-poll 38427 yes 20000 env PYJO_REACTOR=Pyjo.Reactor.Poll "
 bench uvicorn-pyjo-asgi 38423 yes 1000 "$V/python" -m uvicorn --port 38423 --loop uvloop --http httptools pyjo_asgi_app:app
 bench granian-pyjo-asgi 38425 yes 1000 "$V/granian" --interface asgi --host 127.0.0.1 --port 38425 --workers 1 pyjo_asgi_app:app
 bench gunicorn-pyjo-wsgi 38421 no 0 "$V/gunicorn" -w 1 -b 127.0.0.1:38421 pyjo_wsgi_app:app
+
+# Pyjoyment, Pyjoyment.HelloWorld
+bench pyjoyment-reload-asyncio 38431 yes 1000 env PYJO_REACTOR=Pyjo.Reactor.Asyncio "$PY" -m Pyjo.Server.Reload -l http://127.0.0.1:38431 -w none pyjoyment_hello.py
+bench pyjoyment-reload-poll 38432 yes 1000 env PYJO_REACTOR=Pyjo.Reactor.Poll "$PY" -m Pyjo.Server.Reload -l http://127.0.0.1:38432 -w none pyjoyment_hello.py
+bench pyjoyment-daemon-asyncio 38433 yes 1000 env PYJO_REACTOR=Pyjo.Reactor.Asyncio "$PY" pyjoyment_daemon.py 38433
+bench pyjoyment-daemon-poll 38434 yes 1000 env PYJO_REACTOR=Pyjo.Reactor.Poll "$PY" pyjoyment_daemon.py 38434
+bench pypy-pyjoyment-daemon-asyncio 38435 yes 20000 env PYJO_REACTOR=Pyjo.Reactor.Asyncio "$PP" pyjoyment_daemon.py 38435
+bench pypy-pyjoyment-daemon-poll 38436 yes 20000 env PYJO_REACTOR=Pyjo.Reactor.Poll "$PP" pyjoyment_daemon.py 38436
+bench uvicorn-pyjoyment-asgi 38437 yes 1000 "$V/python" -m uvicorn --port 38437 --loop uvloop --http httptools pyjoyment_asgi_app:app
+bench granian-pyjoyment-asgi 38438 yes 1000 "$V/granian" --interface asgi --host 127.0.0.1 --port 38438 --workers 1 pyjoyment_asgi_app:app
+bench gunicorn-pyjoyment-wsgi 38439 no 0 "$V/gunicorn" -w 1 -b 127.0.0.1:38439 pyjoyment_wsgi_app:app
 
 # The others
 bench http.server 38413 yes 1000 "$PY" -m http.server --bind 127.0.0.1 --protocol HTTP/1.1 -d "$OUT/www" 38413

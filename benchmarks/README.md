@@ -39,7 +39,10 @@ The applications answer `Your Pyjo is working!`: `hello.py` and
 `pyjo_daemon.py` are `Pyjo.HelloWorld` on `Pyjo.Server.Reload` and
 `Pyjo.Server.Daemon`, `pyjo_asgi_app.py` and `pyjo_wsgi_app.py` the same
 through `Pyjo.Server.ASGI` and `Pyjo.Server.WSGI`, and the others are the
-smallest application of each framework.
+smallest application of each framework. The scenarios `pyjoyment-*` run the
+same servers with `Pyjoyment.HelloWorld`, an application of the web framework
+with a route, which answers `Your Pyjoyment is working!`: `pyjoyment_hello.py`,
+`pyjoyment_daemon.py`, `pyjoyment_asgi_app.py` and `pyjoyment_wsgi_app.py`.
 
 ```sh
 PYTHON=$(mise exec -- which python) PYPY=pypy3 benchmarks/bench.sh
