@@ -28,6 +28,11 @@ uv, so that the signals of ``docker stop`` go straight to the server, which
 stops gracefully on ``TERM``. The images of Python and of uv are those of the
 versions that run the generator.
 
+Docker gives a container 10 seconds to stop, less than the 25 seconds that
+:attr:`Pyjo.Server.Prefork.Pyjo_Server_Prefork.graceful_timeout` gives a
+worker, so ``docker stop -t 30``, or ``stop_grace_period: 30s`` of Docker
+Compose, lets the workers finish their requests.
+
 This is a core command, that means it is always enabled and its code a good
 example for learning to build new commands, you're welcome to fork it.
 

@@ -19,7 +19,7 @@ Pyjoyment.Command.prefork - Pre-fork command
                                            SOMAXCONN
       -c, --clients <number>               Maximum number of concurrent
                                            connections, defaults to 1000
-      -G, --graceful-timeout <seconds>     Graceful timeout, defaults to 120.
+      -G, --graceful-timeout <seconds>     Graceful timeout, defaults to 25.
       -I, --heartbeat-interval <seconds>   Heartbeat interval, defaults to 5
       -H, --heartbeat-timeout <seconds>    Heartbeat timeout, defaults to 50
       -h, --help                           Show this summary of available options
@@ -120,6 +120,7 @@ class Pyjoyment_Command_prefork(Pyjoyment.Command.object):
                 'a|accepts=i': lambda name, value: setattr(prefork, 'accepts', value),
                 'b|backlog=i': lambda name, value: setattr(prefork, 'backlog', value),
                 'c|clients=i': lambda name, value: setattr(prefork, 'max_clients', value),
+                # Unlike Mojolicious: the graceful timeout defaults to 25 seconds, as Pyjo.Server.Prefork has it
                 'G|graceful-timeout=i': lambda name, value: setattr(prefork, 'graceful_timeout', value),
                 'I|heartbeat-interval=i': lambda name, value: setattr(prefork, 'heartbeat_interval', value),
                 'H|heartbeat-timeout=i': lambda name, value: setattr(prefork, 'heartbeat_timeout', value),

@@ -205,7 +205,7 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
         *,
         accepts: int = 10000,
         cleanup: bool = True,
-        graceful_timeout: float = 120,
+        graceful_timeout: float = 25,
         heartbeat_interval: float = 5,
         heartbeat_timeout: float = 50,
         pid_file: str | os.PathLike[str] | None = None,
@@ -247,6 +247,8 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
         defaults to a true value.
         """
 
+        # Unlike Mojolicious: 25 seconds, where Mojo has 120, below the 30 seconds that Kubernetes gives a container to
+        # stop, so that the server forces its workers and stops by itself before it is killed
         self.graceful_timeout = graceful_timeout
         """::
 
@@ -254,7 +256,8 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
             prefork.graceful_timeout = 15
 
         Maximum amount of time in seconds stopping a worker gracefully may take
-        before being forced, defaults to ``120``. Note that this value should
+        before being forced, defaults to ``25``, less than the 30 seconds that
+        Kubernetes gives a container to stop. Note that this value should
         usually be a little larger than the maximum amount of time you expect
         any one request to take.
         """
