@@ -157,6 +157,9 @@ ignore = [
 ]
 # The examples of the guides are scripts of Pyjoyment.Lite too.
 "docs/guides/**" = [
+  # TID251 "`asyncio` is banned: ...": an example is the code of a user, as
+  # the ones of examples/.
+  "TID251",
   # F403 "`from Pyjoyment.Lite import *` used; unable to detect undefined
   # names"
   "F403",

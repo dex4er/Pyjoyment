@@ -1158,6 +1158,12 @@ an example is a file of `Pyjoyment/Plugin` in its directory, which
 regular package of the name is found. Two plugins of the same name, as the
 two forms of one in `rendering.rst`, are run with the script that loads
 them in a process of their own, with their directory in `PYTHONPATH`. The
+remote services that the examples request, as in `cookbook.rst`, are
+answered by a mock, as the tests do not use the network: the event `start`
+of the user agent sends a request to it, with the host of the service as
+the `Host` header, and the mock runs in a process of its own, as a blocking
+request runs an event loop of its own, which a server on the event loop of
+the test would not answer. The
 names of the files are not those of modules of the standard library,
 as the directory of a script is the first one of `sys.path`. A link to a
 guide that is not ported yet goes to the one of Mojolicious. An example of

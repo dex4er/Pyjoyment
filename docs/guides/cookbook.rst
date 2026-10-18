@@ -1,0 +1,2011 @@
+Cookbook
+========
+
+Cooking with Pyjoyment.
+
+This document contains many fun recipes for cooking with :mod:`Pyjoyment`.
+
+Concepts
+--------
+
+Essentials every :mod:`Pyjoyment` developer should know.
+
+Blocking and non-blocking operations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A *blocking* operation is a function that blocks the execution of the calling
+function until the function is finished.
+
+.. code-block:: python
+
+    def foo():
+        result = blocking_function()
+        ...
+
+A *non-blocking* operation on the other hand lets the calling function
+continue execution even though the function is not yet finished. Instead of
+waiting, the calling function passes along a callback to be executed once the
+function is finished, this is called continuation-passing style.
+
+.. code-block:: python
+
+    def foo():
+        def done(result):
+            ...
+
+        non_blocking_function(done)
+        ...
+
+While :mod:`Pyjoyment` has been designed from the ground up for non-blocking
+I/O and event loops, it is not possible to magically make Python code
+non-blocking. You have to use specialized non-blocking code available through
+modules like :mod:`Pyjo.IOLoop` and :mod:`Pyjo.UserAgent`, or the coroutines
+of :mod:`asyncio`. You can wrap your blocking code in
+:meth:`subprocesses <Pyjo.IOLoop.Pyjo_IOLoop.subprocess>` though to prevent
+it from interfering with your non-blocking code.
+
+Event loops
+~~~~~~~~~~~
+
+An event loop is basically a loop that continually tests for external events
+and executes the appropriate callbacks to handle them, it is often the main
+loop in a program. Non-blocking tests for readability/writability of file
+descriptors and timers are commonly used events for highly scalable network
+servers, because they allow a single process to handle thousands of client
+connections concurrently.
+
+.. code-block:: python
+
+    while True:
+        readable = test_fds_for_readability()
+        handle_readable_fds(readable)
+
+        writable = test_fds_for_writability()
+        handle_writable_fds(writable)
+
+        expired = test_timers()
+        handle_timers(expired)
+
+In :mod:`Pyjoyment` this event loop is :mod:`Pyjo.IOLoop`, which runs on the
+event loop of :mod:`asyncio`.
+
+Reverse proxy
+~~~~~~~~~~~~~
+
+A reverse proxy architecture is a deployment technique used in many
+production environments, where a *reverse proxy* server is put in front of
+your application to act as the endpoint accessible by external clients. It
+can provide a lot of benefits, like terminating SSL connections from the
+outside, limiting the number of concurrent open sockets towards the
+Pyjoyment application (or even using Unix sockets), balancing load across
+multiple instances, or supporting several applications through the same
+IP/port.
+
+.. code-block:: text
+
+                   ..........................................
+                   :                                        :
+   +--------+      :  +-----------+      +---------------+  :
+   |        |-------->|           |      |               |  :
+   | client |      :  |  reverse  |----->|   Pyjoyment   |  :
+   |        |<--------|   proxy   |      |  application  |  :
+   +--------+      :  |           |<-----|               |  :
+                   :  +-----------+      +---------------+  :
+                   :                                        :
+                   .. system boundary (e.g. same host) ......
+
+This setup introduces some problems, though: the application will receive
+requests from the reverse proxy instead of the original client; the
+address/hostname where your application lives internally will be different
+from the one visible from the outside; and if terminating SSL, the reverse
+proxy exposes services via HTTPS while using HTTP towards the Pyjoyment
+application.
+
+As an example, compare a sample request from the client and what the
+Pyjoyment application receives:
+
+.. code-block:: text
+
+   client                       reverse proxy                Pyjoyment app
+    __|__              _______________|______________             ____|____
+   /     \            /                              \           /         \
+   1.2.3.4 --HTTPS--> api.example.com      10.20.30.39 --HTTP--> 10.20.30.40
+
+   GET /foo/1 HTTP/1.1                |    GET /foo/1 HTTP/1.1
+   Host: api.example.com              |    Host: 10.20.30.40
+   User-Agent: Firefox                |    User-Agent: ShinyProxy/1.2
+   ...                                |    ...
+
+However, now the client address is no longer available (which might be
+useful for analytics, or Geo-IP) and URLs generated via
+:meth:`Pyjoyment.Controller.Pyjoyment_Controller.url_for` will look like
+this:
+
+.. code-block:: text
+
+   http://10.20.30.40/bar/2
+
+instead of something meaningful for the client, like this:
+
+.. code-block:: text
+
+   https://api.example.com/bar/2
+
+To solve these problems, you can configure your reverse proxy to send the
+missing data (see `Nginx`_, `Apache/mod_proxy`_ and `Caddy`_) and tell your
+application about it by setting the environment variable
+``PYJO_REVERSE_PROXY``. In more complex situations, usually involving
+multiple proxies or proxies that live outside your network, it can be
+necessary to tell the application from which ip addresses to expect proxy
+requests by setting ``PYJO_TRUSTED_PROXIES`` to a list of comma separated
+addresses or CIDR networks. For even finer control, `Rewriting`_ includes
+examples of how the changes could be implemented manually.
+
+.. _cookbook-deployment:
+
+Deployment
+----------
+
+Getting :mod:`Pyjoyment` and :mod:`Pyjoyment.Lite` applications running on
+different platforms. Note that many real-time web features are based on the
+:mod:`Pyjo.IOLoop` event loop, and therefore require one of the built-in web
+servers, or an ASGI server, to be able to use them to their full potential.
+
+Built-in web server
+~~~~~~~~~~~~~~~~~~~
+
+:mod:`Pyjoyment` contains a very portable non-blocking I/O HTTP and WebSocket
+server with :mod:`Pyjo.Server.Daemon`. It is usually used during development
+and in the construction of more advanced web servers, but is solid and fast
+enough for small to mid sized applications.
+
+.. code-block:: console
+
+    $ ./myapp.py daemon
+    Web application available at http://127.0.0.1:3000
+
+It is available to every application through the command
+:mod:`Pyjoyment.Command.daemon`, which has many configuration options and is
+known to work on every platform Python works on with its single-process
+architecture.
+
+.. code-block:: console
+
+    $ ./myapp.py daemon -h
+    ...List of available options...
+
+Another huge advantage is that it supports TLS and WebSockets out of the box,
+a development certificate for testing purposes is built right in, so it just
+works, but you can specify all listen locations supported by
+:attr:`Pyjo.Server.Daemon.Pyjo_Server_Daemon.listen`.
+
+.. code-block:: console
+
+    $ ./myapp.py daemon -l 'https://[::]:3000'
+    Web application available at https://[::]:3000
+
+To manage the web server with systemd, you can use a unit configuration file
+like this.
+
+.. code-block:: ini
+
+    [Unit]
+    Description=My Pyjoyment application
+    After=network.target
+
+    [Service]
+    Type=simple
+    User=sri
+    ExecStart=/home/sri/myapp/myapp.py daemon -m production -l http://*:8080
+
+    [Install]
+    WantedBy=multi-user.target
+
+Pre-forking
+~~~~~~~~~~~
+
+For bigger applications :mod:`Pyjoyment` contains the UNIX optimized
+pre-forking web server :mod:`Pyjo.Server.Prefork`, which can take advantage
+of multiple CPU cores and copy-on-write memory management to scale up to
+thousands of concurrent client connections.
+
+.. code-block:: text
+
+    Pyjo.Server.Prefork
+    |- Pyjo.Server.Daemon [1]
+    |- Pyjo.Server.Daemon [2]
+    |- Pyjo.Server.Daemon [3]
+    +- Pyjo.Server.Daemon [4]
+
+It is based on :mod:`Pyjo.Server.Daemon` and available to every application
+through the command :mod:`Pyjoyment.Command.prefork`.
+
+.. code-block:: console
+
+    $ ./myapp.py prefork
+    Web application available at http://127.0.0.1:3000
+
+Since all built-in web servers are based on the :mod:`Pyjo.IOLoop` event
+loop, they scale best with non-blocking operations. But if your application
+for some reason needs to perform many blocking operations, you can improve
+performance by increasing the number of worker processes and decreasing the
+number of concurrent connections each worker is allowed to handle (often as
+low as ``1``).
+
+.. code-block:: console
+
+    $ ./myapp.py prefork -m production -w 10 -c 1
+    Web application available at http://127.0.0.1:3000
+
+During startup your application is preloaded in the manager process, which
+does not run an event loop, so you can use
+:meth:`Pyjo.IOLoop.Pyjo_IOLoop.next_tick` to run code whenever a new worker
+process has been forked and its event loop gets started.
+
+.. literalinclude:: cookbook/worker.py
+    :language: python
+    :caption: myapp.py
+
+And to manage the pre-forking web server with systemd, you can use a unit
+configuration file like this.
+
+.. code-block:: ini
+
+    [Unit]
+    Description=My Pyjoyment application
+    After=network.target
+
+    [Service]
+    Type=simple
+    User=sri
+    ExecStart=/home/sri/myapp/myapp.py prefork -m production -l http://*:8080
+
+    [Install]
+    WantedBy=multi-user.target
+
+Reload
+~~~~~~
+
+After reading the :doc:`tutorial`, you should already be familiar with
+:mod:`Pyjo.Server.Reload`.
+
+.. code-block:: text
+
+    Pyjo.Server.Reload
+    +- Pyjo.Server.Daemon
+
+It is basically a restarter that forks a new :mod:`Pyjo.Server.Daemon` web
+server whenever a file in your project changes, and should therefore only be
+used during development. To start applications with it you can use the
+``pyjo-reload`` script.
+
+.. code-block:: console
+
+    $ pyjo-reload ./myapp.py
+    Web application available at http://127.0.0.1:3000
+
+Containers
+~~~~~~~~~~
+
+There are many ways to go cloud-native with :mod:`Pyjoyment`. To get you
+started with containerizing your web applications we will explore one of them
+in this recipe. First, you will need to declare the dependencies of your
+application, for example in a ``pyproject.toml`` file. This should always
+include at the very least :mod:`Pyjoyment` itself.
+
+.. code-block:: toml
+
+    [project]
+    name = "myapp"
+    version = "0.1.0"
+    requires-python = ">=3.12"
+    dependencies = ["Pyjoyment"]
+
+The helper command :mod:`Pyjoyment.Command.Author.generate.pyproject` can
+also generate a minimal ``pyproject.toml`` for you.
+
+.. code-block:: console
+
+    $ ./myapp.py generate pyproject
+    ...
+
+And then we are going to need a ``Dockerfile`` describing the container. A
+very simple one will do for now.
+
+.. code-block:: dockerfile
+
+    FROM python:3.15
+    COPY --from=ghcr.io/astral-sh/uv /uv /bin/uv
+    WORKDIR /opt/myapp
+    COPY . .
+    RUN uv sync --no-dev
+    EXPOSE 3000
+    CMD [".venv/bin/python", "myapp.py", "prefork"]
+
+It uses the `Python container <https://hub.docker.com/_/python>`_ from Docker
+Hub, copies all the contents of your application directory into the
+container, installs the dependencies with `uv <https://docs.astral.sh/uv/>`_,
+and then starts the application on port ``3000`` with the pre-forking web
+server. With :mod:`Pyjoyment.Command.Author.generate.dockerfile` there is also
+a helper command to generate a ``Dockerfile`` for you, with a smaller image
+and a server that stops gracefully in the time a container gets.
+
+.. code-block:: console
+
+    $ ./myapp.py generate dockerfile
+    ...
+
+To build and deploy our container there are also many options available, here
+we will simply use Docker.
+
+.. code-block:: console
+
+    $ docker build -t myapp_image .
+    ...
+    $ docker run -d -p 3000:3000 --name myapp_container myapp_image
+    ...
+
+And now your web application should be deployed as a container under
+``http://127.0.0.1:3000``. For more information and many more container
+deployment options we recommend the `Docker <https://docs.docker.com/>`_ and
+`Kubernetes <https://kubernetes.io/docs/>`_ documentation.
+
+Hot deployment
+~~~~~~~~~~~~~~
+
+:mod:`Pyjo.Server.Hot` is based on the :mod:`Pyjo.Server.Prefork` web
+server, and adds some features especially optimized for high availability
+non-containerized production environments. To start applications with it you
+can use the ``pyjo-hot`` script, which listens on port ``8080``,
+automatically daemonizes the server process and defaults to ``production``
+mode for :mod:`Pyjoyment` and :mod:`Pyjoyment.Lite` applications.
+
+.. code-block:: console
+
+    $ pyjo-hot ./myapp.py
+
+The script of a :mod:`Pyjoyment` application is ``MyApp/__main__.py``, which
+``pyjo-hot`` starts from the directory of its project.
+
+.. code-block:: console
+
+    $ pyjo-hot ./MyApp/__main__.py
+
+Many configuration settings can be tweaked right from within your application
+with :meth:`Pyjo.App.Pyjo_App.config`, for a full list see
+:mod:`Pyjo.Server.Hot`.
+
+.. literalinclude:: cookbook/hot.py
+    :language: python
+    :caption: myapp.py
+
+Or just add a ``hot`` section to your :mod:`Pyjoyment.Plugin.Config`,
+:mod:`Pyjoyment.Plugin.JSONConfig`, :mod:`Pyjoyment.Plugin.YAMLConfig` or
+:mod:`Pyjoyment.Plugin.TOMLConfig` configuration file.
+
+.. code-block:: python
+    :caption: myapp.conf
+
+    {
+        'hot': {
+            'listen': ['https://*:443?cert=/etc/server.crt&key=/etc/server.key'],
+            'workers': 10,
+        }
+    }
+
+But one of its biggest advantages is the support for effortless zero downtime
+software upgrades (hot deployment). That means you can upgrade
+:mod:`Pyjoyment`, Python or even system libraries at runtime without ever
+stopping the server or losing a single incoming connection, just by running
+the command above again.
+
+.. code-block:: console
+
+    $ pyjo-hot ./myapp.py
+    Starting hot deployment for Hot server 31841.
+
+You might also want to enable proxy support if you're using
+:mod:`Pyjo.Server.Hot` behind a reverse proxy. This allows :mod:`Pyjoyment`
+to automatically pick up the ``X-Forwarded-For`` and ``X-Forwarded-Proto``
+headers.
+
+.. code-block:: python
+    :caption: myapp.conf
+
+    {'hot': {'proxy': True}}
+
+To manage :mod:`Pyjo.Server.Hot` with systemd, you can use a unit
+configuration file like this.
+
+.. code-block:: ini
+
+    [Unit]
+    Description=My Pyjoyment application
+    After=network.target
+
+    [Service]
+    Type=forking
+    User=sri
+    PIDFile=/home/sri/myapp/hot.pid
+    ExecStart=/path/to/pyjo-hot /home/sri/myapp/myapp.py
+    ExecReload=/path/to/pyjo-hot /home/sri/myapp/myapp.py
+    KillMode=process
+
+    [Install]
+    WantedBy=multi-user.target
+
+Zero downtime software upgrades
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+:mod:`Pyjo.Server.Hot` makes zero downtime software upgrades (hot deployment)
+very simple, as you can see above, but on modern operating systems that
+support the ``SO_REUSEPORT`` socket option, there is also another method
+available that works with all built-in web servers.
+
+.. code-block:: console
+
+    $ ./myapp.py prefork -P /tmp/first.pid -l 'http://*:8080?reuse=1'
+    Web application available at http://127.0.0.1:8080
+
+All you have to do, is to start a second web server listening to the same
+port, and stop the first web server gracefully afterwards.
+
+.. code-block:: console
+
+    $ ./myapp.py prefork -P /tmp/second.pid -l 'http://*:8080?reuse=1'
+    Web application available at http://127.0.0.1:8080
+    $ kill -s TERM $(cat /tmp/first.pid)
+
+Just remember that both web servers need to be started with the ``reuse``
+parameter.
+
+Nginx
+~~~~~
+
+One of the most popular setups these days is :mod:`Pyjo.Server.Hot` behind
+an `Nginx <https://nginx.org>`__ reverse proxy, which even supports WebSockets
+in newer versions.
+
+.. code-block:: nginx
+
+    upstream myapp {
+      server 127.0.0.1:8080;
+    }
+    server {
+      listen 80;
+      server_name localhost;
+      location / {
+        proxy_pass http://myapp;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+      }
+    }
+
+Apache/mod_proxy
+~~~~~~~~~~~~~~~~
+
+Another good reverse proxy is `Apache <https://httpd.apache.org>`_ with
+``mod_proxy``, the configuration looks quite similar to the Nginx one above.
+And if you need WebSocket support, newer versions come with
+``mod_proxy_wstunnel``.
+
+.. code-block:: apache
+
+    <VirtualHost *:80>
+      ServerName localhost
+      <Proxy *>
+        Require all granted
+      </Proxy>
+      ProxyRequests Off
+      ProxyPreserveHost On
+      ProxyPass /echo ws://localhost:8080/echo
+      ProxyPass / http://localhost:8080/ keepalive=On
+      ProxyPassReverse / http://localhost:8080/
+      RequestHeader set X-Forwarded-Proto "http"
+    </VirtualHost>
+
+Caddy
+~~~~~
+
+`Caddy <https://caddyserver.com>`__ is a reverse proxy that needs the least
+configuration of them all: it gets a certificate for the domain of the site
+on its own, passes WebSockets along, and sets the ``X-Forwarded-For`` and
+``X-Forwarded-Proto`` headers by default.
+
+.. code-block:: text
+    :caption: Caddyfile
+
+    example.com {
+      reverse_proxy 127.0.0.1:8080
+    }
+
+Apache/CGI
+~~~~~~~~~~
+
+``CGI`` is supported out of the box and your :mod:`Pyjoyment` application
+will automatically detect that it is executed as a ``CGI`` script. Its use in
+production environments is discouraged though, because as a result of how
+``CGI`` works, it is very slow and many web servers are making it
+exceptionally hard to configure properly. Additionally, many real-time web
+features, such as WebSockets, are not available.
+
+.. code-block:: apache
+
+    ScriptAlias / /home/sri/myapp/myapp.py/
+
+Envoy
+~~~~~
+
+:mod:`Pyjoyment` applications can be deployed on cloud-native environments
+that use `Envoy <https://www.envoyproxy.io>`_, such as with this reverse proxy
+configuration similar to the Apache and Nginx ones above.
+
+.. code-block:: yaml
+
+    static_resources:
+      listeners:
+      - name: listener_0
+        address:
+          socket_address: { address: 0.0.0.0, port_value: 80 }
+        filter_chains:
+        - filters:
+          - name: envoy.filters.network.http_connection_manager
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+              codec_type: auto
+              stat_prefix: index_http
+              route_config:
+                name: local_route
+                virtual_hosts:
+                - name: service
+                  domains: ["*"]
+                  routes:
+                  - match:
+                      prefix: "/"
+                    route:
+                      cluster: local_service
+              upgrade_configs:
+              - upgrade_type: websocket
+              http_filters:
+              - name: envoy.filters.http.router
+                typed_config:
+      clusters:
+      - name: local_service
+        connect_timeout: 0.25s
+        type: strict_dns
+        lb_policy: round_robin
+        load_assignment:
+          cluster_name: local_service
+          endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address: { address: pyjo, port_value: 8080 }
+
+While this configuration works for simple applications, Envoy's typical use
+case is for implementing proxies of applications as a "service mesh"
+providing advanced filtering, load balancing, and observability features,
+such as seen in `Istio
+<https://istio.io/latest/docs/ops/deployment/architecture/>`_. For more
+examples, visit the `Envoy documentation
+<https://www.envoyproxy.io/docs/envoy/latest/start/start>`_.
+
+WSGI and ASGI
+~~~~~~~~~~~~~
+
+`WSGI <https://peps.python.org/pep-3333/>`_ is an interface between Python
+web frameworks and web servers, and `ASGI <https://asgi.readthedocs.io>`_ is
+its asynchronous successor, with WebSockets. :mod:`Pyjoyment` applications
+are ridiculously simple to deploy on their servers, with
+:mod:`Pyjo.Server.WSGI` and :mod:`Pyjo.Server.ASGI`, but be aware that with
+WSGI many real-time web features, such as WebSockets, are not available. The
+script of the application ends with ``application = app.start()``, which
+gives a server the application, when the ``PYJO_WSGI`` or ``PYJO_ASGI``
+environment variable is set.
+
+.. code-block:: console
+
+    $ PYJO_WSGI=1 gunicorn myapp:application
+    $ PYJO_ASGI=1 uvicorn myapp:application
+
+WSGI servers provide many protocols for you to choose from, such as
+``FastCGI``, which `uWSGI <https://uwsgi-docs.readthedocs.io>`_ speaks to a web
+server in front of it, as its ``mod_proxy_fcgi`` speaks to Apache.
+
+.. code-block:: console
+
+    $ PYJO_WSGI=1 uwsgi --fastcgi-socket /tmp/myapp.sock --wsgi-file myapp.py
+
+The ``PYJO_REVERSE_PROXY`` environment variable can be used to enable proxy
+support, this allows :mod:`Pyjoyment` to automatically pick up the
+``X-Forwarded-For`` and ``X-Forwarded-Proto`` headers.
+
+.. code-block:: console
+
+    $ PYJO_REVERSE_PROXY=1 PYJO_WSGI=1 gunicorn myapp:application
+
+If a server is unable to correctly detect the application home directory, you
+can simply use the ``PYJO_HOME`` environment variable.
+
+.. code-block:: console
+
+    $ PYJO_HOME=/home/sri/myapp PYJO_WSGI=1 gunicorn myapp:application
+
+There is no need for a separate file of the application for the server, just
+point the server at your application script, it will automatically act like
+one if it detects the presence of the ``PYJO_WSGI`` or ``PYJO_ASGI``
+environment variable.
+
+WSGI middleware
+~~~~~~~~~~~~~~~
+
+Wrapper scripts like ``myapp_wsgi.py`` are a great way to separate deployment
+and application logic. :mod:`Pyjo.Server.WSGI` can be used directly to load
+and customize applications in the wrapper script.
+
+.. literalinclude:: cookbook/wsgi/myapp_wsgi.py
+    :language: python
+    :caption: myapp_wsgi.py
+
+.. code-block:: console
+
+    $ gunicorn myapp_wsgi:application
+
+But you could even use middleware right in your application, which starts
+the command :mod:`Pyjoyment.Command.wsgi` for it.
+
+.. literalinclude:: cookbook/wsgi/welcome.py
+    :language: python
+    :caption: myapp.py
+
+Rewriting
+~~~~~~~~~
+
+Sometimes you might have to deploy your application in a blackbox environment
+where you can't just change the server configuration or behind a reverse
+proxy that passes along additional information with ``X-Forwarded-*``
+headers. In such cases you can use the hook ``before_dispatch`` of
+:meth:`Pyjoyment.Pyjoyment_App.hook` to rewrite incoming requests.
+
+.. code-block:: python
+
+    # Change scheme if "X-Forwarded-HTTPS" header is set
+    @app.hook('before_dispatch')
+    def https(c):
+        if c.req.headers.header('X-Forwarded-HTTPS'):
+            c.req.url.base.scheme = 'https'
+
+Since reverse proxies generally don't pass along information about path
+prefixes your application might be deployed under, rewriting the base path of
+incoming requests is also quite common. This allows
+:meth:`Pyjoyment.Controller.Pyjoyment_Controller.url_for` for example, to
+generate portable URLs based on the current environment.
+
+.. code-block:: python
+
+    # Move first part and slash from path to base path in production mode
+    if app.mode == 'production':
+
+        @app.hook('before_dispatch')
+        def prefix(c):
+            base, path = c.req.url.base.path, c.req.url.path
+            base.trailing_slash, path.leading_slash = True, False
+            base.parts.append(path.parts.pop(0))
+
+:mod:`Pyjo.URL` objects are very easy to manipulate, just make sure that the
+URL (``foo/bar?baz=yada``), which represents the routing destination, is
+always relative to the base URL (``http://example.com/myapp/``), which
+represents the deployment location of your application.
+
+Deployment specific plugins
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Deployment specific 3rd party plugins, such as one that would switch the user
+and group of the server, ``SetUserGroup``, do not need to be included in your
+application code. They can also be loaded later on via the reserved
+``plugins`` value for :mod:`Pyjoyment` applications that are using any one of
+the built-in configuration plugins :mod:`Pyjoyment.Plugin.Config`,
+:mod:`Pyjoyment.Plugin.JSONConfig`, :mod:`Pyjoyment.Plugin.YAMLConfig` or
+:mod:`Pyjoyment.Plugin.TOMLConfig`.
+
+.. code-block:: python
+    :caption: myapp.conf
+
+    {
+        'plugins': [
+            {'SetUserGroup': {'user': 'sri', 'group': 'staff'}},
+        ]
+    }
+
+Application embedding
+~~~~~~~~~~~~~~~~~~~~~
+
+From time to time you might want to reuse parts of :mod:`Pyjoyment`
+applications like configuration files, database connection or helpers for
+other scripts, with this little :mod:`Pyjo.Server` based mock server you can
+just embed them.
+
+.. code-block:: python
+
+    import Pyjo.Server
+
+    # Load application with mock server
+    server = Pyjo.Server.new()
+    app = server.load_app('./myapp.py')
+
+    # Access fully initialized application
+    print(*app.static.paths, sep='\n')
+    print(app.config('secret_identity'))
+    print(app.dumper({'just': 'a helper test'}))
+    print(app.build_controller().render_to_string(template='foo'))
+
+The plugin :mod:`Pyjoyment.Plugin.Mount` uses this functionality to allow you
+to combine multiple applications into one and deploy them together.
+
+.. code-block:: python
+
+    from Pyjoyment.Lite import *
+
+    app.config(hot={'listen': ['http://*:80']})
+
+    plugin('Mount', {'test1.example.com': '/home/sri/myapp1.py'})
+    plugin('Mount', {'test2.example.com': '/home/sri/myapp2.py'})
+
+    app.start()
+
+Web server embedding
+~~~~~~~~~~~~~~~~~~~~
+
+You can also use :meth:`Pyjo.IOLoop.Pyjo_IOLoop.one_tick` to embed the
+built-in web server :mod:`Pyjo.Server.Daemon` into alien environments like
+foreign event loops that for some reason can't just be integrated with a new
+reactor backend.
+
+.. code-block:: python
+
+    import Pyjo.IOLoop
+    import Pyjo.Server.Daemon
+
+    from Pyjoyment.Lite import *
+
+    # Normal action
+    get('/', {'text': 'Hello World!'})
+
+    # Connect application with web server and start accepting connections
+    daemon = Pyjo.Server.Daemon.new(app=app, listen=['http://*:8080'])
+    daemon.start()
+
+    # Call "one_tick" repeatedly from the alien environment
+    while True:
+        Pyjo.IOLoop.one_tick()
+
+.. _cookbook-real-time-web:
+
+Real-time web
+-------------
+
+The real-time web is a collection of technologies that include Comet (long
+polling), EventSource and WebSockets, which allow content to be pushed to
+consumers with long-lived connections as soon as it is generated, instead of
+relying on the more traditional pull model. All built-in web servers use
+non-blocking I/O and are based on the :mod:`Pyjo.IOLoop` event loop, which
+provides many very powerful features that allow real-time web applications to
+scale up to thousands of concurrent client connections.
+
+Backend web services
+~~~~~~~~~~~~~~~~~~~~
+
+Since :mod:`Pyjo.UserAgent` is also based on the :mod:`Pyjo.IOLoop` event
+loop, it won't block the built-in web servers when used non-blocking, even for
+high latency backend web services.
+
+.. literalinclude:: cookbook/backend.py
+    :language: python
+    :caption: myapp.py
+
+The callback passed to :meth:`Pyjo.UserAgent.Pyjo_UserAgent.get` will be
+executed once the request to the backend web service has been finished, this
+is called continuation-passing style.
+
+Synchronizing non-blocking operations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Multiple non-blocking operations, such as concurrent requests, can be easily
+synchronized with promises and :meth:`Pyjo.Promise.Pyjo_Promise.all`. You
+create :mod:`Pyjo.Promise` objects manually or use methods like ``get_p`` of
+:mod:`Pyjo.UserAgent` that create them for you.
+
+.. literalinclude:: cookbook/synchronizing.py
+    :language: python
+    :caption: myapp.py
+
+To create promises manually you just wrap your continuation-passing style APIs
+in functions that return promises. Here's an example for how ``get_p`` of
+:mod:`Pyjo.UserAgent` works internally.
+
+.. code-block:: python
+
+    import Pyjo.Promise
+    import Pyjo.UserAgent
+
+    # Wrap a user agent method with a promise
+    ua = Pyjo.UserAgent.new()
+
+
+    def get_p(*args):
+        promise = Pyjo.Promise.new()
+
+        def done(ua, tx):
+            err = tx.error
+            if not err or err.get('code'):
+                promise.resolve(tx)
+            promise.reject(err['message'] if err else None)
+
+        ua.get(*args, done)
+        return promise
+
+
+    # Use our new promise generating function
+    get_p('https://pyjoyment.readthedocs.io').then(lambda tx: print(tx.result.dom().at('title').text)).wait()
+
+Promises have three states, they start out as ``pending`` and you call
+:meth:`Pyjo.Promise.Pyjo_Promise.resolve` to transition them to
+``fulfilled``, or :meth:`Pyjo.Promise.Pyjo_Promise.reject` to transition
+them to ``rejected``.
+
+async/await
+~~~~~~~~~~~
+
+And Python has the ``async`` and ``await`` keywords built right in, which
+make using promises even easier, and make the use of closures with promises
+completely optional.
+
+The ``async`` keyword is placed before the ``def`` keyword, and with the
+decorator :func:`Pyjo.Promise.coroutine` means that this function always
+returns a promise. Returned values that are not :mod:`Pyjo.Promise` objects
+will be wrapped in a resolved promise automatically. And if an exception gets
+raised in the function it will result in a rejected promise.
+
+.. code-block:: python
+
+    import Pyjo.Promise
+
+
+    @Pyjo.Promise.coroutine
+    async def hello_p():
+        return 'Hello Pyjo!'
+
+
+    hello_p().then(print).wait()
+
+The ``await`` keyword on the other hand makes Python wait for the promise to
+be settled. It then returns the fulfillment values or raises an exception with
+the rejection reason. While waiting, the event loop is free to perform other
+tasks however, so no resources are wasted.
+
+.. code-block:: python
+
+    import Pyjo.Promise
+    import Pyjo.URL
+    import Pyjo.UserAgent
+
+    ua = Pyjo.UserAgent.new()
+
+
+    # Search GitHub non-blocking for multiple terms sequentially
+    @Pyjo.Promise.coroutine
+    async def search_github_p(terms):
+        github = Pyjo.URL.new('https://api.github.com/search/repositories')
+        urls = [github.clone().set(query={'q': term}) for term in terms]
+
+        for url in urls:
+            tx = await ua.get_p(url)
+            print(tx.result.json('/items/0/full_name'))
+
+
+    search_github_p(['pyjoyment', 'mojolicious']).wait()
+
+The loop above performs all requests sequentially, awaiting a result before
+sending the next request. But you can also perform those requests
+concurrently instead, by using methods like
+:meth:`Pyjo.Promise.Pyjo_Promise.all` to combine multiple promises before
+awaiting the results.
+
+.. code-block:: python
+
+    import Pyjo.Promise
+    import Pyjo.URL
+    import Pyjo.UserAgent
+
+    ua = Pyjo.UserAgent.new()
+
+
+    # Search GitHub non-blocking for multiple terms concurrently
+    @Pyjo.Promise.coroutine
+    async def search_github_p(terms):
+        github = Pyjo.URL.new('https://api.github.com/search/repositories')
+        urls = [github.clone().set(query={'q': term}) for term in terms]
+
+        promises = [ua.get_p(url) for url in urls]
+        results = await Pyjo.Promise.all(*promises)
+        for result in results:
+            print(result[0].result.json('/items/0/full_name'))
+
+
+    search_github_p(['pyjoyment', 'mojolicious']).wait()
+
+All of this also means that you can use normal Python exception handling
+again.
+
+.. code-block:: python
+
+    import Pyjo.Promise
+
+    from Pyjo.Util import warn
+
+
+    # Catch a non-blocking exception
+    @Pyjo.Promise.coroutine
+    async def hello_p():
+        try:
+            await Pyjo.Promise.reject('This is an exception')
+        except Exception as err:
+            warn(f'Error: {err}')
+
+
+    hello_p().wait()
+
+And it works just the same in :mod:`Pyjoyment` and :mod:`Pyjoyment.Lite`
+applications. Just declare your actions with the ``async`` keyword and use
+``await`` to wait for promises to be ``fulfilled`` or ``rejected``.
+
+.. literalinclude:: cookbook/titles.py
+    :language: python
+    :caption: myapp.py
+
+Promises returned by actions will automatically get the default
+:mod:`Pyjoyment` exception handler attached. Making it much harder to ever
+miss a non-blocking exception again, even if you forgot to handle it yourself.
+
+Timers
+~~~~~~
+
+Timers, another primary feature of the event loop, are created with
+:meth:`Pyjo.IOLoop.Pyjo_IOLoop.timer` and can, for example, be used to delay
+rendering of a response, and unlike :func:`time.sleep`, won't block any other
+requests that might be processed concurrently.
+
+.. literalinclude:: cookbook/delayed.py
+    :language: python
+    :caption: myapp.py
+
+Recurring timers created with :meth:`Pyjo.IOLoop.Pyjo_IOLoop.recurring` are
+slightly more powerful, but need to be stopped manually, or they would just
+keep getting emitted.
+
+.. literalinclude:: cookbook/counter.py
+    :language: python
+    :caption: myapp.py
+
+Timers are not tied to a specific request or connection, and can even be
+created at startup time.
+
+.. literalinclude:: cookbook/background.py
+    :language: python
+    :caption: myapp.py
+
+Just remember that all these non-blocking operations are processed
+cooperatively, so your callbacks shouldn't block for too long.
+
+Subprocesses
+~~~~~~~~~~~~
+
+You can also use subprocesses, created with
+:meth:`Pyjo.IOLoop.Pyjo_IOLoop.subprocess`, to perform computationally
+expensive operations without blocking the event loop.
+
+.. literalinclude:: cookbook/blocking.py
+    :language: python
+    :caption: myapp.py
+
+The callback passed to :meth:`Pyjo.IOLoop.Subprocess.Pyjo_IOLoop_Subprocess.run_p`
+will be executed in a child process, without blocking the event loop of the
+parent process. The results of the callback will then be shared between both
+processes, and the promise fulfilled or rejected in the parent process.
+
+Exceptions in non-blocking operations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Since timers and other non-blocking operations are running solely in the
+event loop, outside of the application, exceptions that get raised in
+callbacks can't get caught and handled automatically. But you can handle them
+manually by subscribing to the event ``error`` of :mod:`Pyjo.Reactor` or
+catching them inside the callback.
+
+.. literalinclude:: cookbook/errors.py
+    :language: python
+    :caption: myapp.py
+
+A default subscriber that turns all errors into warnings will usually be added
+by :mod:`Pyjo.IOLoop` as a fallback.
+
+.. code-block:: python
+
+    Pyjo.IOLoop.singleton.reactor.unsubscribe('error')
+
+During development or for applications where crashing is simply preferable,
+you can also make every exception that gets raised in a callback fatal by
+removing all of its subscribers.
+
+WebSocket web service
+~~~~~~~~~~~~~~~~~~~~~
+
+The WebSocket protocol offers full bi-directional low-latency communication
+channels between clients and servers. Receive messages just by subscribing to
+events such as ``message`` of :mod:`Pyjo.Transaction.WebSocket` with
+:meth:`Pyjoyment.Controller.Pyjoyment_Controller.on` and return them with
+:meth:`Pyjoyment.Controller.Pyjoyment_Controller.send`.
+
+.. literalinclude:: cookbook/echo.py
+    :language: python
+    :caption: myapp.py
+
+The event ``finish`` of :mod:`Pyjo.Transaction.WebSocket` will be emitted
+right after the WebSocket connection has been closed.
+
+.. code-block:: python
+
+    c.tx.with_compression()
+
+You can activate ``permessage-deflate`` compression with
+:meth:`Pyjo.Transaction.WebSocket.Pyjo_Transaction_WebSocket.with_compression`,
+this can result in much better performance, but also increases memory usage by
+up to 300KiB per connection.
+
+.. code-block:: python
+
+    proto = c.tx.with_protocols('v2.proto', 'v1.proto')
+
+You can also use
+:meth:`Pyjo.Transaction.WebSocket.Pyjo_Transaction_WebSocket.with_protocols`
+to negotiate a subprotocol.
+
+Server-Sent Events web service
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Server-Sent Events (SSE) is a special form of long polling where you can use
+:meth:`Pyjoyment.Controller.Pyjoyment_Controller.write_sse` to directly send
+DOM events from servers to clients. It is uni-directional, that means you will
+have to use Ajax requests for sending data from clients to servers, the
+advantage however is low infrastructure requirements, since it reuses the HTTP
+protocol for transport.
+
+.. literalinclude:: cookbook/livelog.py
+    :language: python
+    :caption: myapp.py
+
+The event ``message`` of :mod:`Pyjo.Log` will be emitted for every new log
+message and the event ``finish`` of :mod:`Pyjo.Transaction` right after the
+transaction has been finished.
+
+Streaming multipart uploads
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+:mod:`Pyjoyment` contains a very sophisticated event system based on
+:mod:`Pyjo.EventEmitter`, with ready-to-use events on almost all layers, and
+which can be combined to solve some of the hardest problems in web
+development.
+
+.. literalinclude:: cookbook/upload.py
+    :language: python
+    :caption: myapp.py
+
+More event loops
+~~~~~~~~~~~~~~~~
+
+Internally, the :mod:`Pyjo.IOLoop` event loop can use multiple reactor
+backends, :mod:`Pyjo.Reactor.Asyncio`, the default one, runs on the event loop
+of :mod:`asyncio`. Which in turn allows the coroutines of :mod:`asyncio` and
+the libraries built on it to just work.
+
+.. literalinclude:: cookbook/sleepy.py
+    :language: python
+    :caption: myapp.py
+
+.. _cookbook-user-agent:
+
+User agent
+----------
+
+When we say :mod:`Pyjoyment` is a web framework we actually mean it, with
+:mod:`Pyjo.UserAgent` there's a full featured HTTP and WebSocket user agent
+built right in.
+
+REST web services
+~~~~~~~~~~~~~~~~~
+
+Requests can be performed very comfortably with methods like
+:meth:`Pyjo.UserAgent.Pyjo_UserAgent.get`, and always result in a
+:mod:`Pyjo.Transaction.HTTP` object, which has many useful attributes and
+methods. You can check for connection errors with
+:attr:`Pyjo.Transaction.Pyjo_Transaction.result`, or access HTTP request and
+response information directly through
+:attr:`Pyjo.Transaction.Pyjo_Transaction.req` and
+:attr:`Pyjo.Transaction.Pyjo_Transaction.res`.
+
+.. code-block:: python
+
+    import Pyjo.UserAgent
+
+    # Request a resource and make sure there were no connection errors
+    ua = Pyjo.UserAgent.new()
+    tx = ua.get('https://pyjoyment.readthedocs.io/en/latest/api/Pyjo.html', {'Accept': 'text/plain'})
+    res = tx.result
+
+    # Decide what to do with its representation
+    if res.is_success:
+        print(res.text)
+    elif res.is_error:
+        print(res.message)
+    elif res.code == 301:
+        print(res.headers.location)
+    else:
+        print('Whatever...')
+
+While methods like
+:attr:`Pyjo.Message.Response.Pyjo_Message_Response.is_success` and
+:attr:`Pyjo.Message.Response.Pyjo_Message_Response.is_error` serve as
+building blocks for more sophisticated REST clients.
+
+Web scraping
+~~~~~~~~~~~~
+
+Scraping information from websites has never been this much fun before. The
+built-in HTML/XML parser :mod:`Pyjo.DOM` is accessible through
+:meth:`Pyjo.Message.Pyjo_Message.dom` and supports all CSS selectors that make
+sense for a standalone parser, it can be a very powerful tool especially for
+testing web application.
+
+.. code-block:: python
+
+    import Pyjo.UserAgent
+
+    # Fetch website
+    ua = Pyjo.UserAgent.new()
+    res = ua.get('https://pyjoyment.readthedocs.io').result
+
+    # Extract title
+    print('Title:', res.dom().at('head > title').text)
+
+    # Extract headings
+    res.dom('h1, h2, h3').each(lambda dom, i: print('Heading:', dom.all_text))
+
+    # Visit all nodes recursively to extract more than just text
+    for n in res.dom().descendant_nodes:
+        # Text or CDATA node
+        if n.type == 'text' or n.type == 'cdata':
+            print(n.content, end='')
+
+        # Also include alternate text for images
+        if n.type == 'tag' and n.tag == 'img':
+            print(n['alt'] or '', end='')
+
+For a full list of available CSS selectors see :mod:`Pyjo.DOM.CSS`.
+
+JSON web services
+~~~~~~~~~~~~~~~~~
+
+Most web services these days are based on the JSON data-interchange format.
+That's why :mod:`Pyjoyment` comes with :mod:`Pyjo.JSON` built right in, which
+is accessible through :meth:`Pyjo.Message.Pyjo_Message.json`.
+
+.. code-block:: python
+
+    import Pyjo.URL
+    import Pyjo.UserAgent
+
+    # Fresh user agent
+    ua = Pyjo.UserAgent.new()
+
+    # Search GitHub for "pyjoyment" and list recently updated repositories
+    url = Pyjo.URL.new('https://api.github.com/search/repositories')
+    url.query = {'q': 'pyjoyment', 'sort': 'updated'}
+    for item in ua.get(url).result.json('/items'):
+        print(f"{item['full_name']} ({item['owner']['login']})")
+
+Basic authentication
+~~~~~~~~~~~~~~~~~~~~
+
+You can just add username and password to the URL, an ``Authorization``
+header will be automatically generated.
+
+.. code-block:: python
+
+    import Pyjo.UserAgent
+
+    ua = Pyjo.UserAgent.new()
+    print(ua.get('https://sri:secret@example.com/hideout').result.text)
+
+If you're using :mod:`Pyjo.URL` to build the URL, be aware that the userinfo
+part will not be included if the object is stringified. You'll have to pass
+the object itself to :mod:`Pyjo.UserAgent` or use
+:meth:`Pyjo.URL.Pyjo_URL.to_unsafe_str`.
+
+.. code-block:: python
+
+    import Pyjo.URL
+    import Pyjo.UserAgent
+
+    ua = Pyjo.UserAgent.new()
+    url = Pyjo.URL.new('https://example.com/hideout').set(userinfo='sri:secret')
+    print(ua.get(url).result.text)
+
+Decorating follow-up requests
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+:mod:`Pyjo.UserAgent` can automatically follow redirects, the event ``start``
+of :mod:`Pyjo.UserAgent` allows you direct access to each transaction right
+after they have been initialized and before a connection gets associated with
+them.
+
+.. code-block:: python
+
+    import Pyjo.UserAgent
+
+    # User agent following up to 10 redirects
+    ua = Pyjo.UserAgent.new(max_redirects=10)
+
+
+    # Add a witty header to every request
+    @ua.on('start')
+    def start(ua, tx):
+        tx.req.headers.header('X-Bender', 'Bite my shiny metal ass!')
+        print('Request:', tx.req.url.clone().to_abs())
+
+
+    # Request that will most likely get redirected
+    print('Title:', ua.get('google.com').result.dom().at('head > title').text)
+
+This even works for proxy ``CONNECT`` requests.
+
+Content generators
+~~~~~~~~~~~~~~~~~~
+
+Content generators can be registered with
+:meth:`Pyjo.UserAgent.Transactor.Pyjo_UserAgent_Transactor.add_generator` to
+generate the same type of content repeatedly for multiple requests.
+
+.. code-block:: python
+
+    import Pyjo.Asset.File
+    import Pyjo.UserAgent
+
+    # Add "stream" generator
+    ua = Pyjo.UserAgent.new()
+
+
+    def stream(transactor, tx, path):
+        tx.req.content.asset = Pyjo.Asset.File.new(path=path)
+
+
+    ua.transactor.add_generator('stream', stream)
+
+    # Send multiple files streaming via PUT and POST
+    ua.put('http://example.com/upload', stream='/home/sri/pyjo.png')
+    ua.post('http://example.com/upload', stream='/home/sri/minion.png')
+
+The ``json``, ``form`` and ``multipart`` content generators are always
+available.
+
+.. code-block:: python
+
+    import Pyjo.UserAgent
+
+    # Send "application/json" content via PATCH
+    ua = Pyjo.UserAgent.new()
+    tx = ua.patch('http://api.example.com', json={'foo': 'bar'})
+
+    # Send query parameters via GET
+    tx2 = ua.get('search.example.com', form={'q': 'test'})
+
+    # Send "application/x-www-form-urlencoded" content via POST
+    tx3 = ua.post('http://search.example.com', form={'q': 'test'})
+
+    # Send "multipart/form-data" content via PUT
+    tx4 = ua.put('upload.example.com', form={'test': {'content': 'Hello World!'}})
+
+    # Send custom multipart content via PUT
+    tx5 = ua.put('api.example.com', multipart=['Hello', 'World!'])
+
+For more information about available content generators see also
+:meth:`Pyjo.UserAgent.Transactor.Pyjo_UserAgent_Transactor.tx`.
+
+Large file downloads
+~~~~~~~~~~~~~~~~~~~~
+
+When downloading large files with :mod:`Pyjo.UserAgent` you don't have to
+worry about memory usage at all, because it will automatically stream
+everything above 250KiB into a temporary file, which can then be moved into a
+permanent file with :meth:`Pyjo.Message.Pyjo_Message.save_to`.
+
+.. code-block:: python
+
+    import Pyjo.UserAgent
+
+    # Fetch the latest Pyjoyment tarball
+    ua = Pyjo.UserAgent.new(max_redirects=5)
+    tx = ua.get('https://github.com/dex4er/Pyjoyment/tarball/master')
+    tx.result.save_to('pyjoyment.tar.gz')
+
+With :meth:`Pyjo.File.Pyjo_File.download` you can also stream file downloads
+directly into the target file. This allows for interrupted downloads to be
+resumed at a later time.
+
+.. code-block:: python
+
+    import Pyjo.File
+
+    # Download the latest Pyjoyment tarball directly into a file
+    Pyjo.File.path('/home/sri/pyjoyment.tar.gz').download('https://github.com/dex4er/Pyjoyment/tarball/master')
+
+To protect you from excessively large files there is also a limit of 2GiB by
+default, which you can tweak with the attribute
+:attr:`Pyjo.UserAgent.Pyjo_UserAgent.max_response_size`.
+
+.. code-block:: python
+
+    # Increase limit to 10GiB
+    ua.max_response_size = 10737418240
+
+Large file upload
+~~~~~~~~~~~~~~~~~
+
+Uploading a large file is even easier.
+
+.. code-block:: python
+
+    import Pyjo.UserAgent
+
+    # Upload file via POST and "multipart/form-data"
+    ua = Pyjo.UserAgent.new()
+    ua.post('example.com/upload', form={'image': {'file': '/home/sri/hello.png'}})
+
+And once again you don't have to worry about memory usage, all data will be
+streamed directly from the file.
+
+Streaming response
+~~~~~~~~~~~~~~~~~~
+
+Receiving a streaming response can be really tricky in most HTTP clients, but
+:mod:`Pyjo.UserAgent` makes it actually easy.
+
+.. code-block:: python
+
+    import Pyjo.UserAgent
+
+    # Accept responses of indefinite size
+    ua = Pyjo.UserAgent.new(max_response_size=0)
+
+    # Build a normal transaction
+    tx = ua.build_tx('GET', 'http://example.com')
+
+    # Replace "read" events to disable default content parser
+    tx.res.content.unsubscribe('read').on('read', lambda content, data: print(f'Streaming: {data}'))
+
+    # Process transaction
+    tx = ua.start(tx)
+
+The event ``read`` of :mod:`Pyjo.Content` will be emitted for every chunk of
+data that is received, even chunked transfer encoding and gzip content
+encoding will be handled transparently if necessary.
+
+Streaming request
+~~~~~~~~~~~~~~~~~
+
+Sending a streaming request is almost just as easy.
+
+.. code-block:: python
+
+    import Pyjo.UserAgent
+
+    # Build a normal transaction
+    ua = Pyjo.UserAgent.new()
+    tx = ua.build_tx('POST', 'http://example.com')
+
+    # Prepare body
+    body = b'Hello World!'
+    tx.req.headers.content_length = len(body)
+
+
+    # Start writing directly with a drain callback
+    def drain(content, offset=None):
+        global body
+        chunk, body = body[:1], body[1:]
+        content.write(chunk, drain if len(body) else None)
+
+
+    drain(tx.req.content)
+
+    # Process transaction
+    tx = ua.start(tx)
+
+The drain callback passed to :meth:`Pyjo.Content.Pyjo_Content.write` will be
+executed whenever the entire previous chunk of data has actually been
+written.
+
+Non-blocking
+~~~~~~~~~~~~
+
+:mod:`Pyjo.UserAgent` has been designed from the ground up to be
+non-blocking, the whole blocking API is just a simple convenience wrapper.
+Especially for high latency tasks like web crawling this can be extremely
+useful, because you can keep many concurrent connections active at the same
+time.
+
+.. code-block:: python
+
+    import Pyjo.IOLoop
+    import Pyjo.UserAgent
+
+    # Concurrent non-blocking requests
+    ua = Pyjo.UserAgent.new()
+    ua.get('https://github.com/dex4er/Pyjoyment', lambda ua, pyjo: print(pyjo.result.dom().at('title').text))
+    ua.get('https://github.com/mojolicious/mojo', lambda ua, mojo: print(mojo.result.dom().at('title').text))
+
+    # Start event loop if necessary
+    if not Pyjo.IOLoop.is_running():
+        Pyjo.IOLoop.start()
+
+But don't try to open too many connections to one server at the same time, it
+might get overwhelmed. Better use a queue to process requests in smaller
+batches.
+
+.. code-block:: python
+
+    import Pyjo.Promise
+    import Pyjo.UserAgent
+
+    urls = [
+        'https://pyjoyment.readthedocs.io/en/latest/api/Pyjo_DOM.html',
+        'https://pyjoyment.readthedocs.io/en/latest/api/Pyjo.html',
+        'https://pyjoyment.readthedocs.io/en/latest/api/Pyjo_File.html',
+        'https://pyjoyment.readthedocs.io/en/latest/api/Pyjo_URL.html',
+    ]
+
+    # User agent with a custom name, following up to 5 redirects
+    ua = Pyjo.UserAgent.new(max_redirects=5)
+    ua.transactor.name = 'MyParallelCrawler 1.0'
+
+    # Use a promise to keep the event loop running until we are done
+    promise = Pyjo.Promise.new()
+    count = 0
+
+
+    def fetch():
+        global count
+
+        # Stop if there are no more URLs
+        if not urls:
+            return
+        url = urls.pop(0)
+
+        # Fetch the next title
+        def title(ua, tx):
+            global count
+            print(f'{url}: {tx.result.dom().at("title").text}')
+
+            # Next request
+            fetch()
+            count -= 1
+            if count == 0:
+                promise.resolve()
+
+        ua.get(url, title)
+        count += 1
+
+
+    # Process two requests at a time
+    for _ in range(2):
+        fetch()
+    promise.wait()
+
+It is also strongly recommended to respect every sites ``robots.txt`` file as
+well as terms of service, and to wait a little before reopening connections to
+the same host, or the operators might be forced to block your access.
+
+Concurrent blocking requests
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+You might have seen :meth:`Pyjo.Promise.Pyjo_Promise.wait` already in some
+examples above. It is used to make non-blocking operations portable, allowing
+them to work inside an already running event loop or start one on demand.
+
+.. code-block:: python
+
+    import Pyjo.Promise
+    import Pyjo.UserAgent
+
+    # Synchronize non-blocking requests with promises
+    ua = Pyjo.UserAgent.new()
+    pyjo_promise = ua.get_p('https://github.com/dex4er/Pyjoyment')
+    mojo_promise = ua.get_p('https://github.com/mojolicious/mojo')
+
+
+    @Pyjo.Promise.all(pyjo_promise, mojo_promise).then
+    def titles(pyjo, mojo):
+        print(pyjo[0].result.dom().at('title').text)
+        print(mojo[0].result.dom().at('title').text)
+
+
+    titles.wait()
+
+WebSockets
+~~~~~~~~~~
+
+WebSockets are not just for the server-side, you can use ``websocket_p`` of
+:mod:`Pyjo.UserAgent` to open new connections, which are always
+non-blocking. The WebSocket handshake uses HTTP, and is a normal ``GET``
+request with a few additional headers. It can even contain cookies, and is
+followed by a ``101`` response from the server, notifying our user agent that
+the connection has been established and it can start using the bi-directional
+WebSocket protocol.
+
+.. code-block:: python
+
+    import Pyjo.Promise
+    import Pyjo.UserAgent
+
+    from Pyjo.Util import warn
+
+    # Open WebSocket to echo service
+    ua = Pyjo.UserAgent.new()
+
+
+    @ua.websocket_p('wss://ws.postman-echo.com/raw').then
+    def echo(tx):
+        # Prepare a followup promise so we can wait for messages
+        promise = Pyjo.Promise.new()
+
+        # Wait for WebSocket to be closed
+        @tx.on('finish')
+        def finish(tx, code, reason):
+            print(f'WebSocket closed with status {code}.')
+            promise.resolve()
+
+        # Close WebSocket after receiving one message
+        @tx.on('message')
+        def message(tx, msg):
+            print(f'WebSocket message: {msg}')
+            tx.finish()
+
+        # Send a message to the server
+        tx.send('Hi!')
+
+        # Insert a new promise into the promise chain
+        return promise
+
+
+    # Handle failed WebSocket handshakes and other exceptions
+    echo.catch(lambda err: warn(f'WebSocket error: {err}')).wait()
+
+UNIX domain sockets
+~~~~~~~~~~~~~~~~~~~
+
+Not just TCP/IP sockets are supported, but also UNIX domain sockets, which can
+have significant security and performance benefits when used for
+inter-process communication. Instead of ``http://`` and ``ws://`` you can use
+the ``http+unix://`` and ``ws+unix://`` schemes, and pass along a percent
+encoded path (``/`` becomes ``%2F``) instead of a hostname.
+
+.. code-block:: python
+
+    import Pyjo.Promise
+    import Pyjo.UserAgent
+
+    from Pyjo.Util import warn
+
+    # GET request via UNIX domain socket "/tmp/foo.sock"
+    ua = Pyjo.UserAgent.new()
+    print(ua.get('http+unix://%2Ftmp%2Ffoo.sock/index.html').result.text)
+
+    # GET request with HOST header via UNIX domain socket "/tmp/bar.sock"
+    tx = ua.get('http+unix://%2Ftmp%2Fbar.sock', {'Host': 'example.com'})
+    print(tx.result.text)
+
+
+    # WebSocket connection via UNIX domain socket "/tmp/baz.sock"
+    @ua.websocket_p('ws+unix://%2Ftmp%2Fbaz.sock/echo').then
+    def echo(tx):
+        promise = Pyjo.Promise.new()
+        tx.on('finish', lambda tx, *args: promise.resolve())
+
+        @tx.on('message')
+        def message(tx, msg):
+            print(f'WebSocket message: {msg}')
+            tx.finish()
+
+        tx.send('Hi!')
+
+        return promise
+
+
+    echo.catch(lambda err: warn(f'WebSocket error: {err}')).wait()
+
+You can set the ``Host`` header manually to pass along a hostname.
+
+Command line
+~~~~~~~~~~~~
+
+Don't you hate checking huge HTML files from the command line? Thanks to the
+command :mod:`Pyjoyment.Command.get` that is about to change. You can just
+pick the parts that actually matter with the CSS selectors from
+:mod:`Pyjo.DOM` and JSON Pointers from :mod:`Pyjo.JSON.Pointer`.
+
+.. code-block:: console
+
+    $ pyjo get https://mojolicious.org 'head > title'
+
+How about a list of all id attributes?
+
+.. code-block:: console
+
+    $ pyjo get https://mojolicious.org '*' attr id
+
+Or the text content of all heading tags?
+
+.. code-block:: console
+
+    $ pyjo get https://mojolicious.org 'h1, h2, h3' text
+
+Maybe just the text of the third heading?
+
+.. code-block:: console
+
+    $ pyjo get https://mojolicious.org 'h1, h2, h3' 3 text
+
+You can also extract all text from nested child elements.
+
+.. code-block:: console
+
+    $ pyjo get https://mojolicious.org '#mojobar' all
+
+The request can be customized as well.
+
+.. code-block:: console
+
+    $ pyjo get -M POST -H 'X-Bender: Bite my shiny metal ass!' http://google.com
+
+Store response data by redirecting ``STDOUT``.
+
+.. code-block:: console
+
+    $ pyjo get mojolicious.org > example.html
+
+Pass request data by redirecting ``STDIN``.
+
+.. code-block:: console
+
+    $ pyjo get -M PUT mojolicious.org < example.html
+
+Or use the output of another program.
+
+.. code-block:: console
+
+    $ echo 'Hello World' | pyjo get -M PUT https://mojolicious.org
+
+Submit forms as ``application/x-www-form-urlencoded`` content.
+
+.. code-block:: console
+
+    $ pyjo get -M POST -f 'q=Pyjoyment' -f 'size=5' https://metacpan.org/search
+
+And upload files as ``multipart/form-data`` content.
+
+.. code-block:: console
+
+    $ pyjo get -M POST -f 'upload=@example.html' mojolicious.org
+
+You can follow redirects and view the headers for all messages.
+
+.. code-block:: console
+
+    $ pyjo get -r -v http://google.com 'head > title'
+
+Extract just the information you really need from JSON data structures.
+
+.. code-block:: console
+
+    $ pyjo get https://pypi.org/pypi/Pyjoyment/json /info/version
+
+This can be an invaluable tool for testing your applications.
+
+.. code-block:: console
+
+    $ ./myapp.py get /welcome 'head > title'
+
+One-liners
+~~~~~~~~~~
+
+For quick hacks and especially testing, :mod:`Pyjo` one-liners are also a
+great choice.
+
+.. code-block:: console
+
+    $ python -m Pyjo 'g("mojolicious.org").dom().at("title").text'
+
+Applications
+------------
+
+Fun :mod:`Pyjoyment` application hacks for all occasions.
+
+Basic authentication
+~~~~~~~~~~~~~~~~~~~~
+
+Basic authentication data will be automatically extracted from the
+``Authorization`` header.
+
+.. literalinclude:: cookbook/basic_auth.py
+    :language: python
+    :caption: myapp.py
+
+This can be combined with TLS for a secure authentication mechanism.
+
+.. code-block:: console
+
+    $ ./myapp.py daemon -l 'https://*:3000?cert=./server.crt&key=./server.key'
+
+Adding a configuration file
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Adding a configuration file to your application is as easy as adding a file to
+its home directory and loading the plugin :mod:`Pyjoyment.Plugin.Config`. The
+default name is based on the value of :attr:`Pyjo.App.Pyjo_App.moniker`
+(``myapp``), appended with a ``.conf`` extension (``myapp.conf``).
+
+.. code-block:: console
+
+    $ mkdir myapp
+    $ cd myapp
+    $ touch myapp.py
+    $ chmod 744 myapp.py
+    $ echo "{'name': 'my Pyjoyment application'}" > myapp.conf
+
+Configuration files themselves are just Python code whose last expression is
+a dict with configuration settings of your choice. All those settings are then
+available through the method :meth:`Pyjo.App.Pyjo_App.config` and the
+helper ``config`` of :mod:`Pyjoyment.Plugin.DefaultHelpers`.
+
+.. literalinclude:: cookbook/config/myapp.py
+    :language: python
+    :caption: myapp.py
+
+Alternatively you can also use configuration files in the JSON format with
+:mod:`Pyjoyment.Plugin.JSONConfig`, in YAML with
+:mod:`Pyjoyment.Plugin.YAMLConfig` or in TOML with
+:mod:`Pyjoyment.Plugin.TOMLConfig`.
+
+Adding a plugin to your application
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To organize your code better and to prevent helpers from cluttering your
+application, you can use application specific plugins.
+
+.. code-block:: console
+
+    $ mkdir -p MyApp/Plugin
+    $ touch MyApp/Plugin/MyHelpers.py
+
+They work just like normal plugins and are also subclasses of
+:mod:`Pyjoyment.Plugin`. Nested helpers with a prefix based on the plugin name
+are an easy way to avoid conflicts.
+
+.. literalinclude:: cookbook/plugin/MyApp/Plugin/MyHelpers.py
+    :language: python
+    :caption: MyApp/Plugin/MyHelpers.py
+
+You can have as many application specific plugins as you like, the only
+difference to normal plugins is that you load them using their full name.
+The directory of the script is the first one of ``sys.path``, so the package
+``MyApp`` next to it is found.
+
+.. literalinclude:: cookbook/plugin/myapp.py
+    :language: python
+    :caption: myapp.py
+
+Of course these plugins can contain more than just helpers, take a look at
+:mod:`Pyjoyment.Plugins` for a few ideas.
+
+Adding commands to Pyjoyment
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+By now you've probably used many of the built-in commands described in
+:mod:`Pyjoyment.Commands`, but did you know that you can just add new ones and
+that they will be picked up automatically by the command line interface if
+they are placed in a directory from ``sys.path``? The namespace
+``Pyjoyment.Command`` takes in the modules of every
+``Pyjoyment/Command`` directory there.
+
+.. literalinclude:: cookbook/commands/Pyjoyment/Command/spy.py
+    :language: python
+    :caption: Pyjoyment/Command/spy.py
+
+Command line arguments are passed right through and there are many useful
+attributes and methods in :mod:`Pyjoyment.Command` that you can use or
+overload.
+
+.. code-block:: console
+
+    $ pyjo spy secrets
+    pyjoyment-hello_world
+
+    $ python -m MyApp spy secrets
+    my_app
+
+And to make your commands application specific, just add a custom namespace to
+:attr:`Pyjoyment.Commands.Pyjoyment_Commands.namespaces` and use a module
+like ``MyApp.Command.spy`` instead of ``Pyjoyment.Command.spy``.
+
+.. literalinclude:: cookbook/commands/MyApp/__init__.py
+    :language: python
+    :caption: MyApp/__init__.py
+
+The options ``-h``/``--help``, ``--home`` and ``-m``/``--mode`` are handled
+automatically by :mod:`Pyjoyment.Commands` and are shared by all commands.
+
+.. code-block:: console
+
+    $ python -m MyApp spy -m production mode
+    production
+
+For a full list of shared options see :mod:`Pyjoyment.Commands`.
+
+Running code against your application
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Ever thought about running a quick one-liner against your :mod:`Pyjoyment`
+application to test something? Thanks to the command
+:mod:`Pyjoyment.Command.eval` you can do just that, the application object
+itself can be accessed via ``app``.
+
+.. code-block:: console
+
+    $ pyjo generate lite-app myapp.py
+    $ ./myapp.py eval 'print(*app.static.paths, sep="\n")'
+    $ ./myapp.py eval 'print(*sorted(app.renderer.helpers), sep="\n")'
+
+The ``verbose`` options will automatically print the return value or returned
+data structure to ``sys.stdout``.
+
+.. code-block:: console
+
+    $ ./myapp.py eval -v 'app.static.paths[0]'
+    $ ./myapp.py eval -V 'app.static.paths'
+
+Making your application installable
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Ever thought about releasing your :mod:`Pyjoyment` application to PyPI? It's
+actually much easier than you might think.
+
+.. code-block:: console
+
+    $ pyjo generate app MyApp
+    $ cd my_app
+    $ mv public templates my_app.yml MyApp/
+
+The trick is to move the ``public`` and ``templates`` directories, and the
+configuration file, into the package, so they can get automatically installed
+with the modules. A configuration file with secrets can also stay out of the
+package, where the ``PYJO_CONFIG`` environment variable points at it, so that
+the secrets are not published. Additionally author commands from the
+``Pyjoyment.Command.Author`` namespace are not usually wanted by an installed
+application so they can be excluded.
+
+.. literalinclude:: cookbook/installable/MyApp/__init__.py
+    :language: python
+    :caption: MyApp/__init__.py
+
+Finally there is just one small change to be made to ``pyproject.toml``. It
+gets a build system, which builds the package ``MyApp`` with its files into a
+wheel, and the version that every distribution on PyPI needs.
+
+.. literalinclude:: cookbook/installable/pyproject.toml
+    :language: toml
+    :caption: pyproject.toml
+
+That's really everything, now you can package your application like any other
+Python project, and ``python -m MyApp`` starts it once it is installed.
+
+.. code-block:: console
+
+    $ python -m Pyjo.Prove -l -r t
+    $ uv build
+
+And if you have a PyPI account (which can be requested at https://pypi.org)
+even upload it.
+
+.. code-block:: console
+
+    $ uv publish
+
+Proxy
+~~~~~
+
+While every :mod:`Pyjoyment` application has the built-in user agent, the
+helper ``ua`` of :mod:`Pyjoyment.Plugin.DefaultHelpers`, for you to perform
+requests to backend web services, this is not always the most efficient
+solution. The specialized proxy helpers ``proxy.get_p`` and ``proxy.start_p``
+of :mod:`Pyjoyment.Plugin.DefaultHelpers` can stream response content
+straight to the client, as soon as a new chunk of data is received from the
+backend web service. Additionally they will take care of removing hop-by-hop
+headers and protect you automatically from backpressure issues. Which can
+happen in situations where the connection to the backend web service is
+faster than the connection to the client and data forwarding needs to be
+throttled. And the best of all, everything happens non-blocking, that means
+your web server can process other requests concurrently while waiting for
+I/O.
+
+.. literalinclude:: cookbook/proxy.py
+    :language: python
+    :caption: myapp.py
+
+All proxy helpers return a :mod:`Pyjo.Promise` object, which should be used to
+handle connection errors to backend web services gracefully. And if you ever
+need to forward all headers from the client to the backend web service, make
+sure to use :meth:`Pyjo.Headers.Pyjo_Headers.dehop` to remove all hop-by-hop
+headers.
+
+.. code-block:: python
+
+    # Clone and modify request headers
+    headers = c.req.headers.clone().dehop()
+    headers.accept = 'application/json'
+    tx = c.ua().build_tx('PUT', 'https://mojolicious.org', headers.to_dict())
+
+Hello World
+~~~~~~~~~~~
+
+If every byte matters this is the smallest ``Hello World`` application you can
+write with :mod:`Pyjoyment.Lite`.
+
+.. literalinclude:: cookbook/hello.py
+    :language: python
+    :caption: myapp.py
+
+It works because all routes without a pattern default to ``/`` and automatic
+rendering kicks in even if no actual code gets executed by the router. The
+renderer just picks up the ``text`` value from the stash and generates a
+response.
+
+Hello World one-liners
+~~~~~~~~~~~~~~~~~~~~~~
+
+The ``Hello World`` example above can get even a little bit shorter in a
+:mod:`Pyjo` one-liner.
+
+.. code-block:: console
+
+    $ python -m Pyjo 'a({"text": "Hello World!"}).start()' daemon
+
+And you can use all the commands from :mod:`Pyjoyment.Commands`.
+
+.. code-block:: console
+
+    $ python -m Pyjo 'a({"text": "Hello World!"}).start()' get -v /
+
+More
+----
+
+You can continue with `the guides of Mojolicious
+<https://docs.mojolicious.org/Mojolicious/Guides>`_ now, which this one is
+ported from, or take a look at the `Mojolicious wiki
+<https://github.com/mojolicious/mojo/wiki>`_, which contains a lot more
+documentation and examples by many different authors.
+
+Ported from `Mojolicious::Guides::Cookbook
+<https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojolicious/Guides/Cookbook.pod>`_
+of Mojolicious 9.49.

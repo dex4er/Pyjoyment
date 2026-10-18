@@ -80,8 +80,7 @@ restart the server after every change.
     Web application available at http://127.0.0.1:3000
 
 For more information about how to deploy your application see also
-`the deployment in the cookbook
-<https://docs.mojolicious.org/Mojolicious/Guides/Cookbook#DEPLOYMENT>`_.
+:ref:`the deployment in the cookbook <cookbook-deployment>`.
 
 Routes
 ------
@@ -528,8 +527,7 @@ user agent. A blocking request, without a callback, does not work in an
 action of a server that runs on the asyncio event loop, which does not run
 inside itself; it is for scripts and tests. For more information about the
 user agent see also
-`the user agent in the cookbook
-<https://docs.mojolicious.org/Mojolicious/Guides/Cookbook#USER-AGENT>`_.
+:ref:`the user agent in the cookbook <cookbook-user-agent>`.
 
 WebSockets
 ----------
@@ -544,8 +542,7 @@ messages by subscribing to events such as ``json`` of
     :language: python
 
 For more information about real-time web features see also
-`the real-time web in the cookbook
-<https://docs.mojolicious.org/Mojolicious/Guides/Cookbook#REAL-TIME-WEB>`_.
+:ref:`the real-time web in the cookbook <cookbook-real-time-web>`.
 
 Mode
 ----
