@@ -7,6 +7,7 @@ import importlib
 import io
 import os
 import re
+import subprocess
 import sys
 import types
 
@@ -339,6 +340,12 @@ ok(os.path.isdir(app.rel_file('my_app/public/assets').to_str()), 'assets directo
 ok(os.path.exists(app.rel_file('my_app/public/index.html').to_str()), 'static file exists')
 ok(os.path.exists(app.rel_file('my_app/templates/layouts/default.html.ep').to_str()), 'layout exists')
 ok(os.path.exists(app.rel_file('my_app/templates/example/welcome.html.ep').to_str()), 'template exists')
+# Not in Mojolicious: the application starts with the configuration of a test, which has no secrets, as Perl takes the
+# value of a missing key for undef
+code = "import Pyjo.Test.Pyjo; Pyjo.Test.Pyjo.new('MyApp', {'enable_weather': 1}).get_ok('/').status_is(200)"
+env = {**os.environ, 'PYTHONPATH': os.pathsep.join([cwd.to_str(), app.rel_file('my_app').to_str()])}
+result = subprocess.run([sys.executable, '-c', code], cwd=app.rel_file('my_app').to_str(), env=env, capture_output=True)
+ok(re.search(r'^ok 2 - 200 OK$', result.stdout.decode(), re.M), 'configuration of a test')
 os.chdir(cwd)
 
 with subtest('generate dockerfile'):

@@ -144,7 +144,7 @@ class <%= class_ %>(Pyjoyment.object):
         config = self.plugin('YAMLConfig')
 
         # Configure the application
-        self.secrets = config['secrets']
+        self.secrets = config.get('secrets')
 
         # Router
         r = self.routes
