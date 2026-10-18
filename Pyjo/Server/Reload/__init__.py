@@ -54,8 +54,8 @@ pyjo-reload
                                      defaults to "Poll"
       -h, --help                     Show this message
       -l, --listen <location>        One or more locations you want to listen
-                                     on, defaults to the value of PYJO_LISTEN
-                                     or "http://*:3000"
+                                     on, defaults to the value of PYJO_LISTEN,
+                                     the port of PORT or "http://*:3000"
       -m, --mode <name>              Operating mode for your application,
                                      defaults to the value of PYJO_MODE or
                                      "development"
@@ -297,7 +297,10 @@ def main(argv: Sequence[str] | None = None) -> NoReturn:
         action='append',
         default=[],
         metavar='LOCATION',
-        help='one or more locations you want to listen on, defaults to the value of PYJO_LISTEN or "http://*:3000"',
+        help=(
+            'one or more locations you want to listen on, defaults to the value of PYJO_LISTEN, the port of PORT or '
+            '"http://*:3000"'
+        ),
     )
     parser.add_argument(
         '-m',
