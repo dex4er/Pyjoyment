@@ -17,6 +17,11 @@ list:
     documents = load_all('--- first\n--- second\n')
     is_deeply_ok(documents, ['first', 'second'], 'documents')
 
+    from Pyjo.YAML import dump, dump_all
+
+    string = dump({'foo': 'bar', 'list': ['one', 'two']})
+    is_ok(string, 'foo: bar\nlist:\n  - one\n  - two\n', 'dump')
+
 with subtest('Description'):
     # {'foo': [1, True, 'yes', '2']}
     is_deeply_ok(load("foo:\n  - 1\n  - true\n  - yes\n  - '2'\n"), {'foo': [1, True, 'yes', '2']}, 'types')
@@ -39,6 +44,31 @@ with subtest('Anchors'):
         {'base': {'a': 1, 'b': 1}, 'copy': {'a': 1, 'b': 2}},
         'anchor, alias and merge key',
     )
+
+with subtest('Dump'):
+    # 'name: Pyjoyment\nlist:\n  - one\n  - 2\nrun: |\n  make\n'
+    is_ok(
+        dump({'name': 'Pyjoyment', 'list': ['one', 2], 'run': 'make\n'}),
+        'name: Pyjoyment\nlist:\n  - one\n  - 2\nrun: |\n  make\n',
+        'block style',
+    )
+
+with subtest('dump'):
+    value = {'foo': ['bar']}
+    string = dump(value)
+    is_ok(string, 'foo:\n  - bar\n', 'string')
+    string = dump(value, indent=4, indent_sequences=False, quote='"')
+    is_ok(string, 'foo:\n- "bar"\n', 'options')
+
+    # 'foo:\n- "bar"\n'
+    is_ok(dump({'foo': ['bar']}, indent_sequences=False, quote='"'), 'foo:\n- "bar"\n', 'example')
+
+with subtest('dump_all'):
+    values = ['first', 'second']
+    string = dump_all(values)
+
+    # '--- first\n--- second\n'
+    is_ok(dump_all(['first', 'second']), '--- first\n--- second\n', 'documents')
 
 with subtest('load'):
     value = load('foo: bar')
