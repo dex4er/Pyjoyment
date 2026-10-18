@@ -9,8 +9,7 @@ applications.
 
 This is only the first of the guides. Other guides delve deeper into topics
 like :doc:`growing <growing>` a :mod:`Pyjoyment.Lite` prototype into a
-well-structured :mod:`Pyjoyment` application,
-`routing <https://docs.mojolicious.org/Mojolicious/Guides/Routing>`_,
+well-structured :mod:`Pyjoyment` application, :doc:`routing <routing>`,
 `rendering <https://docs.mojolicious.org/Mojolicious/Guides/Rendering>`_ and
 more, in the guides of Mojolicious until Pyjoyment has its own. It is highly
 encouraged that readers continue on to the remaining guides after reading

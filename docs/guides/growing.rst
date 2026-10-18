@@ -533,10 +533,8 @@ routing information.
     :language: python
     :caption: MyApp/__init__.py
 
-The router allows many different route variations,
-`Mojolicious::Guides::Routing
-<https://docs.mojolicious.org/Mojolicious/Guides/Routing>`_ explains them all
-in great detail.
+The router allows many different route variations, :doc:`routing` explains
+them all in great detail.
 
 Templates
 ~~~~~~~~~
