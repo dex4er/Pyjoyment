@@ -3,7 +3,9 @@ from Pyjo.Test import *
 
 import contextlib
 import io
+import json
 import logging
+import os
 import time
 
 
@@ -46,6 +48,29 @@ with subtest('message'):
         log.info('Hello', 'World')
     is_ok(output.getvalue(), 'info: HelloWorld\n', 'printed')
 
+with subtest('JSON'):
+    log = Pyjo.Log.new(json=True)
+    record = json.loads(log.format(1760861742.12345, 'warn', 'Disk is 95% full'))
+    is_deeply_ok(
+        record,
+        {
+            'time': '2025-10-19T08:15:42.123450Z',
+            'level': 'warn',
+            'severity': 'WARNING',
+            'message': 'Disk is 95% full',
+            'pid': os.getpid(),
+        },
+        'line of JSON',
+    )
+    is_deeply_ok(
+        [
+            json.loads(log.format(0, level, 'x'))['severity']
+            for level in ('trace', 'debug', 'info', 'warn', 'error', 'fatal')
+        ],
+        ['DEBUG', 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+        'severities',
+    )
+
 with subtest('The logging module'):
     log = Pyjo.Log.new(handle=None)
     logger = logging.getLogger('t.docs.Log')
@@ -83,6 +108,13 @@ with subtest('history'):
     is_ok(history, [], 'empty')
     log.history = [[time.time(), 'debug', 'That went wrong']]
     is_ok(log.history[0][2], 'That went wrong', 'set')
+
+with subtest('json'):
+    log = Pyjo.Log.new()
+    boolean = log.json
+    is_ok(boolean, False, 'default')
+    log.json = True
+    like_ok(log.format(time.time(), 'info', 'JSON'), r'^\{"time":.*"message":"JSON".*\}\n$', 'json')
 
 with subtest('level'):
     log = Pyjo.Log.new()
@@ -149,6 +181,13 @@ with subtest('context'):
     like_ok(stderr.getvalue(), r'\[debug\] \[17a60115\] This is a log message with context information\n', 'debug')
     like_ok(stderr.getvalue(), r'\[info\] \[17a60115\] And another\n', 'info')
 
+    # Log with the fields of a context
+    context = log.context({'user': 'sri'})
+    with log.capture() as messages:
+        context.info('Fields')
+    like_ok(messages[0], r'\[info\] user=sri Fields\n$', 'fields')
+
+
 with subtest('Logging methods'):
     log = Pyjo.Log.new(handle=None)
     with log.capture() as messages:
@@ -193,6 +232,25 @@ with subtest('new'):
     is_ok(len(log.subscribers('message')), 1, 'default logger')
     log = Pyjo.Log.new(level='warn')
     is_ok(log.level, 'warn', 'level')
+
+with subtest('Field'):
+    field = Pyjo.Log.Field('user', 'sri')
+    is_ok(str(field), 'user=sri', 'field')
+    field = Pyjo.Log.Field('request_id', 'abc123', '[abc123]')
+    is_ok(str(field), '[abc123]', 'text')
+
+    # Log with a field
+    log = Pyjo.Log.new(json=True, handle=None)
+    with log.capture() as messages:
+        log.info('Disk is full', Pyjo.Log.Field('disk', '/dev/sda1'))
+    record = json.loads(messages[0])
+    is_ok(record['message'], 'Disk is full', 'message')
+    is_ok(record['disk'], '/dev/sda1', 'field')
+
+    name = field.name
+    is_ok(name, 'request_id', 'name')
+    value = field.value
+    is_ok(value, 'abc123', 'value')
 
 with subtest('Handler'):
     log = Pyjo.Log.new(handle=None)

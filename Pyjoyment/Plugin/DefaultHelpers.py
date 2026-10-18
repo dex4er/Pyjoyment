@@ -222,7 +222,8 @@ log ::
 
 Alternative to :attr:`Pyjoyment.Pyjoyment_App.log` that includes
 :attr:`Pyjo.Message.Request.Pyjo_Message_Request.request_id` with every log
-message. ::
+message, as the field ``request_id`` of a message of JSON, see
+:class:`Pyjo.Log.Field`. ::
 
     # Log message with context
     c.log().debug('This is a log message with request id')
@@ -592,6 +593,7 @@ import Pyjo.Asset.File
 import Pyjo.Collection
 import Pyjo.Exception
 import Pyjo.IOLoop
+import Pyjo.Log
 import Pyjo.Promise
 import Pyjo.String.Bytes
 import Pyjo.String.HTML
@@ -898,7 +900,9 @@ def _json_not_found(c: 'Controller') -> Any:
 def _log(c: 'Controller') -> Any:
     stash = c.stash()
     if not stash.get('mojo.log'):
-        stash['mojo.log'] = c.app.log.context(f'[{c.req.request_id}]')
+        # Not in Mojolicious: the request id as a field of its own of a message of JSON
+        id = c.req.request_id
+        stash['mojo.log'] = c.app.log.context(Pyjo.Log.Field('request_id', id, f'[{id}]'))
     return stash['mojo.log']
 
 

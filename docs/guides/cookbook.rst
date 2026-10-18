@@ -346,9 +346,19 @@ we will simply use Docker.
     ...
 
 And now your web application should be deployed as a container under
-``http://127.0.0.1:3000``. For more information and many more container
-deployment options we recommend the `Docker <https://docs.docker.com/>`_ and
-`Kubernetes <https://kubernetes.io/docs/>`_ documentation.
+``http://127.0.0.1:3000``. With the ``PYJO_LOG_JSON`` environment variable its
+log messages are lines of JSON, which the log collectors of platforms such as
+Cloud Run and Kubernetes read with their levels and fields, see
+:mod:`Pyjo.Log`.
+
+.. code-block:: console
+
+    $ docker run -d -p 3000:3000 -e PYJO_LOG_JSON=1 --name myapp_container myapp_image
+    ...
+
+For more information and many more container deployment options we recommend
+the `Docker <https://docs.docker.com/>`_ and `Kubernetes
+<https://kubernetes.io/docs/>`_ documentation.
 
 Hot deployment
 ~~~~~~~~~~~~~~
