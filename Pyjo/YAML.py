@@ -193,7 +193,7 @@ def dump(
       ``_``, ``id`` without a key, and a number from ``2`` for another
       anchor of the same name. ::
 
-        # 'foo:\n- "bar"\n'
+        # 'foo:\\n- "bar"\\n'
         dump({'foo': ['bar']}, indent_sequences=False, quote='"')
     """
     return dump_all(
@@ -229,7 +229,7 @@ def dump_all(
     options of :func:`dump`, where the documents after the first one start
     with ``---``. ::
 
-        # '--- first\n--- second\n'
+        # '--- first\\n--- second\\n'
         dump_all(['first', 'second'])
     """
     dumper = _Dumper(indent, indent_sequences, quote, quote_keys, multiline, version, anchors)
