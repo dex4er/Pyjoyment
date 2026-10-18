@@ -316,9 +316,11 @@ Classes
 
 import Pyjo.Base
 import Pyjo.File
+import Pyjo.GetOpt
 import Pyjo.Server.Prefork
 
-import argparse
+from Pyjo.Util import die, extract_usage, getopt
+
 import os
 import signal
 import sys
@@ -581,7 +583,8 @@ class Pyjo_Server_Hot(Pyjo.Base.object):
         _exit(f'Stopping Hot server {pid} gracefully.')
 
 
-# Not in Mojolicious: script/hypnotoad, the command line interface, with argparse
+# Renamed from Mojolicious: script/hypnotoad, the command line interface, a function of the module, whose usage is the
+# section pyjo-hot of its docstring
 def main(argv: Sequence[str] | None = None) -> None:
     """::
 
@@ -590,25 +593,20 @@ def main(argv: Sequence[str] | None = None) -> None:
     The command line interface of ``pyjo-hot``: parse the options and run the
     server for the application.
     """
-    parser = argparse.ArgumentParser(
-        prog='pyjo-hot', description='Start Pyjoyment applications with the Pyjo.Server.Hot web server.'
+    args = list(sys.argv[1:] if argv is None else argv)
+    opts = getopt(
+        args,
+        {
+            'f|foreground': Pyjo.GetOpt.env('PYJO_HOT_FOREGROUND'),
+            'h|help': None,
+            's|stop': Pyjo.GetOpt.env('PYJO_HOT_STOP'),
+            't|test': Pyjo.GetOpt.env('PYJO_HOT_TEST'),
+        },
     )
-    parser.add_argument('-f', '--foreground', action='store_true', help='keep manager process in foreground')
-    parser.add_argument('-s', '--stop', action='store_true', help='stop server gracefully')
-    parser.add_argument('-t', '--test', action='store_true', help='test application and exit')
-    parser.add_argument(
-        'application', nargs='?', help='the script of the application, defaults to the value of PYJO_HOT_APP'
-    )
-    args = parser.parse_args(argv)
 
-    if args.foreground:
-        os.environ['PYJO_HOT_FOREGROUND'] = '1'
-    if args.stop:
-        os.environ['PYJO_HOT_STOP'] = '1'
-    if args.test:
-        os.environ['PYJO_HOT_TEST'] = '1'
-    if not (app := args.application or os.environ.get('PYJO_HOT_APP')):
-        parser.error('the following arguments are required: application')
+    if not opts or opts.help or not (app := (args[0] if args else None) or os.environ.get('PYJO_HOT_APP')):
+        # The usage without its last newline, as SystemExit writes the message with one
+        die(extract_usage(section='pyjo-hot').rstrip('\n'))
     Pyjo_Server_Hot.new().run(app)
 
 

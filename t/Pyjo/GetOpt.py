@@ -181,6 +181,24 @@ with subtest('Targets'):
     ok(callable(backlog), 'decorator returns the callback')
     ok(not hasattr(result, 'listen'), 'no value of a target in the result')
 
+with subtest('Environment variables as targets'):
+    names = ('PYJO_TEST_MODE', 'PYJO_TEST_FLAG', 'PYJO_TEST_COLOR', 'PYJO_TEST_COUNT')
+    try:
+        getopt = Pyjo.GetOpt.new()
+        getopt.option('m|mode=s', Pyjo.GetOpt.env('PYJO_TEST_MODE'))
+        getopt.option('f|flag', Pyjo.GetOpt.env('PYJO_TEST_FLAG'))
+        getopt.option('color!', Pyjo.GetOpt.env('PYJO_TEST_COLOR'))
+        getopt.option('c|count=i', Pyjo.GetOpt.env('PYJO_TEST_COUNT'))
+        ok(getopt.parse(['-m', 'production', '-f', '--no-color', '-c', '3']), 'success')
+        is_deeply_ok([os.environ.get(name) for name in names], ['production', '1', '0', '3'], 'values of the options')
+        ok(getopt.parse(['--color']), 'success')
+        is_ok(os.environ['PYJO_TEST_COLOR'], '1', 'flag again')
+    finally:
+        for name in names:
+            os.environ.pop(name, None)
+    getopt.parse([])
+    is_ok(os.environ.get('PYJO_TEST_MODE'), None, 'not set without the option')
+
 with subtest('Environment'):
     env = {
         'TEST_MODE': 'production',

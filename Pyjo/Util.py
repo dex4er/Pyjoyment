@@ -278,11 +278,12 @@ def encode(charset: str, chars: str) -> bytes:
 # Left out from Mojolicious: encrypt_cookie, as ChaCha20-Poly1305 of the sessions is not in the standard library
 
 
-def extract_usage(file: 'str | os.PathLike[str] | None' = None) -> str:
+def extract_usage(file: 'str | os.PathLike[str] | None' = None, section: str | None = None) -> str:
     """::
 
         usage = extract_usage()
         usage = extract_usage('/home/sri/foo.py')
+        usage = extract_usage(section='myscript')
 
     Extract usage message from the synopsis of the docstring of a module, its
     first literal block, defaults to using the file this function was called
@@ -298,6 +299,26 @@ def extract_usage(file: 'str | os.PathLike[str] | None' = None) -> str:
 
             Usage: APPLICATION test [OPTIONS]
         \"\"\"
+
+    With a section, the first literal block after its heading, as the usage of
+    a script that is a function of the module. ::
+
+        # "Usage: myscript [OPTIONS]\\n"
+        extract_usage(section='myscript')
+
+        \"\"\"
+        Test module
+        ===========
+        ::
+
+            test = Test.new()
+
+        myscript
+        --------
+        ::
+
+            Usage: myscript [OPTIONS]
+        \"\"\"
     """
     # Unlike Mojolicious: the synopsis of the docstring, which the file is parsed for without running it, where Mojo
     # extracts the section SYNOPSIS of POD
@@ -306,6 +327,21 @@ def extract_usage(file: 'str | os.PathLike[str] | None' = None) -> str:
         docstring = ast.get_docstring(ast.parse(handle.read()), clean=False) or ''
 
     lines = docstring.split('\n')
+
+    # Not in Mojolicious: the section of a heading, as the usage of a script that is a function of the module
+    if section is not None:
+        start = next(
+            (
+                i + 2
+                for i, line in enumerate(lines[:-1])
+                if line.strip() == section and re.fullmatch(r'\s*([-=~^"\'])\1+\s*', lines[i + 1])
+            ),
+            None,
+        )
+        if start is None:
+            return ''
+        lines = lines[start:]
+
     block: list[str] = []
     for i, line in enumerate(lines):
         if line.rstrip().endswith('::'):

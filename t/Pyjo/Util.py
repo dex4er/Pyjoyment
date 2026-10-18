@@ -230,6 +230,45 @@ myapp.py
     )
     is_ok(extract_usage(myapp.to_str()), 'USAGE: myapp.py daemon\n\n test\n123\n', 'right result')
 
+    # Not in Mojolicious: the usage of a section, as the one of a script in the docstring of its module
+    module = (
+        tempdir()
+        .child('myserver.py')
+        .spew(b'''\
+"""
+myserver
+========
+::
+
+    server = myserver.new()
+
+myserver-script
+---------------
+::
+
+    Usage: myserver-script [OPTIONS]
+
+      -h   Help
+
+Text.
+
+Other
+-----
+::
+
+    Not this
+"""
+''')
+    )
+    is_ok(extract_usage(module.to_str()), 'server = myserver.new()\n', 'synopsis')
+    is_ok(
+        extract_usage(module.to_str(), section='myserver-script'),
+        'Usage: myserver-script [OPTIONS]\n\n  -h   Help\n',
+        'usage of the section',
+    )
+    is_ok(extract_usage(module.to_str(), section='Other'), 'Not this\n', 'last section')
+    is_ok(extract_usage(module.to_str(), section='Missing'), '', 'no section')
+
 with subtest('getopt'):
     opts = getopt(['--charset', 'UTF-8'], {'c|charset=s': None})
     is_ok(opts.charset, 'UTF-8', 'right string')

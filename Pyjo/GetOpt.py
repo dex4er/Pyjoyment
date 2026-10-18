@@ -96,6 +96,14 @@ values separated by commas, as ``PYJO_LISTEN=http://*:80,https://*:443``. ::
     # PYJO_WORKERS=12 python myapp.py prefork
     getopt = Pyjo.GetOpt.new(env_prefix='PYJO_').option('w|workers=i', default=4)
 
+The other way around, the target :func:`env` sets an environment variable to
+the value of an option, as a script of Mojolicious binds an option to
+``$ENV{...}``, for the code that reads the variable later, as the
+application its mode. ::
+
+    # python myapp.py --mode production sets PYJO_MODE
+    getopt = Pyjo.GetOpt.new().option('m|mode=s', Pyjo.GetOpt.env('PYJO_MODE'))
+
 See also
 --------
 
@@ -475,6 +483,25 @@ def _store(option: _Option, values: dict[str, Any], value: Any) -> None:
         values[option.name][key] = value
     else:
         values[option.name] = value
+
+
+# Not in Getopt::Long: a target for an environment variable, as Perl binds an option to $ENV{...}
+def env(name: str) -> Callable[[str, Any], None]:
+    """::
+
+        target = Pyjo.GetOpt.env('PYJO_MODE')
+
+    A target of an option that sets the environment variable ``name`` to its
+    value, ``1`` for a flag and ``0`` for a negated one, see `Environment`_. ::
+
+        # --foreground sets PYJO_HOT_FOREGROUND to 1
+        getopt.option('f|foreground', Pyjo.GetOpt.env('PYJO_HOT_FOREGROUND'))
+    """
+
+    def target(option: str, value: Any) -> None:
+        os.environ[name] = '1' if value is True else '0' if value is False else str(value)
+
+    return target
 
 
 new = Pyjo_GetOpt.new

@@ -539,9 +539,15 @@ copy:
   that says what the module does, `Pyjo.Server.Hot` and `Pyjo.Server.Reload`,
   with a `# Renamed from Mojolicious:` comment; so are its environment
   variables (`PYJO_RELOAD_BACKEND`) and the jokes of its documentation. A
-  script of Mojolicious, as `script/morbo`, is a `main` function of the module
-  with `argparse`, a `pyjo-` command in `[project.scripts]` of
-  `pyproject.toml` (`pyjo-reload`) and `python -m` of the module.
+  script of Mojolicious, as `script/morbo`, is a `main` function of the module,
+  a `pyjo-` command in `[project.scripts]` of `pyproject.toml` (`pyjo-reload`)
+  and `python -m` of the module. It parses its options with `getopt` of
+  `Pyjo.Util`, as the script does with the one of `Mojo::Util`, with the
+  target `Pyjo.GetOpt.env` for an option that the script binds to `$ENV{...}`,
+  as `PYJO_HOT_FOREGROUND` for `--foreground`, and its usage,
+  which the script has in its SYNOPSIS, is the section of the docstring of the
+  module with the name of the command, which `extract_usage(section=...)`
+  reads, so that the help of the command and its documentation are one text.
   `script/mojo`, the command line interface of `Mojo::HelloWorld`, is `pyjo`,
   the `main` of `Pyjoyment.Commands`, and `python -m Pyjoyment`.
 - A command of Mojolicious, as `Mojolicious::Command::daemon`, is a module of
