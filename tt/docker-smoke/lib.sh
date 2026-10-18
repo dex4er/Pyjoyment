@@ -102,10 +102,12 @@ smoke_dockerfile() {
     sleep 0.5
   done
 
-  local page
+  local page body
   for page in "$@"; do
-    curl --silent --fail "${url}${page}" | grep -q 'Welcome to the Pyjoyment real-time web framework!' ||
-      fail "GET ${page}"
+    # The body read whole, as grep -q that stops reading it would fail the pipe
+    # of curl with pipefail
+    body=$(curl --silent --fail "${url}${page}") || fail "GET ${page}"
+    grep -q 'Welcome to the Pyjoyment real-time web framework!' <<<"${body}" || fail "GET ${page}"
     echo "ok - GET ${page}"
   done
 
