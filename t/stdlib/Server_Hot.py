@@ -47,6 +47,15 @@ app.start()
     return app
 
 
+# The process id of the manager, 0 while there is none: the manager writes the file after it creates it, and a hot
+# deployment removes it before the new manager creates it again
+def read_pid(pid):
+    try:
+        return int(pid.read_text() or 0)
+    except FileNotFoundError:
+        return 0
+
+
 # The response of the worker, once there is one
 def get(port):
     deadline = time.monotonic() + 20
@@ -92,12 +101,12 @@ Pyjo.Server.Hot.new().run(pathlib.Path({str(app)!r}))
     port, app, result = ServerStart.retry(start)
     pid = app.with_name('hot.pid')
     is_ok(result.returncode, 0, 'daemonized')
-    atexit.register(lambda: pid.exists() and os.kill(int(pid.read_text()), signal.SIGQUIT))
+    atexit.register(lambda: (manager := read_pid(pid)) and os.kill(manager, signal.SIGQUIT))
     is_ok(get(port), b'int_max_str_digits=1234', 'the command line of the process with -X, run again')
     deadline = time.monotonic() + 20
-    while not pid.exists() and time.monotonic() < deadline:
+    while not read_pid(pid) and time.monotonic() < deadline:
         time.sleep(0.1)
-    os.kill(int(pid.read_text()), signal.SIGTERM)
+    os.kill(read_pid(pid), signal.SIGTERM)
     ok(closed(port), 'stopped gracefully')
 
 with subtest('-t and -s'), tempfile.TemporaryDirectory() as dir:
@@ -124,17 +133,17 @@ with subtest('HUP and -s'), tempfile.TemporaryDirectory() as dir:
 
     port, app, result = ServerStart.retry(start)
     pid = app.with_name('hot.pid')
-    atexit.register(lambda: pid.exists() and os.kill(int(pid.read_text()), signal.SIGQUIT))
+    atexit.register(lambda: (manager := read_pid(pid)) and os.kill(manager, signal.SIGQUIT))
     like_ok(get(port), rb'^int_max_str_digits=', 'serving')
     deadline = time.monotonic() + 20
-    while not pid.exists() and time.monotonic() < deadline:
+    while not read_pid(pid) and time.monotonic() < deadline:
         time.sleep(0.1)
-    old = int(pid.read_text())
+    old = read_pid(pid)
     os.kill(old, signal.SIGHUP)
     deadline = time.monotonic() + 30
-    while (not pid.exists() or int(pid.read_text() or 0) == old) and time.monotonic() < deadline:
+    while read_pid(pid) in (0, old) and time.monotonic() < deadline:
         time.sleep(0.1)
-    isnt_ok(int(pid.read_text()), old, 'new manager')
+    isnt_ok(read_pid(pid), old, 'new manager')
     like_ok(get(port), rb'^int_max_str_digits=', 'serving after the hot deployment')
     result = subprocess.run(
         [sys.executable, '-m', 'Pyjo.Server.Hot', '-s', str(app)], env=ENV, capture_output=True, text=True
