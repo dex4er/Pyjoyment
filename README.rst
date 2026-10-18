@@ -192,6 +192,19 @@ and answers on port 3000: ::
 
     curl http://localhost:3000/
 
+On `AWS Lambda <https://aws.amazon.com/lambda/>`_, it is an event function,
+whose handler ``hello_world_lambda.handler`` answers the events of API
+Gateway, Function URLs and Application Load Balancers:
+
+.. code-block:: python
+
+   import Pyjo.HelloWorld
+   import Pyjo.Server.Lambda
+
+
+   # The handler "hello_world_lambda.handler" of an event function of AWS Lambda
+   handler = Pyjo.Server.Lambda.new(app=Pyjo.HelloWorld.new()).to_lambda_app()
+
 Documentation
 =============
 

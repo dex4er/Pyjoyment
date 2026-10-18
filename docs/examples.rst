@@ -37,6 +37,11 @@ On `Werkzeug <https://werkzeug.palletsprojects.com/>`_, a WSGI server:
     .. include:: ../examples/hello_world_werkzeug.py
        :code: python
 
+As an event function of `AWS Lambda <https://aws.amazon.com/lambda/>`_:
+
+    .. include:: ../examples/hello_world_lambda.py
+       :code: python
+
 
 Web scraping
 ------------
