@@ -943,7 +943,7 @@ pattern.match_partial(path)`.
   The workflow Bundle Check fails a pull request whose files do not match the
   lock, and commits them to a branch of Renovate, which cannot run the copy,
   with the token of the workflow; a push with that token starts no workflow, so
-  the job starts Bundle Check, Tests and Trunk Check on the commit with
+  the job starts Bundle Check, Build, Tests and Trunk Check on the commit with
   `workflow_dispatch`. Renovate keeps a major release for an approval in its
   Dependency Dashboard, as the tests do not run JavaScript: such a release is
   checked in a browser, and the templates follow its API. `bootstrap.js` is the
