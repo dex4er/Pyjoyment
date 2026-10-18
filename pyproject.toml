@@ -155,6 +155,14 @@ ignore = [
   # F405 "`get` may be undefined, or defined from star imports"
   "F405",
 ]
+# The examples of the guides are scripts of Pyjoyment.Lite too.
+"docs/guides/**" = [
+  # F403 "`from Pyjoyment.Lite import *` used; unable to detect undefined
+  # names"
+  "F403",
+  # F405 "`get` may be undefined, or defined from star imports"
+  "F405",
+]
 # E402 "Module level import not at top of file": the namespace of the package is
 # open before it imports its subpackages, which extend it with their parts.
 "Pyjoyment/__init__.py" = ["E402"]

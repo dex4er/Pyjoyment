@@ -14,5 +14,6 @@ Contents:
     status
     installation
     examples
+    guides/index
     api/index
     license
