@@ -99,6 +99,24 @@ with subtest('Environment'):
         del os.environ['PYJO_WORKERS']
     is_ok(getopt.parse([]).workers, 4, 'default')
 
+with subtest('env'):
+    try:
+        # python myapp.py --mode production sets PYJO_MODE
+        getopt = Pyjo.GetOpt.new().option('m|mode=s', Pyjo.GetOpt.env('PYJO_MODE'))
+        getopt.parse(['--mode', 'production'])
+        is_ok(os.environ.get('PYJO_MODE'), 'production', 'mode')
+
+        target = Pyjo.GetOpt.env('PYJO_HOT_FOREGROUND')
+        ok(callable(target), 'target')
+
+        # --foreground sets PYJO_HOT_FOREGROUND to 1
+        getopt.option('f|foreground', Pyjo.GetOpt.env('PYJO_HOT_FOREGROUND'))
+        getopt.parse(['--foreground'])
+        is_ok(os.environ.get('PYJO_HOT_FOREGROUND'), '1', 'flag')
+    finally:
+        os.environ.pop('PYJO_MODE', None)
+        os.environ.pop('PYJO_HOT_FOREGROUND', None)
+
 with subtest('new'):
     getopt = Pyjo.GetOpt.new(pass_through=True)
     args = ['--unknown', '--', 'x']

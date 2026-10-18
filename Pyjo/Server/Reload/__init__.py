@@ -87,10 +87,11 @@ Classes
 
 import Pyjo.Base
 import Pyjo.Exception
+import Pyjo.GetOpt
 import Pyjo.Server.Daemon
 
 from Pyjo.Loader import load_class
-from Pyjo.Util import die, extract_usage, getopt, setenv
+from Pyjo.Util import die, extract_usage, getopt
 
 import os
 import signal
@@ -295,12 +296,12 @@ def main(argv: Sequence[str] | None = None) -> NoReturn:
     opts = getopt(
         args,
         {
-            'b|backend=s': lambda name, value: setenv('PYJO_RELOAD_BACKEND', value),
+            'b|backend=s': Pyjo.GetOpt.env('PYJO_RELOAD_BACKEND'),
             'h|help': None,
             'l|listen=s': listen,
             # Not in Mojolicious: the format of the log messages of Pyjo.Log, as the option of the commands
-            'log-format=s': lambda name, value: setenv('PYJO_LOG_FORMAT', value),
-            'm|mode=s': lambda name, value: setenv('PYJO_MODE', value),
+            'log-format=s': Pyjo.GetOpt.env('PYJO_LOG_FORMAT'),
+            'm|mode=s': Pyjo.GetOpt.env('PYJO_MODE'),
             'v|verbose': None,
             'w|watch=s': watch,
         },

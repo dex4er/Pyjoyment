@@ -316,9 +316,10 @@ Classes
 
 import Pyjo.Base
 import Pyjo.File
+import Pyjo.GetOpt
 import Pyjo.Server.Prefork
 
-from Pyjo.Util import die, extract_usage, getopt, setenv
+from Pyjo.Util import die, extract_usage, getopt
 
 import os
 import signal
@@ -596,10 +597,10 @@ def main(argv: Sequence[str] | None = None) -> None:
     opts = getopt(
         args,
         {
-            'f|foreground': lambda name, value: setenv('PYJO_HOT_FOREGROUND', '1'),
+            'f|foreground': Pyjo.GetOpt.env('PYJO_HOT_FOREGROUND'),
             'h|help': None,
-            's|stop': lambda name, value: setenv('PYJO_HOT_STOP', '1'),
-            't|test': lambda name, value: setenv('PYJO_HOT_TEST', '1'),
+            's|stop': Pyjo.GetOpt.env('PYJO_HOT_STOP'),
+            't|test': Pyjo.GetOpt.env('PYJO_HOT_TEST'),
         },
     )
 

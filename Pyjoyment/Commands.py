@@ -239,11 +239,12 @@ Classes
 # Left out from Mojolicious: the command cpanify, as uv publish uploads distributions to PyPI
 
 import Pyjo.Exception
+import Pyjo.GetOpt
 import Pyjo.Loader
 import Pyjo.Server
 import Pyjoyment.Command
 
-from Pyjo.Util import getopt, tablify
+from Pyjo.Util import getopt, setenv, tablify
 
 import errno
 import os
@@ -251,7 +252,7 @@ import re
 import socket
 import sys
 
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from typing import Any
 
 
@@ -373,7 +374,7 @@ class Pyjoyment_Commands(Pyjoyment.Command.object):
                 name = arguments.pop(0)
             saved = os.environ.get('PYJO_HELP')
             help = bool(saved) or help
-            _setenv('PYJO_HELP', '1' if help else None)
+            setenv('PYJO_HELP', '1' if help else None)
             try:
                 name = name.replace('-', '_')
 
@@ -396,7 +397,7 @@ class Pyjoyment_Commands(Pyjoyment.Command.object):
                 app.plugins.emit_hook('before_command', command, arguments)
                 return command.run(*arguments)
             finally:
-                _setenv('PYJO_HELP', saved)
+                setenv('PYJO_HELP', saved)
 
         elif name and name not in ('help', '--help', '-h'):
             raise Pyjo.Exception.new(f'Invalid command "{name}".\n')
@@ -442,11 +443,11 @@ def _args(args: list[str]) -> None:
         getopt(
             args,
             {
-                'h|help': _env('PYJO_HELP'),
-                'home=s': _env('PYJO_HOME'),
+                'h|help': Pyjo.GetOpt.env('PYJO_HELP'),
+                'home=s': Pyjo.GetOpt.env('PYJO_HOME'),
                 # Not in Mojolicious: the format of the log messages of Pyjo.Log, text or JSON
-                'log-format=s': _env('PYJO_LOG_FORMAT'),
-                'm|mode=s': _env('PYJO_MODE'),
+                'log-format=s': Pyjo.GetOpt.env('PYJO_LOG_FORMAT'),
+                'm|mode=s': Pyjo.GetOpt.env('PYJO_MODE'),
             },
             pass_through=True,
         )
@@ -459,10 +460,6 @@ def _command(module: str, fatal: bool = False) -> type[Pyjoyment.Command.object]
     if fatal and isinstance(e, Exception):
         raise e
     return None
-
-
-def _env(name: str) -> Callable[[str, Any], None]:
-    return lambda option, value: _setenv(name, '1' if value is True else str(value))
 
 
 # Not in Mojolicious: the file descriptor 0 is a listen socket, which has no peer, as the specification of FastCGI tells
@@ -483,13 +480,6 @@ def _fastcgi() -> bool:
         except OSError as e:
             return e.errno == errno.ENOTCONN
     return False
-
-
-def _setenv(name: str, value: str | None) -> None:
-    if value is None:
-        os.environ.pop(name, None)
-    else:
-        os.environ[name] = value
 
 
 # Do not remove options from sys.argv
