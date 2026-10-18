@@ -1,8 +1,9 @@
 name: Build
 
 # Checks that uv.lock matches pyproject.toml, builds the sdist and the wheel,
-# and checks that the wheel has the files of the package that hatchling takes
-# from the patterns of .gitignore.
+# checks that the wheel has the files of the package that hatchling takes from
+# the patterns of .gitignore, and installs it and runs pyjo version outside the
+# checkout.
 on:
   push:
     branches:
@@ -50,3 +51,13 @@ jobs:
           grep -q 'Pyjoyment/resources/public/pyjo/bootstrap/bootstrap.css' wheel.txt
           grep -q 'Pyjoyment/resources/templates/pyjo/debug.html.ep' wheel.txt
           grep -q 'Pyjo/py.typed' wheel.txt
+
+      # The wheel in an environment of its own, outside the checkout, so that
+      # nothing comes from it.
+      - name: Install and run the wheel
+        shell: bash
+        run: |-
+          uv venv --python "$(command -v python)" "$RUNNER_TEMP/venv"
+          uv pip install --python "$RUNNER_TEMP/venv/bin/python" dist/*.whl
+          cd "$RUNNER_TEMP"
+          venv/bin/pyjo version
