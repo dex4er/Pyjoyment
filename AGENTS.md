@@ -1139,7 +1139,16 @@ its test copies the stages over each other into a temporary directory and
 runs the commands of the guide there, as `inflate` and the moves of the
 templates, so that each stage is tested as the reader has it, and pyright
 finds the modules of the final application from the other stages with
-`extraPaths` in `pyproject.toml`. The names of the files are not those of modules of the standard library,
+`extraPaths` in `pyproject.toml`. A guide whose examples are several
+applications, as `routing.rst`, has a directory for each, which its test
+puts on `sys.path` while it loads that application, after it removes the
+modules of the one before, as they all have the package `MyApp`. A plugin of
+an example is a file of `Pyjoyment/Plugin` in its directory, which
+`extend_path` adds to the namespace only when the directory is on
+`sys.path` before `Pyjoyment.Plugin` is imported; the test removes it from
+`sys.path` afterwards, as a `MyApp` with `__init__.py` there would hide a
+`MyApp` without it, which Python makes a namespace package only when no
+regular package of the name is found. The names of the files are not those of modules of the standard library,
 as the directory of a script is the first one of `sys.path`. A link to a
 guide that is not ported yet goes to the one of Mojolicious. An example of
 Mojolicious that does not do what its guide says at the tag of the release,
