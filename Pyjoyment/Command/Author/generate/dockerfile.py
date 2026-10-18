@@ -19,8 +19,8 @@ Pyjoyment.Command.Author.generate.dockerfile - Dockerfile generator command
       -p, --port <port>                  Port that the server listens on and the
                                          image exposes, defaults to 3000
       -u, --user <name>                  Create a system user and run the
-                                         application as it, defaults to the
-                                         user of the image
+                                         application as it, defaults to the user
+                                         of the image
 
 :mod:`Pyjoyment.Command.Author.generate.dockerfile` generates ``Dockerfile``
 and ``.dockerignore`` for applications.
