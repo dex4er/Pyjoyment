@@ -110,6 +110,28 @@ Test command
     )
     is_ok(extract_usage(file.to_str()), 'Usage: APPLICATION test [OPTIONS]\n', 'usage')
 
+    # "Usage: myscript [OPTIONS]\n"
+    file = (
+        tempdir()
+        .child('test.py')
+        .spew(b'''\
+"""
+Test module
+===========
+::
+
+    test = Test.new()
+
+myscript
+--------
+::
+
+    Usage: myscript [OPTIONS]
+"""
+''')
+    )
+    is_ok(extract_usage(file.to_str(), section='myscript'), 'Usage: myscript [OPTIONS]\n', 'section')
+
 with subtest('generate_secret'):
     from Pyjo.Util import generate_secret
 

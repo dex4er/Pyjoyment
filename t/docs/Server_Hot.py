@@ -22,6 +22,7 @@ import Pyjo.Server.Hot
 import Pyjo.Server.Prefork
 
 from Pyjo.File import curfile, tempdir
+from Pyjo.Util import extract_usage
 
 
 ROOT = curfile().dirname().dirname().dirname().to_str()
@@ -149,10 +150,12 @@ with subtest('pyjo-hot'):
     result = subprocess.run(
         [sys.executable, '-m', 'Pyjo.Server.Hot', '--help'], env=ENV, capture_output=True, text=True
     )
-    is_ok(result.returncode, 0, 'help')
-    like_ok(result.stdout, r'^usage: pyjo-hot ', 'usage')
+    # The usage of the section pyjo-hot, as script/hypnotoad dies with its usage
+    is_ok(result.returncode, 1, 'help')
+    is_ok(result.stderr, extract_usage(Pyjo.Server.Hot.__file__, section='pyjo-hot'), 'usage')
+    like_ok(result.stderr, r'^Usage: pyjo-hot \[OPTIONS\] \[APPLICATION\]\n', 'usage of pyjo-hot')
     for option in ('--foreground', '--stop', '--test'):
-        like_ok(result.stdout, rf'{option}', option)
+        like_ok(result.stderr, rf'{option}', option)
 
 with subtest('new'):
     hot = Pyjo.Server.Hot.new()

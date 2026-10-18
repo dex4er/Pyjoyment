@@ -90,8 +90,8 @@ import Pyjo.Exception
 import Pyjo.Server.Daemon
 
 from Pyjo.Loader import load_class
+from Pyjo.Util import die, extract_usage, getopt, setenv
 
-import argparse
 import os
 import signal
 import sys
@@ -279,7 +279,8 @@ class Pyjo_Server_Reload(Pyjo.Base.object):
         os._exit(code)
 
 
-# Not in Mojolicious: script/morbo, the command line interface, with argparse
+# Renamed from Mojolicious: script/morbo, the command line interface, a function of the module, whose usage is the
+# section pyjo-reload of its docstring
 def main(argv: Sequence[str] | None = None) -> NoReturn:
     """::
 
@@ -288,60 +289,32 @@ def main(argv: Sequence[str] | None = None) -> NoReturn:
     The command line interface of ``pyjo-reload``: parse the options and run
     the server for the application.
     """
-    parser = argparse.ArgumentParser(
-        prog='pyjo-reload', description='Start Pyjoyment applications with the Pyjo.Server.Reload web server.'
+    args = list(sys.argv[1:] if argv is None else argv)
+    listen: list[str] = []
+    watch: list[str] = []
+    opts = getopt(
+        args,
+        {
+            'b|backend=s': lambda name, value: setenv('PYJO_RELOAD_BACKEND', value),
+            'h|help': None,
+            'l|listen=s': listen,
+            # Not in Mojolicious: the format of the log messages of Pyjo.Log, as the option of the commands
+            'log-format=s': lambda name, value: setenv('PYJO_LOG_FORMAT', value),
+            'm|mode=s': lambda name, value: setenv('PYJO_MODE', value),
+            'v|verbose': None,
+            'w|watch=s': watch,
+        },
     )
-    parser.add_argument(
-        '-b', '--backend', metavar='NAME', help='Reload backend to use for reloading, defaults to "Poll"'
-    )
-    parser.add_argument(
-        '-l',
-        '--listen',
-        action='append',
-        default=[],
-        metavar='LOCATION',
-        help=(
-            'one or more locations you want to listen on, defaults to the value of PYJO_LISTEN, the port of PORT or '
-            '"http://*:3000"'
-        ),
-    )
-    # Not in Mojolicious: the format of the log messages of Pyjo.Log, as the option of the commands
-    parser.add_argument(
-        '--log-format',
-        metavar='NAME',
-        help='format of log messages, "text" or "json", defaults to the value of PYJO_LOG_FORMAT or "text"',
-    )
-    parser.add_argument(
-        '-m',
-        '--mode',
-        metavar='NAME',
-        help='operating mode for your application, defaults to the value of PYJO_MODE or "development"',
-    )
-    parser.add_argument('-v', '--verbose', action='store_true', help='print details about what files changed')
-    parser.add_argument(
-        '-w',
-        '--watch',
-        action='append',
-        default=[],
-        metavar='DIRECTORY/FILE',
-        help='one or more directories and files to watch for changes, defaults to the application script as well as'
-        ' the "lib" and "templates" directories in the current working directory',
-    )
-    parser.add_argument('application', help='the script of the application')
-    args = parser.parse_args(argv)
 
-    if args.backend:
-        os.environ['PYJO_RELOAD_BACKEND'] = args.backend
-    if args.log_format:
-        os.environ['PYJO_LOG_FORMAT'] = args.log_format
-    if args.mode:
-        os.environ['PYJO_MODE'] = args.mode
-    reload = Pyjo_Server_Reload.new(silent=not args.verbose)
-    if args.listen:
-        reload.daemon.listen = args.listen
-    if args.watch:
-        reload.backend.watch = args.watch
-    reload.run(args.application)
+    if not opts or opts.help or not args:
+        # The usage without its last newline, as SystemExit writes the message with one
+        die(extract_usage(section='pyjo-reload').rstrip('\n'))
+    reload = Pyjo_Server_Reload.new(silent=not opts.verbose)
+    if listen:
+        reload.daemon.listen = listen
+    if watch:
+        reload.backend.watch = watch
+    reload.run(args[0])
 
 
 def _flush() -> None:
