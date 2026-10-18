@@ -43,6 +43,14 @@ Pyjoyment.Command.daemon - Daemon command
 :mod:`Pyjoyment.Command.daemon` starts applications with the
 :mod:`Pyjo.Server.Daemon` backend.
 
+An option that is not given has the value of the environment variable of
+``PYJO_`` and its name, as ``PYJO_CLIENTS`` for ``--clients``, with the
+values of ``--listen`` and ``--proxy`` separated by commas, see
+:mod:`Pyjo.GetOpt`, so that the environment of a container or a platform
+can tune the server. ::
+
+    PYJO_CLIENTS=100 ./myapp.py daemon
+
 This is a core command, that means it is always enabled and its code a good
 example for learning to build new commands, you're welcome to fork it.
 
@@ -105,6 +113,7 @@ class Pyjoyment_Command_daemon(Pyjoyment.Command.object):
         daemon = Pyjo.Server.Daemon.new(app=self.app)
         listen: list[str] = []
         proxy: list[str] = []
+        # Not in Mojolicious: the options from the environment variables of their names
         if not getopt(
             arguments,
             {
@@ -116,6 +125,7 @@ class Pyjoyment_Command_daemon(Pyjoyment.Command.object):
                 'p|proxy:s': proxy,
                 'r|requests=i': lambda name, value: setattr(daemon, 'max_requests', value),
             },
+            env_prefix='PYJO_',
         ):
             raise Pyjo.Exception.new(self.usage)
 

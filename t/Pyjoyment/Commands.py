@@ -370,6 +370,15 @@ with subtest('generate dockerfile'):
     with contextlib.redirect_stdout(io.StringIO()):
         dockerfile.run('-p', '8080')
     like_ok(app.rel_file('Dockerfile').slurp().decode(), r'(?m)^ARG PORT=8080$', 'right port')
+    unlike_ok(app.rel_file('Dockerfile').slurp().decode(), r'PYJO_GRACEFUL_TIMEOUT', 'no graceful timeout')
+    app.rel_file('Dockerfile').remove()
+    with contextlib.redirect_stdout(io.StringIO()):
+        dockerfile.run('-G', '8')
+    like_ok(
+        app.rel_file('Dockerfile').slurp().decode(),
+        r'(?m)^ENV PORT=\$\{PORT\}\nENV PYJO_GRACEFUL_TIMEOUT=8\nEXPOSE',
+        'right graceful timeout',
+    )
     buffer = io.StringIO()
     with contextlib.redirect_stderr(buffer):
         throws_ok(

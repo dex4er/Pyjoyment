@@ -128,6 +128,12 @@ with subtest('getopt'):
     args = ['-t', '3', '-x']
     opts = getopt(args, {'H|headers=s': headers, 't|timeout=i': None}, pass_through=True)
     is_deeply_ok(args, ['-x'], 'pass through')
+    os.environ['PYJO_TIMEOUT'] = '5'
+    try:
+        opts = getopt([], {'t|timeout=i': None}, env_prefix='PYJO_')
+    finally:
+        del os.environ['PYJO_TIMEOUT']
+    is_ok(opts.timeout, 5, 'environment')
 
     # Extract "charset" option
     opts = getopt(['--charset', 'UTF-8'], {'charset=s': None})

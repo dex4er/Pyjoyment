@@ -5,7 +5,10 @@ from Pyjo.Test import *
 
 import contextlib
 import io
+import os
 import re
+
+from unittest.mock import patch
 
 
 with subtest('Synopsis'):
@@ -23,6 +26,17 @@ with subtest('Synopsis'):
         [5, 10, 20, 3, 50],
         'options',
     )
+
+with subtest('Description'):
+    # PYJO_CLIENTS=100 ./myapp.py daemon
+    with patch.dict(
+        os.environ, {'PYJO_CLIENTS': '100', 'PYJO_LISTEN': 'http://*:80,http://*:81', 'PYJO_PROXY': '10.0.0.0/8'}
+    ):
+        server = daemon.build_server()
+        is_ok(server.max_clients, 100, 'option of the environment')
+        is_deeply_ok(server.listen, ['http://*:80', 'http://*:81'], 'locations of the environment')
+        is_deeply_ok(server.trusted_proxies, ['10.0.0.0/8'], 'trusted proxies of the environment')
+        is_ok(daemon.build_server('-c', '5').max_clients, 5, 'command line first')
 
 with subtest('Attributes'):
     daemon = Pyjoyment.Command.daemon.new()

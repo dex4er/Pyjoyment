@@ -4,6 +4,7 @@ from Pyjo.Test import *
 
 import contextlib
 import io
+import os
 
 
 with subtest('Synopsis'):
@@ -87,11 +88,24 @@ with subtest('Options'):
 
     is_ok(Pyjo.GetOpt.new().option('i|inactivity-timeout=i').parse(['-i', '1']).inactivity_timeout, 1, 'name')
 
+with subtest('Environment'):
+    os.environ['PYJO_WORKERS'] = '12'
+    try:
+        # PYJO_WORKERS=12 python myapp.py prefork
+        getopt = Pyjo.GetOpt.new(env_prefix='PYJO_').option('w|workers=i', default=4)
+        is_ok(getopt.parse([]).workers, 12, 'environment')
+        is_ok(getopt.parse(['-w', '2']).workers, 2, 'command line first')
+    finally:
+        del os.environ['PYJO_WORKERS']
+    is_ok(getopt.parse([]).workers, 4, 'default')
+
 with subtest('new'):
     getopt = Pyjo.GetOpt.new(pass_through=True)
     args = ['--unknown', '--', 'x']
     ok(getopt.parse(args), 'pass through')
     is_deeply_ok(args, ['--unknown', '--', 'x'], 'kept')
+    getopt = Pyjo.GetOpt.new(env_prefix='PYJO_')
+    is_ok(getopt.env_prefix, 'PYJO_', 'prefix')
 
 with subtest('on'):
     getopt = Pyjo.GetOpt.new()

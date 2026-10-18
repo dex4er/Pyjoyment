@@ -9,13 +9,18 @@ Pyjoyment.Command.Author.generate.dockerfile - Dockerfile generator command
       python -m MyApp generate dockerfile
       python -m MyApp generate dockerfile --user app
       python -m MyApp generate dockerfile --port 8080
+      python -m MyApp generate dockerfile --graceful-timeout 8
 
     Options:
-      -h, --help          Show this summary of available options
-      -p, --port <port>   Port that the server listens on and the image
-                          exposes, defaults to 3000
-      -u, --user <name>   Create a system user and run the application as it,
-                          defaults to the user of the image
+      -G, --graceful-timeout <seconds>   Graceful timeout of the workers of the
+                                         server, defaults to the one of the
+                                         server
+      -h, --help                         Show this summary of available options
+      -p, --port <port>                  Port that the server listens on and the
+                                         image exposes, defaults to 3000
+      -u, --user <name>                  Create a system user and run the
+                                         application as it, defaults to the
+                                         user of the image
 
 :mod:`Pyjoyment.Command.Author.generate.dockerfile` generates ``Dockerfile``
 and ``.dockerignore`` for applications.
@@ -31,10 +36,13 @@ uv, so that the signals of ``docker stop`` go straight to the server, which
 stops gracefully on ``TERM``. The images of Python and of uv are those of the
 versions that run the generator.
 
-Docker gives a container 10 seconds to stop, less than the 25 seconds that
-:attr:`Pyjo.Server.Prefork.Pyjo_Server_Prefork.graceful_timeout` gives a
-worker, so ``docker stop -t 30``, or ``stop_grace_period: 30s`` of Docker
-Compose, lets the workers finish their requests.
+Docker and Cloud Run give a container 10 seconds to stop, less than the 25
+seconds that :attr:`Pyjo.Server.Prefork.Pyjo_Server_Prefork.graceful_timeout`
+gives a worker, so ``--graceful-timeout 8`` sets ``PYJO_GRACEFUL_TIMEOUT`` in
+the image, which the command ``prefork`` takes for its option, and which the
+environment of the container can change again. With Docker,
+``docker stop -t 30``, or ``stop_grace_period: 30s`` of Docker Compose, lets
+the workers finish their requests too.
 
 The server listens on the port of the ``PORT`` environment variable, which
 the image sets to the port of ``--port``, ``3000`` by default, and exposes,
@@ -110,7 +118,7 @@ class Pyjoyment_Command_Author_generate_dockerfile(Pyjoyment.Command.object):
         """
         # Not in Mojolicious: the options
         arguments = list(args)
-        if not (opts := getopt(arguments, {'p|port=i': None, 'u|user=s': None})):
+        if not (opts := getopt(arguments, {'G|graceful-timeout=i': None, 'p|port=i': None, 'u|user=s': None})):
             raise Pyjo.Exception.new(self.usage)
 
         name = self.app.moniker
@@ -125,6 +133,7 @@ class Pyjoyment_Command_Author_generate_dockerfile(Pyjoyment.Command.object):
         lock = 'uv.lock' if project else f'{script}.lock'
         values = {
             'cmd': json.dumps([*cmd, 'prefork']),
+            'graceful_timeout': opts.graceful_timeout,
             'lock': lock if os.path.isfile(self.rel_file(lock)) else None,
             'name': name,
             'port': opts.port or 3000,
@@ -187,6 +196,9 @@ USER <%= user %>
 % end
 ARG PORT=<%= port %>
 ENV PORT=${PORT}
+% if graceful_timeout is not None:
+ENV PYJO_GRACEFUL_TIMEOUT=<%= graceful_timeout %>
+% end
 EXPOSE ${PORT}
 CMD <%= cmd %>
 

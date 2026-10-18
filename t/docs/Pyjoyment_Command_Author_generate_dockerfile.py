@@ -37,6 +37,7 @@ with subtest('Synopsis'):
     )
     like_ok(dockerfile.usage, r'-u, --user <name>', 'option')
     like_ok(dockerfile.usage, r'-p, --port <port>', 'option of the port')
+    like_ok(dockerfile.usage, r'-G, --graceful-timeout <seconds>', 'option of the graceful timeout')
 
     # python -m MyApp generate dockerfile
     tmp = Pyjo.File.tempdir()
@@ -58,6 +59,12 @@ with subtest('Synopsis'):
     tmp.child('pyproject.toml').spew('[project]\nname = "my_app"\n')
     content = generate(tmp, '--port', '8080')
     like_ok(content, r'(?m)^ARG PORT=8080\nENV PORT=\$\{PORT\}\nEXPOSE \$\{PORT\}$', 'port')
+
+    # python -m MyApp generate dockerfile --graceful-timeout 8
+    tmp = Pyjo.File.tempdir()
+    tmp.child('pyproject.toml').spew('[project]\nname = "my_app"\n')
+    content = generate(tmp, '--graceful-timeout', '8')
+    like_ok(content, r'(?m)^ENV PYJO_GRACEFUL_TIMEOUT=8$', 'graceful timeout')
 
     # ./myapp.py generate dockerfile
     tmp = Pyjo.File.tempdir()

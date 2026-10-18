@@ -53,6 +53,14 @@ Pyjoyment.Command.prefork - Pre-fork command
 :mod:`Pyjoyment.Command.prefork` starts applications with the
 :mod:`Pyjo.Server.Prefork` backend.
 
+An option that is not given has the value of the environment variable of
+``PYJO_`` and its name, as ``PYJO_WORKERS`` for ``--workers``, with the
+values of ``--listen`` and ``--proxy`` separated by commas, see
+:mod:`Pyjo.GetOpt`, so that the environment of a container or a platform
+can tune the server. ::
+
+    PYJO_GRACEFUL_TIMEOUT=8 PYJO_WORKERS=2 ./myapp.py prefork
+
 This is a core command, that means it is always enabled and its code a good
 example for learning to build new commands, you're welcome to fork it.
 
@@ -115,6 +123,7 @@ class Pyjoyment_Command_prefork(Pyjoyment.Command.object):
         prefork = Pyjo.Server.Prefork.new(app=self.app)
         listen: list[str] = []
         proxy: list[str] = []
+        # Not in Mojolicious: the options from the environment variables of their names
         if not getopt(
             arguments,
             {
@@ -134,6 +143,7 @@ class Pyjoyment_Command_prefork(Pyjoyment.Command.object):
                 's|spare=i': lambda name, value: setattr(prefork, 'spare', value),
                 'w|workers=i': lambda name, value: setattr(prefork, 'workers', value),
             },
+            env_prefix='PYJO_',
         ):
             raise Pyjo.Exception.new(self.usage)
 

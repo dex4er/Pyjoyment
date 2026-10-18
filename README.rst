@@ -20,7 +20,10 @@ web framework:
 * HTTP and WebSocket client and server.
 * Non-blocking I/O web server, which also runs as an ASGI, WSGI or CGI
   application, or as an event function of AWS Lambda.
-* HTML/XML parser with CSS selector support, and JSON with JSON Pointers.
+* HTML/XML parser with CSS selector support.
+* JSON with JSON Pointers, and YAML, both loaded and dumped.
+* Command line options with ``Pyjo.GetOpt``, in the way of Getopt::Long,
+  argparse and Cobra, also from environment variables.
 * Python-ish templates and template strings, with automatic escaping.
 * Containers for URLs, paths, query strings, headers, cookies and HTTP
   messages.
@@ -31,7 +34,9 @@ web framework:
   harness, ``Pyjo.Prove``, inspired by Perl's ``prove``.
 
 The ``Pyjoyment`` package is the web framework itself: routes, controllers,
-renderer, plugins, ``Pyjoyment.Lite`` and the command line interface.
+renderer, plugins, ``Pyjoyment.Lite`` and the command line interface. It
+renders JSON and YAML, and reads its configuration from Python, JSON, YAML
+and TOML files.
 
 Both are cloud native: ``generate dockerfile`` writes the image of an
 application, whose server stops gracefully on the ``TERM`` of its container
