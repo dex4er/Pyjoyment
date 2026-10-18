@@ -1,0 +1,22 @@
+"""
+__DATA__
+
+@@ favicon.ico (base64)
+iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABmJLR0QA/wD/AP+gvaeTAAAB5UlE
+QVQ4jbWRvWtTYRTGf+e9uTdNSZo0Vo10af2g4sdQdRKxBSeL4KD/gIuDg4OL4N/gJPgv6OqgLhZX
+0SiiBGrQIpT0kxJqm9ybe/Pe9ziYgrY0tIPPen7POQ/ngf8pVR3RZPWpbtXeqo3uqKrsZDJ9zHnX
+nK2z9a2kzZohO3LFG783Cdz/mzN9Atwwa7NDxLFRF6Nhw08bL+7uTLFnAiBI41CERbw0RV0Rkez2
+0XQ/CV5L+XLkVj8SLzSIm8uOw1dfiUjax/OvVPVi+OaBtt89STRceqyqwb7NvQXXN5/d1jTafLQX
+k+mBl4Bru6bdXzclKGAGCsdU9eGO6ayIfBJV9XXt5Ub85flgWv2Jd2aCYPwkcRiyXq+hzXWOXpgm
+IKSzvIWb+4o5dZ7c5EzIuVslA0wlKx98UxilO3YEm2ljowjfJRgp4A0O4EUrWOsjkmKLQ5jiMOnC
+ex+YygCVVv2HZzsR4gzduc9sBotouIx/6CxIlvX5RaQ1D8EguvSdMFGyOd8rz1D5U6PLoGELkg4U
+xxCX4pcnEPHBekg7RnMFdGMeLR/HJRGaZnX7idWh09Mdu7GQUQsmEMV2BJwQx2BKqu22OD+ntjIq
+Xr6ihBHB8AkLVKXXgg/kD9QxtESke0DPbv0G4xbnimn9MWcAAAAASUVORK5CYII=
+"""
+
+from Pyjoyment.Lite import *
+
+
+get('/', {'text': 'I ♥ Pyjoyment!'})
+
+app.start()

@@ -1148,7 +1148,10 @@ an example is a file of `Pyjoyment/Plugin` in its directory, which
 `sys.path` before `Pyjoyment.Plugin` is imported; the test removes it from
 `sys.path` afterwards, as a `MyApp` with `__init__.py` there would hide a
 `MyApp` without it, which Python makes a namespace package only when no
-regular package of the name is found. The names of the files are not those of modules of the standard library,
+regular package of the name is found. Two plugins of the same name, as the
+two forms of one in `rendering.rst`, are run with the script that loads
+them in a process of their own, with their directory in `PYTHONPATH`. The
+names of the files are not those of modules of the standard library,
 as the directory of a script is the first one of `sys.path`. A link to a
 guide that is not ported yet goes to the one of Mojolicious. An example of
 Mojolicious that does not do what its guide says at the tag of the release,
