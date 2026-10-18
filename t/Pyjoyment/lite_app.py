@@ -332,6 +332,9 @@ get('/handler_change_status', lambda c: c.render(handler='change_status', status
 
 get('/template_change_status', lambda c: c.render(inline='Bad<% stash(status=500) %>', status=200))
 
+# Not in Mojolicious: a status that is a string, which Perl takes for a number
+get('/string_status', lambda c: c.render(text='Gone', status='410'))
+
 get('/regex/in/template', r'test(test)(\Qtest\E)(')
 
 
@@ -925,6 +928,9 @@ t.get_ok('/handler_change_status').status_is(500).content_is('Bad\n')
 
 # Template that changes status
 t.get_ok('/template_change_status').status_is(500).content_is('Bad\n')
+
+# Not in Mojolicious: GET /string_status
+t.get_ok('/string_status').status_is(410).content_is('Gone')
 
 # Regex in name
 (
