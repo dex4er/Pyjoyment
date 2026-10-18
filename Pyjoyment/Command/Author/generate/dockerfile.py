@@ -8,9 +8,12 @@ Pyjoyment.Command.Author.generate.dockerfile - Dockerfile generator command
       ./myapp.py generate dockerfile
       python -m MyApp generate dockerfile
       python -m MyApp generate dockerfile --user app
+      python -m MyApp generate dockerfile --port 8080
 
     Options:
       -h, --help          Show this summary of available options
+      -p, --port <port>   Port that the server listens on and the image
+                          exposes, defaults to 3000
       -u, --user <name>   Create a system user and run the application as it,
                           defaults to the user of the image
 
@@ -32,6 +35,13 @@ Docker gives a container 10 seconds to stop, less than the 25 seconds that
 :attr:`Pyjo.Server.Prefork.Pyjo_Server_Prefork.graceful_timeout` gives a
 worker, so ``docker stop -t 30``, or ``stop_grace_period: 30s`` of Docker
 Compose, lets the workers finish their requests.
+
+The server listens on the port of the ``PORT`` environment variable, which
+the image sets to the port of ``--port``, ``3000`` by default, and exposes,
+and which ``docker build --build-arg PORT=8080`` changes too. A platform as
+Knative, Cloud Run, Render, Koyeb or Heroku sets ``PORT`` for the container,
+and the server listens on its port, as Knative ignores ``EXPOSE`` and sets
+``PORT`` to the ``containerPort`` of the service, ``8080`` by default.
 
 This is a core command, that means it is always enabled and its code a good
 example for learning to build new commands, you're welcome to fork it.
@@ -100,7 +110,7 @@ class Pyjoyment_Command_Author_generate_dockerfile(Pyjoyment.Command.object):
         """
         # Not in Mojolicious: the options
         arguments = list(args)
-        if not (opts := getopt(arguments, {'u|user=s': None})):
+        if not (opts := getopt(arguments, {'p|port=i': None, 'u|user=s': None})):
             raise Pyjo.Exception.new(self.usage)
 
         name = self.app.moniker
@@ -117,6 +127,7 @@ class Pyjoyment_Command_Author_generate_dockerfile(Pyjoyment.Command.object):
             'cmd': json.dumps([*cmd, 'prefork']),
             'lock': lock if os.path.isfile(self.rel_file(lock)) else None,
             'name': name,
+            'port': opts.port or 3000,
             'python': f'{sys.version_info.major}.{sys.version_info.minor}',
             'script': None if project else script,
             'user': opts.user,
@@ -174,7 +185,9 @@ ENV PATH="/opt/<%= name %>/.venv/bin:$PATH"
 RUN useradd --system <%= user %>
 USER <%= user %>
 % end
-EXPOSE 3000
+ARG PORT=<%= port %>
+ENV PORT=${PORT}
+EXPOSE ${PORT}
 CMD <%= cmd %>
 
 @@ dockerignore

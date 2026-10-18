@@ -262,7 +262,10 @@ on Python 3.14.
 The workflow Docker Smoke Test builds and runs the images of
 `generate dockerfile`, for an application, a Lite script with
 `pyproject.toml` and one with the inline metadata of PEP 723, and checks that
-they serve their pages and stop gracefully on the TERM of `docker stop`. Its
+they serve their pages and stop gracefully on the TERM of `docker stop`: the
+Lite script with `pyproject.toml` in an image of `generate dockerfile --port`,
+which exposes its port, and the one with the inline metadata on the port of
+`PORT` of the container, as Knative sets it. Its
 variant `lambda` runs a Lite script that ends with `handler = app.start()` as
 an event function in the image of AWS Lambda for Python, whose emulator of the
 Runtime API it invokes with the events of the payload formats 2.0 and 1.0.

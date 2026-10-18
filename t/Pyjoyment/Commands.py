@@ -360,6 +360,16 @@ with subtest('generate dockerfile'):
     with contextlib.redirect_stdout(buffer):
         dockerfile.run('-u', 'app')
     like_ok(app.rel_file('Dockerfile').slurp().decode(), r'(?m)^USER app$', 'right user')
+    # Not in Mojolicious: the port, which the image sets for the server and exposes
+    like_ok(
+        app.rel_file('Dockerfile').slurp().decode(),
+        r'(?m)^ARG PORT=3000\nENV PORT=\$\{PORT\}\nEXPOSE \$\{PORT\}$',
+        'right port',
+    )
+    app.rel_file('Dockerfile').remove()
+    with contextlib.redirect_stdout(io.StringIO()):
+        dockerfile.run('-p', '8080')
+    like_ok(app.rel_file('Dockerfile').slurp().decode(), r'(?m)^ARG PORT=8080$', 'right port')
     buffer = io.StringIO()
     with contextlib.redirect_stderr(buffer):
         throws_ok(

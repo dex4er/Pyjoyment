@@ -54,16 +54,31 @@ lock() {
 }
 
 # The image of "generate dockerfile", with the wheel copied with the files of
-# the dependencies, the only change of the generated Dockerfile, which serves
-# the pages and stops gracefully on the TERM of docker stop
+# the dependencies, the only change of the generated Dockerfile, which exposes
+# its port, serves the pages and stops gracefully on the TERM of docker stop
 #
-#   smoke_dockerfile [--user USER] PAGE...
+#   smoke_dockerfile [--user USER] [--expose PORT] [--port PORT] PAGE...
+#
+#   --expose PORT   the port of the image, of "generate dockerfile --port"
+#   --port PORT     the port of PORT of the container, as Knative sets it
 smoke_dockerfile() {
-  local user=
-  if [[ ${1:-} == --user ]]; then
-    user=$2
+  local user='' expose=3000 listen=3000
+  local -a env=()
+  while [[ ${1:-} == --* ]]; do
+    case $1 in
+      --user) user=$2 ;;
+      --expose)
+        expose=$2
+        listen=$2
+        ;;
+      --port)
+        listen=$2
+        env=(--env "PORT=$2")
+        ;;
+      *) fail "unknown option $1" ;;
+    esac
     shift 2
-  fi
+  done
 
   [[ -f .dockerignore ]] || fail ".dockerignore"
   WHEEL=${wheel} perl -pi -e 's{^(COPY (?:pyproject\.toml|myapp\.py)\b.*) \./$}{$1 $ENV{WHEEL} ./}' Dockerfile
@@ -71,9 +86,14 @@ smoke_dockerfile() {
   cat Dockerfile
 
   docker build --progress plain --tag "${name}" .
-  docker run --detach --name "${name}" --publish 127.0.0.1::3000 "${name}" >/dev/null
+  local exposed
+  exposed=$(docker inspect --format '{{range $port, $_ := .Config.ExposedPorts}}{{$port}} {{end}}' "${name}")
+  [[ ${exposed} == "${expose}/tcp " ]] || fail "exposed ${exposed}"
+  echo "ok - exposed ${expose}"
+
+  docker run --detach --name "${name}" "${env[@]}" --publish "127.0.0.1::${listen}" "${name}" >/dev/null
   local port url
-  port=$(docker port "${name}" 3000/tcp | perl -ne 'print $1 and last if /:(\d+)$/')
+  port=$(docker port "${name}" "${listen}/tcp" | perl -ne 'print $1 and last if /:(\d+)$/')
   url=http://127.0.0.1:${port}
 
   # The server listens once its workers are started
