@@ -8,12 +8,16 @@ Pyjoyment.Command.cgi - CGI command
       ./myapp.py cgi
 
     Options:
-      -h, --help          Show this summary of available options
-          --home <path>   Path to home directory of your application, defaults to
-                          the value of PYJO_HOME or auto-detection
-      -m, --mode <name>   Operating mode for your application, defaults to the
-                          value of PYJO_MODE or "development"
-          --nph           Enable non-parsed-header mode
+      -h, --help                Show this summary of available options
+          --home <path>         Path to home directory of your application,
+                                defaults to the value of PYJO_HOME or
+                                auto-detection
+          --log-format <name>   Format of log messages, "text" or "json",
+                                defaults to the value of PYJO_LOG_FORMAT or
+                                "text"
+      -m, --mode <name>         Operating mode for your application, defaults to
+                                the value of PYJO_MODE or "development"
+          --nph                 Enable non-parsed-header mode
 
 :mod:`Pyjoyment.Command.cgi` starts applications with the
 :mod:`Pyjo.Server.CGI` backend.

@@ -43,8 +43,10 @@ Emitted when a new message gets logged. ::
 JSON
 ----
 
-With :attr:`~Pyjo_Log.json`, or the ``PYJO_LOG_JSON`` environment variable,
-every message is a line of JSON, with the fields that log collectors, as
+With :attr:`~Pyjo_Log.json`, or the ``PYJO_LOG_FORMAT`` environment variable
+set to ``json``, which the option ``--log-format`` of the commands of
+:mod:`Pyjoyment.Commands` sets, every message is a line of JSON, with the
+fields that log collectors, as
 Cloud Logging, Datadog and Elastic, recognize: ``time`` in UTC, as of
 :rfc:`3339`, ``level``, ``severity`` with the names of Cloud Logging and
 syslog, ``message``, ``pid``, and the fields of the message and its context,
@@ -247,12 +249,13 @@ class Pyjo_Log(Pyjo.EventEmitter.object):
             boolean = log.json
             log.json = boolean
 
-        Generate log messages as lines of JSON, see `JSON`_, defaults to the
-        value of the ``PYJO_LOG_JSON`` environment variable. It takes
-        precedence over :attr:`short` and :attr:`color`.
+        Generate log messages as lines of JSON, see `JSON`_, defaults to true
+        when the ``PYJO_LOG_FORMAT`` environment variable is ``json``, and
+        false when it is ``text`` or not set. It takes precedence over
+        :attr:`short` and :attr:`color`.
         """
         if self._json is None:
-            self._json = bool(os.environ.get('PYJO_LOG_JSON'))
+            self._json = (os.environ.get('PYJO_LOG_FORMAT') or '').lower() == 'json'
         return self._json
 
     @json.setter

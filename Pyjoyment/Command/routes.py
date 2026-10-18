@@ -9,13 +9,18 @@ Pyjoyment.Command.routes - Routes command
       ./myapp.py routes -v
 
     Options:
-      -h, --help          Show this summary of available options
-          --home <path>   Path to home directory of your application, defaults to
-                          the value of PYJO_HOME or auto-detection
-      -m, --mode <name>   Operating mode for your application, defaults to the
-                          value of PYJO_MODE or "development"
-      -v, --verbose       Print additional details about routes, flags indicate
-                          C=Conditions, P=Partial, U=Under and W=WebSocket
+      -h, --help                Show this summary of available options
+          --home <path>         Path to home directory of your application,
+                                defaults to the value of PYJO_HOME or
+                                auto-detection
+          --log-format <name>   Format of log messages, "text" or "json",
+                                defaults to the value of PYJO_LOG_FORMAT or
+                                "text"
+      -m, --mode <name>         Operating mode for your application, defaults to
+                                the value of PYJO_MODE or "development"
+      -v, --verbose             Print additional details about routes, flags
+                                indicate C=Conditions, P=Partial, U=Under and
+                                W=WebSocket
 
 :mod:`Pyjoyment.Command.routes` lists all your application routes.
 

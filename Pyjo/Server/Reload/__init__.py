@@ -56,6 +56,9 @@ pyjo-reload
       -l, --listen <location>        One or more locations you want to listen
                                      on, defaults to the value of PYJO_LISTEN,
                                      the port of PORT or "http://*:3000"
+          --log-format <name>        Format of log messages, "text" or
+                                     "json", defaults to the value of
+                                     PYJO_LOG_FORMAT or "text"
       -m, --mode <name>              Operating mode for your application,
                                      defaults to the value of PYJO_MODE or
                                      "development"
@@ -302,6 +305,12 @@ def main(argv: Sequence[str] | None = None) -> NoReturn:
             '"http://*:3000"'
         ),
     )
+    # Not in Mojolicious: the format of the log messages of Pyjo.Log, as the option of the commands
+    parser.add_argument(
+        '--log-format',
+        metavar='NAME',
+        help='format of log messages, "text" or "json", defaults to the value of PYJO_LOG_FORMAT or "text"',
+    )
     parser.add_argument(
         '-m',
         '--mode',
@@ -323,6 +332,8 @@ def main(argv: Sequence[str] | None = None) -> NoReturn:
 
     if args.backend:
         os.environ['PYJO_RELOAD_BACKEND'] = args.backend
+    if args.log_format:
+        os.environ['PYJO_LOG_FORMAT'] = args.log_format
     if args.mode:
         os.environ['PYJO_MODE'] = args.mode
     reload = Pyjo_Server_Reload.new(silent=not args.verbose)

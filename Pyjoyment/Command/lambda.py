@@ -8,11 +8,15 @@ Pyjoyment.Command.lambda - AWS Lambda command
       handler = app.start('lambda')
 
     Options:
-      -h, --help          Show this summary of available options
-          --home <path>   Path to home directory of your application, defaults to
-                          the value of PYJO_HOME or auto-detection
-      -m, --mode <name>   Operating mode for your application, defaults to the
-                          value of PYJO_MODE or "development"
+      -h, --help                Show this summary of available options
+          --home <path>         Path to home directory of your application,
+                                defaults to the value of PYJO_HOME or
+                                auto-detection
+          --log-format <name>   Format of log messages, "text" or "json",
+                                defaults to the value of PYJO_LOG_FORMAT or
+                                "text"
+      -m, --mode <name>         Operating mode for your application, defaults to
+                                the value of PYJO_MODE or "development"
 
 :mod:`Pyjoyment.Command.lambda` starts applications with the
 :mod:`Pyjo.Server.Lambda` backend: it returns the handler of an event

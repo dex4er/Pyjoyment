@@ -16,11 +16,15 @@ Pyjoyment.Commands - Command line interface
          work without commands.
 
     Options (for all commands):
-      -h, --help          Get more information on a specific command
-          --home <path>   Path to home directory of your application, defaults to
-                          the value of PYJO_HOME or auto-detection
-      -m, --mode <name>   Operating mode for your application, defaults to the
-                          value of PYJO_MODE or "development"
+      -h, --help                Get more information on a specific command
+          --home <path>         Path to home directory of your application,
+                                defaults to the value of PYJO_HOME or
+                                auto-detection
+          --log-format <name>   Format of log messages, "text" or "json",
+                                defaults to the value of PYJO_LOG_FORMAT or
+                                "text"
+      -m, --mode <name>         Operating mode for your application, defaults to
+                                the value of PYJO_MODE or "development"
 
 :mod:`Pyjoyment.Commands` is the interactive command line interface for the
 :mod:`Pyjoyment` framework. It will automatically detect available commands in
@@ -432,12 +436,18 @@ class Pyjoyment_Commands(Pyjoyment.Command.object):
         return application.start(*args)
 
 
-# Command line options for PYJO_HELP, PYJO_HOME and PYJO_MODE
+# Command line options for PYJO_HELP, PYJO_HOME, PYJO_LOG_FORMAT and PYJO_MODE
 def _args(args: list[str]) -> None:
     if not Pyjoyment_Commands.detect():
         getopt(
             args,
-            {'h|help': _env('PYJO_HELP'), 'home=s': _env('PYJO_HOME'), 'm|mode=s': _env('PYJO_MODE')},
+            {
+                'h|help': _env('PYJO_HELP'),
+                'home=s': _env('PYJO_HOME'),
+                # Not in Mojolicious: the format of the log messages of Pyjo.Log, text or JSON
+                'log-format=s': _env('PYJO_LOG_FORMAT'),
+                'm|mode=s': _env('PYJO_MODE'),
+            },
             pass_through=True,
         )
 
