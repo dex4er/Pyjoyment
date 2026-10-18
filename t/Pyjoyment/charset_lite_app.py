@@ -6,6 +6,7 @@ __DATA__
 
 import Pyjo.Test.Pyjo
 
+from Pyjo.String.Unicode import u
 from Pyjo.Test import *
 from Pyjoyment.Lite import app, get, post
 
@@ -30,9 +31,8 @@ def before_dispatch(c):
 
 # UTF-8 text renderer
 def test(renderer, c, output, options):
-    # The output is characters, which the response encodes to UTF-8 without the encoding of the options
     options.pop('encoding', None)
-    output.write(c.stash('test'))
+    output.write(u(c.stash('test')).encode('UTF-8'))
 
 
 app.renderer.add_handler('test', test)

@@ -405,14 +405,14 @@ class Pyjoyment_Renderer(Pyjo.Base.object):
         saved = _MISSING
         if local := bool(stash.get('extends') or stash.get('layout')):
             saved = content.get('content', _MISSING)
-            content['content'] = output if re.search(r'\S', output) else None
+            content['content'] = output if _visible(output) else None
         try:
             while (next := _next(stash)) and inline is None:
                 options['handler'], options['template'] = stash.get('handler'), next
                 options['format'] = stash.get('format') or self.default_format
                 if (tmp := self._render_template(c, options)) is not None:
                     output = tmp
-                if content.get('content') is None and re.search(r'\S', output):
+                if content.get('content') is None and _visible(output):
                     content['content'] = output
 
             if stash.get('mojo.string'):
@@ -426,7 +426,7 @@ class Pyjoyment_Renderer(Pyjo.Base.object):
                 content['content'] = saved
 
     def respond(
-        self, c: 'Pyjoyment.Controller.object', output: str | bytes, format: str | None, status: int | None = None
+        self, c: 'Pyjoyment.Controller.object', output: str | bytes, format: str | None, status: int | str | None = None
     ) -> bool:
         """::
 
@@ -567,7 +567,7 @@ class Pyjoyment_Renderer(Pyjo.Base.object):
         for key in self.templates:
             templates.setdefault(key, []).insert(0, 'py')
 
-    def _render_template(self, c: 'Pyjoyment.Controller.object', options: dict[str, Any]) -> str | None:
+    def _render_template(self, c: 'Pyjoyment.Controller.object', options: dict[str, Any]) -> str | bytes | None:
         if not options.get('handler'):
             options['handler'] = self.template_handler(options)
         if not (handler := options['handler']):
@@ -578,7 +578,7 @@ class Pyjoyment_Renderer(Pyjo.Base.object):
 
         output = _Output()
         renderer(self, c, output, options)
-        return output.getvalue() if output.defined else None
+        return output.value() if output.defined else None
 
 
 class Pyjoyment_Renderer_Helpers:
@@ -601,13 +601,21 @@ class Pyjoyment_Renderer_Helpers:
         )
 
 
-# The output of a handler, which tells whether the handler wrote any, as Mojo checks that it is defined
+# The output of a handler, which tells whether the handler wrote any, as Mojo checks that it is defined, and which
+# holds bytes instead of characters for a handler that writes them, as one that removes the encoding of the options
 class _Output(io.StringIO):
     defined = False
+    data: bytearray | None = None
 
-    def write(self, s: str, /) -> int:
+    def write(self, s: str | bytes, /) -> int:
         self.defined = True
+        if isinstance(s, bytes):
+            self.data = (self.data or bytearray()) + s
+            return len(s)
         return super().write(s)
+
+    def value(self) -> str | bytes:
+        return bytes(self.data) if self.data is not None else self.getvalue()
 
 
 _MISSING: Any = Pyjo.Base.object()
@@ -625,8 +633,13 @@ def _attribute(sub: Any) -> Any:
     return method
 
 
-def _maybe(encoding: str | None, output: str) -> str | bytes:
-    return encode(encoding, output) if encoding else output
+def _maybe(encoding: str | None, output: str | bytes) -> str | bytes:
+    return encode(encoding, output) if encoding and isinstance(output, str) else output
+
+
+# Content that is not only whitespace, of characters or of the bytes of a handler
+def _visible(output: str | bytes) -> bool:
+    return bool(re.search(rb'\S', output) if isinstance(output, bytes) else re.search(r'\S', output))
 
 
 def _next(stash: dict[str, Any]) -> str | None:
