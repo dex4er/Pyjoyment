@@ -7,6 +7,7 @@ from Pyjo.Util import decode
 
 import contextlib
 import io
+import json
 import os
 import time
 
@@ -115,6 +116,48 @@ with subtest('Colorized log messages'):
         'right format',
     )
     del os.environ['PYJO_LOG_COLOR']
+
+# Not in Mojolicious: JSON Lines with the fields that log collectors recognize, as Cloud Logging, Datadog and Elastic
+with subtest('JSON log messages'):
+    log = Pyjo.Log.new()
+    ok(not log.json, 'text messages')
+    os.environ['PYJO_LOG_JSON'] = '1'
+    log = Pyjo.Log.new()
+    ok(log.json, 'JSON messages')
+    del os.environ['PYJO_LOG_JSON']
+    log = Pyjo.Log.new(json=True, short=True, color=True)
+    ok(log.json, 'JSON messages')
+    msg = log.format(1760861742.12345, 'warn', 'Test', 1, '2')
+    like_ok(msg, r'^\{.*\}\n$', 'one line')
+    record = json.loads(msg)
+    is_deeply_ok(list(record), ['time', 'level', 'severity', 'message', 'pid'], 'right fields in order')
+    is_ok(record['time'], '2025-10-19T08:15:42.123450Z', 'time in UTC')
+    is_ok(record['level'], 'warn', 'level')
+    is_ok(record['severity'], 'WARNING', 'severity')
+    is_ok(record['message'], 'Test 1 2', 'message')
+    is_ok(record['pid'], os.getpid(), 'pid')
+    severities = {level: json.loads(log.format(0, level, 'Test'))['severity'] for level in Pyjo.Log.LEVEL}
+    is_deeply_ok(
+        severities,
+        {
+            'trace': 'DEBUG',
+            'debug': 'DEBUG',
+            'info': 'INFO',
+            'warn': 'WARNING',
+            'error': 'ERROR',
+            'fatal': 'CRITICAL',
+        },
+        'severities',
+    )
+    msg = log.format(0, 'error', 'I ♥ Pyjoyment\nTraceback "/"')
+    is_ok(msg.count('\n'), 1, 'multiple lines in one line')
+    like_ok(msg, r'"message":"I ♥ Pyjoyment\\nTraceback \\"/\\""', 'characters and escapes')
+    is_ok(json.loads(log.format(0, 'info', object))['message'], str(object), 'stringified')
+
+    with contextlib.redirect_stderr(io.StringIO()) as handle:
+        log = Pyjo.Log.new(json=True)
+        log.info('Just works')
+    is_ok(json.loads(handle.getvalue())['message'], 'Just works', 'logged')
 
 with subtest('Events'):
     log = Pyjo.Log.new(level='trace')
@@ -282,5 +325,34 @@ with subtest('Context'):
     like_ok(buffer, r'\[.*\] \[error\] \[123\] Just works\n', 'right error message')
     like_ok(buffer, r'\[.*\] \[warn\] No context\n', 'right warn message')
     like_ok(buffer, r'\[.*\] \[fatal\] \[123\] Mojolicious rocks\n', 'right fatal message')
+
+# Not in Mojolicious: the fields of a context, which a JSON message has as fields of its own
+with subtest('Context fields'):
+    log = Pyjo.Log.new()
+    context = log.context(Pyjo.Log.Field('request_id', 'abc123', '[abc123]'), {'user': 'sri', 'tries': 3})
+    with contextlib.redirect_stderr(io.StringIO()) as handle:
+        context.info('Text')
+    like_ok(handle.getvalue(), r'\[.*\] \[info\] \[abc123\] user=sri tries=3 Text\n', 'fields as text')
+    log = Pyjo.Log.new(json=True)
+    context = log.context(Pyjo.Log.Field('request_id', 'abc123', '[abc123]'), {'user': 'sri', 'tries': 3})
+    with contextlib.redirect_stderr(io.StringIO()) as handle:
+        context.info('JSON', Pyjo.Log.Field('message', 'Not this'), Pyjo.Log.Field('extra', [1, 2]))
+    record = json.loads(handle.getvalue())
+    is_deeply_ok(
+        list(record), ['time', 'level', 'severity', 'message', 'pid', 'request_id', 'user', 'tries', 'extra'], 'fields'
+    )
+    is_ok(record['message'], 'JSON', 'message without fields')
+    is_ok(record['request_id'], 'abc123', 'request id')
+    is_ok(record['user'], 'sri', 'field of a dict')
+    is_ok(record['tries'], 3, 'number')
+    is_deeply_ok(record['extra'], [1, 2], 'field of a message')
+
+    field = Pyjo.Log.Field('user', 'sri')
+    is_ok(str(field), 'user=sri', 'text of a field')
+    is_ok(field.name, 'user', 'name')
+    is_ok(field.value, 'sri', 'value')
+    with contextlib.redirect_stderr(io.StringIO()) as handle:
+        Pyjo.Log.new(json=True).info('Values', Pyjo.Log.Field('when', time))
+    like_ok(json.loads(handle.getvalue())['when'], r"^<module 'time'", 'value that JSON has no type for')
 
 done_testing()

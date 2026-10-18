@@ -40,6 +40,23 @@ Emitted when a new message gets logged. ::
 
     log.on('message', lambda log, level, *lines: print(f'{level}: ', *lines, sep=''))
 
+JSON
+----
+
+With :attr:`~Pyjo_Log.json`, or the ``PYJO_LOG_JSON`` environment variable,
+every message is a line of JSON, with the fields that log collectors, as
+Cloud Logging, Datadog and Elastic, recognize: ``time`` in UTC, as of
+:rfc:`3339`, ``level``, ``severity`` with the names of Cloud Logging and
+syslog, ``message``, ``pid``, and the fields of the message and its context,
+as :class:`Field` objects. A message of several lines, as a traceback, stays
+one line of JSON. ::
+
+    {"time":"2026-10-19T08:15:42.123450Z","level":"warn","severity":"WARNING","message":"Disk is 95% full","pid":31841}
+
+The levels ``trace`` and ``debug`` are of the severity ``DEBUG``, ``info`` of
+``INFO``, ``warn`` of ``WARNING``, ``error`` of ``ERROR`` and ``fatal`` of
+``CRITICAL``.
+
 The logging module
 ------------------
 
@@ -70,13 +87,15 @@ import Pyjo.Exception
 import Pyjo.File
 
 import builtins
+import datetime
+import json
 import logging
 import os
 import sys
 import time
 import weakref
 
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from types import TracebackType
 from typing import IO, Any, Self, cast
 
@@ -88,6 +107,16 @@ type Format = Callable[..., str]
 
 # Supported log levels
 LEVEL = {'trace': 1, 'debug': 2, 'info': 3, 'warn': 4, 'error': 5, 'fatal': 6}
+
+# The severities of Cloud Logging and syslog, which Datadog recognizes too
+SEVERITY = {
+    'trace': 'DEBUG',
+    'debug': 'DEBUG',
+    'info': 'INFO',
+    'warn': 'WARNING',
+    'error': 'ERROR',
+    'fatal': 'CRITICAL',
+}
 
 # Systemd magic numbers
 MAGIC = {'trace': 7, 'debug': 6, 'info': 5, 'warn': 4, 'error': 3, 'fatal': 2}
@@ -112,6 +141,7 @@ class Pyjo_Log(Pyjo.EventEmitter.object):
         format: Format | None = None,
         handle: IO[str] | None = _UNSET,
         history: list[list[Any]] | None = None,
+        json: bool | None = None,
         level: str = 'trace',
         max_history_size: int = 10,
         path: str | os.PathLike[str] | None = None,
@@ -128,6 +158,7 @@ class Pyjo_Log(Pyjo.EventEmitter.object):
         super().__init__()
 
         self._color: bool | None = color
+        self._json: bool | None = json
 
         self.history: list[list[Any]] = history if history is not None else []
         """::
@@ -208,6 +239,26 @@ class Pyjo_Log(Pyjo.EventEmitter.object):
     def color(self, value: bool) -> None:
         self._color = value
 
+    # Not in Mojolicious: JSON Lines for log collectors
+    @property
+    def json(self) -> bool:
+        """::
+
+            boolean = log.json
+            log.json = boolean
+
+        Generate log messages as lines of JSON, see `JSON`_, defaults to the
+        value of the ``PYJO_LOG_JSON`` environment variable. It takes
+        precedence over :attr:`short` and :attr:`color`.
+        """
+        if self._json is None:
+            self._json = bool(os.environ.get('PYJO_LOG_JSON'))
+        return self._json
+
+    @json.setter
+    def json(self, value: bool) -> None:
+        self._json = value
+
     @property
     def short(self) -> bool:
         """::
@@ -239,7 +290,7 @@ class Pyjo_Log(Pyjo.EventEmitter.object):
             log.format = lambda time, level, *lines: '[2018-11-08 14:20:13.77168] [28320] [info] I ♥ Pyjoyment\\n'
         """
         if self._format is None:
-            self._format = _short if self.short else _color if self.color else _default
+            self._format = _json if self.json else _short if self.short else _color if self.color else _default
         return self._format
 
     @format.setter
@@ -358,10 +409,26 @@ class Pyjo_Log(Pyjo.EventEmitter.object):
             context = log.context('[17a60115]')
             context.debug('This is a log message with context information')
             context.info('And another')
+
+        The items of a dict are :class:`Field` objects, which a message of
+        JSON has as fields of its own, and the other formats as
+        ``name=value``. ::
+
+            # Log with the fields of a context
+            context = log.context({'user': 'sri'})
         """
         log = self.new(level=self.level)
         log._parent = self
-        log._context = list(context)
+        # Not in Mojolicious: the items of a dict as fields
+        log._context = [
+            field
+            for item in context
+            for field in (
+                [Field(name, value) for name, value in cast(Mapping[str, Any], item).items()]
+                if isinstance(item, Mapping)
+                else [item]
+            )
+        ]
         return log
 
     def debug(self, *msgs: Any) -> Self:
@@ -457,6 +524,44 @@ class Pyjo_Log(Pyjo.EventEmitter.object):
         return self
 
 
+# Not in Mojolicious: a field of a JSON message
+class Field(str):
+    """::
+
+        field = Pyjo.Log.Field('user', 'sri')
+        field = Pyjo.Log.Field('request_id', 'abc123', '[abc123]')
+
+    A field of a message of JSON, as a line of a message or of a context, see
+    `JSON`_, which the other formats have as its text, ``name=value`` by
+    default. A field does not replace the fields that every message of JSON
+    has, and a value that JSON has no type for is a string. ::
+
+        # Log with a field
+        log.info('Disk is full', Pyjo.Log.Field('disk', '/dev/sda1'))
+    """
+
+    name: str
+    """::
+
+        name = field.name
+
+    Name of the field.
+    """
+
+    value: Any
+    """::
+
+        value = field.value
+
+    Value of the field.
+    """
+
+    def __new__(cls, name: str, value: Any, text: str | None = None) -> Self:
+        field = super().__new__(cls, f'{name}={value}' if text is None else text)
+        field.name, field.value = name, value
+        return field
+
+
 class _Capture:
     def __init__(self, restore: Callable[[], None]) -> None:
         self.messages: list[str] = []
@@ -547,6 +652,21 @@ def _flock(fd: int | None, lock: bool) -> None:
 
 
 # The closest level of Pyjo.Log for a level of the logging module
+def _json(time_: float, level: str, *lines: Any) -> str:
+    timestamp = datetime.datetime.fromtimestamp(time_, datetime.UTC).isoformat(timespec='microseconds')
+    record: dict[str, Any] = {
+        'time': timestamp.removesuffix('+00:00') + 'Z',
+        'level': level,
+        'severity': SEVERITY[level],
+        'message': ' '.join(str(line) for line in lines if not isinstance(line, Field)),
+        'pid': os.getpid(),
+    }
+    for line in lines:
+        if isinstance(line, Field):
+            record.setdefault(line.name, line.value)
+    return json.dumps(record, ensure_ascii=False, separators=(',', ':'), default=str) + '\n'
+
+
 def _level(levelno: int) -> str:
     if levelno >= logging.CRITICAL:
         return 'fatal'

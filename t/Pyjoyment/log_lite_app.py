@@ -5,6 +5,7 @@ from Pyjo.Test import *
 from Pyjoyment.Lite import get, hook
 
 import io
+import json
 
 
 # Left out from Mojolicious: MOJO_REACTOR, as the tests run on the reactor of Pyjo.Reactor.detect()
@@ -56,5 +57,19 @@ with subtest('Concurrent requests'):
     like_ok(buffer, r'\[.+\] \[\d+\] \[debug\] \[123-first\] Third!', 'message with request id')
     like_ok(buffer, r'\[.+\] \[\d+\] \[debug\] \[123-second\] Fourth!', 'message with request id')
     like_ok(buffer, r'\[.+\] \[\d+\] \[debug\] Fifth!', 'message without request id')
+
+# Not in Mojolicious: the request id as a field of its own of a message of JSON
+with subtest('JSON log messages'):
+    handle = io.StringIO()
+    t.app.log = Pyjo.Log.new(handle=handle, json=True)
+    t.get_ok('/simple').status_is(200).content_is('Simple!')
+    records = [json.loads(line) for line in handle.getvalue().splitlines()]
+    first = next(record for record in records if record['message'] == 'First!')
+    is_ok(first['request_id'], '17a60115', 'request id')
+    is_ok(first['level'], 'debug', 'level')
+    second = next(record for record in records if record['message'] == 'Second! Third!')
+    is_ok(second['request_id'], '17a60115', 'request id')
+    no_context = next(record for record in records if record['message'] == 'No context!')
+    ok('request_id' not in no_context, 'message without request id')
 
 done_testing()
