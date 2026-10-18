@@ -23,7 +23,7 @@ class FakeUA:
         tx = types.SimpleNamespace(
             error=None,
             req=types.SimpleNamespace(url=url),
-            res=types.SimpleNamespace(code=200, dom=Pyjo.DOM.new(f'<title>{url}</title>')),
+            res=types.SimpleNamespace(code=200, dom=lambda: Pyjo.DOM.new(f'<title>{url}</title>')),
         )
         Pyjo.IOLoop.timer(0.01 if 'mojolicious' in url else 0.02, lambda loop: cb(self, tx))
 
@@ -94,7 +94,7 @@ with subtest('Values'):
 with subtest('Coroutines'):
 
     async def main():
-        title = (await get_p('https://mojolicious.org')).res.dom.at('title').text
+        title = (await get_p('https://mojolicious.org')).res.dom().at('title').text
         return title
 
     is_ok(asyncio.run(main()), 'https://mojolicious.org', 'awaited in asyncio')
@@ -322,7 +322,7 @@ with subtest('coroutine'):
         @Pyjo.Promise.coroutine
         async def title(url):
             tx = await ua.get_p(url)
-            return tx.res.dom.at('title').text
+            return tx.res.dom().at('title').text
 
         title('https://mojolicious.org').then(print).wait()
     is_ok(output.getvalue(), 'https://mojolicious.org\n', 'title')

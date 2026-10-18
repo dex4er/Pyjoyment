@@ -11,3 +11,4 @@ The guides of Pyjoyment, ported from the guides of Mojolicious.
     routing
     rendering
     testing
+    cookbook
