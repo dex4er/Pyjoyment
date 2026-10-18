@@ -195,8 +195,9 @@ with subtest('Reserved stash value'):
     ok(t.app.routes.is_reserved('text'), 'is reserved')
     ok(t.app.routes.is_reserved('variant'), 'is reserved')
 
-    # Not in Mojolicious: YAML
+    # Not in Mojolicious: YAML and TOML
     ok(t.app.routes.is_reserved('yaml'), 'is reserved')
+    ok(t.app.routes.is_reserved('toml'), 'is reserved')
 
 with subtest('Reserved stash value (in placeholder)'):
     throws_ok(

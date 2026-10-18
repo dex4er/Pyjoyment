@@ -518,8 +518,9 @@ def json(c):
     c.render(json={'foo': [1, -2, 3, 'b☃r']}, layout='layout')
 
 
-# Not in Mojolicious: YAML
+# Not in Mojolicious: YAML and TOML
 get('/yaml', lambda c: c.render(yaml={'foo': [1, -2, 3, 'b☃r']}))
+get('/toml', lambda c: c.render(toml={'foo': [1, -2, 3, 'b☃r']}))
 
 get('/autostash', lambda c: c.render(handler='ep', foo='bar'))
 
@@ -1289,6 +1290,15 @@ t.get_ok('/url_for_foxy').status_is(200).header_is('Server', 'Pyjoyment (Python)
     .header_is('Server', 'Pyjoyment (Python)')
     .content_type_is('application/yaml;charset=UTF-8')
     .content_is('foo:\n- 1\n- -2\n- 3\n- b☃r\n')
+)
+
+# Not in Mojolicious: TOML
+(
+    t.get_ok('/toml')
+    .status_is(200)
+    .header_is('Server', 'Pyjoyment (Python)')
+    .content_type_is('application/toml;charset=UTF-8')
+    .content_is('foo = [1, -2, 3, "b☃r"]\n')
 )
 
 # Stash values in template

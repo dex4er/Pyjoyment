@@ -163,6 +163,11 @@ is_deeply_ok(
     'YAML',
 )
 
+# Not in Mojolicious: TOML
+c = app.build_controller()
+c.stash()['toml'] = {'name': 'I ♥ Pyjoyment!', 'server': {'workers': 4}}
+is_deeply_ok(renderer.render(c), ('name = "I ♥ Pyjoyment!"\n\n[server]\nworkers = 4\n'.encode(), 'toml'), 'TOML')
+
 with subtest('Response has already been rendered'):
     c = app.build_controller()
     c.render(text='First call')

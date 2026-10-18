@@ -28,6 +28,7 @@ import Pyjo.Loader
 
 from Pyjo.JSON import encode_json
 from Pyjo.String.Template import is_template
+from Pyjo.TOML import dump as dump_toml
 from Pyjo.Util import decamelize, deprecated, encode, gzip, md5_sum
 from Pyjo.YAML import dump
 
@@ -388,6 +389,10 @@ class Pyjoyment_Renderer(Pyjo.Base.object):
         # of Helm: the items of a sequence at the column of its key, no anchors, and the quotes of YAML 1.1
         if 'yaml' in stash:
             return encode('UTF-8', dump(stash.pop('yaml'), indent_sequences=False, anchors=False)), 'yaml'
+
+        # Not in Mojolicious: TOML, of a table
+        if 'toml' in stash:
+            return encode('UTF-8', dump_toml(stash.pop('toml'))), 'toml'
 
         # Template or templateless handler
         if options['template'] is None:

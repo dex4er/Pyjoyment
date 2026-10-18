@@ -275,6 +275,7 @@ strict = [
   "Pyjo/String/Mixin.py",
   "Pyjo/String/Template.py",
   "Pyjo/String/Unicode.py",
+  "Pyjo/TOML.py",
   "Pyjo/Template.py",
   "Pyjo/Test/__init__.py",
   "Pyjo/Test/Pyjo.py",

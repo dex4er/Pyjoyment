@@ -33,6 +33,7 @@ Pyjoyment.Types - MIME types
     rss      -> application/rss+xml
     sse      -> text/event-stream
     svg      -> image/svg+xml
+    toml     -> application/toml;charset=UTF-8
     ttf      -> font/ttf
     txt      -> text/plain;charset=UTF-8
     webm     -> video/webm
@@ -110,6 +111,8 @@ class Pyjoyment_Types(Pyjo.Base.object):
                 'rss': ['application/rss+xml'],
                 'sse': ['text/event-stream'],
                 'svg': ['image/svg+xml'],
+                # Not in Mojolicious: TOML
+                'toml': ['application/toml;charset=UTF-8'],
                 'ttf': ['font/ttf'],
                 'txt': ['text/plain;charset=UTF-8'],
                 'webm': ['video/webm'],

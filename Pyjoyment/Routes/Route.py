@@ -48,10 +48,10 @@ from typing import Any, Self, cast, overload
 
 
 # Reserved stash values
-# Not in Mojolicious: yaml, which the renderer renders as json
+# Not in Mojolicious: toml and yaml, which the renderer renders as json
 _RESERVED = frozenset(
     'action app cb controller data extends format handler inline json layout namespace path status template text '
-    'variant yaml'.split()
+    'toml variant yaml'.split()
 )
 
 
