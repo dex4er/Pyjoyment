@@ -1113,7 +1113,15 @@ it, examples, and where the documentation is. This file is for whoever
 changes the code: how it works and why. Module documentation lives in the
 module docstrings, ported from Mojo's POD in the same layout (synopsis,
 events, attributes, methods), and Sphinx builds the API reference in `docs/`
-from them.
+from them. Read the Docs builds the documentation with the Sphinx of
+`docs/requirements.txt`, and so does the job `docs` of the workflow Tests,
+with `-W`, so that a warning, as a reference that is not found or a
+docstring that is not valid reStructuredText, fails the pull request that
+makes it:
+
+```sh
+mise exec -- uv run --with-requirements docs/requirements.txt sphinx-build -W --keep-going -b html docs docs/_build/html
+```
 
 The intro, status, installation and license pages in `docs/` include their
 text from `README.rst`, between `.. begin-<name>` and `.. end-<name>`
