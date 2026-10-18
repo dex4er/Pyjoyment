@@ -20,6 +20,18 @@ Pyjoyment.Controller - Controller base class
 controllers. It is also the default controller class unless you set
 :attr:`Pyjoyment.Pyjoyment_App.controller_class`.
 
+A controller is a context manager for the callbacks of a delayed response: an
+exception that the ``with`` block does not catch is replied with the helper
+``reply.exception`` of :mod:`Pyjoyment.Plugin.DefaultHelpers`, as an exception
+that goes on to the event loop would leave the request without a response. ::
+
+    # Exception in a callback of a delayed response
+    def later(self):
+        @Pyjo.IOLoop.next_tick
+        def tick(loop):
+            with self:
+                self.render(text=self.param('name').upper())
+
 Helpers
 -------
 
@@ -62,6 +74,7 @@ import sys
 import weakref
 
 from collections.abc import Callable
+from types import TracebackType
 from typing import TYPE_CHECKING, Any, Self, cast, overload
 
 
@@ -107,6 +120,19 @@ class Pyjoyment_Controller(Pyjo.Base.object):
 
         self.app = app
         self.tx = tx
+
+    # Not in Mojolicious: a context manager, which replies with the exception that the block does not catch, as an
+    # exception that goes on from a callback to the event loop would leave the request without a response
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+        self, type: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None
+    ) -> bool:
+        if not isinstance(value, Exception):
+            return False
+        self.helpers.reply.exception(value)
+        return True
 
     # Unlike Mojolicious: Mojo registers the helpers with Mojo::DynamicMethods, Python looks them up in the renderer of
     # the application when a method is not found
