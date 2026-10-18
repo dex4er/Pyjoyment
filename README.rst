@@ -19,7 +19,7 @@ web framework:
 
 * HTTP and WebSocket client and server.
 * Non-blocking I/O web server, which also runs as an ASGI, WSGI or CGI
-  application.
+  application, or as an event function of AWS Lambda.
 * HTML/XML parser with CSS selector support, and JSON with JSON Pointers.
 * Python-ish templates and template strings, with automatic escaping.
 * Containers for URLs, paths, query strings, headers, cookies and HTTP
@@ -48,7 +48,7 @@ Mojolicious 9 to Python 3.12 and newer, with ``asyncio`` as its event loop.
 The toolkit, the ``Pyjo`` package, is ported: URLs, DOM and CSS selectors,
 JSON, templates, HTTP messages and cookies, the event loop with promises, the
 user agent, and the servers, on their own, preforking, with hot deployment or
-reloading, and through ASGI, WSGI and CGI. So is the web framework, the
+reloading, and through ASGI, WSGI, CGI and AWS Lambda. So is the web framework, the
 ``Pyjoyment`` package: routes, controllers, the renderer with templates and
 template strings, plugins, ``Pyjoyment.Lite`` and the commands. The tests of
 Mojolicious are ported with them, and a ported module names the Mojolicious
@@ -191,6 +191,19 @@ or on `Werkzeug <https://werkzeug.palletsprojects.com/>`_, a WSGI server
 and answers on port 3000: ::
 
     curl http://localhost:3000/
+
+On `AWS Lambda <https://aws.amazon.com/lambda/>`_, it is an event function,
+whose handler ``hello_world_lambda.handler`` answers the events of API
+Gateway, Function URLs and Application Load Balancers:
+
+.. code-block:: python
+
+   import Pyjo.HelloWorld
+   import Pyjo.Server.Lambda
+
+
+   # The handler "hello_world_lambda.handler" of an event function of AWS Lambda
+   handler = Pyjo.Server.Lambda.new(app=Pyjo.HelloWorld.new()).to_lambda_app()
 
 Documentation
 =============

@@ -261,15 +261,19 @@ on Python 3.14.
 
 The workflow Docker Smoke Test builds and runs the images of
 `generate dockerfile`, for an application, a Lite script with
-`pyproject.toml` and one with the inline metadata of PEP 723, which
-`.github/scripts/docker-smoke.sh` generates, and checks that they serve their
-pages and stop gracefully on the TERM of `docker stop`. The image gets the
-wheel of the checkout, as the version that is tested is not on PyPI, which is
-the only change of the generated `Dockerfile`. The script runs locally as
-well, with Docker:
+`pyproject.toml` and one with the inline metadata of PEP 723, and checks that
+they serve their pages and stop gracefully on the TERM of `docker stop`. Its
+variant `lambda` runs a Lite script that ends with `handler = app.start()` as
+an event function in the image of AWS Lambda for Python, whose emulator of the
+Runtime API it invokes with the events of the payload formats 2.0 and 1.0.
+The image gets the wheel of the checkout, as the version that is tested is not
+on PyPI, which is the only change of the generated `Dockerfile`. The workflow
+runs only `tt/docker-smoke/smoke.sh`, which runs the script of a variant, as
+`app.sh`, with the steps they share in `lib.sh`, so that the logic of the test
+is in files of its own, which run locally as well, with Docker:
 
 ```sh
-mise exec -- .github/scripts/docker-smoke.sh app
+mise exec -- tt/docker-smoke/smoke.sh app
 ```
 
 CI sets `PYTHONWARNINGS=error::SyntaxWarning,error::DeprecationWarning`, so an
@@ -364,7 +368,9 @@ targets of the options), `Pyjo.IOLoop.Datagram` (inspired by `dgram` of Node.js)
 `Pyjo.App` (inspired by `Mojo` of Mojolicious 6, the base class of
 `Mojolicious` until Mojolicious 7, as `Pyjo_App` is of `Pyjoyment_App`),
 `Pyjo.HelloWorld` (an application of pure Pyjo, where `Mojo::HelloWorld` is
-one of Mojolicious, which `Pyjoyment.HelloWorld` ports),
+one of Mojolicious, which `Pyjoyment.HelloWorld` ports), `Pyjo.Server.Lambda`
+and `Pyjoyment.Command.lambda` (the server and the command of the event
+functions of AWS Lambda, inspired by `Pyjo.Server.WSGI` and its command),
 `Pyjoyment.Plugin.PyRenderer` (the renderer of template strings, inspired by
 `Mojolicious::Plugin::EPLRenderer`), `Pyjoyment.Plugin.TOMLConfig` (inspired
 by `Mojolicious::Plugin::NotYAMLConfig`, for the format of configuration of
@@ -537,7 +543,10 @@ copy:
   `PLACK_ENV`, as WSGI and ASGI have no environment variable of their own: a
   server imports the script of an application, which ends with
   `application = app.start()`, with its own arguments in `sys.argv`, so that
-  the command has to be detected.
+  the command has to be detected. The runtime of AWS Lambda imports the script
+  the same way, and `AWS_LAMBDA_RUNTIME_API`, which it sets, detects the
+  command `lambda`, whose module has the name of a keyword of Python, which
+  only `importlib` imports.
 - The generators of the command `generate` write projects for uv, where Mojo
   writes ones for ExtUtils::MakeMaker: `generate makefile` is
   `generate pyproject`, and `cpanify` is left out, as `uv publish` uploads to

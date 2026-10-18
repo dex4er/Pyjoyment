@@ -3,6 +3,7 @@ import Pyjo.File
 from Pyjo.Test import *
 
 import contextlib
+import importlib
 import io
 import os
 import re
@@ -14,6 +15,8 @@ import types
 os.environ.pop('PYJO_WSGI', None)
 # Not in Mojolicious: PYJO_ASGI, as ASGI has no environment variable of its own
 os.environ.pop('PYJO_ASGI', None)
+# Not in Mojolicious: AWS_LAMBDA_RUNTIME_API, of the runtime of AWS Lambda
+os.environ.pop('AWS_LAMBDA_RUNTIME_API', None)
 # Left out from Mojolicious: MOJO_REACTOR, as the tests run on the reactor of Pyjo.Reactor.detect()
 
 # Renamed from Mojolicious: the modules of the tests are in tt/lib, where Mojo has them in t/mojolicious/lib
@@ -104,11 +107,14 @@ with local(PYJO_WSGI='production'):
 # Not in Mojolicious: ASGI
 with local(PYJO_ASGI='production'):
     is_ok(commands.detect(), 'asgi', 'right environment')
+# Not in Mojolicious: AWS Lambda
+with local(AWS_LAMBDA_RUNTIME_API='127.0.0.1:9001'):
+    is_ok(commands.detect(), 'lambda', 'right environment')
 with local(PATH_INFO='/test'):
     is_ok(commands.detect(), 'cgi', 'right environment')
 with local(GATEWAY_INTERFACE='CGI/1.1'):
     is_ok(commands.detect(), 'cgi', 'right environment')
-with local(PYJO_WSGI=None, PYJO_ASGI=None, PATH_INFO=None, GATEWAY_INTERFACE=None):
+with local(PYJO_WSGI=None, PYJO_ASGI=None, AWS_LAMBDA_RUNTIME_API=None, PATH_INFO=None, GATEWAY_INTERFACE=None):
     is_ok(commands.detect(), None, 'no environment')
 with local(PYJO_WSGI='production'):
     ok(callable(Pyjoyment.Commands.new().run()), 'right reference')
@@ -119,6 +125,8 @@ with local(PYJO_WSGI='production'):
 ok(callable(Pyjoyment.Commands.new().run('wsgi')), 'right reference')
 # Not in Mojolicious: ASGI
 ok(callable(Pyjoyment.Commands.new().run('asgi')), 'right reference')
+# Not in Mojolicious: AWS Lambda
+ok(callable(Pyjoyment.Commands.new().run('lambda')), 'right reference')
 
 # Start application
 with local(PYJO_APP_LOADER='1'):
@@ -464,6 +472,10 @@ like_ok(wsgi.usage, r'wsgi', 'has usage information')
 asgi = Pyjoyment.Command.asgi.new()
 ok(asgi.description, 'has a description')
 like_ok(asgi.usage, r'asgi', 'has usage information')
+# Not in Mojolicious: AWS Lambda, whose module has the name of a keyword of Python
+lambda_ = importlib.import_module('Pyjoyment.Command.lambda').new()
+ok(lambda_.description, 'has a description')
+like_ok(lambda_.usage, r'lambda', 'has usage information')
 
 # routes
 routes = Pyjoyment.Command.routes.new()

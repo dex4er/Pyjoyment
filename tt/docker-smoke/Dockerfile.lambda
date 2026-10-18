@@ -1,0 +1,10 @@
+# An event function of AWS Lambda: the wheel of the checkout and the script
+# myapp.py, whose handler is myapp.handler
+FROM public.ecr.aws/lambda/python:3.14
+
+ARG WHEEL
+COPY ${WHEEL} ./
+RUN pip install --no-cache-dir --target "${LAMBDA_TASK_ROOT}" "./${WHEEL}"
+COPY myapp.py ${LAMBDA_TASK_ROOT}/
+
+CMD ["myapp.handler"]

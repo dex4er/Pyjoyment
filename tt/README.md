@@ -1,15 +1,16 @@
 # Files of the tests
 
-Python files that the tests in [`t/`](../t/README.md) use as data. They are
-not tests: the harness runs every `.py` file under `t/`, so these are kept
-outside of it.
+Python files that the tests in [`t/`](../t/README.md) use as data, and the
+smoke test of the images, which CI runs with Docker. They are not tests of the
+harness: it runs every `.py` file under `t/`, so these are kept outside of it.
 
-| Directory           | What it holds                                                                                        |
-| ------------------- | ---------------------------------------------------------------------------------------------------- |
-| `templates/`        | templates of files of `Pyjoyment.Plugin.PyRenderer`, as `files/hello.html.py`                        |
-| `templates_native/` | the same with the t-strings of Python 3.14, checked by ruff and pyright as Python 3.14               |
-| `lib/`              | modules of the tests, as `PyjoymentTest.Plugin.DeploymentPlugin`, where Mojo has `t/mojolicious/lib` |
-| `external/`         | applications that `Pyjoyment.Plugin.Mount` mounts, where Mojo has `t/mojolicious/external`           |
+| Directory           | What it holds                                                                                          |
+| ------------------- | ------------------------------------------------------------------------------------------------------ |
+| `templates/`        | templates of files of `Pyjoyment.Plugin.PyRenderer`, as `files/hello.html.py`                          |
+| `templates_native/` | the same with the t-strings of Python 3.14, checked by ruff and pyright as Python 3.14                 |
+| `lib/`              | modules of the tests, as `PyjoymentTest.Plugin.DeploymentPlugin`, where Mojo has `t/mojolicious/lib`   |
+| `external/`         | applications that `Pyjoyment.Plugin.Mount` mounts, where Mojo has `t/mojolicious/external`             |
+| `docker-smoke/`     | the smoke test of the workflow Docker Smoke Test: `smoke.sh` runs the script of a variant, as `app.sh` |
 
 A test adds a directory to the paths of the renderer of its application, and
 renders a template by its name:

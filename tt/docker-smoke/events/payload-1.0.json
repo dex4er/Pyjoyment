@@ -1,0 +1,19 @@
+{
+  "path": "/",
+  "httpMethod": "GET",
+  "headers": {
+    "Host": "abc.execute-api.eu-central-1.amazonaws.com",
+    "X-Forwarded-Proto": "https"
+  },
+  "multiValueHeaders": {
+    "Host": ["abc.execute-api.eu-central-1.amazonaws.com"],
+    "X-Forwarded-Proto": ["https"]
+  },
+  "requestContext": {
+    "stage": "prod",
+    "path": "/prod/",
+    "identity": { "sourceIp": "192.0.2.2" }
+  },
+  "body": null,
+  "isBase64Encoded": false
+}
