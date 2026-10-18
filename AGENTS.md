@@ -265,7 +265,8 @@ The workflow Docker Smoke Test builds and runs the images of
 they serve their pages and stop gracefully on the TERM of `docker stop`: the
 Lite script with `pyproject.toml` in an image of `generate dockerfile --port`,
 which exposes its port, and the one with the inline metadata on the port of
-`PORT` of the container, as Knative sets it. Its
+`PORT` of the container, as Knative sets it, and the application in an image
+of `generate dockerfile --graceful-timeout`, whose workers stop with it. Its
 variant `lambda` runs a Lite script that ends with `handler = app.start()` as
 an event function in the image of AWS Lambda for Python, whose emulator of the
 Runtime API it invokes with the events of the payload formats 2.0 and 1.0.
@@ -539,7 +540,14 @@ copy:
   section SYNOPSIS of its POD, is the first literal block of the docstring of
   the module, which the class reads with `usage = extract_usage()`. Its
   options are parsed with `getopt` of `Pyjo.Util`, whose targets are a dict,
-  as Python has no references to variables.
+  as Python has no references to variables. The commands of the servers,
+  `daemon` and `prefork`, parse them with `env_prefix='PYJO_'`, so that an
+  option that is not given has the value of `PYJO_` and its name, as
+  `PYJO_WORKERS`, the way Cobra and Viper of Go have it, which continues the
+  variables that Mojo already has for some of them, as `MOJO_LISTEN` and
+  `MOJO_INACTIVITY_TIMEOUT`; the environment of a container tunes the server
+  without its command line. Other commands, as `get`, have no such
+  variables, as `PYJO_METHOD` or `PYJO_VERBOSE` would surprise.
 - PSGI is WSGI and ASGI: the command `psgi` is `wsgi`, and `asgi` is its
   counterpart, which return the application of `Pyjo.Server.WSGI` and
   `Pyjo.Server.ASGI`. `PYJO_WSGI` and `PYJO_ASGI` take the place of

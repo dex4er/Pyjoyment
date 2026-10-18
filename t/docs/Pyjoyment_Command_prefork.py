@@ -5,7 +5,10 @@ from Pyjo.Test import *
 
 import contextlib
 import io
+import os
 import re
+
+from unittest.mock import patch
 
 
 with subtest('Synopsis'):
@@ -31,6 +34,13 @@ with subtest('Synopsis'):
     )
     is_ok(server.pid_file, '/tmp/p.pid', 'pid file')
     is_ok(server.workers, 12, 'workers')
+
+with subtest('Description'):
+    # PYJO_GRACEFUL_TIMEOUT=8 PYJO_WORKERS=2 ./myapp.py prefork
+    with patch.dict(os.environ, {'PYJO_GRACEFUL_TIMEOUT': '8', 'PYJO_WORKERS': '2'}):
+        server = prefork.build_server()
+        is_deeply_ok([server.graceful_timeout, server.workers], [8, 2], 'options of the environment')
+        is_ok(prefork.build_server('-w', '3').workers, 3, 'command line first')
 
 with subtest('Attributes'):
     prefork = Pyjoyment.Command.prefork.new()
