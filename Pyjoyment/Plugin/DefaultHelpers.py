@@ -68,7 +68,7 @@ config ::
 
     %= config('something')
 
-Alias for :meth:`Pyjoyment.Pyjoyment_App.config`.
+Alias for :meth:`Pyjo.App.Pyjo_App.config`.
 
 content ::
 
@@ -526,7 +526,7 @@ ua ::
 
     %= ua().get('mojolicious.org').result.dom().at('title').text
 
-Alias for :attr:`Pyjoyment.Pyjoyment_App.ua`.
+Alias for :attr:`Pyjo.App.Pyjo_App.ua`.
 
 url_for ::
 
