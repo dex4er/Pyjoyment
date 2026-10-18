@@ -29,6 +29,7 @@ import Pyjo.Loader
 from Pyjo.JSON import encode_json
 from Pyjo.String.Template import is_template
 from Pyjo.Util import decamelize, deprecated, encode, gzip, md5_sum
+from Pyjo.YAML import dump
 
 import io
 import os
@@ -382,6 +383,11 @@ class Pyjoyment_Renderer(Pyjo.Base.object):
         # JSON
         if 'json' in stash:
             return encode_json(stash.pop('json')), 'json'
+
+        # Not in Mojolicious: YAML, in the style of the documents that tools write, as index.yaml of a chart repository
+        # of Helm: the items of a sequence at the column of its key, no anchors, and the quotes of YAML 1.1
+        if 'yaml' in stash:
+            return encode('UTF-8', dump(stash.pop('yaml'), indent_sequences=False, anchors=False)), 'yaml'
 
         # Template or templateless handler
         if options['template'] is None:

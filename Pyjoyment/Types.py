@@ -39,6 +39,7 @@ Pyjoyment.Types - MIME types
     woff     -> font/woff
     woff2    -> font/woff2
     xml      -> application/xml,text/xml
+    yaml     -> application/yaml;charset=UTF-8,text/yaml,application/x-yaml,text/x-yaml
     zip      -> application/zip
 
 The most common ones are already defined.
@@ -115,6 +116,8 @@ class Pyjoyment_Types(Pyjo.Base.object):
                 'woff': ['font/woff'],
                 'woff2': ['font/woff2'],
                 'xml': ['application/xml', 'text/xml'],
+                # Not in Mojolicious: YAML, of RFC 9512, and the types that it had before
+                'yaml': ['application/yaml;charset=UTF-8', 'text/yaml', 'application/x-yaml', 'text/x-yaml'],
                 'zip': ['application/zip'],
             }
         )
