@@ -4,8 +4,11 @@ from Pyjo.Test import *
 
 import contextlib
 import io
+import os
 import re
 import sys
+
+from unittest.mock import patch
 
 
 # Not in Mojolicious: the tests of Pyjo.GetOpt, which follows Getopt::Long as Mojo::Util configures it; the expected
@@ -177,6 +180,64 @@ with subtest('Targets'):
     is_deeply_ok(called[-1], ('x', ('b', '2')), 'callback of a hash')
     ok(callable(backlog), 'decorator returns the callback')
     ok(not hasattr(result, 'listen'), 'no value of a target in the result')
+
+with subtest('Environment'):
+    env = {
+        'TEST_MODE': 'production',
+        'TEST_WORKERS': '12',
+        'TEST_VERBOSE': '1',
+        'TEST_COLOR': 'false',
+        'TEST_COUNT': '3',
+        'TEST_LISTEN': 'http://*:80,https://*:443',
+        'TEST_DEFINE': 'a=1,b=2',
+        'TEST_PROXY': '',
+        'TEST_EMPTY': '',
+        'TEST_V': '1',
+        'TEST_TIMEOUT': '7',
+    }
+    with patch.dict(os.environ, env):
+        getopt = Pyjo.GetOpt.new(env_prefix='TEST_')
+        for spec in ('m|mode=s', 'w|workers=i', 'verbose', 'color!', 'count+', 'l|listen=s@', 'D|define=s%', 'empty=s'):
+            getopt.option(spec)
+        getopt.option('v').option('p|proxy:s').option('t|timeout=i', default=30)
+        args = ['-w', '4', 'myapp.py']
+        result = getopt.parse(args)
+        ok(result, 'success')
+        is_ok(result.mode, 'production', 'string')
+        is_ok(result.workers, 4, 'command line first')
+        is_ok(result.verbose, True, 'flag')
+        is_ok(result.color, False, 'false flag')
+        is_ok(result.count, 3, 'counter')
+        is_deeply_ok(result.listen, ['http://*:80', 'https://*:443'], 'list of values with commas')
+        is_deeply_ok(result.define, {'a': '1', 'b': '2'}, 'dict of keys and values with commas')
+        is_ok(result.proxy, None, 'empty variable of an optional value')
+        is_ok(result.empty, None, 'empty variable')
+        is_ok(result.v, None, 'no variable of an option of one letter')
+        is_ok(result.timeout, 7, 'variable before the default')
+        is_deeply_ok(args, ['myapp.py'], 'arguments')
+
+        for value in ('0', 'false', 'FALSE', 'no', 'off'):
+            with patch.dict(os.environ, {'TEST_VERBOSE': value}):
+                is_ok(Pyjo.GetOpt.new(env_prefix='TEST_').option('verbose').parse([]).verbose, False, f'false {value}')
+
+        # Targets
+        listen = []
+        called = []
+        getopt = Pyjo.GetOpt.new(env_prefix='TEST_').option('l|listen=s', listen)
+        getopt.on('w|workers=i', lambda name, value: called.append((name, value)))
+        ok(getopt.parse([]), 'success')
+        is_deeply_ok(listen, ['http://*:80', 'https://*:443'], 'list target')
+        is_deeply_ok(called, [('workers', 12)], 'callback')
+
+        # Without the prefix
+        is_ok(Pyjo.GetOpt.new().option('m|mode=s').parse([]).mode, None, 'no variables without a prefix')
+
+    with patch.dict(os.environ, {'TEST_WORKERS': 'many'}):
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            result = Pyjo.GetOpt.new(env_prefix='TEST_').option('w|workers=i').parse([])
+        ok(not result, 'invalid value')
+        is_ok(stderr.getvalue(), 'Value "many" invalid for option TEST_WORKERS (integer number expected)\n', 'warning')
 
 with subtest('sys.argv'):
     argv = sys.argv

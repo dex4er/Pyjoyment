@@ -81,6 +81,21 @@ The name of an option in the result, and the name that a callback gets, is
 its first name that is longer than one letter, or its only name, with ``_``
 for ``-``: ``inactivity_timeout`` for ``i|inactivity-timeout=i``.
 
+Environment
+-----------
+
+With ``env_prefix``, an option that is not given has the value of the
+environment variable of the prefix and its name in upper case, as
+``PYJO_INACTIVITY_TIMEOUT`` for ``i|inactivity-timeout=i``, which is
+converted and checked as a value of the command line, before the default,
+the way Cobra and Viper of Go have it. An option of one letter has none, and
+an empty variable is not set. A flag is false as ``0``, ``false``, ``no`` or
+``off``, a counter is the number, and an option of a list or a dict takes
+values separated by commas, as ``PYJO_LISTEN=http://*:80,https://*:443``. ::
+
+    # PYJO_WORKERS=12 python myapp.py prefork
+    getopt = Pyjo.GetOpt.new(env_prefix='PYJO_').option('w|workers=i', default=4)
+
 See also
 --------
 
@@ -99,6 +114,7 @@ import Pyjo.Exception
 
 from Pyjo.Util import warn
 
+import os
 import re
 import sys
 
@@ -119,16 +135,20 @@ class Pyjo_GetOpt(Pyjo.Base.object):
     implements the following new ones.
     """
 
-    def __init__(self, *, pass_through: bool = False) -> None:
+    def __init__(self, *, pass_through: bool = False, env_prefix: str | None = None) -> None:
         """::
 
             getopt = Pyjo.GetOpt.new()
             getopt = Pyjo.GetOpt.new(pass_through=True)
+            getopt = Pyjo.GetOpt.new(env_prefix='PYJO_')
 
         Construct a new :mod:`Pyjo.GetOpt` object. With ``pass_through``,
         unknown options and ``--`` stay in the list of arguments, without a
-        warning.
+        warning. With ``env_prefix``, an option that is not given has the
+        value of the environment variable of its name, see
+        `Environment`_.
         """
+        self.env_prefix = env_prefix
         self.pass_through = pass_through
         self._names: dict[str, _Option] = {}
         self._negations: set[str] = set()
@@ -302,6 +322,19 @@ class Pyjo_GetOpt(Pyjo.Base.object):
             seen.add(option.name)
             _store(option, values, converted if key is None else (key, converted))
 
+        # Not in Getopt::Long: the options that are not given, from the environment variables of their names
+        if self.env_prefix is not None:
+            for option in self._options:
+                if option.name in seen or len(option.name) < 2:
+                    continue
+                name = f'{self.env_prefix}{option.name.upper()}'
+                if not (value := os.environ.get(name)):
+                    continue
+                if self._environ(option, name, value, values):
+                    seen.add(option.name)
+                else:
+                    success = False
+
         # The defaults of the options that are not given
         for option in self._options:
             if option.target is None and option.default is not None and option.name not in seen:
@@ -312,6 +345,39 @@ class Pyjo_GetOpt(Pyjo.Base.object):
 
         argv[start:] = keep
         return Pyjo_GetOpt_Result(values, success)
+
+    def _environ(self, option: '_Option', name: str, value: str, values: dict[str, Any]) -> bool:
+        # A flag, which is false as 0, false, no and off
+        if option.kind in ('flag', 'negatable'):
+            _store(option, values, value.lower() not in ('0', 'false', 'no', 'off'))
+            return True
+
+        # A counter, which is the number
+        if option.kind == 'increment':
+            if not _RE_INT.fullmatch(value):
+                warn(f'Value "{value}" invalid for option {name} (integer number expected)')
+                return False
+            _store(option, values, int(value))
+            return True
+
+        # The values of a list or a dict, separated by commas, as PYJO_LISTEN has them
+        target: Any = option.target
+        mapping = option.multi == '%' or isinstance(target, dict)
+        several = mapping or option.multi == '@' or isinstance(target, list)
+        converted: list[Any] = []
+        for item in value.split(',') if several else [value]:
+            key = None
+            if mapping:
+                key, equals, item = item.partition('=')
+                if not equals and not option.optional:
+                    warn(f'Option {name}, key "{key}", requires a value')
+                    return False
+            if (result := self._convert(option, name, item)) is _INVALID:
+                return False
+            converted.append(result if key is None else (key, result))
+        for result in converted:
+            _store(option, values, result)
+        return True
 
     def _convert(self, option: '_Option', given: str, value: str) -> Any:
         if option.optional and value == '' and option.type != 's':
