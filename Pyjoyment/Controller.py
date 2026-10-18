@@ -508,6 +508,7 @@ class Pyjoyment_Controller(Pyjo.Base.object):
             boolean = c.render(data=data)
             boolean = c.render(text='Hello!')
             boolean = c.render(json={'foo': 'bar'})
+            boolean = c.render(yaml={'foo': 'bar'})
             boolean = c.render(handler='something')
             boolean = c.render('foo/index')
 
@@ -528,6 +529,9 @@ class Pyjoyment_Controller(Pyjo.Base.object):
 
             # Render JSON
             c.render(json={'test': 'I ♥ Pyjoyment!'})
+
+            # Render YAML, in the style of index.yaml of a chart repository of Helm
+            c.render(yaml={'entries': {'test': [{'version': '1.0.0'}]}})
 
             # Render inline template
             c.render(inline='<%= 1 + 1 %>')
@@ -903,8 +907,8 @@ class Pyjoyment_Controller(Pyjo.Base.object):
         special meaning and are reserved, the full list is currently
         ``action``, ``app``, ``cb``, ``controller``, ``data``, ``extends``,
         ``format``, ``handler``, ``inline``, ``json``, ``layout``,
-        ``namespace``, ``path``, ``status``, ``template``, ``text`` and
-        ``variant``. Note that all stash values with a ``mojo.*`` prefix are
+        ``namespace``, ``path``, ``status``, ``template``, ``text``,
+        ``variant`` and ``yaml``. Note that all stash values with a ``mojo.*`` prefix are
         reserved for internal use. ::
 
             # Remove value

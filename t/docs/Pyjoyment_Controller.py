@@ -340,6 +340,12 @@ with subtest('render'):
 
     app.routes.get('/json', json)
 
+    def yaml(c):
+        # Render YAML, in the style of index.yaml of a chart repository of Helm
+        c.render(yaml={'entries': {'test': [{'version': '1.0.0'}]}})
+
+    app.routes.get('/yaml', yaml)
+
     def inline(c):
         # Render inline template
         c.render(inline='<%= 1 + 1 %>')
@@ -381,6 +387,7 @@ with subtest('render'):
     is_ok(request(app, '/stash').res.text, 'I ♥ Pyjoyment!', 'characters from the stash')
     is_deeply_ok(request(app, '/data').res.json(), {'test': 'I ♥ Pyjoyment!'}, 'binary data')
     is_deeply_ok(request(app, '/json').res.json(), {'test': 'I ♥ Pyjoyment!'}, 'JSON')
+    is_ok(request(app, '/yaml').res.text, 'entries:\n  test:\n  - version: 1.0.0\n', 'YAML')
     is_ok(request(app, '/inline').res.text, '2\n', 'inline template')
     is_ok(request(app, '/template').res.text, '<p>Bar</p>\n', 'template')
     is_ok(request(app, '/values').res.text, 'test 23\n', 'template with values')

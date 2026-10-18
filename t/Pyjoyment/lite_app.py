@@ -518,6 +518,9 @@ def json(c):
     c.render(json={'foo': [1, -2, 3, 'b☃r']}, layout='layout')
 
 
+# Not in Mojolicious: YAML
+get('/yaml', lambda c: c.render(yaml={'foo': [1, -2, 3, 'b☃r']}))
+
 get('/autostash', lambda c: c.render(handler='ep', foo='bar'))
 
 # Unlike Mojolicious: the template app.html.ep reads the layout with c.layout(), as the variable layout is the value
@@ -1277,6 +1280,15 @@ t.get_ok('/url_for_foxy').status_is(200).header_is('Server', 'Pyjoyment (Python)
     .content_type_is('application/json;charset=UTF-8')
     .json_is(None)
     .content_is('null')
+)
+
+# Not in Mojolicious: YAML
+(
+    t.get_ok('/yaml')
+    .status_is(200)
+    .header_is('Server', 'Pyjoyment (Python)')
+    .content_type_is('application/yaml;charset=UTF-8')
+    .content_is('foo:\n- 1\n- -2\n- 3\n- b☃r\n')
 )
 
 # Stash values in template

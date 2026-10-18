@@ -148,6 +148,21 @@ ok(not c.res.headers.vary, 'no "Vary" value')
 ok(not c.res.headers.content_encoding, 'no "Content-Encoding" value')
 is_ok(c.res.body, output, 'same string')
 
+# Not in Mojolicious: YAML, in the style of the documents that tools write, as index.yaml of a chart repository of
+# Helm: the items of a sequence at the column of its key and no anchors
+c = app.build_controller()
+shared = ['https://example.com/a-1.0.tgz']
+c.stash()['yaml'] = {'entries': {'a': [{'urls': shared, 'more': shared, 'deprecated': 'no'}]}, 'note': 'I ♥ Pyjoyment!'}
+is_deeply_ok(
+    renderer.render(c),
+    (
+        'entries:\n  a:\n  - urls:\n    - https://example.com/a-1.0.tgz\n    more:\n    - https://example.com/a-1.0.tgz\n'
+        "    deprecated: 'no'\nnote: I ♥ Pyjoyment!\n".encode(),
+        'yaml',
+    ),
+    'YAML',
+)
+
 with subtest('Response has already been rendered'):
     c = app.build_controller()
     c.render(text='First call')

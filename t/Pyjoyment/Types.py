@@ -8,6 +8,9 @@ t = Pyjoyment.Types.new()
 
 with subtest('Basic functionality'):
     is_ok(t.type('json'), 'application/json;charset=UTF-8', 'right type')
+
+    # Not in Mojolicious: YAML
+    is_ok(t.type('yaml'), 'application/yaml;charset=UTF-8', 'right type')
     is_ok(t.type('foo'), None, 'no type')
     t.type('foo', 'foo/bar')
     is_ok(t.type('foo'), 'foo/bar', 'right type')
@@ -43,6 +46,12 @@ with subtest('Detect common MIME types'):
     is_deeply_ok(t.detect('application/xml'), ['xml'], 'right formats')
     is_deeply_ok(t.detect('text/xml'), ['xml'], 'right formats')
     is_deeply_ok(t.detect('application/zip'), ['zip'], 'right format')
+
+    # Not in Mojolicious: YAML, of RFC 9512, and the types that it had before
+    is_deeply_ok(t.detect('application/yaml'), ['yaml'], 'right format')
+    is_deeply_ok(t.detect('text/yaml'), ['yaml'], 'right format')
+    is_deeply_ok(t.detect('application/x-yaml'), ['yaml'], 'right format')
+    is_deeply_ok(t.detect('text/x-yaml'), ['yaml'], 'right format')
 
 with subtest('Detect special cases'):
     is_deeply_ok(t.detect('Application/Xml'), ['xml'], 'right formats')
