@@ -231,15 +231,15 @@ PYJO_REACTOR=Pyjo.Reactor.Poll mise exec -- python -m Pyjo.Prove -l -j 4 --captu
   t/Pyjo/Server_Reload.py t/stdlib/Server_Reload.py t/Pyjo/File_download.py
 ```
 
-CI runs the tests in `t/servers` on the Python of `mise.toml`, with the
-dependency group `servers` installed by uv in `.venv`, and again on Python
-3.14, in `.venv-3.14`, as the CGI server of `http.server` is gone from
-Python 3.15:
+CI runs the tests in `t/servers` on Python 3.12 and 3.15, the oldest and the
+newest supported, which uv downloads, with the dependency group `servers`
+installed by uv in `.venv`, so that the servers and their libraries are tested
+on both ends; locally, `.venv-3.12` keeps the other version apart:
 
 ```sh
-mise exec -- uv run --python "$(mise exec -- which python)" \
+mise exec -- uv run --python 3.15 \
   --only-group servers python -m Pyjo.Prove -l --timeout 120 -r t/servers
-UV_PROJECT_ENVIRONMENT=.venv-3.14 mise exec -- uv run --python 3.14 \
+UV_PROJECT_ENVIRONMENT=.venv-3.12 mise exec -- uv run --python 3.12 \
   --only-group servers python -m Pyjo.Prove -l --timeout 120 -r t/servers
 ```
 
@@ -256,8 +256,8 @@ wheels of `pyuwsgi` have no plugin `cgi`. `extra-build-variables` in
 `pyproject.toml` builds the plugin into it with `UWSGI_EMBED_PLUGINS=cgi`, and
 uv keeps such a build apart from one without the variable in its cache.
 `http.server --cgi` runs the CGI tests too, on a Python that still has
-`CGIHTTPRequestHandler`, which Python 3.15 removed, as the second run of CI
-on Python 3.14.
+`CGIHTTPRequestHandler`, which Python 3.15 removed, as the run of CI on
+Python 3.12.
 
 The workflow Docker Smoke Test builds and runs the images of
 `generate dockerfile`, for an application, a Lite script with
