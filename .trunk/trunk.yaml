@@ -57,6 +57,8 @@ lint:
     # grype: known vulnerabilities in images and dependencies; there are no
     # runtime dependencies, as for osv-scanner and trivy
     - grype
+    # hadolint: lints Dockerfiles; the only one is used by a test in CI
+    - hadolint
     # isort: sorts Python imports; ruff sorts them (rule I)
     - isort
     # osv-scanner: known vulnerabilities in dependency lockfiles; there are no
