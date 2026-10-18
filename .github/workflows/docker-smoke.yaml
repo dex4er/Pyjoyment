@@ -11,7 +11,7 @@ on:
     branches:
       - master
     paths:
-      - .github/scripts/docker-smoke.sh
+      - tt/docker-smoke/**
       - .github/workflows/docker-smoke.yaml
       - Pyjo/**
       - Pyjoyment/**
@@ -22,7 +22,7 @@ on:
     branches:
       - "*"
     paths:
-      - .github/scripts/docker-smoke.sh
+      - tt/docker-smoke/**
       - .github/workflows/docker-smoke.yaml
       - Pyjo/**
       - Pyjoyment/**
@@ -64,4 +64,4 @@ jobs:
       - name: Run smoke test
         env:
           VARIANT: ${{ matrix.variant }}
-        run: .github/scripts/docker-smoke.sh "${VARIANT}"
+        run: tt/docker-smoke/smoke.sh "${VARIANT}"
