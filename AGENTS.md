@@ -166,6 +166,8 @@ does not start fails the test instead of hanging it.
   the comments that show a result turned into assertions. Documented code
   that prints TAP itself or ends the script, as in `Pyjo.Test`, runs as a
   script of its own, and the test checks its output and exit status.
+  A test of a guide, as `guides_tutorial.py`, loads the applications of
+  its examples from their files and checks what the guide says of them.
 - `t/stdlib/` checks the interaction with the Python standard library,
   written for Pyjoyment, as Mojolicious has no counterpart.
 - `t/examples/` checks the code of some scripts of `examples/` with assertions,
@@ -1100,6 +1102,22 @@ and goes stale. `README.rst` is the exception, as it has to render on GitHub,
 which does not support `include`: its examples are copies of `examples/`.
 `docs/conf.py` takes the name, the authors and the version from
 `pyproject.toml`.
+
+The guides of Mojolicious, `Mojolicious::Guides::*`, are pages of
+`docs/guides`, as `tutorial.rst` for `Mojolicious::Guides::Tutorial`, with
+the sections and the wording of Mojo and the forms of Pyjoyment, and they end
+with the name of their source, as the modules do. An example that is a whole
+application is a file of its own, in a directory with the name of the page,
+as `docs/guides/tutorial/`, which the page includes with `literalinclude`
+and the test of the guide in `t/docs` loads, so that what the reader sees is
+what is tested; a short snippet stays in the page, and the test has a copy of
+it. The names of the files are not those of modules of the standard library,
+as the directory of a script is the first one of `sys.path`. A link to a
+guide that is not ported yet goes to the one of Mojolicious. An example of
+Mojolicious that does not do what its guide says at the tag of the release,
+as a template that does not exist, which gives 500 and not 404, is
+corrected in the port, and goes to the issue that collects the quirks of
+Mojolicious.
 
 Documentation describes how things are and has to stay true without anyone
 maintaining it. Keep out of it whatever goes stale on its own: issue and pull
