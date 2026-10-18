@@ -4,6 +4,7 @@ import os
 os.environ['PYJO_NO_TLS'] = '1'
 # Left out from Mojolicious: MOJO_REACTOR, as the tests run on the reactor that Pyjo.Reactor.detect gives
 
+import Pyjo.App
 import Pyjo.IOLoop
 import Pyjo.Promise
 import Pyjo.Server
@@ -16,7 +17,9 @@ import Pyjoyment
 from Pyjo.File import tempdir
 from Pyjo.Test import *
 
+import contextlib
 import gc
+import io
 import re
 import socket
 
@@ -126,6 +129,34 @@ with subtest('Invalid listen location'):
     )
 
 # Not in Mojolicious: a location of a Pyjo.URL object, which Mojo::URL->new takes as it stringifies a Mojo::URL
+# Not in Mojolicious: a transaction as a context manager, which ends a handler with the default error after an
+# exception, and keeps the connection
+with subtest('Transaction as a context manager'):
+
+    class App(Pyjo.App.object):
+        def handler(self, tx):
+            with tx:
+                tx.res.code = 200
+                tx.res.body = b'works!'
+                if tx.req.url.path == '/die':
+                    raise Exception('Something went wrong!')
+
+    with Pyjo.Server.Daemon.new(app=App.new(), listen=['http://127.0.0.1'], silent=True) as daemon:
+        port = daemon.start().ports()[0]
+        ua = Pyjo.UserAgent.new(ioloop=Pyjo.IOLoop.singleton)
+        tx = ua.get(f'http://127.0.0.1:{port}/')
+        is_ok(tx.res.code, 200, 'right status')
+        is_ok(tx.res.body, b'works!', 'right content')
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            tx = ua.get(f'http://127.0.0.1:{port}/die')
+        is_ok(tx.res.code, 500, 'right status')
+        is_ok(tx.res.body, b'Internal Server Error', 'right content')
+        like_ok(err.getvalue(), r'^Something went wrong! at ', 'warning')
+        tx = ua.get(f'http://127.0.0.1:{port}/')
+        ok(tx.kept_alive, 'kept alive')
+        is_ok(tx.res.body, b'works!', 'right content')
+
 with subtest('Listen location of a URL object'):
     url = Pyjo.URL.new().set(scheme='http', host='127.0.0.1')
     with Pyjo.Server.Daemon.new(listen=[url], silent=True) as daemon:

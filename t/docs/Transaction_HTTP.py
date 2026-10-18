@@ -46,6 +46,35 @@ with subtest('Synopsis'):
 
     is_ok(output(server), 'GET\n\nNone\nNone\n', 'server')
 
+with subtest('Context manager'):
+    tx = Pyjo.Transaction.HTTP.new()
+    resumed = []
+    tx.on('resume', lambda tx: resumed.append(tx.res.code))
+
+    # Server
+    with tx:
+        tx.res.code = 200
+        tx.res.headers.content_type = 'text/plain'
+        tx.res.body = b'Hello World!'
+
+    is_deeply_ok(resumed, [200], 'resumed at the end of the block')
+    like_ok(tx.server_write().decode(), r'^HTTP/1\.1 200 OK\x0d\x0a', 'response written')
+
+    tx = Pyjo.Transaction.HTTP.new()
+    resumed = []
+    tx.on('resume', lambda tx: resumed.append(tx.res.code))
+    err = io.StringIO()
+    with contextlib.redirect_stderr(err):
+        with tx:
+            tx.res.code = 200
+            tx.res.headers.content_type = 'text/html'
+            raise Exception('Something went wrong!')
+
+    is_deeply_ok(resumed, [500], 'resumed with the default error')
+    is_ok(tx.res.headers.content_type, 'text/plain;charset=UTF-8', 'new response')
+    is_ok(tx.res.body, b'Internal Server Error', 'default error')
+    like_ok(err.getvalue(), r'^Something went wrong! at .+ line \d+\.$', 'warning')
+
 with subtest('request'):
     tx = Pyjo.Transaction.HTTP.new()
     tx.on('request', lambda tx: ...)

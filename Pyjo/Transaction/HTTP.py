@@ -29,6 +29,19 @@ Pyjo.Transaction.HTTP - HTTP transaction
 `RFC 7230 <https://tools.ietf.org/html/rfc7230>`_ and
 `RFC 7231 <https://tools.ietf.org/html/rfc7231>`_.
 
+The end of a ``with`` block resumes the transaction with
+:meth:`~Pyjo_Transaction_HTTP.resume`, so that a server writes the response
+that the block prepares. An exception that the block does not catch ends it
+with the default error: the response is replaced with a
+``500 Internal Server Error``, which is resumed, and the exception goes to
+``sys.stderr`` as a warning, so that the server writes the response. ::
+
+    # Server
+    with tx:
+        tx.res.code = 200
+        tx.res.headers.content_type = 'text/plain'
+        tx.res.body = b'Hello World!'
+
 Events
 ------
 
@@ -72,9 +85,14 @@ Ported from `Mojo::Transaction::HTTP <https://github.com/mojolicious/mojo/blob/v
 of Mojolicious 9.49.
 """
 
+import Pyjo.Exception
 import Pyjo.Message
+import Pyjo.Message.Response
 import Pyjo.Transaction
 
+from Pyjo.Util import warn
+
+from types import TracebackType
 from typing import Any, Self
 
 
@@ -211,6 +229,25 @@ class Pyjo_Transaction_HTTP(Pyjo.Transaction.object):
         """
         self._writing = True
         return self.emit('resume')
+
+    # Not in Mojolicious: a context manager, which resumes the transaction where the block ends, as a handler of a
+    # server ends with a call of resume, with the default error after an exception, which it does not pass on, as the
+    # server writes the response after the handler returns
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+        self, type: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None
+    ) -> bool:
+        error = isinstance(value, Exception)
+        if error:
+            warn(str(Pyjo.Exception.new(value)))
+            res = self.res = Pyjo.Message.Response.new()
+            res.code = 500
+            res.headers.content_type = 'text/plain;charset=UTF-8'
+            res.body = b'Internal Server Error'
+        self.resume()
+        return error
 
     def server_read(self, chunk: bytes) -> None:
         """::
