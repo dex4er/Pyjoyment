@@ -263,7 +263,10 @@ The workflow Docker Smoke Test builds and runs the images of
 `generate dockerfile`, for an application, a Lite script with
 `pyproject.toml` and one with the inline metadata of PEP 723, which
 `.github/scripts/docker-smoke.sh` generates, and checks that they serve their
-pages and stop gracefully on the TERM of `docker stop`. The image gets the
+pages and stop gracefully on the TERM of `docker stop`. Its variant `lambda`
+runs a Lite script that ends with `handler = app.start()` as an event
+function in the image of AWS Lambda for Python, whose emulator of the Runtime
+API it invokes with the events of the payload formats 2.0 and 1.0. The image gets the
 wheel of the checkout, as the version that is tested is not on PyPI, which is
 the only change of the generated `Dockerfile`. The script runs locally as
 well, with Docker:

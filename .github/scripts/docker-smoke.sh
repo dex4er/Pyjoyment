@@ -1,19 +1,22 @@
 #!/usr/bin/env bash
 # Smoke test of the image of "generate dockerfile": generates an application,
 # builds its image with the wheel of the checkout, runs it, requests its pages
-# and stops it, which has to be graceful.
+# and stops it, which has to be graceful. The variant lambda runs a Lite script
+# as an event function in the image of AWS Lambda for Python, whose emulator
+# of the Runtime API is invoked with the events of HTTP requests.
 #
-# Usage: .github/scripts/docker-smoke.sh app|lite|lite-pep723
+# Usage: .github/scripts/docker-smoke.sh app|lite|lite-pep723|lambda
 #
 #   app           generate app, run as python -m MyApp, with --user app
 #   lite          generate lite-app, with generate pyproject
 #   lite-pep723   generate lite-app, with the inline metadata of PEP 723
+#   lambda        generate lite-app, with handler = app.start(), on AWS Lambda
 #
 # It needs docker, python and uv on PATH, as "mise exec --" gives them.
 
 set -euo pipefail
 
-variant=${1:?Usage: $0 app|lite|lite-pep723}
+variant=${1:?Usage: $0 app|lite|lite-pep723|lambda}
 root=$(cd "$(dirname "$0")/../.." && pwd)
 work=$(mktemp -d)
 name=pyjo-smoke-${variant}
@@ -49,6 +52,60 @@ Pyjoyment = { path = \"${wheel}\" }"
 
 mkdir "${work}/project"
 cd "${work}/project"
+
+# An event function of AWS Lambda, whose runtime the script detects
+if [[ ${variant} == lambda ]]; then
+  python -m Pyjoyment generate lite-app >/dev/null
+  perl -pi -e 's/^app\.start\(\)$/handler = app.start()/' myapp.py
+  grep -q '^handler = app.start()$' myapp.py || fail "handler in myapp.py"
+  cp "${work}/wheel/${wheel}" .
+  cat >Dockerfile <<EOD
+FROM public.ecr.aws/lambda/python:3.14
+COPY ${wheel} ./
+RUN pip install --no-cache-dir --target "\${LAMBDA_TASK_ROOT}" ./${wheel}
+COPY myapp.py \${LAMBDA_TASK_ROOT}/
+CMD ["myapp.handler"]
+EOD
+  cat Dockerfile
+
+  docker build --progress plain --tag "${name}" .
+  docker run --detach --name "${name}" --publish 127.0.0.1::8080 "${name}" >/dev/null
+  port=$(docker port "${name}" 8080/tcp | perl -ne 'print $1 and last if /:(\d+)$/')
+  url=http://127.0.0.1:${port}/2015-03-31/functions/function/invocations
+
+  # The events of the payload formats 2.0, of Function URLs, and 1.0, of REST
+  # APIs with a stage, and the response that the welcome page has to be
+  host=abc.lambda-url.eu-central-1.on.aws
+  for format in 2.0 1.0; do
+    if [[ ${format} == 2.0 ]]; then
+      # SC2016 "Expressions don't expand in single quotes, use double quotes for
+      # that": $default is the name of the default stage, not a variable
+      # shellcheck disable=SC2016
+      event='{"version":"2.0","rawPath":"/","rawQueryString":"","headers":{"host":"'${host}'"},
+        "requestContext":{"http":{"method":"GET","sourceIp":"192.0.2.1"},"stage":"$default"},"isBase64Encoded":false}'
+    else
+      event='{"path":"/","httpMethod":"GET","headers":{"Host":"'${host}'","X-Forwarded-Proto":"https"},
+        "multiValueHeaders":{"Host":["'${host}'"],"X-Forwarded-Proto":["https"]},
+        "requestContext":{"stage":"prod","path":"/prod/","identity":{"sourceIp":"192.0.2.2"}},
+        "body":null,"isBase64Encoded":false}'
+    fi
+    response=
+    for _ in $(seq 60); do
+      response=$(curl --silent --fail --data "${event}" "${url}") && break
+      sleep 0.5
+    done
+    RESPONSE=${response} python -c '
+import json, os, sys
+
+response = json.loads(os.environ["RESPONSE"] or "{}")
+ok = response.get("statusCode") == 200 and not response.get("isBase64Encoded")
+ok = ok and "Welcome to the Pyjoyment real-time web framework!" in response.get("body", "")
+sys.exit(not ok)
+' || fail "invoke with the payload format ${format}: ${response}"
+    echo "ok - invoke with the payload format ${format}"
+  done
+  exit 0
+fi
 
 case ${variant} in
   app)

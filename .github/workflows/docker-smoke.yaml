@@ -3,8 +3,9 @@ name: Docker Smoke Test
 # Builds and runs the images of "generate dockerfile" for an application, a
 # Lite script with pyproject.toml and a Lite script with the inline metadata
 # of PEP 723, with the wheel of the checkout, and checks that they serve the
-# generated pages and stop gracefully. The weekly run catches a change of the
-# images of Python and uv.
+# generated pages and stop gracefully, and runs a Lite script as an event
+# function in the image of AWS Lambda for Python. The weekly run catches a
+# change of the images of Python, uv and AWS Lambda.
 on:
   push:
     branches:
@@ -46,6 +47,7 @@ jobs:
           - app
           - lite
           - lite-pep723
+          - lambda
 
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 15
