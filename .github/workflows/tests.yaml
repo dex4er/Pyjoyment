@@ -121,9 +121,9 @@ jobs:
           if grep -n 'ResourceWarning:' prove.log; then exit 1; fi
 
   # The tests of Pyjo.Server.ASGI, Pyjo.Server.WSGI and Pyjo.Server.CGI with
-  # real servers, from the dependency group "servers", on the oldest and the
-  # newest supported Python, which uv downloads; Python 3.12 runs the CGI
-  # server of http.server too, which Python 3.15 removed.
+  # real servers, from the dependency group "servers", which uv installs, on
+  # the oldest and the newest supported Python; Python 3.12 runs the CGI server
+  # of http.server too, which Python 3.15 removed.
   servers:
     name: servers (python ${{ matrix.python }})
 
@@ -141,17 +141,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Set up mise
-        uses: jdx/mise-action@v5
+      - name: Set up Python
+        uses: actions/setup-python@v7
         with:
-          version: 2026.10.4 # datasource=github-releases depName=jdx/mise
+          python-version: ${{ matrix.python }}
+          allow-prereleases: true
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.3.0
+        with:
+          version: 0.13.0 # datasource=github-releases depName=astral-sh/uv
 
       - name: Run tests on ASGI, WSGI and CGI servers
         shell: bash
         env:
-          PYTHON: ${{ matrix.python }}
           PYTHONDEVMODE: "1"
           PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
         run: |-
-          uv run --python "$PYTHON" --only-group servers python -m Pyjo.Prove -l --color --timeout 120 -r t/servers 2>&1 | tee prove.log
+          uv run --python "$(command -v python)" --only-group servers python -m Pyjo.Prove -l --color --timeout 120 -r t/servers 2>&1 | tee prove.log
           if grep -n 'ResourceWarning:' prove.log; then exit 1; fi

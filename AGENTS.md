@@ -232,7 +232,7 @@ PYJO_REACTOR=Pyjo.Reactor.Poll mise exec -- python -m Pyjo.Prove -l -j 4 --captu
 ```
 
 CI runs the tests in `t/servers` on Python 3.12 and 3.15, the oldest and the
-newest supported, which uv downloads, with the dependency group `servers`
+newest supported, of setup-python, with the dependency group `servers`
 installed by uv in `.venv`, so that the servers and their libraries are tested
 on both ends; locally, `.venv-3.12` keeps the other version apart:
 
