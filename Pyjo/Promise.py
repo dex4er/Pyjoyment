@@ -106,7 +106,7 @@ Another awaitable, as a future of asyncio, is a promise with
 promise into a future of the reactor. ::
 
     async def main():
-        title = (await get_p('https://mojolicious.org')).res.dom.at('title').text
+        title = (await get_p('https://mojolicious.org')).res.dom().at('title').text
 
 Debugging
 ---------
@@ -408,7 +408,7 @@ class Pyjo_Promise(Pyjo.Base.object):
 
             # Perform 3 requests at a time concurrently
             Pyjo.Promise.map(lambda url: ua.get_p(url), *urls, concurrency=3).then(
-                lambda *results: [print(r[0].res.dom.at('title').text) for r in results]
+                lambda *results: [print(r[0].res.dom().at('title').text) for r in results]
             )
 
         These options are currently available:
@@ -671,7 +671,7 @@ def coroutine[**P](func: Callable[P, Coroutine[Any, Any, Any]]) -> Callable[P, P
         @Pyjo.Promise.coroutine
         async def title(url):
             tx = await ua.get_p(url)
-            return tx.res.dom.at('title').text
+            return tx.res.dom().at('title').text
 
         title('https://mojolicious.org').then(print).wait()
 

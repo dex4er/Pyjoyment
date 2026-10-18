@@ -524,7 +524,7 @@ into the ``stash``.
 
 ua ::
 
-    %= ua().get('mojolicious.org').result.dom.at('title').text
+    %= ua().get('mojolicious.org').result.dom().at('title').text
 
 Alias for :attr:`Pyjoyment.Pyjoyment_App.ua`.
 
