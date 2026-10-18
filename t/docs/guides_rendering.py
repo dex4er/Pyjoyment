@@ -387,12 +387,10 @@ with subtest('Reusable template blocks'):
 
 with subtest('Adding helpers'):
     with rendering('debug_helper') as t:
-        t.app.log.level = 'debug'
-        messages = []
-        t.app.log.on('message', lambda log, level, *lines: messages.append(' '.join(lines)))
-        t.get_ok('/').status_is(200)
-        ok('Hello from an action!' in messages, 'action')
-        ok('Hello from a template!' in messages, 'template')
+        with t.app.log.capture('debug') as messages:
+            t.get_ok('/').status_is(200)
+        like_ok(str(messages), r'\[debug\] Hello from an action!', 'action')
+        like_ok(str(messages), r'\[debug\] Hello from a template!', 'template')
 
     with rendering('trim_newline') as t:
         t.get_ok('/').status_is(200).content_like(r'^\s*Some text\.\s*2\s*More text\.$')
