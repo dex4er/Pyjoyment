@@ -70,6 +70,11 @@ with subtest('detect'):
             is_ok(commands.detect(), name, name.upper())
         finally:
             del os.environ[f'PYJO_{name.upper()}']
+    os.environ['AWS_LAMBDA_RUNTIME_API'] = '127.0.0.1:9001'
+    try:
+        is_ok(commands.detect(), 'lambda', 'AWS Lambda')
+    finally:
+        del os.environ['AWS_LAMBDA_RUNTIME_API']
 
 with subtest('run'):
     commands = Pyjoyment.Commands.new()

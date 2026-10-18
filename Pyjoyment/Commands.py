@@ -11,8 +11,9 @@ Pyjoyment.Commands - Command line interface
       ./myapp.py get /foo
       ./myapp.py routes -v
 
-    Tip: CGI environments, and WSGI and ASGI ones with PYJO_WSGI and PYJO_ASGI,
-         can be automatically detected very often and work without commands.
+    Tip: CGI and AWS Lambda environments, and WSGI and ASGI ones with PYJO_WSGI
+         and PYJO_ASGI, can be automatically detected very often and work
+         without commands.
 
     Options (for all commands):
       -h, --help          Get more information on a specific command
@@ -164,6 +165,16 @@ inflate
 Use :mod:`Pyjoyment.Command.Author.inflate` to turn templates and static files
 embedded in the ``DATA`` sections of your application into real files.
 
+lambda
+~~~~~~
+::
+
+    handler = app.start('lambda')
+
+Use :mod:`Pyjoyment.Command.lambda` to start application as an event function
+of AWS Lambda, auto detected with the ``AWS_LAMBDA_RUNTIME_API`` environment
+variable.
+
 prefork
 ~~~~~~~
 ::
@@ -296,6 +307,10 @@ class Pyjoyment_Commands(Pyjoyment.Command.object):
         if os.environ.get('PYJO_ASGI') is not None:
             return 'asgi'
 
+        # Not in Mojolicious: an event function of AWS Lambda, whose runtime has the endpoint of its API
+        if os.environ.get('AWS_LAMBDA_RUNTIME_API') is not None:
+            return 'lambda'
+
         # CGI
         if os.environ.get('PATH_INFO') is not None or os.environ.get('GATEWAY_INTERFACE') is not None:
             return 'cgi'
@@ -311,10 +326,11 @@ class Pyjoyment_Commands(Pyjoyment.Command.object):
 
         Load and run commands. Automatic deployment environment detection can
         be disabled with the ``PYJO_NO_DETECT`` environment variable. A
-        detected environment, CGI, or WSGI and ASGI with the ``PYJO_WSGI``
-        and ``PYJO_ASGI`` environment variables, runs its command, whatever
-        the arguments are, as a WSGI or an ASGI server imports the script of
-        the application with its own arguments. ::
+        detected environment, CGI, AWS Lambda, or WSGI and ASGI with the
+        ``PYJO_WSGI`` and ``PYJO_ASGI`` environment variables, runs its
+        command, whatever the arguments are, as a WSGI or an ASGI server and
+        AWS Lambda import the script of the application with their own
+        arguments. ::
 
             # The WSGI application of a script, for PYJO_WSGI=1 gunicorn myapp:application
             application = app.start()

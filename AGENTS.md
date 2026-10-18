@@ -364,7 +364,9 @@ targets of the options), `Pyjo.IOLoop.Datagram` (inspired by `dgram` of Node.js)
 `Pyjo.App` (inspired by `Mojo` of Mojolicious 6, the base class of
 `Mojolicious` until Mojolicious 7, as `Pyjo_App` is of `Pyjoyment_App`),
 `Pyjo.HelloWorld` (an application of pure Pyjo, where `Mojo::HelloWorld` is
-one of Mojolicious, which `Pyjoyment.HelloWorld` ports),
+one of Mojolicious, which `Pyjoyment.HelloWorld` ports), `Pyjo.Server.Lambda`
+and `Pyjoyment.Command.lambda` (the server and the command of the event
+functions of AWS Lambda, inspired by `Pyjo.Server.WSGI` and its command),
 `Pyjoyment.Plugin.PyRenderer` (the renderer of template strings, inspired by
 `Mojolicious::Plugin::EPLRenderer`), `Pyjoyment.Plugin.TOMLConfig` (inspired
 by `Mojolicious::Plugin::NotYAMLConfig`, for the format of configuration of
@@ -537,7 +539,10 @@ copy:
   `PLACK_ENV`, as WSGI and ASGI have no environment variable of their own: a
   server imports the script of an application, which ends with
   `application = app.start()`, with its own arguments in `sys.argv`, so that
-  the command has to be detected.
+  the command has to be detected. The runtime of AWS Lambda imports the script
+  the same way, and `AWS_LAMBDA_RUNTIME_API`, which it sets, detects the
+  command `lambda`, whose module has the name of a keyword of Python, which
+  only `importlib` imports.
 - The generators of the command `generate` write projects for uv, where Mojo
   writes ones for ExtUtils::MakeMaker: `generate makefile` is
   `generate pyproject`, and `cpanify` is left out, as `uv publish` uploads to
