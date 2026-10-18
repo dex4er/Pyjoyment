@@ -11,9 +11,9 @@ Pyjoyment.Commands - Command line interface
       ./myapp.py get /foo
       ./myapp.py routes -v
 
-    Tip: CGI and AWS Lambda environments, and WSGI and ASGI ones with PYJO_WSGI
-         and PYJO_ASGI, can be automatically detected very often and work
-         without commands.
+    Tip: CGI, FastCGI and AWS Lambda environments, and WSGI and ASGI ones with
+         PYJO_WSGI and PYJO_ASGI, can be automatically detected very often and
+         work without commands.
 
     Options (for all commands):
       -h, --help          Get more information on a specific command
@@ -68,6 +68,15 @@ eval
     $ ./myapp.py eval 'print(app.home)'
 
 Use :mod:`Pyjoyment.Command.eval` to run code against application.
+
+fastcgi
+~~~~~~~
+::
+
+    $ ./myapp.py fastcgi
+
+Use :mod:`Pyjoyment.Command.fastcgi` to start application with the FastCGI
+of a web server that starts it, usually auto detected.
 
 generate
 ~~~~~~~~
@@ -232,8 +241,10 @@ import Pyjoyment.Command
 
 from Pyjo.Util import getopt, tablify
 
+import errno
 import os
 import re
+import socket
 import sys
 
 from collections.abc import Callable, Sequence
@@ -311,6 +322,10 @@ class Pyjoyment_Commands(Pyjoyment.Command.object):
         if os.environ.get('AWS_LAMBDA_RUNTIME_API') is not None:
             return 'lambda'
 
+        # Not in Mojolicious: FastCGI, whose web server gives the application its listen socket as the file descriptor 0
+        if _fastcgi():
+            return 'fastcgi'
+
         # CGI
         if os.environ.get('PATH_INFO') is not None or os.environ.get('GATEWAY_INTERFACE') is not None:
             return 'cgi'
@@ -326,8 +341,8 @@ class Pyjoyment_Commands(Pyjoyment.Command.object):
 
         Load and run commands. Automatic deployment environment detection can
         be disabled with the ``PYJO_NO_DETECT`` environment variable. A
-        detected environment, CGI, AWS Lambda, or WSGI and ASGI with the
-        ``PYJO_WSGI`` and ``PYJO_ASGI`` environment variables, runs its
+        detected environment, CGI, FastCGI, AWS Lambda, or WSGI and ASGI with
+        the ``PYJO_WSGI`` and ``PYJO_ASGI`` environment variables, runs its
         command, whatever the arguments are, as a WSGI or an ASGI server and
         AWS Lambda import the script of the application with their own
         arguments. ::
@@ -440,6 +455,26 @@ def _env(name: str) -> Callable[[str, Any], None]:
     return lambda option, value: _setenv(name, '1' if value is True else str(value))
 
 
+# Not in Mojolicious: the file descriptor 0 is a listen socket, which has no peer, as the specification of FastCGI tells
+# an application to check
+def _fastcgi() -> bool:
+    try:
+        fd = os.dup(0)
+    except OSError:
+        return False
+    try:
+        handle = socket.socket(fileno=fd)
+    except OSError:
+        os.close(fd)
+        return False
+    with handle:
+        try:
+            handle.getpeername()
+        except OSError as e:
+            return e.errno == errno.ENOTCONN
+    return False
+
+
 def _setenv(name: str, value: str | None) -> None:
     if value is None:
         os.environ.pop(name, None)
@@ -464,6 +499,7 @@ def main(argv: Sequence[str] | None = None) -> None:
 
 
 start_app = Pyjoyment_Commands.start_app
+
 
 new = Pyjoyment_Commands.new
 object = Pyjoyment_Commands

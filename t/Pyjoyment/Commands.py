@@ -7,6 +7,7 @@ import importlib
 import io
 import os
 import re
+import socket
 import subprocess
 import sys
 import types
@@ -82,6 +83,7 @@ import Pyjoyment.Command.Author.inflate  # noqa: E402
 import Pyjoyment.Command.cgi  # noqa: E402
 import Pyjoyment.Command.daemon  # noqa: E402
 import Pyjoyment.Command.eval  # noqa: E402
+import Pyjoyment.Command.fastcgi  # noqa: E402
 import Pyjoyment.Command.get  # noqa: E402
 import Pyjoyment.Command.prefork  # noqa: E402
 import Pyjoyment.Command.routes  # noqa: E402
@@ -111,6 +113,17 @@ with local(PYJO_ASGI='production'):
 # Not in Mojolicious: AWS Lambda
 with local(AWS_LAMBDA_RUNTIME_API='127.0.0.1:9001'):
     is_ok(commands.detect(), 'lambda', 'right environment')
+# Not in Mojolicious: FastCGI, whose web server gives the application its listen socket as the file descriptor 0
+with socket.socket() as listener:
+    listener.bind(('127.0.0.1', 0))
+    listener.listen()
+    stdin = os.dup(0)
+    try:
+        os.dup2(listener.fileno(), 0)
+        is_ok(commands.detect(), 'fastcgi', 'right environment')
+    finally:
+        os.dup2(stdin, 0)
+        os.close(stdin)
 with local(PATH_INFO='/test'):
     is_ok(commands.detect(), 'cgi', 'right environment')
 with local(GATEWAY_INTERFACE='CGI/1.1'):
@@ -302,6 +315,16 @@ throws_ok(
 buffer = io.StringIO()
 with contextlib.redirect_stderr(buffer):
     throws_ok(lambda: eval_.run('--unknown'), re.compile(r'Usage: APPLICATION eval'), 'unknown option')
+like_ok(buffer.getvalue(), r'Unknown option: unknown', 'right output')
+
+# fastcgi
+# Not in Mojolicious: the command fastcgi, for the listen socket that a web server gives a FastCGI application
+fastcgi = Pyjoyment.Command.fastcgi.new()
+ok(fastcgi.description, 'has a description')
+like_ok(fastcgi.usage, r'fastcgi', 'has usage information')
+buffer = io.StringIO()
+with contextlib.redirect_stderr(buffer):
+    throws_ok(lambda: fastcgi.run('--unknown'), re.compile(r'Usage: APPLICATION fastcgi'), 'unknown option')
 like_ok(buffer.getvalue(), r'Unknown option: unknown', 'right output')
 
 # generate

@@ -1,0 +1,4 @@
+# Caddy in front of the application, which speaks FastCGI to it
+FROM caddy:2.11.4-alpine
+
+COPY Caddyfile /etc/caddy/Caddyfile

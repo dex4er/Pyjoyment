@@ -4,8 +4,9 @@ name: Docker Smoke Test
 # Lite script with pyproject.toml and a Lite script with the inline metadata
 # of PEP 723, with the wheel of the checkout, and checks that they serve the
 # generated pages and stop gracefully, and runs a Lite script as an event
-# function in the image of AWS Lambda for Python. The weekly run catches a
-# change of the images of Python, uv and AWS Lambda.
+# function in the image of AWS Lambda for Python, and a Lite script that
+# speaks FastCGI to Caddy in front of it. The weekly run catches a change of
+# the images of Python, uv, AWS Lambda and Caddy.
 on:
   push:
     branches:
@@ -48,6 +49,7 @@ jobs:
           - lite
           - lite-pep723
           - lambda
+          - fastcgi
 
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 15
