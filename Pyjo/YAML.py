@@ -1,9 +1,9 @@
 """
-Pyjo.YAML - Minimal YAML loader
-===============================
+Pyjo.YAML - Minimal YAML loader and dumper
+==========================================
 ::
 
-    from Pyjo.YAML import load, load_all
+    from Pyjo.YAML import dump, dump_all, load, load_all
 
     config = load(\"\"\"\\
     foo: bar
@@ -14,16 +14,21 @@ Pyjo.YAML - Minimal YAML loader
 
     documents = load_all('--- first\\n--- second\\n')
 
-:mod:`Pyjo.YAML` loads the YAML that configuration files and workflows use, a
-subset of `YAML 1.2 <https://yaml.org>`_, which :mod:`Pyjoyment.Plugin.YAMLConfig`
-reads, as Python has no YAML in its standard library:
+    string = dump({'foo': 'bar', 'list': ['one', 'two']})
+
+:mod:`Pyjo.YAML` loads and dumps the YAML that configuration files and
+workflows use, a subset of `YAML 1.2 <https://yaml.org>`_, which
+:mod:`Pyjoyment.Plugin.YAMLConfig` reads, as Python has no YAML in its
+standard library:
 
 * mappings and sequences in the block style, nested by their indentation, and
-  a mapping that starts in an item of a sequence (``- name: value``);
+  a mapping or a sequence that starts in an item of a sequence
+  (``- name: value``, ``- - item``);
 * flow sequences and mappings, ``[a, b]`` and ``{a: 1}``, nested, and over
   several lines;
 * scalars, plain, in single quotes (with ``''`` for a quote) and in double
-  quotes (with the escapes ``\\n``, ``\\t``, ``\\xHH`` and the others of C),
+  quotes (with the escapes ``\\n``, ``\\t``, ``\\xHH``, ``\\uHHHH`` and the
+  others of YAML),
   over several lines too, and the literal ``|`` and folded ``>`` block
   scalars, with their empty lines, and the indicators ``-`` and ``+`` that
   strip and keep the final line breaks;
@@ -63,6 +68,19 @@ Other tags, complex keys and the indicator of the indentation of a block
 scalar are not supported, and raise an error, as do lines that the subset
 does not know.
 
+:func:`dump` writes what the loader reads, in the block style of
+configuration files: a :class:`dict` is a mapping, a :class:`list` and a
+:class:`tuple` are a sequence, ``{}`` and ``[]`` when they are empty, and a
+string is plain where it reads back as the same string, quoted otherwise, and
+a literal block scalar when it has several lines. :class:`bytes` and dates
+have the tags ``!!binary`` and ``!!timestamp``, and another object is what
+:mod:`Pyjo.JSON` encodes, the value of its method ``__json__`` or its string.
+A collection that is there twice is written twice, without anchors, and one
+inside itself raises an error. ::
+
+    # 'name: Pyjoyment\\nlist:\\n  - one\\n  - 2\\nrun: |\\n  make\\n'
+    dump({'name': 'Pyjoyment', 'list': ['one', 2], 'run': 'make\\n'})
+
 See also
 --------
 
@@ -77,11 +95,13 @@ import Pyjo.Exception
 
 import base64
 import binascii
+import builtins
 import datetime
+import math
 import re
 
-from collections.abc import Callable
-from typing import Any, cast
+from collections.abc import Callable, Iterable
+from typing import Any, Literal, cast
 
 
 # The regular expressions of CPAN::Meta::YAML
@@ -105,7 +125,9 @@ _RE_KEY_ANCHOR = re.compile(rf'^(\s*)&({_ANCHOR})\s+')
 
 _ESCAPES = {
     '0': '\x00',
+    'L': '\u2028',
     'N': '\x85',
+    'P': '\u2029',
     'a': '\x07',
     'b': '\x08',
     'e': '\x1b',
@@ -116,7 +138,92 @@ _ESCAPES = {
     'v': '\x0b',
     'z': '\x00',
     '\\': '\\',
+    '_': '\xa0',
 }
+
+
+def dump(
+    value: Any,
+    *,
+    indent: int = 2,
+    indent_sequences: bool = True,
+    quote: Literal["'", '"'] | None = None,
+    quote_keys: Literal["'", '"'] | None = None,
+    multiline: bool = True,
+    explicit_start: bool = False,
+    version: Literal['1.1', '1.2'] = '1.1',
+) -> str:
+    """::
+
+        string = dump(value)
+        string = dump(value, indent=4, indent_sequences=False, quote='"')
+
+    Dump a value to a YAML string of one document, with the options:
+
+    * ``indent``, the number of spaces of a level of the indentation, ``2``
+      by default;
+    * ``indent_sequences``, whether a sequence below a key is indented,
+      ``True`` by default, or has its items at the column of the key;
+    * ``quote``, the quotes of every string value, ``"'"`` or ``'"'``, or
+      ``None`` by default, for quotes only where a string needs them, single
+      ones unless it needs the escapes of the double ones, which a string
+      gets with any of them;
+    * ``quote_keys``, the same for the keys, which are quoted only where they
+      need it by default;
+    * ``multiline``, whether a string of several lines is a literal block
+      scalar, ``True`` by default, or a quoted scalar; a string whose lines a
+      block scalar cannot keep, as one with a first line that starts with a
+      space, is quoted anyway;
+    * ``explicit_start``, whether the document starts with ``---``,
+      ``False`` by default; a scalar document always does;
+    * ``version``, the YAML whose reader gets the strings back: ``'1.1'`` by
+      default quotes also the strings that YAML 1.1 reads as other types,
+      as ``yes``, ``off``, ``1_000``, ``12:30`` and ``2001-12-14``, which
+      PyYAML reads so, and ``'1.2'`` only those of the core schema of YAML
+      1.2, as ``true``, ``null`` and ``1.5``. ::
+
+        # 'foo:\n- "bar"\n'
+        dump({'foo': ['bar']}, indent_sequences=False, quote='"')
+    """
+    return dump_all(
+        [value],
+        indent=indent,
+        indent_sequences=indent_sequences,
+        quote=quote,
+        quote_keys=quote_keys,
+        multiline=multiline,
+        explicit_start=explicit_start,
+        version=version,
+    )
+
+
+def dump_all(
+    values: Iterable[Any],
+    *,
+    indent: int = 2,
+    indent_sequences: bool = True,
+    quote: Literal["'", '"'] | None = None,
+    quote_keys: Literal["'", '"'] | None = None,
+    multiline: bool = True,
+    explicit_start: bool = False,
+    version: Literal['1.1', '1.2'] = '1.1',
+) -> str:
+    """::
+
+        string = dump_all(values)
+
+    Dump values to a YAML string of documents, one for each value, with the
+    options of :func:`dump`, where the documents after the first one start
+    with ``---``. ::
+
+        # '--- first\n--- second\n'
+        dump_all(['first', 'second'])
+    """
+    dumper = _Dumper(indent, indent_sequences, quote, quote_keys, multiline, version)
+    lines: list[str] = []
+    for i, value in enumerate(values):
+        lines += dumper.document(value, explicit_start or i > 0)
+    return ''.join(f'{line}\n' for line in lines)
 
 
 def load(string: str) -> Any:
@@ -158,9 +265,15 @@ def _indent(line: str) -> int:
 
 def _unquote_double(string: str) -> str:
     def unescape(m: re.Match[str]) -> str:
-        return chr(int(m[1], 16)) if m[1] is not None else _ESCAPES.get(m[2], m[2])
+        if (code := m[1] or m[2] or m[3]) is not None:
+            return chr(int(code, 16))
+        return _ESCAPES.get(m[4], m[4])
 
-    return re.sub(r'\\(?:x([0-9a-fA-F]{2})|(["\\0Nabefnrtvz]))', unescape, string)
+    return re.sub(
+        r'\\(?:x([0-9a-fA-F]{2})|u([0-9a-fA-F]{4})|U(0010[0-9a-fA-F]{4}|000[0-9a-fA-F]{5})|(["\\/ \t0LNP_abefnrtvz]))',
+        unescape,
+        string,
+    )
 
 
 # Not in CPAN::Meta::YAML: the type of a plain scalar of the core schema of YAML 1.2, where CPAN::Meta::YAML keeps a
@@ -502,8 +615,13 @@ class _Loader:
             if depth > indent:
                 raise _error(f"found bad indenting in line '{lines[0]}'")
 
+            # Not in CPAN::Meta::YAML: a sequence that starts on the line of the item
+            if m := re.search(r'^(\s*-\s+)-(?:\s|\Z)', lines[0]):
+                lines[0] = lines[0].replace('-', ' ', 1)
+                sequence.append(self.sequence(len(m[1])))
+
             # A mapping that starts on the line of the item
-            if (m := re.search(r'^(\s*-\s+)(?![\[{!|>])', lines[0])) and _is_key(lines[0][m.end() :]):
+            elif (m := re.search(r'^(\s*-\s+)(?![\[{!|>])', lines[0])) and _is_key(lines[0][m.end() :]):
                 lines[0] = lines[0].replace('-', ' ', 1)
                 sequence.append(self.mapping(len(m[1]), indent))
 
@@ -770,3 +888,206 @@ def _rstrip_empty(lines: list[str]) -> list[str]:
     while end and not lines[end - 1]:
         end -= 1
     return lines[:end]
+
+
+# The characters that a double quoted scalar escapes, which a single quoted and a plain one cannot have, and the ones
+# that a literal block scalar cannot have either, which are the same without the line break and the tab
+_RE_ESCAPE = re.compile(r'["\\\x00-\x1f\x7f-\x9f\u2028\u2029\ufeff\ud800-\udfff\ufffe\uffff]')
+_RE_UNQUOTABLE = re.compile(r'[\x00-\x1f\x7f-\x9f\u2028\u2029\ufeff\ud800-\udfff\ufffe\uffff]')
+_RE_UNLITERAL = re.compile(r'[\x00-\x08\x0b-\x1f\x7f-\x9f\u2028\u2029\ufeff\ud800-\udfff\ufffe\uffff]')
+
+_ESCAPED = {
+    '\x00': '\\0',
+    '\x07': '\\a',
+    '\x08': '\\b',
+    '\x09': '\\t',
+    '\x0a': '\\n',
+    '\x0b': '\\v',
+    '\x0c': '\\f',
+    '\x0d': '\\r',
+    '\x1b': '\\e',
+    '"': '\\"',
+    '\\': '\\\\',
+    '\x85': '\\N',
+    '\u2028': '\\L',
+    '\u2029': '\\P',
+}
+
+# The plain scalars that YAML 1.1 reads as other types than a string, as PyYAML does: booleans, numbers with
+# underscores, of base 2 and 60, and timestamps
+_RE_YAML11 = re.compile(
+    r'[yYnN]|yes|Yes|YES|no|No|NO|on|On|ON|off|Off|OFF|='
+    r'|[-+]?(?:0b[01_]+|0x[0-9a-fA-F_]+|[0-9][0-9_]*(?::[0-5]?[0-9])*(?:\.[0-9_]*)?|\.[0-9_]+)(?:[eE][-+]?[0-9]+)?'
+    r'|[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}(?:(?:[Tt]|[ \t]+)[0-9]{1,2}:[0-9]{2}:[0-9]{2}.*)?'
+)
+
+
+class _Dumper:
+    def __init__(
+        self,
+        indent: int,
+        indent_sequences: bool,
+        quote: str | None,
+        quote_keys: str | None,
+        multiline: bool,
+        version: str,
+    ) -> None:
+        if indent < 1:
+            raise ValueError(f'indent must be 1 or more, not {indent}')
+        for name, value in (('quote', quote), ('quote_keys', quote_keys)):
+            if value not in (None, "'", '"'):
+                raise ValueError(f"""{name} must be "'", '"' or None, not {value!r}""")
+        if version not in ('1.1', '1.2'):
+            raise ValueError(f"version must be '1.1' or '1.2', not {version!r}")
+        self.indent = indent
+        self.indent_sequences = indent_sequences
+        self.multiline = multiline
+        self.parents: set[int] = set()
+        self.quote = quote
+        self.quote_keys = quote_keys
+        self.yaml11 = version == '1.1'
+
+    def collection(self, value: Any, column: int) -> list[str] | None:
+        # The lines of a collection that is not empty, which is not a scalar, or None
+        if not value or not isinstance(value, (dict, list, tuple)):
+            return None
+        collection = cast(dict[Any, Any] | list[Any] | tuple[Any, ...], value)
+        if id(collection) in self.parents:
+            raise _error('found a collection inside itself')
+        self.parents.add(id(collection))
+        if isinstance(collection, dict):
+            lines = self.mapping(collection, column)
+        else:
+            lines = self.sequence(collection, column)
+        self.parents.remove(id(collection))
+        return lines
+
+    def document(self, value: Any, start: bool) -> list[str]:
+        if (lines := self.collection(value := _data(value), 0)) is not None:
+            return ['---', *lines] if start else lines
+
+        # A scalar after the start of its document, where the loader reads it
+        text, block = self.scalar(value, 0)
+        return [f'--- {text}', *block]
+
+    def key(self, key: Any) -> str:
+        if isinstance(key, str):
+            return self.string(str.__str__(key), 0, self.quote_keys, False, True)[0]
+        if (text := _plain_value(key)) is None:
+            raise _error(f"does not support a key of the type '{type(key).__name__}'")
+        return text
+
+    def literal(self, string: str, column: int) -> tuple[str, list[str]] | None:
+        # A literal block scalar, unless the loader would not read its lines back: its first line that is not empty
+        # starts with a space, which needs the indicator of the indentation, or a line has only spaces
+        body = string.rstrip('\n')
+        lines = body.split('\n')
+        first = next((line for line in lines if line), '')
+        if not first or first[:1].isspace() or _RE_UNLITERAL.search(body):
+            return None
+        if any(line and not line.strip() for line in lines):
+            return None
+
+        # The final line breaks, which the chomping indicator strips, clips to one or keeps
+        breaks = len(string) - len(body)
+        chomping = '-' if breaks == 0 else '' if breaks == 1 else '+'
+        pad = ' ' * (column + self.indent)
+        return f'|{chomping}', [pad + line if line else '' for line in lines + [''] * (breaks - 1)]
+
+    def mapping(self, mapping: dict[Any, Any], column: int) -> list[str]:
+        lines: list[str] = []
+        for key, value in mapping.items():
+            prefix = ' ' * column + self.key(key) + ':'
+            value = _data(value)
+            nested = column + self.indent if isinstance(value, dict) or self.indent_sequences else column
+            if (below := self.collection(value, nested)) is not None:
+                lines += [prefix, *below]
+            else:
+                text, block = self.scalar(value, column)
+                lines += [f'{prefix} {text}', *block]
+        return lines
+
+    def plain(self, string: str, key: bool) -> bool:
+        # A string that the loader reads back as the same string without quotes
+        if not string or string != string.strip() or _RE_UNQUOTABLE.search(string):
+            return False
+        if string[0] in '?:,[]{}#&*!|>\'"%@`' or re.search(r'^(?:-(?:\s|\Z|--)|\.\.\.)|\s#|:(?:\s|\Z)', string):
+            return False
+        if key and (string[0] == '-' or string == '<<'):
+            return False
+        if not isinstance(_resolve(string), str):
+            return False
+        return not (self.yaml11 and _RE_YAML11.fullmatch(string))
+
+    def scalar(self, value: Any, column: int) -> tuple[str, list[str]]:
+        if isinstance(value, str):
+            return self.string(str.__str__(value), column, self.quote, self.multiline)
+        if (text := _plain_value(value)) is not None:
+            return text, []
+        if isinstance(value, dict):
+            return '{}', []
+        if isinstance(value, (list, tuple)):
+            return '[]', []
+        if isinstance(value, (bytes, bytearray)):
+            return '!!binary ' + base64.b64encode(value).decode(), []
+        if isinstance(value, datetime.date):
+            return '!!timestamp ' + value.isoformat(), []
+        raise _error(f"does not support a value of the type '{type(value).__name__}'")
+
+    def sequence(self, sequence: list[Any] | tuple[Any, ...], column: int) -> list[str]:
+        lines: list[str] = []
+        pad = ' ' * column
+        for item in sequence:
+            # A collection that starts on the line of the item
+            if (nested := self.collection(item := _data(item), column + 2)) is not None:
+                lines += [f'{pad}- {nested[0][column + 2 :]}', *nested[1:]]
+            else:
+                text, block = self.scalar(item, column)
+                lines += [f'{pad}- {text}', *block]
+        return lines
+
+    def string(
+        self, string: str, column: int, quote: str | None, multiline: bool, key: bool = False
+    ) -> tuple[str, list[str]]:
+        if multiline and '\n' in string and (block := self.literal(string, column)) is not None:
+            return block
+        if quote is None and self.plain(string, key):
+            return string, []
+        if quote != '"' and not _RE_UNQUOTABLE.search(string):
+            return "'" + string.replace("'", "''") + "'", []
+        return '"' + _RE_ESCAPE.sub(_escape, string) + '"', []
+
+
+# An object that Pyjo.JSON encodes, as the value of its __json__ method, or as a string where its class has its own
+# __str__
+def _data(value: Any) -> Any:
+    if value is None or isinstance(value, (bool, int, float, str, bytes, bytearray, dict, list, tuple, datetime.date)):
+        return cast(Any, value)
+    if (method := getattr(value, '__json__', None)) is not None:
+        return method()
+    if type(value).__str__ is not builtins.object.__str__:
+        return str(value)
+    return value
+
+
+def _escape(m: re.Match[str]) -> str:
+    if (escaped := _ESCAPED.get(c := m[0])) is not None:
+        return escaped
+    return f'\\x{ord(c):02x}' if ord(c) < 0x100 else f'\\u{ord(c):04x}'
+
+
+# The text of a null, a boolean or a number, which the loader reads back as the same value
+def _plain_value(value: Any) -> str | None:
+    if value is None:
+        return 'null'
+    if isinstance(value, bool):
+        return 'true' if value else 'false'
+    if isinstance(value, int):
+        return int.__repr__(value)
+    if isinstance(value, float):
+        if math.isnan(value):
+            return '.nan'
+        if math.isinf(value):
+            return '.inf' if value > 0 else '-.inf'
+        return float.__repr__(value)
+    return None

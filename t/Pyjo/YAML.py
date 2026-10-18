@@ -1,5 +1,5 @@
 from Pyjo.Test import *
-from Pyjo.YAML import load, load_all
+from Pyjo.YAML import dump, dump_all, load, load_all
 
 import datetime
 import re
@@ -26,6 +26,8 @@ with subtest('Sequences'):
     is_deeply_ok(load('foo:\n- one\n- two\nbar: x\n'), {'foo': ['one', 'two'], 'bar': 'x'}, 'not indented')
     is_deeply_ok(load('- a: 1\n  b: 2\n- c: 3\n'), [{'a': 1, 'b': 2}, {'c': 3}], 'mappings in items')
     is_deeply_ok(load('-\n  - x\n  - y\n- z\n'), [['x', 'y'], 'z'], 'nested sequence')
+    is_deeply_ok(load('- - x\n  - y\n- z\n'), [['x', 'y'], 'z'], 'nested sequence on the line of the item')
+    is_deeply_ok(load('- - - x\n- - a: 1\n    b: 2\n'), [[['x']], [{'a': 1, 'b': 2}]], 'deeper on the line of the item')
     is_deeply_ok(load('list:\n  -\n    a: 1\n  -\n    b: 2\n'), {'list': [{'a': 1}, {'b': 2}]}, 'items below')
     is_deeply_ok(load('- \n'), [None], 'null item')
 
@@ -34,6 +36,11 @@ with subtest('Scalars'):
     is_deeply_ok(load("foo: 'it''s'\n"), {'foo': "it's"}, 'single quoted')
     is_deeply_ok(load('foo: "a\\nb\\tc\\x41\\\\d\\"e"\n'), {'foo': 'a\nb\tcA\\d"e'}, 'double quoted')
     is_deeply_ok(load('foo: "\\N\\e\\0"\n'), {'foo': '\x85\x1b\x00'}, 'escapes')
+    is_deeply_ok(
+        load('foo: "\\u263a\\U0001F600\\L\\P\\_\\/\\ \\\t"\n'),
+        {'foo': '\u263a\U0001f600\u2028\u2029\xa0/ \t'},
+        'escapes of YAML',
+    )
     is_deeply_ok(load("foo: '\\n'\n"), {'foo': '\\n'}, 'no escapes in single quotes')
     is_deeply_ok(load('foo: {}\nbar: []\n'), {'foo': {}, 'bar': []}, 'empty collections')
     is_deeply_ok(load("empty: ''\n"), {'empty': ''}, 'empty string')
@@ -251,5 +258,195 @@ with subtest('Errors'):
     # Not in CPAN::Meta::YAML: an unknown alias is an error, not a string
     throws_ok(lambda: load('foo: *alias\n'), re.compile(r"^YAML found an unknown alias '\*alias'"), 'alias')
     throws_ok(lambda: load('foo: *alias bar\n'), re.compile(r'^YAML found illegal characters after the alias'), 'after')
+
+with subtest('Dump mappings'):
+    is_ok(dump({'foo': 'bar'}), 'foo: bar\n', 'one key')
+    is_ok(dump({'a': {'b': {'c': 'd'}, 'e': 'f'}, 'g': 'h'}), 'a:\n  b:\n    c: d\n  e: f\ng: h\n', 'nested')
+    is_ok(dump({404: 'one', True: 'two', None: 3, 1.5: 'four'}), '404: one\ntrue: two\nnull: 3\n1.5: four\n', 'keys')
+    is_ok(
+        dump({'404': 1, 'a: b': 2, 'a #b': 3, '<<': 4, '': 5}),
+        "'404': 1\n'a: b': 2\n'a #b': 3\n'<<': 4\n'': 5\n",
+        'quoted',
+    )
+    is_ok(
+        dump({'-a': 1, 'a:b': 2, 'key with spaces': 3}), "'-a': 1\na:b: 2\nkey with spaces: 3\n", 'keys of characters'
+    )
+    is_ok(dump({'a\nb': 1, 'c\x00': 2}), '"a\\nb": 1\n"c\\0": 2\n', 'escaped keys')
+
+with subtest('Dump sequences'):
+    is_ok(dump(['one', 'two']), '- one\n- two\n', 'root sequence')
+    is_ok(dump({'foo': ['one', 'two'], 'bar': 'x'}), 'foo:\n  - one\n  - two\nbar: x\n', 'indented')
+    is_ok(
+        dump({'foo': ['one', 'two'], 'bar': 'x'}, indent_sequences=False),
+        'foo:\n- one\n- two\nbar: x\n',
+        'not indented',
+    )
+    is_ok(dump([{'a': 1, 'b': 2}, {'c': 3}]), '- a: 1\n  b: 2\n- c: 3\n', 'mappings in items')
+    is_ok(dump([['a', 'b'], 'c']), '- - a\n  - b\n- c\n', 'nested sequence')
+    is_ok(dump([[['x']], [{'a': 1, 'b': 2}]]), '- - - x\n- - a: 1\n    b: 2\n', 'deeper')
+    is_ok(dump(('a', 'b')), '- a\n- b\n', 'tuple')
+    is_ok(dump({'a': {}, 'b': [], 'c': [[], {}]}), 'a: {}\nb: []\nc:\n  - []\n  - {}\n', 'empty collections')
+
+with subtest('Dump indentation'):
+    data = {'a': {'b': [{'c': 1, 'd': [2]}], 'e': 'x\n'}}
+    is_ok(dump(data), 'a:\n  b:\n    - c: 1\n      d:\n        - 2\n  e: |\n    x\n', 'two spaces')
+    is_ok(
+        dump(data, indent=4),
+        'a:\n    b:\n        - c: 1\n          d:\n              - 2\n    e: |\n        x\n',
+        'four spaces',
+    )
+    is_ok(
+        dump(data, indent=4, indent_sequences=False),
+        'a:\n    b:\n    - c: 1\n      d:\n      - 2\n    e: |\n        x\n',
+        'four spaces and sequences not indented',
+    )
+    is_ok(dump(['x\n']), '- |\n  x\n', 'block scalar in an item')
+    throws_ok(lambda: dump([], indent=0), ValueError, 'no indentation')
+
+with subtest('Dump scalars'):
+    is_ok(
+        dump([None, True, False, 0, -12, 1.5, 1e20]), '- null\n- true\n- false\n- 0\n- -12\n- 1.5\n- 1e+20\n', 'types'
+    )
+    is_ok(dump([float('inf'), float('-inf'), float('nan')]), '- .inf\n- -.inf\n- .nan\n', 'special floats')
+    is_ok(
+        dump(['', '1', 'true', 'null', '~', '1.5', '0x1F', '.inf']),
+        "- ''\n- '1'\n- 'true'\n- 'null'\n- '~'\n- '1.5'\n- '0x1F'\n- '.inf'\n",
+        'strings of other types',
+    )
+
+    # Strings that YAML 1.1 reads as other types
+    is_ok(
+        dump(['yes', 'Off', 'y', '1_000', '12:30', '2001-12-14']),
+        "- 'yes'\n- 'Off'\n- 'y'\n- '1_000'\n- '12:30'\n- '2001-12-14'\n",
+        'YAML 1.1',
+    )
+    is_ok(
+        dump(['yes', 'Off', 'y', '1_000', '12:30', '2001-12-14'], version='1.2'),
+        '- yes\n- Off\n- y\n- 1_000\n- 12:30\n- 2001-12-14\n',
+        'YAML 1.2',
+    )
+    throws_ok(lambda: dump('a', version='1.0'), ValueError, 'unknown version')
+
+    # Indicators
+    is_ok(
+        dump(['- a', '-', '---', '...', '?a', ':a', '#a', '&a', '*a', '!a']),
+        "- '- a'\n- '-'\n- '---'\n- '...'\n- '?a'\n- ':a'\n- '#a'\n- '&a'\n- '*a'\n- '!a'\n",
+        'indicators',
+    )
+    is_ok(
+        dump(['|a', '>a', "'a", '"a', '%a', '@a', '`a', '[a', '{a', ',a']),
+        "- '|a'\n- '>a'\n- '''a'\n- '\"a'\n- '%a'\n- '@a'\n- '`a'\n- '[a'\n- '{a'\n- ',a'\n",
+        'more indicators',
+    )
+    is_ok(
+        dump(['a: b', 'a:', 'a #b', ' a', 'a ', 'a\tb']),
+        "- 'a: b'\n- 'a:'\n- 'a #b'\n- ' a'\n- 'a '\n- \"a\\tb\"\n",
+        'inside',
+    )
+    is_ok(
+        dump(['-a', '--port', 'a:b', 'a#b', "it's", 'a "b"', 'утф', '12abc', 'a\\b']),
+        '- -a\n- --port\n- a:b\n- a#b\n- it\'s\n- a "b"\n- утф\n- 12abc\n- a\\b\n',
+        'plain',
+    )
+
+    # Escapes
+    is_ok(dump(['\x00\x07\x08\t\x0b\x0c\r\x1b'], multiline=False), '- "\\0\\a\\b\\t\\v\\f\\r\\e"\n', 'escapes of C')
+    is_ok(
+        dump(['\x01\x7f\x85\x9f\xa0\u2028\u2029\ufeff\ud800']),
+        '- "\\x01\\x7f\\N\\x9f\xa0\\L\\P\\ufeff\\ud800"\n',
+        'escapes of YAML',
+    )
+    is_ok(dump(['a\\"b\x00']), '- "a\\\\\\"b\\0"\n', 'backslash and quote')
+    is_ok(dump(['\U0001f600']), '- \U0001f600\n', 'printable')
+
+with subtest('Dump quotes'):
+    is_ok(
+        dump({'a': 'b', 'c': 1, 'd': "it's", 'e': 'x\x00'}, quote="'"),
+        "a: 'b'\nc: 1\nd: 'it''s'\ne: \"x\\0\"\n",
+        'single',
+    )
+    is_ok(dump({'a': 'b', 'c': None, 'd': "it's"}, quote='"'), 'a: "b"\nc: null\nd: "it\'s"\n', 'double')
+    is_ok(dump({'a': 'b', '1': 'c'}, quote_keys="'"), "'a': b\n'1': c\n", 'single keys')
+    is_ok(dump({'a': 'b', 1: 'c'}, quote_keys='"'), '"a": b\n1: c\n', 'double keys')
+    is_ok(dump({'1': 'x\x00'}), '\'1\': "x\\0"\n', 'quotes when needed')
+    throws_ok(lambda: dump('a', quote='`'), ValueError, 'unknown quote')
+    throws_ok(lambda: dump('a', quote_keys='`'), ValueError, 'unknown quote of keys')
+
+with subtest('Dump multi-line strings'):
+    is_ok(dump({'a': 'one\ntwo\n', 'b': 1}), 'a: |\n  one\n  two\nb: 1\n', 'literal')
+    is_ok(dump({'a': 'one\ntwo', 'b': 1}), 'a: |-\n  one\n  two\nb: 1\n', 'strip')
+    is_ok(dump({'a': 'one\n\n', 'b': 1}), 'a: |+\n  one\n\nb: 1\n', 'keep')
+    is_ok(dump({'a': '\none\n\n  two\n'}), 'a: |\n\n  one\n\n    two\n', 'empty and indented lines')
+    is_ok(dump('a\nb\n'), '--- |\n  a\n  b\n', 'document')
+    is_ok(dump({'a': 'x\n'}, quote="'"), 'a: |\n  x\n', 'with quotes')
+    is_ok(dump({'a': 'one\ntwo\n'}, multiline=False), 'a: "one\\ntwo\\n"\n', 'off')
+    is_ok(
+        dump(['  a\nb', 'a\n  \nb', 'a\r\nb', '\n', 'a\n\x00']),
+        '- "  a\\nb"\n- "a\\n  \\nb"\n- "a\\r\\nb"\n- "\\n"\n- "a\\n\\0"\n',
+        'quoted',
+    )
+
+with subtest('Dump documents'):
+    is_ok(dump({'a': 1}, explicit_start=True), '---\na: 1\n', 'start')
+    is_ok(dump('scalar'), '--- scalar\n', 'scalar')
+    is_ok(dump(None), '--- null\n', 'null')
+    is_ok(dump({}), '--- {}\n', 'empty mapping')
+    is_ok(dump_all([{'a': 1}, ['b'], 'c']), 'a: 1\n---\n- b\n--- c\n', 'documents')
+    is_ok(dump_all([{'a': 1}, ['b']], explicit_start=True), '---\na: 1\n---\n- b\n', 'documents with the start')
+    is_ok(dump_all([]), '', 'no document')
+
+with subtest('Dump tags'):
+    is_ok(dump({'key': b'hello', 'raw': bytearray(b'\x00')}), 'key: !!binary aGVsbG8=\nraw: !!binary AA==\n', 'binary')
+    is_ok(
+        dump([datetime.date(2001, 12, 14), datetime.datetime(2001, 12, 14, 21, 59, 43, 100000)]),
+        '- !!timestamp 2001-12-14\n- !!timestamp 2001-12-14T21:59:43.100000\n',
+        'timestamp',
+    )
+
+with subtest('Dump objects'):
+    import Pyjo.Collection
+    import Pyjo.String.Unicode
+    import Pyjo.URL
+
+    class Data:
+        def __json__(self):
+            return {'a': [1]}
+
+    is_ok(dump({'data': Data()}), 'data:\n  a:\n    - 1\n', '__json__')
+    is_ok(dump([Pyjo.URL.new('http://example.com')]), '- http://example.com\n', 'string')
+    is_ok(dump(Pyjo.Collection.new(Pyjo.String.Unicode.new('a'))), '- a\n', 'collection')
+    throws_ok(lambda: dump({'a': {1}}), re.compile(r"^YAML does not support a value of the type 'set'"), 'set')
+    throws_ok(lambda: dump({(1, 2): 3}), re.compile(r"^YAML does not support a key of the type 'tuple'"), 'key')
+    recursive: list[object] = []
+    recursive.append(recursive)
+    throws_ok(lambda: dump(recursive), re.compile(r'^YAML found a collection inside itself'), 'recursion')
+    shared = ['x']
+    is_ok(dump([shared, shared]), '- - x\n- - x\n', 'same object twice')
+
+with subtest('Dump round trip'):
+    data = {
+        'name': 'Pyjoyment',
+        'numbers': [0, -1, 1.5, float('inf'), True, None],
+        'nested': {'list': [{'a': 'one\ntwo\n'}, ['x', ['y']], {}], 'empty': []},
+        404: {'quoted': ['1', 'yes', '', ' a ', 'a: b', '\x00', '\u2028']},
+    }
+    for options in (
+        {},
+        {'indent': 4},
+        {'indent': 3, 'indent_sequences': False},
+        {'quote': "'", 'quote_keys': '"'},
+        {'quote': '"', 'quote_keys': "'", 'multiline': False},
+        {'explicit_start': True},
+        {'version': '1.2'},
+    ):
+        is_deeply_ok(load(dump(data, **options)), data, f'round trip {options}')
+    is_deeply_ok(load_all(dump_all([data, 'two', []])), [data, 'two', []], 'documents')
+
+    # Every character of the ASCII, the Latin-1 and some more, alone and in strings
+    for code in [*range(0x100), 0x2028, 0x2029, 0xFEFF, 0xD800, 0x1F600]:
+        string = chr(code)
+        strings = [string, f'a{string}', f'{string}a', f'a{string}b', f'a {string} b', f'{string}\n', f'a\n{string}\n']
+        if not is_deeply_ok(load(dump({s: s for s in strings})), {s: s for s in strings}, f'U+{code:04X}'):
+            diag(dump({s: s for s in strings}))
 
 done_testing()
