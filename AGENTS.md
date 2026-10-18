@@ -378,7 +378,8 @@ functions of AWS Lambda, inspired by `Pyjo.Server.WSGI` and its command),
 `Pyjoyment.Plugin.PyRenderer` (the renderer of template strings, inspired by
 `Mojolicious::Plugin::EPLRenderer`), `Pyjoyment.Plugin.TOMLConfig` (inspired
 by `Mojolicious::Plugin::NotYAMLConfig`, for the format of configuration of
-the standard library), `Pyjo.YAML` (the subset of YAML of `CPAN::Meta::YAML`,
+the standard library), `Pyjo.TOML` (the dumper of TOML, which the standard library only reads),
+`Pyjo.YAML` (the subset of YAML of `CPAN::Meta::YAML`,
 which `Mojolicious::Plugin::NotYAMLConfig` reads, written anew, as the license
 of the Perl module is that of Perl 5, with its regular expressions) and the
 helpers in `Pyjo.Util` that turn statements into expressions. These extras follow their inspiration where it
