@@ -121,10 +121,14 @@ with subtest('Colorized log messages'):
 with subtest('JSON log messages'):
     log = Pyjo.Log.new()
     ok(not log.json, 'text messages')
-    os.environ['PYJO_LOG_JSON'] = '1'
+    os.environ['PYJO_LOG_FORMAT'] = 'json'
     log = Pyjo.Log.new()
     ok(log.json, 'JSON messages')
-    del os.environ['PYJO_LOG_JSON']
+    os.environ['PYJO_LOG_FORMAT'] = 'JSON'
+    ok(Pyjo.Log.new().json, 'JSON messages')
+    os.environ['PYJO_LOG_FORMAT'] = 'text'
+    ok(not Pyjo.Log.new().json, 'text messages')
+    del os.environ['PYJO_LOG_FORMAT']
     log = Pyjo.Log.new(json=True, short=True, color=True)
     ok(log.json, 'JSON messages')
     msg = log.format(1760861742.12345, 'warn', 'Test', 1, '2')

@@ -11,13 +11,17 @@ Pyjoyment.Command.eval - Eval command
       ./myapp.py eval -V 'app.renderer.paths'
 
     Options:
-      -h, --help          Show this summary of available options
-          --home <path>   Path to home directory of your application, defaults to
-                          the value of PYJO_HOME or auto-detection
-      -m, --mode <name>   Operating mode for your application, defaults to the
-                          value of PYJO_MODE or "development"
-      -v, --verbose       Print return value to sys.stdout
-      -V                  Print returned data structure to sys.stdout
+      -h, --help                Show this summary of available options
+          --home <path>         Path to home directory of your application,
+                                defaults to the value of PYJO_HOME or
+                                auto-detection
+          --log-format <name>   Format of log messages, "text" or "json",
+                                defaults to the value of PYJO_LOG_FORMAT or
+                                "text"
+      -m, --mode <name>         Operating mode for your application, defaults to
+                                the value of PYJO_MODE or "development"
+      -v, --verbose             Print return value to sys.stdout -V
+                                Print returned data structure to sys.stdout
 
 :mod:`Pyjoyment.Command.eval` runs code against applications. The code
 is Python, with the application as ``app``, and its result is the value of its

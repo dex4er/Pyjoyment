@@ -8,11 +8,15 @@ Pyjoyment.Command.Author.inflate - Inflate command
       ./myapp.py inflate
 
     Options:
-      -h, --help          Show this summary of available options
-          --home <path>   Path to home directory of your application, defaults to
-                          the value of PYJO_HOME or auto-detection
-      -m, --mode <name>   Operating mode for your application, defaults to the
-                          value of PYJO_MODE or "development"
+      -h, --help                Show this summary of available options
+          --home <path>         Path to home directory of your application,
+                                defaults to the value of PYJO_HOME or
+                                auto-detection
+          --log-format <name>   Format of log messages, "text" or "json",
+                                defaults to the value of PYJO_LOG_FORMAT or
+                                "text"
+      -m, --mode <name>         Operating mode for your application, defaults to
+                                the value of PYJO_MODE or "development"
 
 :mod:`Pyjoyment.Command.Author.inflate` turns templates and static files
 embedded in the ``DATA`` sections of your application into real files.

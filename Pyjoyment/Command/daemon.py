@@ -30,6 +30,9 @@ Pyjoyment.Command.daemon - Daemon command
                                            listen on, defaults to the value of
                                            PYJO_LISTEN, the port of PORT or
                                            "http://*:3000"
+          --log-format <name>              Format of log messages, "text" or
+                                           "json", defaults to the value of
+                                           PYJO_LOG_FORMAT or "text"
       -m, --mode <name>                    Operating mode for your application,
                                            defaults to the value of
                                            PYJO_MODE or "development"

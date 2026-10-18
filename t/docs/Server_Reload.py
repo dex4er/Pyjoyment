@@ -99,7 +99,7 @@ with subtest('pyjo-reload'):
     )
     is_ok(result.returncode, 0, 'help')
     like_ok(result.stdout, r'^usage: pyjo-reload ', 'usage')
-    for option in ('--backend', '--listen', '--mode', '--verbose', '--watch'):
+    for option in ('--backend', '--listen', '--log-format', '--mode', '--verbose', '--watch'):
         like_ok(result.stdout, rf'{option}', option)
 
 with subtest('new'):

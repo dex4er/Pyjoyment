@@ -5,6 +5,7 @@ from Pyjo.Test import *
 import contextlib
 import importlib
 import io
+import json
 import os
 import re
 import socket
@@ -57,14 +58,16 @@ def stdout():
 
 
 # Make sure @ARGV is not changed
-with local(PYJO_MODE=None):
+# Not in Mojolicious: the option --log-format
+with local(PYJO_MODE=None, PYJO_LOG_FORMAT=None):
     argv = sys.argv
     try:
-        sys.argv = [argv[0], '-m', 'production', '-x', 'whatever']
+        sys.argv = [argv[0], '-m', 'production', '--log-format', 'json', '-x', 'whatever']
         import Pyjoyment.Commands
 
         is_ok(os.environ.get('PYJO_MODE'), 'production', 'right mode')
-        is_deeply_ok(sys.argv[1:], ['-m', 'production', '-x', 'whatever'], 'unchanged')
+        is_ok(os.environ.get('PYJO_LOG_FORMAT'), 'json', 'right log format')
+        is_deeply_ok(sys.argv[1:], ['-m', 'production', '--log-format', 'json', '-x', 'whatever'], 'unchanged')
     finally:
         sys.argv = argv
 
@@ -583,5 +586,24 @@ buffer = io.StringIO()
 with contextlib.redirect_stdout(buffer):
     app.start('eval', "app.config()['test']")
 like_ok(buffer.getvalue(), r'works!', 'right output')
+
+# Not in Mojolicious: the option --log-format of all commands, which sets PYJO_LOG_FORMAT before the application starts
+with subtest('Log format'):
+    root = Pyjo.File.curfile().dirname().dirname().dirname().to_str()
+    dir = Pyjo.File.tempdir()
+    script = dir.child('myapp.py').spew("from Pyjoyment.Lite import *\n\nget('/', {'text': 'Hello'})\n\napp.start()\n")
+    env = {**os.environ, 'PYTHONPATH': root, 'PYJO_LOG_LEVEL': 'trace'}
+    for name in ('PYJO_HOME', 'PYJO_LOG_FORMAT', 'PYJO_MODE'):
+        env.pop(name, None)
+    run = [sys.executable, script.to_str(), 'get']
+    result = subprocess.run([*run, '--log-format', 'json', '/'], env=env, capture_output=True, text=True)
+    is_ok(result.stdout, 'Hello', 'right output')
+    record = json.loads(result.stderr.splitlines()[0])
+    is_ok(record['message'], 'GET "/"', 'JSON')
+    like_ok(record['request_id'], r'^[\w-]+$', 'request id')
+    result = subprocess.run([*run, '--log-format', 'text', '/'], env=env, capture_output=True, text=True)
+    like_ok(result.stderr, r'^\[.+\] \[\d+\] \[trace\] \[[\w-]+\] GET "/"\n', 'text')
+    result = subprocess.run([*run, '/'], env={**env, 'PYJO_LOG_FORMAT': 'json'}, capture_output=True, text=True)
+    is_ok(json.loads(result.stderr.splitlines()[0])['message'], 'GET "/"', 'environment variable')
 
 done_testing()

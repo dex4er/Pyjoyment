@@ -346,14 +346,15 @@ we will simply use Docker.
     ...
 
 And now your web application should be deployed as a container under
-``http://127.0.0.1:3000``. With the ``PYJO_LOG_JSON`` environment variable its
-log messages are lines of JSON, which the log collectors of platforms such as
-Cloud Run and Kubernetes read with their levels and fields, see
+``http://127.0.0.1:3000``. With the ``PYJO_LOG_FORMAT`` environment variable
+set to ``json``, as the option ``--log-format json`` of the commands sets it,
+its log messages are lines of JSON, which the log collectors of platforms such
+as Cloud Run and Kubernetes read with their levels and fields, see
 :mod:`Pyjo.Log`.
 
 .. code-block:: console
 
-    $ docker run -d -p 3000:3000 -e PYJO_LOG_JSON=1 --name myapp_container myapp_image
+    $ docker run -d -p 3000:3000 -e PYJO_LOG_FORMAT=json --name myapp_container myapp_image
     ...
 
 For more information and many more container deployment options we recommend
