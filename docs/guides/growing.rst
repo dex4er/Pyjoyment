@@ -421,9 +421,7 @@ And the directory structure should be looking like this now.
        +- login.py
 
 Our templates are using quite a few features of the renderer,
-`Mojolicious::Guides::Rendering
-<https://docs.mojolicious.org/Mojolicious/Guides/Rendering>`_ explains them
-all in great detail.
+:doc:`rendering` explains them all in great detail.
 
 Well-structured application
 ---------------------------

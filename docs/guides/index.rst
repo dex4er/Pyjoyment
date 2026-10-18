@@ -9,3 +9,4 @@ The guides of Pyjoyment, ported from the guides of Mojolicious.
     tutorial
     growing
     routing
+    rendering
