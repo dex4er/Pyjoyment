@@ -16,18 +16,94 @@ on:
 permissions:
   contents: read
 
+env:
+  # The tests of the event loop, and of the user agent, the WebSockets and the
+  # servers, which do the most of its I/O, which run on the reactor without
+  # asyncio too.
+  POLL_TESTS: >-
+    t/Pyjo/IOLoop*.py t/Pyjo/TLS.py t/Pyjo/Promise*.py t/Pyjo/Subprocess.py t/stdlib/IOLoop*.py t/Pyjo/UserAgent*.py
+    t/stdlib/UserAgent*.py t/Pyjo/WebSocket*.py t/Pyjo/Server_Daemon*.py t/stdlib/Server_Daemon.py t/Pyjo/Server_Hot.py
+    t/stdlib/Server_Hot.py t/Pyjo/Server_Prefork.py t/stdlib/Server_Prefork.py t/Pyjo/Server_Reload.py
+    t/stdlib/Server_Reload.py t/Pyjo/File_download.py
+
 jobs:
+  # The version pinned in mise.toml and verified against mise.lock, with the
+  # tests that request remote hosts, which are those of GitHub, and the tests
+  # with real ASGI, WSGI and CGI servers.
+  prove-mise:
+    name: prove (python mise)
+
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up mise
+        uses: jdx/mise-action@v5
+        with:
+          version: 2026.10.4 # datasource=github-releases depName=jdx/mise
+
+      # Invalid escape sequences and deprecated APIs become errors in a future
+      # Python; fail now instead. The development mode of Python shows the
+      # ResourceWarning of a socket or a file that is not closed, which only
+      # goes to the standard error, so the output is checked for it.
+      - name: Run tests
+        shell: bash
+        env:
+          PYTHONDEVMODE: "1"
+          PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
+          TEST_ONLINE: "1"
+        run: |
+          python --version
+          python -m Pyjo.Prove -l --color -j 4 --timeout 60 --capture-stderr --stderr-lines 1000 -r t 2>&1 | tee prove.log
+          if grep -n 'ResourceWarning:' prove.log; then exit 1; fi
+
+      - name: Run tests on Pyjo.Reactor.Poll
+        shell: bash
+        env:
+          PYJO_REACTOR: Pyjo.Reactor.Poll
+          PYTHONDEVMODE: "1"
+          PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
+          TEST_ONLINE: "1"
+        run: |
+          # shellcheck disable=SC2086 # POLL_TESTS is a list of globs
+          python -m Pyjo.Prove -l --color -j 4 --timeout 60 --capture-stderr --stderr-lines 1000 $POLL_TESTS 2>&1 | tee prove.log
+          if grep -n 'ResourceWarning:' prove.log; then exit 1; fi
+
+      # The tests of Pyjo.Server.ASGI, Pyjo.Server.WSGI and Pyjo.Server.CGI with
+      # real servers, from the dependency group "servers".
+      - name: Run tests on ASGI, WSGI and CGI servers
+        shell: bash
+        env:
+          PYTHONDEVMODE: "1"
+          PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
+        run: |
+          uv run --python "$(command -v python)" --only-group servers python -m Pyjo.Prove -l --color --timeout 120 -r t/servers 2>&1 | tee prove.log
+          if grep -n 'ResourceWarning:' prove.log; then exit 1; fi
+
+      # The same on Python 3.14, which uv downloads, as it still has the CGI
+      # server of http.server, which Python 3.15 removed.
+      - name: Run tests on ASGI, WSGI and CGI servers on Python 3.14
+        shell: bash
+        env:
+          PYTHONDEVMODE: "1"
+          PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
+          UV_PROJECT_ENVIRONMENT: .venv-3.14
+        run: |
+          uv run --python 3.14 --only-group servers python -m Pyjo.Prove -l --color --timeout 120 -r t/servers 2>&1 | tee prove.log
+          if grep -n 'ResourceWarning:' prove.log; then exit 1; fi
+
+  # The other supported versions, from setup-python. PyPy is supported on a
+  # best-effort basis.
   prove:
     name: prove (python ${{ matrix.python }})
 
     strategy:
       fail-fast: false
       matrix:
-        # "mise" is the version pinned in mise.toml and verified against
-        # mise.lock; the other entries come from setup-python. PyPy is
-        # supported on a best-effort basis.
         python:
-          - mise
           - "3.12"
           - "3.13"
           - "3.14"
@@ -41,79 +117,33 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Set up mise
-        if: matrix.python == 'mise'
-        uses: jdx/mise-action@v5
-        with:
-          version: 2026.10.4 # datasource=github-releases depName=jdx/mise
-
       - name: Set up Python
-        if: matrix.python != 'mise'
         uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python }}
           allow-prereleases: true
 
-      # Invalid escape sequences and deprecated APIs become errors in a future
-      # Python; fail now instead. Only the tests: setup-python runs pip, whose
-      # warnings are not ours. The development mode of Python shows the
-      # ResourceWarning of a socket or a file that is not closed, which only
-      # goes to the standard error, so the output is checked for it. The tests
-      # that request remote hosts, which are those of GitHub, run on the Python
-      # of mise.toml only.
+      # As above. Only the tests: setup-python runs pip, whose warnings are not
+      # ours.
       - name: Run tests
         shell: bash
         env:
           PYTHONDEVMODE: "1"
           PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
-          TEST_ONLINE: ${{ matrix.python == 'mise' && '1' || '' }}
         run: |
           python --version
           python -m Pyjo.Prove -l --color -j 4 --timeout 60 --capture-stderr --stderr-lines 1000 -r t 2>&1 | tee prove.log
           if grep -n 'ResourceWarning:' prove.log; then exit 1; fi
 
-      # The tests of the event loop, and of the user agent, the WebSockets and
-      # the servers, which do the most of its I/O, run on the reactor without
-      # asyncio too, with the tests that request remote hosts.
       - name: Run tests on Pyjo.Reactor.Poll
         shell: bash
         env:
           PYJO_REACTOR: Pyjo.Reactor.Poll
           PYTHONDEVMODE: "1"
           PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
-          TEST_ONLINE: ${{ matrix.python == 'mise' && '1' || '' }}
         run: |
-          python -m Pyjo.Prove -l --color -j 4 --timeout 60 --capture-stderr --stderr-lines 1000 \
-            t/Pyjo/IOLoop*.py t/Pyjo/TLS.py t/Pyjo/Promise*.py t/Pyjo/Subprocess.py t/stdlib/IOLoop*.py \
-            t/Pyjo/UserAgent*.py t/stdlib/UserAgent*.py t/Pyjo/WebSocket*.py t/Pyjo/Server_Daemon*.py t/stdlib/Server_Daemon.py \
-            t/Pyjo/Server_Hot.py t/stdlib/Server_Hot.py t/Pyjo/Server_Prefork.py t/stdlib/Server_Prefork.py \
-            t/Pyjo/Server_Reload.py t/stdlib/Server_Reload.py t/Pyjo/File_download.py 2>&1 | tee prove.log
-          if grep -n 'ResourceWarning:' prove.log; then exit 1; fi
-
-      # The tests of Pyjo.Server.ASGI, Pyjo.Server.WSGI and Pyjo.Server.CGI with
-      # real servers, from the dependency group "servers", on the Python of
-      # mise.toml only.
-      - name: Run tests on ASGI, WSGI and CGI servers
-        if: matrix.python == 'mise'
-        shell: bash
-        env:
-          PYTHONDEVMODE: "1"
-          PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
-        run: |
-          uv run --python "$(command -v python)" --only-group servers python -m Pyjo.Prove -l --color --timeout 120 -r t/servers 2>&1 | tee prove.log
-          if grep -n 'ResourceWarning:' prove.log; then exit 1; fi
-
-      # The same on Python 3.14, which uv downloads, as it still has the CGI
-      # server of http.server, which Python 3.15 removed.
-      - name: Run tests on ASGI, WSGI and CGI servers on Python 3.14
-        if: matrix.python == 'mise'
-        shell: bash
-        env:
-          PYTHONDEVMODE: "1"
-          PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
-          UV_PROJECT_ENVIRONMENT: .venv-3.14
-        run: |
-          uv run --python 3.14 --only-group servers python -m Pyjo.Prove -l --color --timeout 120 -r t/servers 2>&1 | tee prove.log
+          # shellcheck disable=SC2086 # POLL_TESTS is a list of globs
+          python -m Pyjo.Prove -l --color -j 4 --timeout 60 --capture-stderr --stderr-lines 1000 $POLL_TESTS 2>&1 | tee prove.log
           if grep -n 'ResourceWarning:' prove.log; then exit 1; fi
 
   build:
