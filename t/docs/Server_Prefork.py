@@ -166,7 +166,7 @@ with subtest('cleanup'):
 
 with subtest('graceful_timeout'):
     timeout = prefork.graceful_timeout
-    is_ok(timeout, 120, 'default')
+    is_ok(timeout, 25, 'default')
     prefork.graceful_timeout = 15
     is_ok(prefork.graceful_timeout, 15, 'set')
 

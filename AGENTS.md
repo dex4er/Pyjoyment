@@ -832,8 +832,11 @@ pattern.match_partial(path)`.
   signal keeps the meaning that Mojo gives it, a graceful restart of the
   workers in `Pyjo.Server.Prefork`, and nothing in `Pyjo.Server.Daemon`. A
   worker stops gracefully on TERM and ignores INT, which Ctrl-C sends to all
-  the processes of the server. The tests of Mojo that send these signals
-  have `# Unlike Mojolicious:` comments.
+  the processes of the server. `graceful_timeout` of `Pyjo.Server.Prefork`
+  is 25 seconds, where Mojo has 120, below the 30 seconds that Kubernetes
+  gives a container to stop, so that the server forces its workers and stops
+  by itself before the orchestrator kills it. The tests of Mojo that send
+  these signals have `# Unlike Mojolicious:` comments.
 - `local` on an attribute, as `local $self->{running}`, is the value saved
   before and set back in a `finally`.
 - `__del__`, the counterpart of `DESTROY`, does nothing when

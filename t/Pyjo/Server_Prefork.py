@@ -133,7 +133,8 @@ with subtest('Multiple workers and graceful shutdown'):
     like_ok(log, r'Listening at', 'right message')
     like_ok(log, rf'Manager {os.getpid()} started', 'right message')
     like_ok(log, r'Creating process id file', 'right message')
-    like_ok(log, rf'Stopping worker {spawn[0]} gracefully \(120 seconds\)', 'right message')
+    # Unlike Mojolicious: the graceful timeout defaults to 25 seconds, where Mojo has 120
+    like_ok(log, rf'Stopping worker {spawn[0]} gracefully \(25 seconds\)', 'right message')
     like_ok(log, rf'Worker {spawn[0]} stopped', 'right message')
     like_ok(log, rf'Manager {os.getpid()} stopped', 'right message')
     prefork.app.log.unsubscribe('message', cb)
