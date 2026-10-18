@@ -107,8 +107,8 @@ with subtest('Wildcard placeholders'):
 
 with subtest('Minimal route'):
     with application('minimal'):
-        t = Pyjo.Test.Pyjo.new('MyApp')
-        t.get_ok('/welcome').status_is(200).content_is('Hello there.')
+        with Pyjo.Test.Pyjo.new('MyApp') as t:
+            t.get_ok('/welcome').status_is(200).content_is('Hello there.')
 
 with subtest('Routing destination'):
     r = Pyjoyment.new().routes
@@ -136,12 +136,12 @@ with subtest('HTTP methods'):
     app = Pyjoyment.new()
     app.routes.get('/test').to(cb=lambda c: c.render(text='test'))
     app.routes.put('/stuff').to(cb=lambda c: c.render(text='stuff'))
-    t = Pyjo.Test.Pyjo.new(app)
-    t.get_ok('/test').status_is(200).content_is('test')
-    t.head_ok('/test').status_is(200).header_is('Content-Length', '4').content_is('')
-    t.put_ok('/stuff').status_is(200).content_is('stuff')
-    t.post_ok('/stuff?_method=PUT').status_is(200).content_is('stuff')
-    t.post_ok('/stuff').status_is(404)
+    with Pyjo.Test.Pyjo.new(app) as t:
+        t.get_ok('/test').status_is(200).content_is('test')
+        t.head_ok('/test').status_is(200).header_is('Content-Length', '4').content_is('')
+        t.put_ok('/stuff').status_is(200).content_is('stuff')
+        t.post_ok('/stuff?_method=PUT').status_is(200).content_is('stuff')
+        t.post_ok('/stuff').status_is(404)
 
 with subtest('IRIs'):
     r = Pyjoyment.new().routes
@@ -149,7 +149,8 @@ with subtest('IRIs'):
     is_deeply_ok(endpoint(r, '/☃'), {'controller': 'foo', 'action': 'snowman'}, 'snowman')
     app = Pyjoyment.new()
     app.routes.get('/☃').to(cb=lambda c: c.render(text='snowman'))
-    Pyjo.Test.Pyjo.new(app).get_ok('/%E2%98%83').status_is(200).content_is('snowman')
+    with Pyjo.Test.Pyjo.new(app) as t:
+        t.get_ok('/%E2%98%83').status_is(200).content_is('snowman')
 
 with subtest('Stash'):
     r = Pyjoyment.new().routes
@@ -171,9 +172,9 @@ with subtest('Stash'):
     app.routes.get('/bye').to(cb=bye, mymessage='Bye')
     app.routes.get('/howdy').to(cb=lambda c: c.render(text=c.stash('mymessage')))
     app.defaults(mymessage='Howdy')
-    t = Pyjo.Test.Pyjo.new(app)
-    t.get_ok('/bye').status_is(200).content_is('Bye Welcome')
-    t.get_ok('/howdy').status_is(200).content_is('Howdy')
+    with Pyjo.Test.Pyjo.new(app) as t:
+        t.get_ok('/bye').status_is(200).content_is('Bye Welcome')
+        t.get_ok('/howdy').status_is(200).content_is('Howdy')
 
 with subtest('Nested routes'):
     r = Pyjoyment.new().routes
@@ -192,45 +193,47 @@ with subtest('Nested routes'):
 
 with subtest('Special stash values'):
     with application('special'):
-        t = Pyjo.Test.Pyjo.new('MyApp')
-        t.get_ok('/bye').status_is(200).content_is('Good bye.')
+        with Pyjo.Test.Pyjo.new('MyApp') as t:
+            t.get_ok('/bye').status_is(200).content_is('Good bye.')
 
-        r = t.app.routes
-        r.get('/bye2').to('foo#bye', mymessage='Bye')
-        is_deeply_ok(endpoint(r, '/bye2'), {'controller': 'foo', 'action': 'bye', 'mymessage': 'Bye'}, 'shortcut')
-        t.get_ok('/bye2').status_is(200).content_is('Good bye.')
+            r = t.app.routes
+            r.get('/bye2').to('foo#bye', mymessage='Bye')
+            is_deeply_ok(endpoint(r, '/bye2'), {'controller': 'foo', 'action': 'bye', 'mymessage': 'Bye'}, 'shortcut')
+            t.get_ok('/bye2').status_is(200).content_is('Good bye.')
 
-        # foo-bar and Foo.Bar are the class Bar of MyApp.Controller.Foo or MyApp.Foo, which do not exist, as in Mojo
-        r.get('/hi').to('foo-bar#hi')
-        r.get('/hi2').to('Foo.Bar#hi')
-        t.get_ok('/hi').status_is(500).text_is('#error', 'Controller "MyApp.Foo.Bar" does not exist')
-        t.get_ok('/hi2').status_is(500).text_is('#error', 'Controller "MyApp.Foo.Bar" does not exist')
-        r.get('/bye3').to('Foo#bye')
-        t.get_ok('/bye3').status_is(200).content_is('Good bye.')
+            # foo-bar and Foo.Bar are the class Bar of MyApp.Controller.Foo or MyApp.Foo, which do not exist, as in Mojo
+            r.get('/hi').to('foo-bar#hi')
+            r.get('/hi2').to('Foo.Bar#hi')
+            t.get_ok('/hi').status_is(500).text_is('#error', 'Controller "MyApp.Foo.Bar" does not exist')
+            t.get_ok('/hi2').status_is(500).text_is('#error', 'Controller "MyApp.Foo.Bar" does not exist')
+            r.get('/bye3').to('Foo#bye')
+            t.get_ok('/bye3').status_is(200).content_is('Good bye.')
 
-        # The class has to be a controller
-        r.get('/routes').to('Routes#bye', namespace='Pyjoyment')
-        t.get_ok('/routes').status_is(500)
+            # The class has to be a controller
+            r.get('/routes').to('Routes#bye', namespace='Pyjoyment')
+            t.get_ok('/routes').status_is(500)
 
 with subtest('Namespaces'):
     with application('special'):
-        t = Pyjo.Test.Pyjo.new('MyApp')
-        r = t.app.routes
-        r.get('/bye1').to(namespace='MyApp.Controller', controller='Foo', action='bye')
-        r.get('/bye2').to('foo#bye', namespace='MyApp.Controller')
-        r.get('/bye3').to('Foo#bye', namespace='MyApp.Controller')
-        t.get_ok('/bye1').status_is(200).content_is('Good bye.')
-        t.get_ok('/bye2').status_is(200).content_is('Good bye.')
-        t.get_ok('/bye3').status_is(200).content_is('Good bye.')
-        r.get('/bye4').to(namespace='MyApp.MyController', controller='Foo.Bar', action='bye')
-        r.get('/bye5').to('foo-bar#bye', namespace='MyApp.MyController')
-        r.get('/hey').to('Foo.Bar#hey', namespace='MyApp.MyController')
-        for path in ('/bye4', '/bye5', '/hey'):
-            t.get_ok(path).status_is(500).text_is('#error', 'Controller "MyApp.MyController.Foo.Bar" does not exist')
+        with Pyjo.Test.Pyjo.new('MyApp') as t:
+            r = t.app.routes
+            r.get('/bye1').to(namespace='MyApp.Controller', controller='Foo', action='bye')
+            r.get('/bye2').to('foo#bye', namespace='MyApp.Controller')
+            r.get('/bye3').to('Foo#bye', namespace='MyApp.Controller')
+            t.get_ok('/bye1').status_is(200).content_is('Good bye.')
+            t.get_ok('/bye2').status_is(200).content_is('Good bye.')
+            t.get_ok('/bye3').status_is(200).content_is('Good bye.')
+            r.get('/bye4').to(namespace='MyApp.MyController', controller='Foo.Bar', action='bye')
+            r.get('/bye5').to('foo-bar#bye', namespace='MyApp.MyController')
+            r.get('/hey').to('Foo.Bar#hey', namespace='MyApp.MyController')
+            for path in ('/bye4', '/bye5', '/hey'):
+                t.get_ok(path).status_is(500).text_is(
+                    '#error', 'Controller "MyApp.MyController.Foo.Bar" does not exist'
+                )
 
-        is_deeply_ok(r.namespaces, ['MyApp.Controller', 'MyApp'], 'default namespaces')
-        r.namespaces = ['MyApp.MyController']
-        t.get_ok('/bye').status_is(500).text_is('#error', 'Controller "MyApp.MyController.Foo" does not exist')
+            is_deeply_ok(r.namespaces, ['MyApp.Controller', 'MyApp'], 'default namespaces')
+            r.namespaces = ['MyApp.MyController']
+            t.get_ok('/bye').status_is(500).text_is('#error', 'Controller "MyApp.MyController.Foo" does not exist')
 
 with subtest('Route to callback'):
     app = Pyjoyment.new()
@@ -241,9 +244,9 @@ with subtest('Route to callback'):
     def bye2(c):
         c.render(text='Good bye.')
 
-    t = Pyjo.Test.Pyjo.new(app)
-    t.get_ok('/bye').status_is(200).content_is('Good bye.')
-    t.get_ok('/bye2').status_is(200).content_is('Good bye.')
+    with Pyjo.Test.Pyjo.new(app) as t:
+        t.get_ok('/bye').status_is(200).content_is('Good bye.')
+        t.get_ok('/bye2').status_is(200).content_is('Good bye.')
 
 with subtest('Named routes'):
     app = Pyjoyment.new()
@@ -266,15 +269,15 @@ with subtest('Named routes'):
             c.stash(button='green')
         c.render(text=c.stash('button') or '')
 
-    t = Pyjo.Test.Pyjo.new(app)
-    t.get_ok('/urls/marcus').status_is(200).content_is('green')
-    is_ok(urls['baz'], '/foo/marcus', 'in previous request context')
-    is_ok(urls['jan'], '/foo/jan', 'with placeholder')
-    like_ok(urls['abs'], re.compile(r'^http://127\.0\.0\.1:\d+/foo/jan$'), 'absolute')
-    is_ok(urls['foobar'], '/foo/bar', 'automatic name')
-    is_ok(urls['current'], '/urls/marcus', 'current')
-    is_ok(urls['none'], '/urls/marcus', 'no name')
-    is_ok(urls['name'], 'urlsuser', 'current route')
+    with Pyjo.Test.Pyjo.new(app) as t:
+        t.get_ok('/urls/marcus').status_is(200).content_is('green')
+        is_ok(urls['baz'], '/foo/marcus', 'in previous request context')
+        is_ok(urls['jan'], '/foo/jan', 'with placeholder')
+        like_ok(urls['abs'], re.compile(r'^http://127\.0\.0\.1:\d+/foo/jan$'), 'absolute')
+        is_ok(urls['foobar'], '/foo/bar', 'automatic name')
+        is_ok(urls['current'], '/urls/marcus', 'current')
+        is_ok(urls['none'], '/urls/marcus', 'no name')
+        is_ok(urls['name'], 'urlsuser', 'current route')
 
 with subtest('Optional placeholders'):
     r = Pyjoyment.new().routes
@@ -364,50 +367,50 @@ with subtest('Under'):
     auth.get('/blackjack').to(cb=lambda c: c.render(text='Blackjack!'))
     stack = match(r, '/blackjack')
     ok(callable(stack[0]['cb']), 'callback')
-    t = Pyjo.Test.Pyjo.new(app)
-    t.get_ok('/blackjack').status_is(401).content_is("You're not Bender.")
-    t.get_ok('/blackjack', {'X-Bender': '1'}).status_is(200).content_is('Blackjack!')
+    with Pyjo.Test.Pyjo.new(app) as t:
+        t.get_ok('/blackjack').status_is(401).content_is("You're not Bender.")
+        t.get_ok('/blackjack', {'X-Bender': '1'}).status_is(200).content_is('Blackjack!')
 
-    app = Pyjoyment.new()
-    r = app.routes
+        app = Pyjoyment.new()
+        r = app.routes
 
-    @r.under('/maybe')
-    def maybe(c):
+        @r.under('/maybe')
+        def maybe(c):
 
-        # Wait 3 seconds and then give visitors a 50% chance to continue
-        @Pyjo.IOLoop.timer(0.03)
-        def timer(loop):
+            # Wait 3 seconds and then give visitors a 50% chance to continue
+            @Pyjo.IOLoop.timer(0.03)
+            def timer(loop):
 
-            # Loser
-            if not random.randrange(2):
-                return c.render(text='No luck.')
+                # Loser
+                if not random.randrange(2):
+                    return c.render(text='No luck.')
 
-            # Winner
-            c.proceed()
+                # Winner
+                c.proceed()
 
-        return None
+            return None
 
-    maybe.get('/').to(cb=lambda c: c.render(text='Winner!'))
-    t = Pyjo.Test.Pyjo.new(app)
-    with patch('random.randrange', return_value=0):
-        t.get_ok('/maybe').status_is(200).content_is('No luck.')
-    with patch('random.randrange', return_value=1):
-        t.get_ok('/maybe').status_is(200).content_is('Winner!')
+        maybe.get('/').to(cb=lambda c: c.render(text='Winner!'))
+        with Pyjo.Test.Pyjo.new(app) as t:
+            with patch('random.randrange', return_value=0):
+                t.get_ok('/maybe').status_is(200).content_is('No luck.')
+            with patch('random.randrange', return_value=1):
+                t.get_ok('/maybe').status_is(200).content_is('Winner!')
 
-    app = Pyjoyment.new()
-    r = app.routes
-    actions = []
-    one = r.under('/one').to(cb=lambda c: True, action='first')
-    two = one.under('/two').to(cb=lambda c: True, action='second')
-    three = two.under('/three').to(cb=lambda c: True, action='third')
+            app = Pyjoyment.new()
+            r = app.routes
+            one = r.under('/one').to(cb=lambda c: True, action='first')
+            two = one.under('/two').to(cb=lambda c: True, action='second')
+            three = two.under('/three').to(cb=lambda c: True, action='third')
 
-    @three.get('/four', {'action': 'fourth'})
-    def four(c):
-        # Action of the fourth dispatch cycle
-        action = c.match.stack[3]['action']
-        c.render(text=action)
+            @three.get('/four', {'action': 'fourth'})
+            def four(c):
+                # Action of the fourth dispatch cycle
+                action = c.match.stack[3]['action']
+                c.render(text=action)
 
-    Pyjo.Test.Pyjo.new(app).get_ok('/one/two/three/four').status_is(200).content_is('fourth')
+            with Pyjo.Test.Pyjo.new(app) as t:
+                t.get_ok('/one/two/three/four').status_is(200).content_is('fourth')
 
 with subtest('Formats'):
     r = Pyjoyment.new().routes
@@ -446,9 +449,9 @@ with subtest('WebSockets'):
         app.routes.namespaces = ['MyApp.Controller']
         app.routes.websocket('/echo').to('foo#echo')
         is_ok(endpoint(app.routes, '/echo'), None, 'no handshake')
-        t = Pyjo.Test.Pyjo.new(app)
-        t.websocket_ok('/echo').header_is('Upgrade', 'websocket').send_ok('hi').message_ok().message_is('echo: hi')
-        t.finish_ok()
+        with Pyjo.Test.Pyjo.new(app) as t:
+            t.websocket_ok('/echo').header_is('Upgrade', 'websocket').send_ok('hi').message_ok().message_is('echo: hi')
+            t.finish_ok()
 
 with subtest('Catch-all route'):
     app = Pyjoyment.new()
@@ -460,10 +463,10 @@ with subtest('Catch-all route'):
         whatever = c.param('whatever')
         c.render(text=f'/{whatever} did not match.', status=404)
 
-    t = Pyjo.Test.Pyjo.new(app)
-    t.get_ok('/welcome').status_is(200).content_is('Welcome!')
-    t.get_ok('/').status_is(404).content_is('/ did not match.')
-    t.post_ok('/foo/bar.txt').status_is(404).content_is('/foo/bar.txt did not match.')
+    with Pyjo.Test.Pyjo.new(app) as t:
+        t.get_ok('/welcome').status_is(200).content_is('Welcome!')
+        t.get_ok('/').status_is(404).content_is('/ did not match.')
+        t.post_ok('/foo/bar.txt').status_is(404).content_is('/foo/bar.txt did not match.')
 
 with subtest('Conditions'):
     app = Pyjoyment.new()
@@ -472,12 +475,12 @@ with subtest('Conditions'):
     r.get('/').requires(agent=re.compile(r'Firefox')).to(cb=lambda c: c.render(text='Firefox'))
     r.get('/').requires(agent=re.compile(r'Internet Explorer')).to(cb=lambda c: c.render(text='IE'))
     r.get('/').requires(host='docs.mojolicious.org').to(cb=lambda c: c.render(text='Docs'))
-    t = Pyjo.Test.Pyjo.new(app)
-    t.get_ok('/', {'Origin': 'http://python.org'}).status_is(200).content_is('Python')
-    t.get_ok('/', {'User-Agent': 'Firefox'}).status_is(200).content_is('Firefox')
-    t.get_ok('/', {'User-Agent': 'Internet Explorer'}).status_is(200).content_is('IE')
-    t.get_ok('/', {'Host': 'docs.mojolicious.org'}).status_is(200).content_is('Docs')
-    t.get_ok('/').status_is(404)
+    with Pyjo.Test.Pyjo.new(app) as t:
+        t.get_ok('/', {'Origin': 'http://python.org'}).status_is(200).content_is('Python')
+        t.get_ok('/', {'User-Agent': 'Firefox'}).status_is(200).content_is('Firefox')
+        t.get_ok('/', {'User-Agent': 'Internet Explorer'}).status_is(200).content_is('IE')
+        t.get_ok('/', {'Host': 'docs.mojolicious.org'}).status_is(200).content_is('Docs')
+        t.get_ok('/').status_is(404)
 
 with subtest('Hooks'):
     with application('hooks'), Pyjo.Test.Pyjo.new('MyApp') as t:
@@ -506,45 +509,46 @@ with subtest('Hooks'):
         if re.search(r'Internet Explorer', agent):
             c.stash(variant='ie')
 
-    t = Pyjo.Test.Pyjo.new(app)
-    t.get_ok('/pyjo/pyjo.css').status_is(200).header_is('Cache-Control', 'max-age=3600, must-revalidate')
-    t.get_ok('/').status_is(200).header_exists_not('Server').content_is('default')
-    t.get_ok('/', {'User-Agent': 'Internet Explorer'}).status_is(200).content_is('ie')
+    with Pyjo.Test.Pyjo.new(app) as t:
+        t.get_ok('/pyjo/pyjo.css').status_is(200).header_is('Cache-Control', 'max-age=3600, must-revalidate')
+        t.get_ok('/').status_is(200).header_exists_not('Server').content_is('default')
+        t.get_ok('/', {'User-Agent': 'Internet Explorer'}).status_is(200).content_is('ie')
 
-    # Forward exceptions to a web service
-    app = Pyjoyment.new()
-    bugs = []
-    promises = []
-    app.routes.post('/bugs').to(cb=lambda c: bugs.append(c.param('exception')) or c.render(text='ok'))
+        # Forward exceptions to a web service
+        app = Pyjoyment.new()
+        bugs = []
+        promises = []
+        app.routes.post('/bugs').to(cb=lambda c: bugs.append(c.param('exception')) or c.render(text='ok'))
 
-    @app.routes.get('/dies')
-    def dies(c):
-        raise Exception('Intentional error')
+        @app.routes.get('/dies')
+        def dies(c):
+            raise Exception('Intentional error')
 
-    @app.hook('after_dispatch')
-    def forward(c):
-        if not (e := c.stash('exception')):
-            return
-        promises.append(c.ua().post_p('/bugs', form={'exception': str(e)}))
+        @app.hook('after_dispatch')
+        def forward(c):
+            if not (e := c.stash('exception')):
+                return
+            promises.append(c.ua().post_p('/bugs', form={'exception': str(e)}))
 
-    # The server of the user agent of an application is the one of the first application in a process, as in Mojo
-    app.ua.server.app = app
-    # The user agent of the application has a server of its own, which is closed here
-    with Pyjo.Test.Pyjo.new(app) as t, app.ua:
-        t.get_ok('/dies').status_is(500)
-        promises[0].wait()
-    is_ok(len(bugs), 1, 'one exception')
-    like_ok(bugs[0], re.compile(r'^Intentional error'), 'exception')
+        # The server of the user agent of an application is the one of the first application in a process, as in Mojo
+        app.ua.server.app = app
+        # The user agent of the application has a server of its own, which is closed here
+        with Pyjo.Test.Pyjo.new(app) as t, app.ua:
+            t.get_ok('/dies').status_is(500)
+            promises[0].wait()
+        is_ok(len(bugs), 1, 'one exception')
+        like_ok(bugs[0], re.compile(r'^Intentional error'), 'exception')
 
-    # Pass route name as argument to actions
-    app = Pyjoyment.new()
+        # Pass route name as argument to actions
+        app = Pyjoyment.new()
 
-    @app.hook('around_action')
-    def around_action(next, c, action, last):
-        return action(c, c.current_route())
+        @app.hook('around_action')
+        def around_action(next, c, action, last):
+            return action(c, c.current_route())
 
-    app.routes.get('/name').to(cb=lambda c, name: c.render(text=name))
-    Pyjo.Test.Pyjo.new(app).get_ok('/name').status_is(200).content_is('name')
+        app.routes.get('/name').to(cb=lambda c, name: c.render(text=name))
+        with Pyjo.Test.Pyjo.new(app) as t:
+            t.get_ok('/name').status_is(200).content_is('name')
 
 with subtest('Shortcuts'):
     r = Pyjoyment.new().routes
@@ -642,10 +646,10 @@ with subtest('Adding conditions'):
 
     r.add_condition('query', query)
     r.get('/hello').requires(query={'test': '1', 'to': 'world'}).to(cb=lambda c: c.render(text='Hello World!'))
-    t = Pyjo.Test.Pyjo.new(app)
-    t.get_ok('/hello?to=world&test=1').status_is(200).content_is('Hello World!')
-    t.get_ok('/hello?to=world').status_is(404)
-    t.get_ok('/hello?to=mars&test=1').status_is(404)
+    with Pyjo.Test.Pyjo.new(app) as t:
+        t.get_ok('/hello?to=world&test=1').status_is(200).content_is('Hello World!')
+        t.get_ok('/hello?to=world').status_is(404)
+        t.get_ok('/hello?to=mars&test=1').status_is(404)
 
 with subtest('Condition plugins'):
     with application('werewolf'):
@@ -683,22 +687,22 @@ with subtest('Embed applications'):
         app = Pyjoyment.new()
         app.routes.namespaces = ['MyApp.Controller']
         app.routes.any('/foo').set(partial=True).to('bar#', name='Pyjo')
-        t = Pyjo.Test.Pyjo.new(app)
-        t.get_ok('/foo/hello').status_is(200).content_is('Hello Pyjo.')
-        t.get_ok('/foo/bye').status_is(404)
+        with Pyjo.Test.Pyjo.new(app) as t:
+            t.get_ok('/foo/hello').status_is(200).content_is('Hello Pyjo.')
+            t.get_ok('/foo/bye').status_is(404)
 
     with application('embed'):
         app = Pyjoyment.new()
         app.routes.namespaces = ['MyApp.Controller']
         app.routes.any('/foo').set(partial=True).to('bar#', name='Pyjo')
-        t = Pyjo.Test.Pyjo.new(app)
-        t.get_ok('/foo').status_is(200).content_is('Hello Pyjo.')
-        t.get_ok('/foo/whatever').status_is(200).content_is('Hello Pyjo.')
+        with Pyjo.Test.Pyjo.new(app) as t:
+            t.get_ok('/foo').status_is(200).content_is('Hello Pyjo.')
+            t.get_ok('/foo/whatever').status_is(200).content_is('Hello Pyjo.')
 
 with subtest('Application plugins'):
     with application('app_plugin'):
-        t = Pyjo.Test.Pyjo.new('MyApp')
-        t.get_ok('/foo/bar').status_is(200).content_is('Hello World!\n')
-        t.get_ok('/bar').status_is(404)
+        with Pyjo.Test.Pyjo.new('MyApp') as t:
+            t.get_ok('/foo/bar').status_is(200).content_is('Hello World!\n')
+            t.get_ok('/bar').status_is(404)
 
 done_testing()
