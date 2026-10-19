@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # workers.sh [PATTERN...]: the servers of workers, Pyjo.Server.Prefork and Pyjo.Server.Prethread, on a CPython with the
-# GIL and on the same CPython free-threaded, and other Python servers with as many workers, on the CPython with the GIL,
-# under concurrent requests
+# GIL and on the same CPython free-threaded, Pyjo.Server.Prefork on PyPy, and other Python servers with as many workers,
+# on the CPython with the GIL, under concurrent requests
 #
 # Each round runs every scenario, one after the other, so that a change of the load hits all of them, and a scenario
 # measures the requests per second of oha for each number of connections, with keep-alive for DURATION seconds and with
@@ -11,6 +11,7 @@
 #   PYJO_ROOT    Pyjoyment checkout (default: the one of this script)
 #   PYTHON       CPython with the GIL (default: python3)
 #   PYTHON_FT    the same CPython, free-threaded (default: python3t)
+#   PYTHON_PYPY  PyPy, whose scenarios are left out where it is not found (default: pypy3)
 #   VENV         venv of PYTHON with flask uvicorn uvloop httptools aiohttp tornado gunicorn granian
 #                (default: venv next to this script)
 #   OHA          the command of oha (default: mise exec oha@1.16.0 -- oha)
@@ -25,6 +26,7 @@ B=$(cd "$(dirname "$0")" && pwd)
 R=${PYJO_ROOT:-$(cd "$B/.." && pwd)}
 PY=${PYTHON:-python3}
 FT=${PYTHON_FT:-python3t}
+PP=${PYTHON_PYPY:-pypy3}
 V=${VENV:-$B/venv}/bin
 read -r -a oha <<<"${OHA:-mise exec oha@1.16.0 -- oha}"
 W=${WORKERS:-4}
@@ -37,6 +39,7 @@ mkdir -p "$OUT/www" && printf "Your Pyjo is working!" >"$OUT/www/index.html"
 echo "logs: $OUT"
 "$PY" -VV
 "$FT" -VV
+if command -v "$PP" >/dev/null; then "$PP" -VV; fi
 "${oha[@]}" --version
 echo "workers: $W, connections: ${connections[*]}, reactor: ${PYJO_REACTOR:-detected}"
 uptime
@@ -76,6 +79,10 @@ bench() {
     done
     [[ -n $match ]] || return
   fi
+  if ! command -v "$1" >/dev/null; then
+    echo "== $name: $1 not found"
+    return
+  fi
   # A server left on the port would share it, as the Pyjo servers listen with SO_REUSEPORT
   if lsof -nP -iTCP:"$port" -sTCP:LISTEN -t >/dev/null; then
     echo "== $name: port $port is busy"
@@ -88,9 +95,9 @@ bench() {
     sleep 0.1
   done
   echo "== $name, round $round: $(curl -s "http://127.0.0.1:$port/")"
-  # The workers that the manager spawns after the first one, and the warmup of all of them
+  # The workers that the manager spawns after the first one, and the warmup of all of them, longer for a JIT
   sleep 2
-  timeout 300 "${oha[@]}" --no-tui -n 2000 -c "$W" "http://127.0.0.1:$port/" >/dev/null
+  timeout 300 "${oha[@]}" --no-tui -n "${WARMUP:-2000}" -c "$W" "http://127.0.0.1:$port/" >/dev/null
   for c in "${connections[@]}"; do
     # A server that closes the connection after every response has no keep-alive to measure, and oha would use up the
     # ephemeral ports reconnecting
@@ -118,6 +125,11 @@ for round in $(seq "$ROUNDS"); do
   bench pyjoyment-prethread 38446 "$round" "$PY" pyjo_workers.py prethread 38446 "$W" pyjoyment
   bench pyjoyment-prefork-ft 38447 "$round" "$FT" pyjo_workers.py prefork 38447 "$W" pyjoyment
   bench pyjoyment-prethread-ft 38448 "$round" "$FT" pyjo_workers.py prethread 38448 "$W" pyjoyment
+
+  # PyPy, with a warmup for its JIT, as bench.sh has it; its threads take turns, as the ones of a CPython with the GIL,
+  # so it has no Prethread
+  WARMUP=20000 bench pyjo-prefork-pypy 38449 "$round" "$PP" pyjo_workers.py prefork 38449 "$W"
+  WARMUP=20000 bench pyjoyment-prefork-pypy 38450 "$round" "$PP" pyjo_workers.py prefork 38450 "$W" pyjoyment
 
   # The others, with the applications of bench.sh and WORKERS processes, on the CPython with the GIL; gunicorn-threads
   # has WORKERS threads in each of them, http.server and the development server of Flask threads of one process
