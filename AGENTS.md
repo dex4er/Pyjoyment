@@ -1014,6 +1014,43 @@ pattern.match_partial(path)`.
   are. The links of the pages are those of Pyjoyment. A bundled template has
   its markers as comments of the template, as `%# Renamed from Mojolicious:`.
 
+## Distributions of Their Own
+
+What needs a dependency is a distribution of its own, never a part of
+Pyjoyment: a reactor on another event loop, as Pyjo-Reactor-Twisted, or a
+plugin that needs a library. Each lives in a repository of its own, next to
+the checkout of Pyjoyment, so that one does not pull the dependencies of
+another, and follows the conventions of this file, which its own `AGENTS.md`
+points to; its documentation leaves out the paragraph "It has no counterpart
+in Mojolicious", which is obvious there. What it teaches about Pyjoyment comes
+back here.
+
+- **The package.** A distribution adds a module to a namespace of Pyjoyment,
+  `Pyjo.Reactor` or `Pyjoyment.Plugin`, which `extend_path` keeps open: its
+  wheel has only the module (`only-include` of hatchling), without the
+  `__init__.py` of the packages, which are those of Pyjoyment. Until the
+  revival of Pyjoyment is on PyPI, `tool.uv.sources` takes Pyjoyment from the
+  checkout next to it, `../Pyjoyment`, editable.
+- **The tests.** Its CI checks out Pyjoyment next to it and runs the whole
+  suite of Pyjoyment with the distribution, as `PYJO_REACTOR` set to the
+  reactor, on the Pythons of the matrix of Pyjoyment, daily too, as Pyjoyment
+  changes more often. A test of its own covers only what the suite does not,
+  as the port of the test of a reactor of Mojolicious (`reactor_ev.t`).
+- **A reactor on an event loop that is unique in a process**, as the reactor
+  of Twisted, is a subclass of `Pyjo.Reactor.Poll`, as `Mojo::Reactor::EV` is,
+  and `new` returns a `Pyjo.Reactor.Poll` object while another object uses the
+  loop. A loop that cannot run a second time, as `reactor.run()` of Twisted, is
+  driven one iteration at a time by `one_tick`, with the I/O before the timers,
+  as the reactor of poll has them: with the timers first, a recurring timer of
+  no time starves the I/O. While the loop runs, started by something else,
+  `start` and `one_tick` return right away, as `Pyjo.Reactor.Asyncio` does.
+- **References.** The callbacks that a loop of the whole process keeps refer
+  to the reactor weakly, and a callback does not refer to itself, as a
+  recurring timer that schedules itself from its closure would: the cycle
+  keeps the callback, and what it refers to, as a controller, until the
+  garbage collector runs, which `t/Pyjoyment/longpolling_lite_app.py` catches.
+  A finalizer removes what an object leaves in the loop.
+
 ## Linting and Formatting
 
 [Trunk](https://docs.trunk.io) runs the linters and formatters configured in
@@ -1250,3 +1287,5 @@ and the pull request.
   changes in separate commits.
 - A pull request description lists the changes and a validation checklist;
   check an item only once it has been verified.
+- A change of `AGENTS.md` alone, as what a distribution of its own teaches, is
+  committed on `master` directly, without a pull request.
