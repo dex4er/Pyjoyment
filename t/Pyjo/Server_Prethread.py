@@ -86,7 +86,8 @@ with subtest('Multiple workers and graceful shutdown'):
     def heartbeat(prethread, id):
         global worker, tx
         worker = id
-        if prethread.healthy < 4:
+        # One request, as the heartbeats that come in one read are emitted before the manager handles TERM
+        if prethread.healthy < 4 or tx is not None:
             return
         with Pyjo.UserAgent.new() as ua:
             tx = ua.get(f'http://127.0.0.1:{prethread.ports()[0]}')
@@ -259,8 +260,10 @@ with subtest('Second INT and TERM'):
             connection.sendall(b'GET / HTTP/1.1\r\nHost: x\r\n\r\n')
             os.kill(os.getpid(), signal.SIGINT)
 
-            @prethread.once('wait')
-            def again(prethread):
+            # The second signal once the manager has handled the first, as Python handles two of the same signal that
+            # come before its handler runs once
+            @prethread.once('finish')
+            def again(prethread, graceful):
                 os.kill(os.getpid(), second)
 
         prethread.graceful_timeout = 2

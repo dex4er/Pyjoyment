@@ -279,8 +279,10 @@ with subtest('Second INT and TERM'):
             connection.sendall(b'GET / HTTP/1.1\r\nHost: x\r\n\r\n')
             os.kill(os.getpid(), signal.SIGINT)
 
-            @prefork.once('wait')
-            def again(prefork):
+            # The second signal once the manager has handled the first, as Python handles two of the same signal that
+            # come before its handler runs once
+            @prefork.once('finish')
+            def again(prefork, graceful):
                 os.kill(os.getpid(), second)
 
         prefork.graceful_timeout = 2
