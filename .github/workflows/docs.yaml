@@ -1,8 +1,8 @@
 name: Docs
 
 # Builds the documentation with the Sphinx of docs/requirements.txt, as Read
-# the Docs does, from the pages of docs, the docstrings of the modules, the
-# README and the examples that the pages include: a warning of Sphinx, as a
+# the Docs does, from the pages of docs, the docstrings of the modules and the
+# examples that the pages include: a warning of Sphinx, as a
 # reference that is not found or a docstring that is not valid
 # reStructuredText, fails the build.
 on:
@@ -15,7 +15,6 @@ on:
       - examples/**
       - Pyjo/**
       - Pyjoyment/**
-      - README.rst
       - mise.lock
       - mise.toml
       - pyproject.toml
@@ -28,7 +27,6 @@ on:
       - examples/**
       - Pyjo/**
       - Pyjoyment/**
-      - README.rst
       - mise.lock
       - mise.toml
       - pyproject.toml

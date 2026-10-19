@@ -163,7 +163,7 @@ General rules for the project:
 - Functions and methods should be as short as possible, no spaghetti code.
 - Comments should be correctly capitalized, and funny if possible,
   punctuation is optional if it doesn't increase readability.
-- No names outside of ``README.rst`` and ``pyproject.toml``.
+- No names outside of ``README.md``, ``docs/license.rst`` and ``pyproject.toml``.
 
 .. Left out from Mojolicious: the rules of deprecations, of experimental features and of the code names of major
    releases, as Pyjoyment has no policy of deprecations yet and no code names

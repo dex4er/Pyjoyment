@@ -1,0 +1,268 @@
+[![Tests](https://github.com/dex4er/Pyjoyment/actions/workflows/tests.yaml/badge.svg?branch=master)](https://github.com/dex4er/Pyjoyment/actions/workflows/tests.yaml)
+[![Documentation Status](https://app.readthedocs.org/projects/pyjoyment/badge/?version=latest)](https://pyjoyment.readthedocs.io/en/latest/)
+
+# Pyjoyment
+
+A real-time web framework for the Python programming language, ported from
+[Mojolicious](https://mojolicious.org), the real-time web framework for Perl.
+Pyjoyment keeps the API of Mojolicious with Python names, so its documentation
+and experience carry over.
+
+The `Pyjo` package is the web development toolkit, ported from the `Mojo`
+modules, which can be used for all kinds of applications independently of the
+web framework:
+
+- HTTP and WebSocket client and server.
+- Non-blocking I/O web server, which also speaks FastCGI and runs as an ASGI,
+  WSGI or CGI application, or as an event function of AWS Lambda.
+- HTML/XML parser with CSS selector support.
+- JSON with JSON Pointers, YAML and TOML, all loaded and dumped.
+- Command line options with `Pyjo.GetOpt`, in the way of Getopt::Long,
+  argparse and Cobra, also from environment variables.
+- Python-ish templates and template strings, with automatic escaping.
+- Containers for URLs, paths, query strings, headers, cookies and HTTP
+  messages.
+- Event emitter, event loop with TCP, UDP and UNIX domain sockets, logger
+  and utility functions.
+- Test scripts which print the [Test Anything Protocol](https://testanything.org/)
+  (TAP), with `Pyjo.Test`, inspired by Perl's `Test::More`, and a test
+  harness, `Pyjo.Prove`, inspired by Perl's `prove`.
+
+The `Pyjoyment` package is the web framework itself: routes, controllers,
+renderer, plugins, `Pyjoyment.Lite` and the command line interface. It
+renders JSON, YAML and TOML, and reads its configuration from Python, JSON,
+YAML and TOML files.
+
+Both are cloud native: `generate dockerfile` writes the image of an
+application, whose server stops gracefully on the `TERM` of its container
+and listens on the port of `PORT`, as Knative, Cloud Run, Render, Koyeb and
+Heroku set it, and an application runs as an event function of AWS Lambda
+too.
+
+Pyjoyment requires Python 3.12 or newer and runs on PyPy on a best-effort
+basis. It needs nothing besides the Python standard library.
+
+## Status
+
+Pyjoyment was written against Mojolicious 6 and is being revived as a port of
+Mojolicious 9 to Python 3.12 and newer, with `asyncio` as its event loop.
+The toolkit, the `Pyjo` package, is ported: URLs, DOM and CSS selectors,
+JSON, templates, HTTP messages and cookies, the event loop with promises, the
+user agent, and the servers, on their own, preforking, prethreading, with hot
+deployment or reloading, and through FastCGI, ASGI, WSGI, CGI and AWS Lambda. So is the web framework, the
+`Pyjoyment` package: routes, controllers, the renderer with templates and
+template strings, plugins, `Pyjoyment.Lite` and the commands. The tests of
+Mojolicious are ported with them, and a ported module names the Mojolicious
+version it was ported from in its documentation.
+
+The progress is tracked in [GitHub Issues](https://github.com/dex4er/Pyjoyment/issues).
+
+## Installation
+
+Pyjoyment is installed from its Git repository, as the release on PyPI
+predates the revival:
+
+```sh
+pip install git+https://github.com/dex4er/Pyjoyment
+```
+
+or, in a project managed with [uv](https://docs.astral.sh/uv/):
+
+```sh
+uv add git+https://github.com/dex4er/Pyjoyment
+```
+
+## Quick start
+
+These three lines are a whole web application.
+
+```python
+from Pyjoyment.Lite import *
+
+
+get('/', {'text': 'I ♥ Pyjoyment!'})
+
+app.start()
+```
+
+To run the example with the built-in development web server, just put the
+code into a file and start it with `pyjo-reload`.
+
+```console
+$ pyjo-reload hello.py
+Web application available at http://127.0.0.1:3000
+```
+
+Test it with any HTTP client you prefer.
+
+```console
+$ curl http://127.0.0.1:3000/
+I ♥ Pyjoyment!
+```
+
+## Duct tape for the HTML5 web
+
+Use all the latest Python and HTML features in beautiful single file
+prototypes like this one, and grow them easily into well-structured
+Model-View-Controller web applications with `pyjo generate app`.
+
+```python
+"""
+__DATA__
+
+@@ index.html.ep
+% url = url_for('title')
+<script>
+  const ws = new WebSocket('<%= url.to_abs() %>');
+  ws.onmessage = function (event) { document.body.innerHTML += event.data };
+  ws.onopen    = function (event) { ws.send('https://mojolicious.org') };
+</script>
+"""
+
+from Pyjoyment.Lite import *
+
+
+# Render template "index.html.ep" from the DATA section
+@get('/')
+def index(c):
+    c.render(template='index')
+
+
+# WebSocket service used by the template to extract the title from a website
+@websocket('/title')
+def title(c):
+    @c.on('message')
+    def message(c, msg):
+        c.ua().get_p(msg).then(lambda tx: c.send(tx.result.dom().at('title').text))
+
+
+app.start()
+```
+
+The templates of a script of `Pyjoyment.Lite` are in its docstring, after a
+line `__DATA__`, and the website is requested without blocking, as the
+WebSocket service runs in the event loop.
+
+## Servers
+
+`Pyjo.HelloWorld` is the application that a server runs when it is given
+none, and it answers every request with `Your Pyjo is working!`. It runs
+natively on the web server of Pyjoyment:
+
+```python
+import Pyjo.HelloWorld
+import Pyjo.Server.Daemon
+
+
+Pyjo.Server.Daemon.new(app=Pyjo.HelloWorld.new(), listen=['http://*:3000']).run()
+```
+
+on [uvicorn](https://www.uvicorn.org/), an ASGI server
+(`pip install uvicorn`):
+
+```python
+import Pyjo.HelloWorld
+import Pyjo.Server.ASGI
+
+import uvicorn
+
+
+app = Pyjo.Server.ASGI.new(app=Pyjo.HelloWorld.new()).to_asgi_app()
+
+uvicorn.run(app, port=3000)
+```
+
+or on [Werkzeug](https://werkzeug.palletsprojects.com/), a WSGI server
+(`pip install werkzeug`):
+
+```python
+import Pyjo.HelloWorld
+import Pyjo.Server.WSGI
+
+from werkzeug.serving import run_simple
+
+
+app = Pyjo.Server.WSGI.new(app=Pyjo.HelloWorld.new()).to_wsgi_app()
+
+run_simple('localhost', 3000, app)
+```
+
+and answers on port 3000:
+
+```sh
+curl http://localhost:3000/
+```
+
+On a platform that tells the server the port to listen on with the `PORT`
+environment variable, as [Knative](https://knative.dev/),
+[Cloud Run](https://cloud.google.com/run), [Render](https://render.com/),
+[Koyeb](https://www.koyeb.com/) or [Heroku](https://www.heroku.com/), the
+web server of Pyjoyment listens on that port, and `generate dockerfile`
+writes the `Dockerfile` of the image of an application, with the port that
+the image exposes:
+
+```sh
+./myapp.py generate dockerfile --port 8080
+```
+
+On [AWS Lambda](https://aws.amazon.com/lambda/), it is an event function,
+whose handler `hello_world_lambda.handler` answers the events of API
+Gateway, Function URLs and Application Load Balancers:
+
+```python
+import Pyjo.HelloWorld
+import Pyjo.Server.Lambda
+
+
+# The handler "hello_world_lambda.handler" of an event function of AWS Lambda
+handler = Pyjo.Server.Lambda.new(app=Pyjo.HelloWorld.new()).to_lambda_app()
+```
+
+## Documentation
+
+The documentation is on [Read the Docs](https://pyjoyment.readthedocs.io/).
+
+## Examples
+
+### Web scraping
+
+```python
+import Pyjo.UserAgent
+
+from Pyjo.String.Unicode import u
+
+
+# Extract named character references from HTML spec
+tx = Pyjo.UserAgent.new().get('https://html.spec.whatwg.org')
+for n in tx.res.dom('#named-character-references-table tbody > tr').each():
+    u(n.at('td > code').text + ' ' + n.children('td')[1].text).trim().say()
+```
+
+### URL manipulation
+
+```python
+import Pyjo.URL
+
+
+# 'ssh+git://git@github.com/dex4er/Pyjoyment.git'
+url = Pyjo.URL.new('https://github.com/dex4er/Pyjoyment')
+print(url.set(scheme='ssh+git', userinfo='git', path=f'{url.path}.git').to_unsafe_str())
+
+# 'https://pypi.org/search/?q=Pyjoyment&o=&c=Programming+Language+%3A%3A+Python'
+url = Pyjo.URL.new('https://pypi.org/search/')
+print(url.set(query=[('q', 'Pyjoyment'), ('o', ''), ('c', 'Programming Language :: Python')]))
+```
+
+## Copyright and license
+
+Copyright (C) 2014-2026, Piotr Roszatycki.
+
+Based on Mojolicious: Copyright (C) 2008-2025, Sebastian Riedel and others.
+
+This program is free software, you can redistribute it and/or modify it under
+the terms of the Artistic License version 2.0.
+
+The pages of errors bundle [Bootstrap](https://getbootstrap.com), with
+Popper, under the MIT License, and [highlight.js](https://highlightjs.org)
+under the BSD 3-Clause License, whose texts are next to them in
+`Pyjoyment/resources/public/pyjo`.
