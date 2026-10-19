@@ -218,6 +218,23 @@ import Pyjo.Server.Lambda
 handler = Pyjo.Server.Lambda.new(app=Pyjo.HelloWorld.new()).to_lambda_app()
 ```
 
+## Distributions
+
+Pyjoyment needs nothing besides the Python standard library, so what needs
+another library is a distribution of its own, which adds a module to a
+namespace of Pyjoyment, as `Pyjo.Reactor` for a reactor or `Pyjoyment.Plugin`
+for a plugin. They are installed from their Git repositories until they are
+on PyPI.
+
+- [Pyjo-Reactor-Twisted](https://github.com/dex4er/Pyjo-Reactor-Twisted):
+  `Pyjo.Reactor.Twisted`, on the reactor of [Twisted](https://twisted.org),
+  so that an application shares the event loop with the code of Twisted.
+
+```sh
+uv add git+https://github.com/dex4er/Pyjo-Reactor-Twisted
+PYJO_REACTOR=Pyjo.Reactor.Twisted ./myapp.py daemon
+```
+
 ## Documentation
 
 The documentation is on [Read the Docs](https://pyjoyment.readthedocs.io/).
