@@ -1,15 +1,18 @@
 #!/usr/bin/env bash
-# workers.sh [SCENARIO...]: the servers of workers, Pyjo.Server.Prefork and Pyjo.Server.Prethread, under concurrent
-# requests, on a CPython with the GIL and on the same CPython free-threaded
+# workers.sh [PATTERN...]: the servers of workers, Pyjo.Server.Prefork and Pyjo.Server.Prethread, on a CPython with the
+# GIL and on the same CPython free-threaded, and other Python servers with as many workers, on the CPython with the GIL,
+# under concurrent requests
 #
 # Each round runs every scenario, one after the other, so that a change of the load hits all of them, and a scenario
 # measures the requests per second of oha for each number of connections, with keep-alive for DURATION seconds and with
-# a new connection per request for REQUESTS requests. The end has the medians of the rounds. Without arguments, all
-# scenarios run.
+# a new connection per request for REQUESTS requests. The end has the medians of the rounds. The scenarios run whose
+# names match a pattern of the arguments, as `pyjo*` or `*-ft`, or all of them without arguments.
 #
 #   PYJO_ROOT    Pyjoyment checkout (default: the one of this script)
 #   PYTHON       CPython with the GIL (default: python3)
 #   PYTHON_FT    the same CPython, free-threaded (default: python3t)
+#   VENV         venv of PYTHON with flask uvicorn uvloop httptools aiohttp tornado gunicorn granian
+#                (default: venv next to this script)
 #   OHA          the command of oha (default: mise exec oha@1.16.0 -- oha)
 #   WORKERS      workers of the servers (default: 4)
 #   CONNECTIONS  numbers of connections (default: "1 WORKERS 4*WORKERS")
@@ -22,6 +25,7 @@ B=$(cd "$(dirname "$0")" && pwd)
 R=${PYJO_ROOT:-$(cd "$B/.." && pwd)}
 PY=${PYTHON:-python3}
 FT=${PYTHON_FT:-python3t}
+V=${VENV:-$B/venv}/bin
 read -r -a oha <<<"${OHA:-mise exec oha@1.16.0 -- oha}"
 W=${WORKERS:-4}
 read -r -a connections <<<"${CONNECTIONS:-1 $W $((4 * W))}"
@@ -29,12 +33,12 @@ D=${DURATION:-10}
 N=${REQUESTS:-5000}
 ROUNDS=${ROUNDS:-3}
 OUT=${BENCH_OUT:-$(mktemp -d)}
-mkdir -p "$OUT"
+mkdir -p "$OUT/www" && printf "Your Pyjo is working!" >"$OUT/www/index.html"
 echo "logs: $OUT"
 "$PY" -VV
 "$FT" -VV
 "${oha[@]}" --version
-echo "workers: $W, connections: ${connections[*]}"
+echo "workers: $W, connections: ${connections[*]}, reactor: ${PYJO_REACTOR:-detected}"
 uptime
 
 # Wait for TIME_WAIT to drain, as a new connection per request uses up the ephemeral ports
@@ -64,7 +68,14 @@ measure() {
 bench() {
   local name=$1 port=$2 round=$3
   shift 3
-  if [[ ${#selected[@]} -gt 0 ]] && [[ " ${selected[*]} " != *" $name "* ]]; then return; fi
+  if [[ ${#selected[@]} -gt 0 ]]; then
+    local pattern match=
+    for pattern in "${selected[@]}"; do
+      # shellcheck disable=SC2053 # the argument is a pattern
+      [[ $name == $pattern ]] && match=1
+    done
+    [[ -n $match ]] || return
+  fi
   # A server left on the port would share it, as the Pyjo servers listen with SO_REUSEPORT
   if lsof -nP -iTCP:"$port" -sTCP:LISTEN -t >/dev/null; then
     echo "== $name: port $port is busy"
@@ -81,8 +92,12 @@ bench() {
   sleep 2
   timeout 300 "${oha[@]}" --no-tui -n 2000 -c "$W" "http://127.0.0.1:$port/" >/dev/null
   for c in "${connections[@]}"; do
-    measure "$name" "$round" keep-alive "$c" "$port" -z "${D}s"
-    drain
+    # A server that closes the connection after every response has no keep-alive to measure, and oha would use up the
+    # ephemeral ports reconnecting
+    if [[ ${KEEPALIVE:-yes} == yes ]]; then
+      measure "$name" "$round" keep-alive "$c" "$port" -z "${D}s"
+      drain
+    fi
     measure "$name" "$round" new-connection "$c" "$port" -n "$N" --disable-keepalive
   done
   stop "$port"
@@ -103,6 +118,18 @@ for round in $(seq "$ROUNDS"); do
   bench pyjoyment-prethread 38446 "$round" "$PY" pyjo_workers.py prethread 38446 "$W" pyjoyment
   bench pyjoyment-prefork-ft 38447 "$round" "$FT" pyjo_workers.py prefork 38447 "$W" pyjoyment
   bench pyjoyment-prethread-ft 38448 "$round" "$FT" pyjo_workers.py prethread 38448 "$W" pyjoyment
+
+  # The others, with the applications of bench.sh and WORKERS processes, on the CPython with the GIL; gunicorn-threads
+  # has WORKERS threads in each of them, http.server and the development server of Flask threads of one process
+  bench uvicorn-h11 38451 "$round" "$V/python" -m uvicorn --port 38451 --workers "$W" --loop asyncio --http h11 asgi_app:app
+  bench uvicorn-uvloop 38452 "$round" "$V/python" -m uvicorn --port 38452 --workers "$W" --loop uvloop --http httptools asgi_app:app
+  bench granian 38453 "$round" "$V/granian" --interface asgi --host 127.0.0.1 --port 38453 --workers "$W" asgi_app:app
+  KEEPALIVE=no bench gunicorn 38454 "$round" "$V/gunicorn" -b 127.0.0.1:38454 -w "$W" wsgi_app:app
+  bench gunicorn-threads 38459 "$round" "$V/gunicorn" -b 127.0.0.1:38459 -k gthread -w "$W" --threads "$W" wsgi_app:app
+  bench aiohttp 38455 "$round" "$V/gunicorn" -b 127.0.0.1:38455 -k aiohttp.GunicornWebWorker -w "$W" aiohttp_app:app
+  bench tornado 38456 "$round" "$V/python" tornado_app.py 38456 "$W"
+  bench http.server 38457 "$round" "$V/python" -m http.server --bind 127.0.0.1 --protocol HTTP/1.1 -d "$OUT/www" 38457
+  KEEPALIVE=no bench flask 38458 "$round" "$V/python" -m flask --app flask_app run --port 38458 --with-threads
 done
 
 # The medians of the rounds, in the order of the scenarios

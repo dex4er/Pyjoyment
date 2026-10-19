@@ -30,13 +30,13 @@ scratch directory and adapt them to what it measures, keeping the rules in
 
 ## Scripts
 
-| Script                                         | What it does                                                                                                                                                            |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bench.sh [SCENARIO...]`                       | Every server, or the scenarios named: keep-alive 3 times, a new connection per request, and `ab -c 1`                                                                   |
-| `ab.sh [-n PAIRS] [-r REACTOR]... [REF]`       | `Pyjo.Server.Daemon` of a git ref (default `master`) against the working tree, interleaved, with the medians and the gain                                               |
-| `profile.sh [-n REQUESTS] [-r REACTOR] [ROOT]` | `cProfile` of `Pyjo.Server.Daemon` under keep-alive requests, with the function calls per request and the top of the profile                                            |
-| `ka.py PORT N`                                 | The client: `GET /` on one connection, reads by `Content-Length`; `RECONNECT=1` opens a connection for every request, `WARMUP` sets the requests before the measurement |
-| `workers.sh [SCENARIO...]`                     | `Pyjo.Server.Prefork` and `Pyjo.Server.Prethread` on a CPython with the GIL and free-threaded, rounds of oha at several numbers of connections, with the medians        |
+| Script                                         | What it does                                                                                                                                                                                                 |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `bench.sh [SCENARIO...]`                       | Every server, or the scenarios named: keep-alive 3 times, a new connection per request, and `ab -c 1`                                                                                                        |
+| `ab.sh [-n PAIRS] [-r REACTOR]... [REF]`       | `Pyjo.Server.Daemon` of a git ref (default `master`) against the working tree, interleaved, with the medians and the gain                                                                                    |
+| `profile.sh [-n REQUESTS] [-r REACTOR] [ROOT]` | `cProfile` of `Pyjo.Server.Daemon` under keep-alive requests, with the function calls per request and the top of the profile                                                                                 |
+| `ka.py PORT N`                                 | The client: `GET /` on one connection, reads by `Content-Length`; `RECONNECT=1` opens a connection for every request, `WARMUP` sets the requests before the measurement                                      |
+| `workers.sh [PATTERN...]`                      | `Pyjo.Server.Prefork` and `Pyjo.Server.Prethread` on a CPython with the GIL and free-threaded, and the other servers with as many workers, rounds of oha at several numbers of connections, with the medians |
 
 The applications answer `Your Pyjo is working!`: `hello.py` and
 `pyjo_daemon.py` are `Pyjo.HelloWorld` on `Pyjo.Server.Reload` and
@@ -77,6 +77,22 @@ workers by default, so that the client has cores left. A round runs every
 scenario, one after the other, and the end has the medians of the rounds;
 `BENCH_OUT` keeps the results of oha. The servers log at the level `info`,
 as an application that logs every request measures its log.
+
+The other servers run the applications of `bench.sh` with as many workers, on
+the CPython with the GIL, from the venv of `VENV`, made from that Python, as
+the one of `bench.sh` is from the Python of `mise.toml`: uvicorn with h11 and
+with uvloop and httptools, granian, gunicorn with its sync workers and with
+`gthread`, aiohttp in the workers of gunicorn, tornado with
+`fork_processes`, and `http.server` and the development server of Flask, which
+have threads of one process. The arguments are patterns of the names of the
+scenarios:
+
+```sh
+uv venv --python "$(uv python find --managed-python cpython-3.15.0-macos-aarch64-none)" /tmp/venv-workers
+uv pip install --python /tmp/venv-workers/bin/python \
+  flask uvicorn uvloop httptools aiohttp tornado gunicorn granian
+PYTHON=... PYTHON_FT=... VENV=/tmp/venv-workers benchmarks/workers.sh 'pyjo*' gunicorn
+```
 
 ## Measuring well
 
