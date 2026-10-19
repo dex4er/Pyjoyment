@@ -17,12 +17,17 @@ if not hasattr(os, 'fork'):
 if sys.platform == 'darwin' and getattr(sys, 'pypy_translation_info', {}).get('translation.jit'):
     plan(skip_all='PyPy with its JIT on macOS: the child of a fork crashes now and then with SIGBUS')
 
-import Pyjo.IOLoop.Server
 import Pyjo.Server.Prefork
 import Pyjo.UserAgent
 import Pyjoyment.HelloWorld
 
 from Pyjo.File import curfile, path, tempdir
+
+
+# Unlike Mojolicious: a server listens on a port that the system picks, which ports() gives, where the test picks one
+# with generate_port, which an outgoing connection of a test that runs at the same time can take before the server
+# binds it, and has a process id file of its own, where the default one, in the temporary directory of the system, is
+# the one of every server that runs at the same time
 
 
 with subtest('Manage and clean up PID file'):
@@ -70,11 +75,10 @@ with subtest('Bad PID file'):
 with subtest('Multiple workers and graceful shutdown'):
     dir = tempdir()
     file = dir.child('prefork.pid')
-    port = Pyjo.IOLoop.Server.object.generate_port()
     # Unlike Mojolicious: the default application of Pyjo.Server is Pyjo.HelloWorld, which has no hooks, so the test
     # passes Pyjoyment.HelloWorld, the Mojo::HelloWorld of Mojo
     prefork = Pyjo.Server.Prefork.new(
-        app=Pyjoyment.HelloWorld.new(), heartbeat_interval=0.5, listen=[f'http://*:{port}'], pid_file=file
+        app=Pyjoyment.HelloWorld.new(), heartbeat_interval=0.5, listen=['http://*'], pid_file=file
     )
     prefork.unsubscribe('request')
 
@@ -98,7 +102,7 @@ with subtest('Multiple workers and graceful shutdown'):
         # The user agent closes its connection, as PyPy frees it only when its garbage collector runs, which
         # the workers of a later server, forked with it, may do
         ua = Pyjo.UserAgent.new()
-        tx = ua.get(f'http://127.0.0.1:{port}')
+        tx = ua.get(f'http://127.0.0.1:{prefork.ports()[0]}')
         ua.ioloop.reset()
         # Unlike Mojolicious: TERM shuts the server down gracefully, where Mojo has QUIT
         os.kill(os.getpid(), signal.SIGTERM)
@@ -159,10 +163,7 @@ with subtest('Multiple workers and graceful shutdown (Pyjo.HelloWorld)'):
 
     dir = tempdir()
     file = dir.child('prefork.pid')
-    port = Pyjo.IOLoop.Server.object.generate_port()
-    prefork = Pyjo.Server.Prefork.new(
-        app=HelloWorld.new(), heartbeat_interval=0.5, listen=[f'http://*:{port}'], pid_file=file
-    )
+    prefork = Pyjo.Server.Prefork.new(app=HelloWorld.new(), heartbeat_interval=0.5, listen=['http://*'], pid_file=file)
     spawn, reap = [], []
     worker = tx = graceful = None
     prefork.on('spawn', lambda prefork, pid: spawn.append(pid))
@@ -174,7 +175,7 @@ with subtest('Multiple workers and graceful shutdown (Pyjo.HelloWorld)'):
         if prefork.healthy < 4:
             return
         ua = Pyjo.UserAgent.new()
-        tx = ua.get(f'http://127.0.0.1:{port}')
+        tx = ua.get(f'http://127.0.0.1:{prefork.ports()[0]}')
         ua.ioloop.reset()
         # Unlike Mojolicious: TERM shuts the server down gracefully, where Mojo has QUIT
         os.kill(os.getpid(), signal.SIGTERM)
@@ -195,8 +196,9 @@ with subtest('Multiple workers and graceful shutdown (Pyjo.HelloWorld)'):
 
 
 with subtest('One worker and immediate shutdown'):
-    port = Pyjo.IOLoop.Server.object.generate_port()
-    prefork = Pyjo.Server.Prefork.new(accepts=500, heartbeat_interval=0.5, listen=[f'http://*:{port}'], workers=1)
+    prefork = Pyjo.Server.Prefork.new(
+        accepts=500, heartbeat_interval=0.5, listen=['http://*'], pid_file=tempdir().child('prefork.pid'), workers=1
+    )
     spawn, reap = [], []
     tx = graceful = None
     prefork.unsubscribe('request')
@@ -213,7 +215,7 @@ with subtest('One worker and immediate shutdown'):
     def heartbeat(prefork, pid):
         global tx
         ua = Pyjo.UserAgent.new()
-        tx = ua.get(f'http://127.0.0.1:{port}')
+        tx = ua.get(f'http://127.0.0.1:{prefork.ports()[0]}')
         ua.ioloop.reset()
         # Unlike Mojolicious: QUIT shuts the server down immediately, where Mojo has TERM
         os.kill(os.getpid(), signal.SIGQUIT)
@@ -230,8 +232,9 @@ with subtest('One worker and immediate shutdown'):
 
 # Not in Mojolicious: a worker that gets TERM before it has its handler stops, where Mojo's serves on
 with subtest('TERM right after the fork'):
-    port = Pyjo.IOLoop.Server.object.generate_port()
-    prefork = Pyjo.Server.Prefork.new(heartbeat_interval=0.5, listen=[f'http://127.0.0.1:{port}'], workers=1)
+    prefork = Pyjo.Server.Prefork.new(
+        heartbeat_interval=0.5, listen=['http://127.0.0.1'], pid_file=tempdir().child('prefork.pid'), workers=1
+    )
     spawn, reap, heartbeats = [], [], []
 
     @prefork.on('spawn')
@@ -257,8 +260,9 @@ with subtest('TERM right after the fork'):
 with subtest('Second INT and TERM'):
 
     def second_signal(second):
-        port = Pyjo.IOLoop.Server.object.generate_port()
-        prefork = Pyjo.Server.Prefork.new(heartbeat_interval=0.5, listen=[f'http://127.0.0.1:{port}'], workers=1)
+        prefork = Pyjo.Server.Prefork.new(
+            heartbeat_interval=0.5, listen=['http://127.0.0.1'], pid_file=tempdir().child('prefork.pid'), workers=1
+        )
         prefork.unsubscribe('request')
 
         # A request that keeps the worker from stopping gracefully
@@ -271,7 +275,7 @@ with subtest('Second INT and TERM'):
 
         @prefork.once('heartbeat')
         def heartbeat(prefork, pid):
-            connections.append(connection := socket.create_connection(('127.0.0.1', port)))
+            connections.append(connection := socket.create_connection(('127.0.0.1', prefork.ports()[0])))
             connection.sendall(b'GET / HTTP/1.1\r\nHost: x\r\n\r\n')
             os.kill(os.getpid(), signal.SIGINT)
 
@@ -294,8 +298,9 @@ with subtest('Second INT and TERM'):
 
 # Not in Mojolicious: HUP restarts the workers gracefully, or emits the event "reload"
 with subtest('HUP'):
-    port = Pyjo.IOLoop.Server.object.generate_port()
-    prefork = Pyjo.Server.Prefork.new(heartbeat_interval=0.5, listen=[f'http://127.0.0.1:{port}'], workers=1)
+    prefork = Pyjo.Server.Prefork.new(
+        heartbeat_interval=0.5, listen=['http://127.0.0.1'], pid_file=tempdir().child('prefork.pid'), workers=1
+    )
     spawn, reap = [], []
     prefork.on('spawn', lambda prefork, pid: spawn.append(pid))
 
@@ -309,7 +314,9 @@ with subtest('HUP'):
     ok(len(spawn) >= 2, 'worker restarted')
     is_ok(reap[0], spawn[0], 'first worker stopped')
 
-    prefork = Pyjo.Server.Prefork.new(heartbeat_interval=0.5, listen=[f'http://127.0.0.1:{port}'], workers=1)
+    prefork = Pyjo.Server.Prefork.new(
+        heartbeat_interval=0.5, listen=['http://127.0.0.1'], pid_file=tempdir().child('prefork.pid'), workers=1
+    )
     reloads = []
 
     @prefork.on('reload')

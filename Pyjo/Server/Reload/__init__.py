@@ -53,12 +53,12 @@ pyjo-reload
       -b, --backend <name>           Reload backend to use for reloading,
                                      defaults to "Poll"
       -h, --help                     Show this message
-      -l, --listen <location>        One or more locations you want to listen
-                                     on, defaults to the value of PYJO_LISTEN,
-                                     the port of PORT or "http://*:3000"
-          --log-format <name>        Format of log messages, "text" or
-                                     "json", defaults to the value of
-                                     PYJO_LOG_FORMAT or "text"
+      -l, --listen <location>        One or more locations you want to listen on,
+                                     defaults to the value of PYJO_LISTEN, the
+                                     port of PORT or "http://*:3000"
+          --log-format <name>        Format of log messages, "text" or "json",
+                                     defaults to the value of PYJO_LOG_FORMAT or
+                                     "text"
       -m, --mode <name>              Operating mode for your application,
                                      defaults to the value of PYJO_MODE or
                                      "development"
@@ -66,9 +66,8 @@ pyjo-reload
                                      sys.stdout
       -w, --watch <directory/file>   One or more directories and files to watch
                                      for changes, defaults to the application
-                                     script as well as the "lib" and
-                                     "templates" directories in the current
-                                     working directory
+                                     script as well as the "lib" and "templates"
+                                     directories in the current working directory
 
 Start :mod:`Pyjoyment` applications with the :mod:`Pyjo.Server.Reload` web
 server.

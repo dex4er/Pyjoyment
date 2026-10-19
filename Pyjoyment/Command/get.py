@@ -44,8 +44,8 @@ Pyjoyment.Command.get - Get command
                                            PYJO_LOG_FORMAT or "text"
       -M, --method <method>                HTTP method to use, defaults to "GET"
       -m, --mode <name>                    Operating mode for your application,
-                                           defaults to the value of
-                                           PYJO_MODE or "development"
+                                           defaults to the value of PYJO_MODE or
+                                           "development"
       -o, --connect-timeout <seconds>      Connect timeout, defaults to the value
                                            of PYJO_CONNECT_TIMEOUT or 10
       -r, --redirect                       Follow up to 10 redirects

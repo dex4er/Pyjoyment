@@ -117,6 +117,28 @@ with subtest('env'):
         os.environ.pop('PYJO_MODE', None)
         os.environ.pop('PYJO_HOT_FOREGROUND', None)
 
+with subtest('Usage'):
+    usage = """Options:
+  -h, --help          Show this summary of available options
+      --home <path>   Path to home directory of your application, defaults to
+                      the value of PYJO_HOME or auto-detection
+"""
+    is_ok(Pyjo.GetOpt.format_usage(usage), usage, 'laid out')
+
+with subtest('format_usage'):
+    import Pyjoyment.Command.cgi
+
+    from Pyjo.Util import extract_usage
+
+    usage = extract_usage(Pyjoyment.Command.cgi.__file__)
+    is_ok(Pyjo.GetOpt.format_usage(usage), usage, 'usage')
+    like_ok(Pyjo.GetOpt.format_usage(usage, width=79), r'^Usage: APPLICATION cgi', 'width')
+
+    # The usage of a command, laid out
+    with contextlib.redirect_stdout(io.StringIO()) as stdout:
+        print(Pyjo.GetOpt.format_usage(extract_usage(Pyjoyment.Command.cgi.__file__)))
+    like_ok(stdout.getvalue(), r'--nph', 'printed')
+
 with subtest('new'):
     getopt = Pyjo.GetOpt.new(pass_through=True)
     args = ['--unknown', '--', 'x']

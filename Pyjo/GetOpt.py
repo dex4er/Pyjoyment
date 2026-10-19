@@ -104,6 +104,22 @@ application its mode. ::
     # python myapp.py --mode production sets PYJO_MODE
     getopt = Pyjo.GetOpt.new().option('m|mode=s', Pyjo.GetOpt.env('PYJO_MODE'))
 
+Usage
+-----
+
+The usage of a command, which :func:`Pyjo.Util.extract_usage` reads from its
+documentation, lists its options in a block after a line ``Options:``, an
+option with a short name as ``-h, --help`` or ``-V``, and one with a long name
+only as ``    --home <path>``, aligned with the long names of the others, and
+its description after them, in a column of its own. :func:`format_usage` lays
+out these blocks, so that a new option or a longer one needs no alignment by
+hand. ::
+
+    Options:
+      -h, --help          Show this summary of available options
+          --home <path>   Path to home directory of your application, defaults to
+                          the value of PYJO_HOME or auto-detection
+
 See also
 --------
 
@@ -125,6 +141,7 @@ from Pyjo.Util import warn
 import os
 import re
 import sys
+import textwrap
 
 from collections.abc import Callable, Sequence
 from typing import Any, Self, cast, overload
@@ -135,6 +152,13 @@ type Target = list[Any] | dict[Any, Any] | Callback | None
 
 _RE_FLOAT = re.compile(r'[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?')
 _RE_INT = re.compile(r'[-+]?\d+')
+
+# The default width of the lines of a usage, as the usages of Mojolicious have it
+WIDTH = 77
+
+# A line of options and a line of an option of a usage, with its label and its description
+_RE_USAGE_OPTIONS = re.compile(r'^Options\b[^:]*:$')
+_RE_USAGE_OPTION = re.compile(r'^  ((?:-\w(?:, --[\w-]+)?|    --[\w-]+)(?: \[?<[^>]+>\]?)?)(?: {2,}(\S.*))?$')
 
 
 class Pyjo_GetOpt(Pyjo.Base.object):
@@ -502,6 +526,55 @@ def env(name: str) -> Callable[[str, Any], None]:
         os.environ[name] = '1' if value is True else '0' if value is False else str(value)
 
     return target
+
+
+# Not in Getopt::Long: the layout of the options of a usage, which Pod::Usage leaves to the author of the POD
+def format_usage(usage: str, width: int = WIDTH) -> str:
+    """::
+
+        usage = Pyjo.GetOpt.format_usage(usage)
+        usage = Pyjo.GetOpt.format_usage(usage, width=79)
+
+    Lay out the blocks of options of a usage message, see `Usage`_: the
+    descriptions in a column three spaces after the longest option of the
+    block, wrapped to the width of the lines, ``77`` by default, and the rest
+    of the message as it is. ::
+
+        # The usage of a command, laid out
+        print(Pyjo.GetOpt.format_usage(extract_usage()))
+    """
+    lines = usage.split('\n')
+    result: list[str] = []
+    block: list[list[str]] = []
+
+    def flush() -> None:
+        if not block:
+            return
+        labels = [entry[0] for entry in block]
+        column = 2 + max(len(label) for label in labels) + 3
+        for label, *description in block:
+            wrapped = textwrap.wrap(
+                ' '.join(description), max(width - column, 1), break_long_words=False, break_on_hyphens=False
+            )
+            result.append(f'  {label:<{column - 2}}{wrapped[0]}'.rstrip() if wrapped else f'  {label}')
+            result.extend(' ' * column + line for line in wrapped[1:])
+        block.clear()
+
+    in_block = False
+    for line in lines:
+        if in_block and line.strip():
+            if m := _RE_USAGE_OPTION.match(line):
+                block.append([m[1].rstrip(), *([m[2]] if m[2] else [])])
+                continue
+            if block and line.startswith('   '):
+                block[-1].append(line.strip())
+                continue
+        if in_block:
+            flush()
+        in_block = _RE_USAGE_OPTIONS.match(line) is not None
+        result.append(line)
+    flush()
+    return '\n'.join(result)
 
 
 new = Pyjo_GetOpt.new

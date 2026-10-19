@@ -20,8 +20,8 @@ Pyjoyment.Command.eval - Eval command
                                 "text"
       -m, --mode <name>         Operating mode for your application, defaults to
                                 the value of PYJO_MODE or "development"
-      -v, --verbose             Print return value to sys.stdout -V
-                                Print returned data structure to sys.stdout
+      -v, --verbose             Print return value to sys.stdout
+      -V                        Print returned data structure to sys.stdout
 
 :mod:`Pyjoyment.Command.eval` runs code against applications. The code
 is Python, with the application as ``app``, and its result is the value of its

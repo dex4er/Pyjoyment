@@ -39,8 +39,8 @@ Pyjoyment.Command.prefork - Pre-fork command
                                            "json", defaults to the value of
                                            PYJO_LOG_FORMAT or "text"
       -m, --mode <name>                    Operating mode for your application,
-                                           defaults to the value of
-                                           PYJO_MODE or "development"
+                                           defaults to the value of PYJO_MODE or
+                                           "development"
       -P, --pid-file <path>                Path to process id file, defaults to
                                            "prefork.pid" in a temporary directory
       -p, --proxy [<network>]              Activate reverse proxy support,

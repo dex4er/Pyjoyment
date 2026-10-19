@@ -34,8 +34,8 @@ Pyjoyment.Command.daemon - Daemon command
                                            "json", defaults to the value of
                                            PYJO_LOG_FORMAT or "text"
       -m, --mode <name>                    Operating mode for your application,
-                                           defaults to the value of
-                                           PYJO_MODE or "development"
+                                           defaults to the value of PYJO_MODE or
+                                           "development"
       -p, --proxy [<network>]              Activate reverse proxy support,
                                            defaults to the value of
                                            PYJO_REVERSE_PROXY, optionally takes
