@@ -1053,6 +1053,18 @@ back here.
   as the reactor of poll has them: with the timers first, a recurring timer of
   no time starves the I/O. While the loop runs, started by something else,
   `start` and `one_tick` return right away, as `Pyjo.Reactor.Asyncio` does.
+- **State in the kernel.** Pyjoyment closes some sockets before it removes
+  them from the reactor, and forks the workers of `Pyjo.Server.Prefork`, the
+  servers of `Pyjo.Server.Hot` and `Pyjo.Server.Reload`, and the subprocesses.
+  A loop that keeps its state in the kernel, as epoll or kqueue, loses a
+  socket that is closed before it is removed, and shares the state with the
+  child of a fork, so a reactor prefers a loop with its state in the process,
+  as poll or select, gives the child of a fork what is its own, as the waker
+  of the loop, and is tested on Linux, as macOS has no epoll to show it.
+- **Hang-ups.** A loop that drops a handle at a hang-up or an error without
+  data, as a refused connection, still calls the watcher, as
+  `Pyjo.Reactor.Poll` does: the watcher finds the error of the socket, as
+  `Pyjo.IOLoop.Client` does to try the next address.
 - **References.** The callbacks that a loop of the whole process keeps refer
   to the reactor weakly, and a callback does not refer to itself, as a
   recurring timer that schedules itself from its closure would: the cycle
