@@ -10,9 +10,8 @@ applications.
 This is only the first of the guides. Other guides delve deeper into topics
 like :doc:`growing <growing>` a :mod:`Pyjoyment.Lite` prototype into a
 well-structured :mod:`Pyjoyment` application, :doc:`routing <routing>`,
-:doc:`rendering <rendering>` and more, in the guides of Mojolicious
-until Pyjoyment has its own. It is highly encouraged that readers continue on
-to the remaining guides after reading this one.
+:doc:`rendering <rendering>` and more. It is highly encouraged that readers
+continue on to the remaining guides after reading this one.
 
 Hello World
 -----------
@@ -603,9 +602,9 @@ Just run your tests with :mod:`Pyjo.Prove`.
 More
 ----
 
-You can continue with `the guides of Mojolicious
-<https://docs.mojolicious.org/Mojolicious/Guides>`_ now, which this one is
-ported from.
+You can continue with :doc:`index` now or take a look at the `Mojolicious
+wiki <https://github.com/mojolicious/mojo/wiki>`_, which contains a lot more
+documentation and examples by many different authors.
 
 Ported from `Mojolicious::Guides::Tutorial
 <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojolicious/Guides/Tutorial.pod>`_
