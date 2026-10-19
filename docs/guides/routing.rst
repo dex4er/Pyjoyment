@@ -147,6 +147,8 @@ The colon prefix is optional for standard placeholders that are surrounded by
 
     /i♥mojolicious -> /<one>♥<two> -> {'one': 'i', 'two': 'mojolicious'}
 
+.. _routing-relaxed-placeholders:
+
 Relaxed placeholders
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -708,6 +710,8 @@ more power you can introspect the preceding and succeeding destinations with
 
     # Action of the fourth dispatch cycle
     action = c.match.stack[3]['action']
+
+.. _routing-formats:
 
 Formats
 ~~~~~~~
