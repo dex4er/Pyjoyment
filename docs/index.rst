@@ -15,5 +15,6 @@ Contents:
     installation
     examples
     guides/index
+    distributions
     api/index
     license
