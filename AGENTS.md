@@ -898,12 +898,20 @@ pattern.match_partial(path)`.
   the cleanup waits for the next tick of the event loop, which every reactor
   runs at a point that is safe, and for the end of the interpreter. The
   garbage collector runs in any thread that allocates, as a thread of name
-  resolution, whose frames do not show what the main thread does, so a
-  finalizer outside of the main thread always waits for the next tick, and
-  the asyncio reactor is woken up with `call_soon_threadsafe`; on Linux,
-  epoll reports a socket closed in the middle of `add_reader` as
-  `FileNotFoundError`. `t/stdlib/IOLoop_gc.py` makes the garbage collector
-  run all the time.
+  resolution, whose frames do not show what the thread of the event loop
+  does, so a finalizer outside of the thread of the reactor of its object,
+  the main one for an object without a reactor, always waits for the next
+  tick of that thread, which any of its reactors runs, as an object may
+  belong to several event loops, and the asyncio reactor is woken up with
+  `call_soon_threadsafe`; on Linux, epoll reports a socket closed in the
+  middle of `add_reader` as `FileNotFoundError`. `t/stdlib/IOLoop_gc.py`
+  makes the garbage collector run all the time.
+- Each thread of Perl has a copy of the interpreter, with a `Mojo::IOLoop`
+  singleton of its own; Python shares the module, so `Pyjo.IOLoop.singleton`
+  is found with `__getattr__` of the module in a `threading.local`, the
+  functions of the module, as `Pyjo.IOLoop.timer`, call their methods on it,
+  and a reactor runs in the thread that made it. Threads run event loops of
+  their own at the same time, as `t/stdlib/IOLoop_threading.py` checks.
 - An optional module of Perl that Mojo uses when it is installed has a
   counterpart in the standard library, one of the port's own where the
   standard library has none, or is left out until something needs it:

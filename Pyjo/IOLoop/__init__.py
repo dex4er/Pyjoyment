@@ -48,6 +48,10 @@ as easy as possible.
 
 What Mojo calls on the class, as ``Mojo::IOLoop->timer``, is a function of
 the module that works with the :data:`singleton`, as ``Pyjo.IOLoop.timer``.
+Each thread has a :data:`singleton` of its own, as each thread of Perl has a
+copy of the interpreter, so that the threads run event loops of their own at
+the same time, and the functions of the module work with the one of the
+thread that calls them.
 A method that takes a callback takes it also as the keyword argument ``cb``,
 and is a decorator without it, and the decorated name is what the method
 returns. ::
@@ -116,12 +120,13 @@ import gc
 import os
 import random
 import sys
+import threading
 import time
 import weakref
 
 from collections.abc import Callable, Iterator
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, Self, overload
+from typing import TYPE_CHECKING, Any, Concatenate, Self, overload
 
 
 if TYPE_CHECKING:
@@ -149,7 +154,8 @@ DEBUG = bool(os.environ.get('PYJO_IOLOOP_DEBUG'))
 # The states that reset(freeze=True) keeps
 _FROZEN: list[dict[str, Any]] = []
 
-_singleton: 'Pyjo_IOLoop | None' = None
+# Not in Mojolicious: the singleton of each thread, as each thread of Perl has a copy of the interpreter with its own
+_local = threading.local()
 
 # Not in Mojolicious: the event loops that exist, which are reset at the end of the interpreter
 _LOOPS: 'weakref.WeakSet[Pyjo_IOLoop]' = weakref.WeakSet()
@@ -600,8 +606,8 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
             loop = Pyjo.IOLoop.singleton
 
         The global :mod:`Pyjo.IOLoop` singleton, used to access a single shared
-        event loop object from everywhere inside the process, which is also the
-        :data:`singleton` of the module. ::
+        event loop object from everywhere inside the thread, which is also the
+        :data:`singleton` of the module. Each thread has one of its own. ::
 
             # Many methods also allow you to take shortcuts
             Pyjo.IOLoop.timer(2, lambda loop: Pyjo.IOLoop.stop())
@@ -616,10 +622,11 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
                 'Handle is writable' if writable else 'Handle is readable'
             )).watch(fd, True, False)
         """
-        global _singleton
-        if _singleton is None:
-            _singleton = Pyjo_IOLoop()
-        return _singleton
+        try:
+            return _local.singleton
+        except AttributeError:
+            _local.singleton = loop = Pyjo_IOLoop()
+            return loop
 
     def start(self) -> None:
         """::
@@ -835,16 +842,17 @@ object = Pyjo_IOLoop
 
 # Left out from Mojolicious: $SIG{PIPE} = 'IGNORE', which Python does already
 
-# Initialize singleton reactor early
-singleton = Pyjo_IOLoop.singleton()
+singleton: Pyjo_IOLoop
 """::
 
     loop = Pyjo.IOLoop.singleton
 
 The global :mod:`Pyjo.IOLoop` singleton, as :meth:`Pyjo_IOLoop.singleton`
-gives it.
+gives it, the one of the thread.
 """
-singleton.reactor
+
+# Initialize singleton reactor early
+Pyjo_IOLoop.singleton().reactor
 
 
 # Not in Mojolicious: Perl closes the handles that are left at the end of the interpreter, Python warns that they were
@@ -862,7 +870,7 @@ def _cleanup() -> None:
 
     # The cleanups that finalizers deferred, before and after the event loops and the garbage collector, whose
     # finalizers run in this frame of Pyjo.IOLoop, and so are deferred too
-    Pyjo.Reactor._drain()  # pyright: ignore[reportPrivateUsage]
+    Pyjo.Reactor._drain(every=True)  # pyright: ignore[reportPrivateUsage]
 
     for loop in list(_LOOPS):
         try:
@@ -877,25 +885,40 @@ def _cleanup() -> None:
             close(*connection.values())
     _FROZEN.clear()
     gc.collect()
-    Pyjo.Reactor._drain()  # pyright: ignore[reportPrivateUsage]
+    Pyjo.Reactor._drain(every=True)  # pyright: ignore[reportPrivateUsage]
 
 
-# What Mojo calls on the class works with the singleton
-acceptor = singleton.acceptor
-client = singleton.client
-datagram = singleton.datagram
-next_tick = singleton.next_tick
-one_tick = singleton.one_tick
-recurring = singleton.recurring
-remove = singleton.remove
-reset = singleton.reset
-server = singleton.server
-start = singleton.start
-stop = singleton.stop
-stop_gracefully = singleton.stop_gracefully
-stream = singleton.stream
-subprocess = singleton.subprocess
-timer = singleton.timer
+# Not in Mojolicious: the singleton is found in the thread that asks for it, as a module has the same attributes in all
+# threads
+def __getattr__(name: str) -> Any:
+    if name == 'singleton':
+        return Pyjo_IOLoop.singleton()
+    raise AttributeError(f'module {__name__!r} has no attribute {name!r}')
+
+
+# What Mojo calls on the class works with the singleton, the one of the thread that calls it
+def _shortcut[**P, R](method: Callable[Concatenate[Pyjo_IOLoop, P], R]) -> Callable[P, R]:
+    def shortcut(*args: P.args, **kwargs: P.kwargs) -> R:
+        return method(Pyjo_IOLoop.singleton(), *args, **kwargs)
+
+    return shortcut
+
+
+acceptor = _shortcut(Pyjo_IOLoop.acceptor)
+client = _shortcut(Pyjo_IOLoop.client)
+datagram = _shortcut(Pyjo_IOLoop.datagram)
+next_tick = _shortcut(Pyjo_IOLoop.next_tick)
+one_tick = _shortcut(Pyjo_IOLoop.one_tick)
+recurring = _shortcut(Pyjo_IOLoop.recurring)
+remove = _shortcut(Pyjo_IOLoop.remove)
+reset = _shortcut(Pyjo_IOLoop.reset)
+server = _shortcut(Pyjo_IOLoop.server)
+start = _shortcut(Pyjo_IOLoop.start)
+stop = _shortcut(Pyjo_IOLoop.stop)
+stop_gracefully = _shortcut(Pyjo_IOLoop.stop_gracefully)
+stream = _shortcut(Pyjo_IOLoop.stream)
+subprocess = _shortcut(Pyjo_IOLoop.subprocess)
+timer = _shortcut(Pyjo_IOLoop.timer)
 
 
 def is_running() -> bool:
@@ -905,4 +928,4 @@ def is_running() -> bool:
 
     Check if the :data:`singleton` is running.
     """
-    return singleton.is_running
+    return Pyjo_IOLoop.singleton().is_running

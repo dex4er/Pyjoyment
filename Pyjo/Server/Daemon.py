@@ -420,7 +420,9 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
         try:
             if sys.is_finalizing():
                 return
-            Pyjo.Reactor._finalize(self._cleanup)  # pyright: ignore[reportPrivateUsage]
+            # Not in Mojolicious: the reactor that the daemon has, without making one
+            reactor = getattr(getattr(self, 'ioloop', None), '_reactor', None)
+            Pyjo.Reactor._finalize(self._cleanup, reactor)  # pyright: ignore[reportPrivateUsage]
         except Exception:
             pass
 

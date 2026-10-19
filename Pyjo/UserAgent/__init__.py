@@ -549,7 +549,9 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
         try:
             if sys.is_finalizing():
                 return
-            Pyjo.Reactor._finalize(self._release)  # pyright: ignore[reportPrivateUsage]
+            # Not in Mojolicious: the reactor that the user agent has, without making one
+            reactor = getattr(getattr(self, '_ioloop', None), '_reactor', None)
+            Pyjo.Reactor._finalize(self._release, reactor)  # pyright: ignore[reportPrivateUsage]
         except Exception:
             pass
 

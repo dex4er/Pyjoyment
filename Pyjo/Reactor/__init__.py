@@ -160,6 +160,8 @@ class Pyjo_Reactor(Pyjo.EventEmitter.object):
 
     def __init__(self) -> None:
         super().__init__()
+        # Not in Mojolicious: the thread that made the reactor, where it runs
+        self._thread = threading.get_ident()
         _ALL.add(self)
 
     def again(self, id: str, after: float | None = None) -> None:
@@ -408,19 +410,25 @@ class Pyjo_Reactor(Pyjo.EventEmitter.object):
 
 # Not in Mojolicious: the cleanups of the finalizers that the garbage collector ran in the middle of what an event loop
 # does, as a socket that an object closes there, or an acceptor that it removes, changes the structures that the event
-# loop or asyncio are changing; Perl runs a finalizer where the last reference goes, at the end of a statement
-_DEFERRED: collections.deque[Callable[[], Anything]] = collections.deque()
+# loop or asyncio are changing; Perl runs a finalizer where the last reference goes, at the end of a statement. Each
+# thread has its own, which the reactors of the thread run
+_DEFERRED: dict[int | None, collections.deque[Callable[[], Anything]]] = {}
 
-# The reactors that run the deferred cleanups, any of them, as an object may belong to several event loops
+# The reactors that run the deferred cleanups
 _ALL: 'weakref.WeakSet[Pyjo_Reactor]' = weakref.WeakSet()
 
 
-def _finalize(cb: Callable[[], Anything]) -> None:  # pyright: ignore[reportUnusedFunction]
+# The reactor is the one of the object, none for an object without one
+def _finalize(  # pyright: ignore[reportUnusedFunction]
+    cb: Callable[[], Anything], reactor: Pyjo_Reactor | None = None
+) -> None:
     # The cleanup runs at once, as Mojo's DESTROY runs, unless the garbage collector interrupted the code of an event
     # loop, in a frame of Pyjo.IOLoop, of a reactor, of asyncio or of selectors, below the finalizer that calls it, or
-    # ran in another thread than the main one, as a thread of name resolution, while the main thread may be in the
-    # middle of what its event loop does, which the frames of this thread do not show
-    if threading.current_thread() is threading.main_thread():
+    # ran in another thread than the one of the reactor of the object, the main one for an object without a reactor, as
+    # a thread of name resolution, while that thread may be in the middle of what its event loop does, which the frames
+    # of this thread do not show
+    thread = threading.main_thread().ident if reactor is None else reactor._thread  # pyright: ignore[reportPrivateUsage]
+    if threading.get_ident() == thread:
         prefixes = _prefixes()
         # The frame below the finalizer, none when the interpreter frees the object outside of any code
         frame = sys._getframe(1).f_back  # pyright: ignore[reportPrivateUsage]
@@ -429,19 +437,26 @@ def _finalize(cb: Callable[[], Anything]) -> None:  # pyright: ignore[reportUnus
         if frame is None:
             cb()
             return
-    _DEFERRED.append(cb)
+    _DEFERRED.setdefault(thread, collections.deque()).append(cb)
     for reactor in list(_ALL):
-        reactor._wake()  # pyright: ignore[reportPrivateUsage]
+        if reactor._thread == thread:  # pyright: ignore[reportPrivateUsage]
+            reactor._wake()  # pyright: ignore[reportPrivateUsage]
 
 
-def _drain(*args: Anything) -> None:  # pyright: ignore[reportUnusedFunction]
-    # The cleanups, which fail as a finalizer fails, without an exception
-    while _DEFERRED:
-        cb = _DEFERRED.popleft()
-        try:
-            cb()
-        except Exception:
-            pass
+def _drain(every: bool = False) -> None:  # pyright: ignore[reportUnusedFunction]
+    # The cleanups of the thread, or of every thread, as at the end of the interpreter; they fail as a finalizer fails,
+    # without an exception
+    queues = list(_DEFERRED.values()) if every else [_DEFERRED.get(threading.get_ident())]
+    for queue in queues:
+        while queue:
+            try:
+                cb = queue.popleft()
+            except IndexError:
+                break
+            try:
+                cb()
+            except Exception:
+                pass
 
 
 def _prefixes() -> tuple[str, ...]:
