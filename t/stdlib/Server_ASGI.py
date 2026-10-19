@@ -9,6 +9,11 @@ import os
 import sys
 
 
+# Pyjo.Server.ASGI needs a reactor that runs in the loop of the ASGI server, which Pyjo.Reactor.Poll, with a loop of its
+# own, does not
+if Pyjo.Reactor.object.detect() != 'Pyjo.Reactor.Asyncio':
+    plan(skip_all='needs Pyjo.Reactor.Asyncio, which runs in the loop of the ASGI server')
+
 # The ASGI server of the tests
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
 ASGIClient = importlib.import_module('ASGIClient')

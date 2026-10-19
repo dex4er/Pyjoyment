@@ -400,7 +400,10 @@ with subtest('Timers and subprocesses'):
         is_ok(txs[0].res.text, 'Delayed by 3 seconds!', 'timer')
         is_ok(txs[1].res.text, '12345', 'recurring timer')
         is_ok(txs[2].res.text, 'I ♥ Pyjoyment!', 'subprocess')
-        is_ok(txs[3].res.text, 'Delayed by 3 seconds!', 'asyncio')
+        if Pyjo.Reactor.object.detect() == 'Pyjo.Reactor.Asyncio':
+            is_ok(txs[3].res.text, 'Delayed by 3 seconds!', 'asyncio')
+        else:
+            skip('needs Pyjo.Reactor.Asyncio, as the coroutine awaits asyncio.sleep', 1)
 
     with cookbook('background') as t:
         t.get_ok('/').status_is(200).json_is('/title', 'Got no title yet.')

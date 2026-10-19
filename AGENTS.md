@@ -129,8 +129,8 @@ A test that requests remote hosts, as `t/Pyjo/UserAgent_online.py`, is
 skipped unless `TEST_ONLINE` is set, as in Mojolicious. Its hosts are those of
 GitHub, which the runners of GitHub Actions reach the most reliably, and CI
 sets `TEST_ONLINE` on the Python of `mise.toml` only, so that one job, not
-each of them, depends on the network; that job runs it on `Pyjo.Reactor.Poll`
-too, as the other tests of the user agent.
+each of them, depends on the network; that job runs it on both reactors, as
+every other test.
 
 CI runs the tests with `--timeout 60`: a test script that hangs, such as a
 reactor that never stops, is killed with the processes it started and fails
@@ -229,17 +229,15 @@ Sphinx does) has no effect. Older test files still wrap their body in
 `if __name__ == '__main__':`, which is no longer needed.
 
 The tests run on the reactor that `Pyjo.Reactor.detect()` gives, the asyncio
-one, where Mojo's tests set `MOJO_REACTOR` to `Mojo::Reactor::Poll`. CI runs
-the tests of the event loop, and of the user agent, the WebSockets and the
-servers, which do the most of its I/O, a second time on `Pyjo.Reactor.Poll`,
-as a reactor without asyncio has to pass them too:
+one, where Mojo's tests set `MOJO_REACTOR` to `Mojo::Reactor::Poll`. The
+matrix of CI runs all of them on each Python a second time, in a job of its
+own, on `Pyjo.Reactor.Poll`, as a reactor without asyncio has to pass them
+too. A test of what needs the loop of asyncio, as `Pyjo.Server.ASGI`, whose
+reactor runs in the loop of the ASGI server, or a coroutine that awaits
+`asyncio.sleep`, is skipped on another reactor:
 
 ```sh
-PYJO_REACTOR=Pyjo.Reactor.Poll mise exec -- python -m Pyjo.Prove -l -j 4 --capture-stderr --stderr-lines 1000 \
-  t/Pyjo/IOLoop*.py t/Pyjo/TLS.py t/Pyjo/Promise*.py t/Pyjo/Subprocess.py t/stdlib/IOLoop*.py \
-  t/Pyjo/UserAgent*.py t/stdlib/UserAgent*.py t/Pyjo/WebSocket*.py t/Pyjo/Server_Daemon*.py t/stdlib/Server_Daemon.py \
-  t/Pyjo/Server_FastCGI.py t/Pyjo/Server_Hot.py t/stdlib/Server_Hot.py t/Pyjo/Server_Prefork.py t/stdlib/Server_Prefork.py \
-  t/Pyjo/Server_Prethread.py t/Pyjo/Server_Reload.py t/stdlib/Server_Reload.py t/Pyjo/File_download.py
+PYJO_REACTOR=Pyjo.Reactor.Poll mise exec -- python -m Pyjo.Prove -l -j 4 --capture-stderr --stderr-lines 1000 -r t
 ```
 
 CI runs the tests in `t/servers` on Python 3.12 and 3.15, the oldest and the

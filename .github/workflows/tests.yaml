@@ -16,21 +16,20 @@ on:
 permissions:
   contents: read
 
-env:
-  # The tests of the event loop, and of the user agent, the WebSockets and the
-  # servers, which do the most of its I/O, which run on the reactor without
-  # asyncio too.
-  POLL_TESTS: >-
-    t/Pyjo/IOLoop*.py t/Pyjo/TLS.py t/Pyjo/Promise*.py t/Pyjo/Subprocess.py t/stdlib/IOLoop*.py t/Pyjo/UserAgent*.py
-    t/stdlib/UserAgent*.py t/Pyjo/WebSocket*.py t/Pyjo/Server_Daemon*.py t/stdlib/Server_Daemon.py t/Pyjo/Server_FastCGI.py
-    t/Pyjo/Server_Hot.py t/stdlib/Server_Hot.py t/Pyjo/Server_Prefork.py t/stdlib/Server_Prefork.py t/Pyjo/Server_Prethread.py
-    t/Pyjo/Server_Reload.py t/stdlib/Server_Reload.py t/Pyjo/File_download.py
-
 jobs:
   # The version pinned in mise.toml and verified against mise.lock, with the
-  # tests that request remote hosts, which are those of GitHub.
+  # tests that request remote hosts, which are those of GitHub. Each version
+  # runs the tests on the reactor of asyncio, the default, and on the reactor
+  # without asyncio, as a reactor has to pass them all.
   prove-mise:
-    name: prove (python mise)
+    name: prove (python mise, ${{ matrix.reactor }})
+
+    strategy:
+      fail-fast: false
+      matrix:
+        reactor:
+          - Asyncio
+          - Poll
 
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 10
@@ -51,6 +50,7 @@ jobs:
       - name: Run tests
         shell: bash
         env:
+          PYJO_REACTOR: Pyjo.Reactor.${{ matrix.reactor }}
           PYTHONDEVMODE: "1"
           PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
           TEST_ONLINE: "1"
@@ -59,21 +59,10 @@ jobs:
           python -m Pyjo.Prove -l --color -j 4 --timeout 60 --capture-stderr --stderr-lines 1000 -r t 2>&1 | tee prove.log
           if grep -n 'ResourceWarning:' prove.log; then exit 1; fi
 
-      - name: Run tests on Pyjo.Reactor.Poll
-        shell: bash
-        env:
-          PYJO_REACTOR: Pyjo.Reactor.Poll
-          PYTHONDEVMODE: "1"
-          PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
-          TEST_ONLINE: "1"
-        run: |
-          python -m Pyjo.Prove -l --color -j 4 --timeout 60 --capture-stderr --stderr-lines 1000 $POLL_TESTS 2>&1 | tee prove.log
-          if grep -n 'ResourceWarning:' prove.log; then exit 1; fi
-
   # The other supported versions, from setup-python. PyPy is supported on a
   # best-effort basis.
   prove:
-    name: prove (python ${{ matrix.python }})
+    name: prove (python ${{ matrix.python }}, ${{ matrix.reactor }})
 
     strategy:
       fail-fast: false
@@ -85,6 +74,9 @@ jobs:
           - "3.15"
           - 3.15t
           - pypy3.12
+        reactor:
+          - Asyncio
+          - Poll
 
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 10
@@ -104,21 +96,12 @@ jobs:
       - name: Run tests
         shell: bash
         env:
-          PYTHONDEVMODE: "1"
-          PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
-        run: |
-          python --version
-          python -m Pyjo.Prove -l --color -j 4 --timeout 60 --capture-stderr --stderr-lines 1000 -r t 2>&1 | tee prove.log
-          if grep -n 'ResourceWarning:' prove.log; then exit 1; fi
-
-      - name: Run tests on Pyjo.Reactor.Poll
-        shell: bash
-        env:
-          PYJO_REACTOR: Pyjo.Reactor.Poll
+          PYJO_REACTOR: Pyjo.Reactor.${{ matrix.reactor }}
           PYTHONDEVMODE: "1"
           PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
         run: |-
-          python -m Pyjo.Prove -l --color -j 4 --timeout 60 --capture-stderr --stderr-lines 1000 $POLL_TESTS 2>&1 | tee prove.log
+          python --version
+          python -m Pyjo.Prove -l --color -j 4 --timeout 60 --capture-stderr --stderr-lines 1000 -r t 2>&1 | tee prove.log
           if grep -n 'ResourceWarning:' prove.log; then exit 1; fi
 
   # The tests of Pyjo.Server.ASGI, Pyjo.Server.WSGI and Pyjo.Server.CGI with
