@@ -79,4 +79,14 @@ with subtest('stat'):
     isa_ok(file.stat(), os.stat_result, 'os.stat_result')
     is_ok(file.stat(), os.stat(file), 'as os.stat() gives it')
 
+with subtest('Bytes as they are'):
+    dir = tempdir()
+    data = b'a\nb\r\nc\x1ad'
+    file = dir.child('spew.bin').spew(data)
+    with open(file, 'rb') as f:
+        is_ok(f.read(), data, 'spew() writes them, without the CRLF of the text mode of Windows')
+    with open(dir.child('slurp.bin'), 'wb') as f:
+        f.write(data)
+    is_ok(dir.child('slurp.bin').slurp(), data, 'slurp() reads them, past the Ctrl-Z of the text mode of Windows')
+
 done_testing()
