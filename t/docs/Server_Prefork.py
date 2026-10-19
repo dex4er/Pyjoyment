@@ -33,7 +33,7 @@ ServerStart = importlib.import_module('ServerStart')
 # again on a new port when it is taken
 def server(code):
     def start():
-        port = Pyjo.IOLoop.Server.object.generate_port()
+        port = ServerStart.port()
         process = subprocess.Popen(
             [sys.executable, '-c', code(port)], env=dict(os.environ, PYTHONPATH=ROOT), stdout=subprocess.PIPE, text=True
         )
@@ -105,7 +105,7 @@ def once(prefork):
 
 
 def new(**kwargs):
-    port = Pyjo.IOLoop.Server.object.generate_port()
+    port = ServerStart.port()
     return Pyjo.Server.Prefork.new(
         heartbeat_interval=0.1,
         listen=[f'http://127.0.0.1:{port}'],

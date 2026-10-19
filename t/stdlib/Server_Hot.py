@@ -20,8 +20,6 @@ if not hasattr(os, 'fork'):
 if sys.platform == 'darwin' and getattr(sys, 'pypy_translation_info', {}).get('translation.jit'):
     plan(skip_all='PyPy with its JIT on macOS: the child of a fork crashes now and then with SIGBUS')
 
-import Pyjo.IOLoop.Server
-
 
 ROOT = os.path.join(os.path.dirname(__file__), '..', '..')
 LIB = os.path.join(os.path.dirname(__file__), '..', 'lib')
@@ -85,7 +83,7 @@ def closed(port):
 with subtest('pathlib, http.client and the options of the interpreter'), tempfile.TemporaryDirectory() as dir:
     # The server is started again on a new port when it is taken
     def start():
-        port = Pyjo.IOLoop.Server.object.generate_port()
+        port = ServerStart.port()
         app = application(dir, port)
         code = f"""
 import pathlib
@@ -110,7 +108,7 @@ Pyjo.Server.Hot.new().run(pathlib.Path({str(app)!r}))
     ok(closed(port), 'stopped gracefully')
 
 with subtest('-t and -s'), tempfile.TemporaryDirectory() as dir:
-    app = application(dir, Pyjo.IOLoop.Server.object.generate_port())
+    app = application(dir, ServerStart.port())
     result = subprocess.run(
         [sys.executable, '-m', 'Pyjo.Server.Hot', '-t', str(app)], env=ENV, capture_output=True, text=True
     )
@@ -126,7 +124,7 @@ with subtest('-t and -s'), tempfile.TemporaryDirectory() as dir:
 with subtest('HUP and -s'), tempfile.TemporaryDirectory() as dir:
     # The server is started again on a new port when it is taken
     def start():
-        port = Pyjo.IOLoop.Server.object.generate_port()
+        port = ServerStart.port()
         app = application(dir, port)
         result = subprocess.run([sys.executable, '-m', 'Pyjo.Server.Hot', str(app)], env=ENV, capture_output=True)
         return None if ServerStart.in_use(result) else (port, app, result)
@@ -154,7 +152,7 @@ with subtest('HUP and -s'), tempfile.TemporaryDirectory() as dir:
 with subtest('Foreground and TERM'), tempfile.TemporaryDirectory() as dir:
     # The server is started again on a new port when it is taken
     def start():
-        port = Pyjo.IOLoop.Server.object.generate_port()
+        port = ServerStart.port()
         app = application(dir, port)
         process = subprocess.Popen(
             [sys.executable, '-m', 'Pyjo.Server.Hot', '-f', str(app)], env=ENV, stdout=subprocess.DEVNULL

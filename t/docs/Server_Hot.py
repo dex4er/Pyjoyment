@@ -105,7 +105,7 @@ def command(*args, **kwargs):
 # A server started in the background, again on a new port when it is taken
 def daemonized(*args, **kwargs):
     def start():
-        port = Pyjo.IOLoop.Server.object.generate_port()
+        port = ServerStart.port()
         myapp = application(port)
         atexit.register(kill, myapp)
         names = {'myapp': myapp.to_str(), 'dir': myapp.dirname().to_str()}
@@ -197,7 +197,7 @@ hot.run('myapp.py')
 with subtest('main'):
     # The server is started again on a new port when it is taken
     def start():
-        port = Pyjo.IOLoop.Server.object.generate_port()
+        port = ServerStart.port()
         myapp = application(port)
         code = f"""
 import Pyjo.Server.Hot

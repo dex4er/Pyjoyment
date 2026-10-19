@@ -74,7 +74,7 @@ app.start()
 # Not in Mojolicious: the server is started again on a new port when it is taken, and killed when the test ends before
 # it stops it
 def start():
-    port = Pyjo.IOLoop.Server.object.generate_port()
+    port = ServerStart.port()
     server = subprocess.Popen(
         [sys.executable, '-m', 'Pyjo.Server.Reload', '-l', f'http://127.0.0.1:{port}', script.to_str()],
         env=dict(os.environ, PYTHONPATH=ROOT),

@@ -123,8 +123,8 @@ with subtest('Hot deployment'):
 
     # Not in Mojolicious: the server is started again on new ports when one of them is taken
     def start():
-        port1 = Pyjo.IOLoop.Server.object.generate_port()
-        port2 = Pyjo.IOLoop.Server.object.generate_port()
+        port1 = ServerStart.port()
+        port2 = ServerStart.port()
         script.spew(
             f"""
 import sys
