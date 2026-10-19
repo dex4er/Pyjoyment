@@ -5,7 +5,9 @@ Pyjoyment on its own servers and through ASGI and WSGI, and other Python
 servers next to it. The numbers are the latency of a request, not the
 throughput under concurrency, and the cost of the client, which is Python too,
 is in them: compare the servers with each other, or one version of Pyjoyment
-with another, not with numbers measured elsewhere.
+with another, not with numbers measured elsewhere. The servers of workers are
+the exception, measured under concurrency, as
+[Servers of workers](#servers-of-workers) says.
 
 The scripts are a recipe as much as a tool. An agent may copy them to a
 scratch directory and adapt them to what it measures, keeping the rules in
@@ -34,6 +36,7 @@ scratch directory and adapt them to what it measures, keeping the rules in
 | `ab.sh [-n PAIRS] [-r REACTOR]... [REF]`       | `Pyjo.Server.Daemon` of a git ref (default `master`) against the working tree, interleaved, with the medians and the gain                                               |
 | `profile.sh [-n REQUESTS] [-r REACTOR] [ROOT]` | `cProfile` of `Pyjo.Server.Daemon` under keep-alive requests, with the function calls per request and the top of the profile                                            |
 | `ka.py PORT N`                                 | The client: `GET /` on one connection, reads by `Content-Length`; `RECONNECT=1` opens a connection for every request, `WARMUP` sets the requests before the measurement |
+| `workers.sh [SCENARIO...]`                     | `Pyjo.Server.Prefork` and `Pyjo.Server.Prethread` on a CPython with the GIL and free-threaded, rounds of oha at several numbers of connections, with the medians        |
 
 The applications answer `Your Pyjo is working!`: `hello.py` and
 `pyjo_daemon.py` are `Pyjo.HelloWorld` on `Pyjo.Server.Reload` and
@@ -50,6 +53,30 @@ PYTHON=$(mise exec -- which python) benchmarks/bench.sh pyjo-daemon-asyncio pyjo
 PYTHON=$(mise exec -- which python) benchmarks/ab.sh -n 8 -r Asyncio master
 PYTHON=$(mise exec -- which python) benchmarks/profile.sh -r Poll
 ```
+
+## Servers of workers
+
+`workers.sh` measures the throughput under concurrency, where the other
+scripts measure the latency of one connection: `Pyjo.Server.Prefork` and
+`Pyjo.Server.Prethread` of `pyjo_workers.py`, with `Pyjo.HelloWorld` and
+`Pyjoyment.HelloWorld`, each on a CPython with the GIL and on the same CPython
+free-threaded, where the threads of `Pyjo.Server.Prethread` run at the same
+time. The two Pythons are the builds of uv, of the same version, so that the
+difference between them is the GIL, not the compiler:
+
+```sh
+uv python install 3.15 3.15t
+PYTHON=$(uv python find --managed-python cpython-3.15.0-macos-aarch64-none) \
+  PYTHON_FT=$(uv python find --managed-python 3.15t) \
+  benchmarks/workers.sh
+```
+
+The client is [oha](https://github.com/hatoo/oha), which `mise exec` runs
+without a change of `mise.toml`, with threads of its own: the servers have 4
+workers by default, so that the client has cores left. A round runs every
+scenario, one after the other, and the end has the medians of the rounds;
+`BENCH_OUT` keeps the results of oha. The servers log at the level `info`,
+as an application that logs every request measures its log.
 
 ## Measuring well
 
