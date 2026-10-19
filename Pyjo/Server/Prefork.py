@@ -200,6 +200,17 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
     :mod:`Pyjo.Server.Daemon` and implements the following new ones.
     """
 
+    # Not in Mojolicious: the signals of the manager, as a class attribute, which Pyjo.Server.Prethread changes
+    _MANAGED: tuple[signal.Signals, ...] = (
+        signal.SIGCHLD,
+        signal.SIGHUP,
+        signal.SIGINT,
+        signal.SIGTERM,
+        signal.SIGQUIT,
+        signal.SIGTTIN,
+        signal.SIGTTOU,
+    )
+
     def __init__(
         self,
         *,
@@ -415,8 +426,7 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
 
         # Not in Mojolicious: local %SIG, the handlers of the signals are set back at the end
         handlers: dict[signal.Signals, Any] = {}
-        managed = (signal.SIGCHLD, signal.SIGHUP, signal.SIGINT, signal.SIGTERM, signal.SIGQUIT, signal.SIGTTIN)
-        for name in (*managed, signal.SIGTTOU):
+        for name in self._MANAGED:
             handlers[name] = signal.signal(name, note)
         waker, self._wakee = socket.socketpair()
         waker.setblocking(False)
@@ -505,8 +515,7 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
                 w['quit'] = quit + 1
                 if not quit:
                     log.info(f'Stopping worker {pid} gracefully ({_number(gt)} seconds)')
-                    # Unlike Mojolicious: TERM stops a worker gracefully, where Mojo sends QUIT
-                    if not _kill(signal.SIGTERM, pid):
+                    if not self._kill_worker(pid, True):
                         self._stopped(pid)
             if graceful and graceful + gt <= now:
                 w['force'] = True
@@ -514,8 +523,14 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
             # Normal stop
             if w.get('force') or (self._finished and not graceful):
                 log.warn(f'Stopping worker {pid} immediately')
-                if not _kill(signal.SIGKILL, pid):
+                if not self._kill_worker(pid, False):
                     self._stopped(pid)
+
+    # Not in Mojolicious: a worker is stopped in a method of its own, which Pyjo.Server.Prethread does without signals;
+    # true if the worker has been told to stop
+    def _kill_worker(self, pid: int, graceful: bool) -> bool:
+        # Unlike Mojolicious: TERM stops a worker gracefully, where Mojo sends QUIT
+        return _kill(signal.SIGTERM if graceful else signal.SIGKILL, pid)
 
     # The signals that the handlers noted, as the handlers of Mojo do them
     def _signal(self) -> None:

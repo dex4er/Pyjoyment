@@ -16,6 +16,7 @@ import io
 import os
 import pkgutil
 import re
+import sys
 
 
 # The usages of the commands and of the scripts of the servers, which their documentation has, against the options
@@ -56,8 +57,8 @@ def specified(specs):
 
 
 @contextlib.contextmanager
-def captured(module):
-    # The specifications that a module passes to getopt, which still parses the arguments
+def captured(*modules):
+    # The specifications that modules pass to getopt, which still parses the arguments
     specs = []
     getopt = Pyjo.Util.getopt
 
@@ -65,11 +66,13 @@ def captured(module):
         specs.extend(args[1] if len(args) > 1 and isinstance(args[1], dict) else args[0])
         return getopt(*args, **kwargs)
 
-    module.getopt = capture
+    for module in modules:
+        module.getopt = capture
     try:
         yield specs
     finally:
-        module.getopt = getopt
+        for module in modules:
+            module.getopt = getopt
 
 
 def check(name, usage, specs, shared=frozenset()):
@@ -100,11 +103,13 @@ for package in ('Pyjoyment.Command', 'Pyjoyment.Command.Author', 'Pyjoyment.Comm
         if not isinstance(cls, type) or not issubclass(cls, Pyjoyment.Command.object):
             continue
         specs = []
-        if hasattr(module, 'getopt'):
+        # The modules of the command and of the classes it inherits from, as one that calls getopt in a method of its own
+        modules = [m for m in dict.fromkeys(sys.modules[c.__module__] for c in cls.__mro__) if hasattr(m, 'getopt')]
+        if modules:
             os.chdir(dir.to_str())
             try:
                 with (
-                    captured(module) as specs,
+                    captured(*modules) as specs,
                     contextlib.redirect_stdout(io.StringIO()),
                     contextlib.redirect_stderr(io.StringIO()),
                     contextlib.suppress(BaseException),

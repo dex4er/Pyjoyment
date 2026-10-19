@@ -116,6 +116,9 @@ class Pyjoyment_Command_prefork(Pyjoyment.Command.object):
     Usage information for this command, used for the help screen.
     """
 
+    # Not in Mojolicious: the class of the server, which Pyjoyment.Command.prethread replaces
+    _server: type[Pyjo.Server.Prefork.object] = Pyjo.Server.Prefork.object
+
     def build_server(self, *args: str) -> Pyjo.Server.Prefork.object:
         """::
 
@@ -124,7 +127,7 @@ class Pyjoyment_Command_prefork(Pyjoyment.Command.object):
         Build :mod:`Pyjo.Server.Prefork` instance from command line arguments.
         """
         arguments = list(args)
-        prefork = Pyjo.Server.Prefork.new(app=self.app)
+        prefork = self._server.new(app=self.app)
         listen: list[str] = []
         proxy: list[str] = []
         # Not in Mojolicious: the options from the environment variables of their names
