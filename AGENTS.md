@@ -1190,7 +1190,13 @@ which does not support `include`: its examples are copies of `examples/`.
 The guides of Mojolicious, `Mojolicious::Guides::*`, are pages of
 `docs/guides`, as `tutorial.rst` for `Mojolicious::Guides::Tutorial`, with
 the sections and the wording of Mojo and the forms of Pyjoyment, and they end
-with the name of their source, as the modules do. An example that is a whole
+with the name of their source, as the modules do. `Mojolicious::Guides` is
+`docs/guides/index.rst`, whose section API is the class hierarchy of the
+modules of `docs/api`, each under the module of the base class of its
+class, which `t/docs/guides_index.py` checks, so that a new module goes into
+it. A part of a guide that is about the Mojolicious project rather than the
+code, as its voting rules, is left out with a comment of reStructuredText
+that starts with `Left out from Mojolicious:`. An example that is a whole
 application is a file of its own, in a directory with the name of the page,
 as `docs/guides/tutorial/`, which the page includes with `literalinclude`
 and the test of the guide in `t/docs` loads, so that what the reader sees is

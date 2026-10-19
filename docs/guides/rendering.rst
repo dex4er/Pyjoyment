@@ -1232,10 +1232,8 @@ require a ``handler`` value to be set explicitly.
 More
 ----
 
-You can continue with `the guides of Mojolicious
-<https://docs.mojolicious.org/Mojolicious/Guides>`_ now, which this one is
-ported from, or take a look at the `Mojolicious wiki
-<https://github.com/mojolicious/mojo/wiki>`_, which contains a lot more
+You can continue with :doc:`index` now or take a look at the `Mojolicious
+wiki <https://github.com/mojolicious/mojo/wiki>`_, which contains a lot more
 documentation and examples by many different authors.
 
 Ported from `Mojolicious::Guides::Rendering
