@@ -49,18 +49,7 @@ strong believers of the Perl mantra "There is more than one way to do it",
 even where the Zen of Python prefers one obvious way, and our quest is to
 develop the best possible solutions for these two criteria.
 
-What about backwards compatibility?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-:mod:`Pyjoyment` ports the API of Mojolicious, which will always deprecate a
-feature for 3 months, before removing or changing it in incompatible ways
-between major releases, and follows its changes with the releases of
-Mojolicious that it is ported from. New features can however be marked as
-experimental to explicitly exclude them from these rules. Until its version
-1.0, the API of Pyjoyment itself may still change between releases, as the
-port goes on. So, to completely avoid any risk of accidental breakage, we do
-recommend pinning the versions with the lock file of `uv
-<https://docs.astral.sh/uv/>`_ for production setups.
+.. Left out from Mojolicious: "What about backwards compatibility?", as Pyjoyment has no policy of deprecations yet
 
 Why not split up Pyjoyment into many smaller distributions?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -94,6 +83,8 @@ reliability issues. Some of the more advanced features, such as
 :meth:`subprocesses <Pyjo.IOLoop.Pyjo_IOLoop.subprocess>` and the
 :mod:`Hot <Pyjo.Server.Hot>` web server, will also require the use of the
 `Windows Subsystem for Linux <https://learn.microsoft.com/windows/wsl/>`_.
+The port to Windows is followed in `its issue
+<https://github.com/dex4er/Pyjoyment/issues/253>`_.
 
 .. Left out from Mojolicious: "Is Perl's taint mode supported by Mojolicious?", as Python has no taint mode
 
