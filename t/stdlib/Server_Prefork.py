@@ -18,8 +18,6 @@ if not hasattr(os, 'fork'):
 if sys.platform == 'darwin' and getattr(sys, 'pypy_translation_info', {}).get('translation.jit'):
     plan(skip_all='PyPy with its JIT on macOS: the child of a fork crashes now and then with SIGBUS')
 
-import Pyjo.IOLoop.Server
-
 
 ROOT = os.path.join(os.path.dirname(__file__), '..', '..')
 
@@ -42,7 +40,7 @@ with subtest('Signals, the process id file and http.client'), tempfile.Temporary
 
     # The server is started again on a new port when it is taken
     def start():
-        port = Pyjo.IOLoop.Server.object.generate_port()
+        port = ServerStart.port()
         process = subprocess.Popen(
             [
                 sys.executable,

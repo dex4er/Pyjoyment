@@ -47,7 +47,7 @@ app.start()
 # started again on a new port when it is taken, and killed when the test ends before it stops it
 def server(*args, **kwargs):
     def start():
-        port = Pyjo.IOLoop.Server.object.generate_port()
+        port = ServerStart.port()
         process = subprocess.Popen(
             [sys.executable, *(arg.format(port=port) for arg in args)],
             env=dict(os.environ, PYTHONPATH=ROOT),

@@ -62,7 +62,7 @@ app.start()
 
     # The server is started again on a new port when it is taken
     def start():
-        port = Pyjo.IOLoop.Server.object.generate_port()
+        port = ServerStart.port()
         process = subprocess.Popen(
             [sys.executable, '-m', 'Pyjo.Server.Reload', '-l', f'http://127.0.0.1:{port}', str(app)],
             env=dict(os.environ, PYTHONPATH=ROOT),

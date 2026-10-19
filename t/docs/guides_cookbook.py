@@ -96,7 +96,7 @@ if sys.argv[1:2] == ['backend']:
 
 
 def start_backend():
-    port = Pyjo.IOLoop.Server.object.generate_port()
+    port = ServerStart.port()
     process = subprocess.Popen([sys.executable, __file__, 'backend', str(port)], env={**os.environ, 'PYTHONPATH': ROOT})
     atexit.register(lambda: process.poll() is None and process.kill())
     return (port, process) if ServerStart.listening(port, process) else None

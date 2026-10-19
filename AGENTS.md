@@ -139,13 +139,19 @@ takes a few seconds.
 
 A server that a test starts in a process of its own, as those of
 `Pyjo.Server.Hot`, `Pyjo.Server.Reload` and `Pyjo.Server.Prefork`, listens on
-a port of `generate_port`, which is free when it is found, but not
-necessarily when the process binds it a second later: an outgoing connection
-of a test that runs at the same time can get it as its local port, and Linux
-does not let a server bind it then, even with `SO_REUSEADDR`. Such a test
-starts its server with `retry` of `t/lib/ServerStart.py`, which tries again
-on new ports, and waits for it with a limit of time, so that a server that
-does not start fails the test instead of hanging it.
+a port of `port` of `t/lib/ServerStart.py`, not of `generate_port`, which is
+free when it is found, but not necessarily when the process binds it a second
+later: a server of a test that runs at the same time, which listens on a port
+that the system picks, or an outgoing connection, whose local port the system
+picks, can get it, and the test then takes that server for its own. The system
+picks them from its ephemeral ports, from 32768 on Linux and 49152 on macOS,
+so `port` finds one below them, and a lock of its byte in a file of the
+temporary directory, which the system releases when the test ends, keeps it
+from the other tests. Such a test starts its server with `retry`, which tries
+again on new ports when a port is taken anyway, and waits for it with a limit
+of time, so that a server that does not start fails the test instead of
+hanging it. A server that runs in the process of the test can listen on the
+port 0 instead, which `ports()` gives.
 
 - `t/Pyjo/` holds the module tests, ported from Mojo's `t/mojo/*.t`. A
   file has the name of Mojo's test with the part of the module as Pyjoyment
