@@ -92,7 +92,8 @@ class Pyjo_IOLoop_TLS(Pyjo.EventEmitter.object):
         # Module globals may be gone at the end of the interpreter
         try:
             if not sys.is_finalizing() and getattr(self, '_handle', None) is not None:
-                Pyjo.Reactor._finalize(self._release)  # pyright: ignore[reportPrivateUsage]
+                reactor = self._reactor() if self._reactor is not None else None
+                Pyjo.Reactor._finalize(self._release, reactor)  # pyright: ignore[reportPrivateUsage]
         except Exception:
             pass
 

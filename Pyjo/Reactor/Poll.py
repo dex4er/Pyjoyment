@@ -60,6 +60,7 @@ from Pyjo.Util import md5_sum
 
 import random
 import select
+import threading
 import time
 
 from typing import Any, Self, TypedDict
@@ -173,7 +174,7 @@ class Pyjo_Reactor_Poll(Pyjo.Reactor.object):
             i = 0
             while not i and self._running:
                 # Not in Mojolicious: the cleanups that finalizers deferred, before the reactor waits
-                if Pyjo.Reactor._DEFERRED:  # pyright: ignore[reportPrivateUsage]
+                if Pyjo.Reactor._DEFERRED.get(threading.get_ident()):  # pyright: ignore[reportPrivateUsage]
                     Pyjo.Reactor._drain()  # pyright: ignore[reportPrivateUsage]
 
                 # Stop automatically if there is nothing to watch
