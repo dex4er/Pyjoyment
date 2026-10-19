@@ -88,7 +88,8 @@ with subtest('A client of asyncio'):
         loop.reset()
 
     os.environ.pop('PYJO_REACTOR', None)
-    asyncio.run(main())
+    # A SelectorEventLoop, as the ProactorEventLoop that asyncio.run makes on Windows cannot watch handles
+    asyncio.run(main(), loop_factory=asyncio.SelectorEventLoop)
     is_deeply_ok(got, [b'ASYNCIO'], 'the reactor and asyncio in the same loop')
 
 with subtest('Context manager'):

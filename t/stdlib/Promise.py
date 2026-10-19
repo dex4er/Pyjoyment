@@ -37,8 +37,9 @@ with subtest('await in an asyncio task'):
             got.append(e.message)
         return got
 
+    # A SelectorEventLoop, as the ProactorEventLoop that asyncio.run makes on Windows cannot watch handles
     is_deeply_ok(
-        asyncio.run(main()),
+        asyncio.run(main(), loop_factory=asyncio.SelectorEventLoop),
         ['one', ('a', 'b'), None, 'timer', 'KeyError', 'reason'],
         'values, tuple, None, and exceptions',
     )
@@ -48,7 +49,11 @@ with subtest('asyncio.gather'):
     async def gather():
         return await asyncio.gather(Pyjo.Promise.timer(0.01, 'promise'), asyncio.sleep(0, 'coroutine'))
 
-    is_deeply_ok(asyncio.run(gather()), ['promise', 'coroutine'], 'promises and coroutines together')
+    is_deeply_ok(
+        asyncio.run(gather(), loop_factory=asyncio.SelectorEventLoop),
+        ['promise', 'coroutine'],
+        'promises and coroutines together',
+    )
 
 with subtest('A coroutine with asyncio in a promise'):
 
@@ -124,7 +129,7 @@ with subtest('Promise of a future or a task of asyncio'):
         return got
 
     is_deeply_ok(
-        asyncio.run(futures()),
+        asyncio.run(futures(), loop_factory=asyncio.SelectorEventLoop),
         ['executor', 'task', ('a', 'b'), 'KeyError', 'CancelledError'],
         'value, tuple as one value, exception and cancellation',
     )
@@ -158,7 +163,7 @@ with subtest('Future of asyncio'):
         return got
 
     is_deeply_ok(
-        asyncio.run(futures()),
+        asyncio.run(futures(), loop_factory=asyncio.SelectorEventLoop),
         [True, True, 'one', ('a', 'b'), None, ['g', 's'], 'KeyError', 'reason', ['callback']],
         'future of the loop, values and exceptions',
     )
@@ -231,7 +236,7 @@ with subtest('Promise of a future of concurrent.futures'):
         with concurrent.futures.ThreadPoolExecutor() as executor:
             return await Pyjo.Promise.new(executor.submit(lambda: 'awaited'))
 
-    is_ok(asyncio.run(futures()), 'awaited', 'awaited in a task of asyncio')
+    is_ok(asyncio.run(futures(), loop_factory=asyncio.SelectorEventLoop), 'awaited', 'awaited in a task of asyncio')
 
 with subtest('warnings'):
     with warnings.catch_warnings(record=True) as warn:

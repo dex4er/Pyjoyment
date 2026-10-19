@@ -182,6 +182,28 @@ with subtest('Handles'):
     throws_ok(lambda: reactor.remove(a), re.compile(r'^Handle is closed'), 'closed handle')
     b.close()
 
+with subtest('An event loop that cannot watch handles'):
+    with Pyjo.Reactor.Asyncio.new() as reactor:
+        isa_ok(reactor.loop, asyncio.SelectorEventLoop, 'loop of its own, also on Windows')
+
+    # The ProactorEventLoop of Windows, as asyncio.run makes it there
+    class NoReader(asyncio.SelectorEventLoop):
+        def add_reader(self, *args, **kwargs):
+            raise NotImplementedError
+
+    loop = NoReader()
+    reactor = Pyjo.Reactor.Asyncio.new(loop=loop)
+    a, b = socket.socketpair()
+    throws_ok(
+        lambda: reactor.io(a, lambda reactor, writable: None),
+        re.compile(r'^Event loop __main__\.NoReader cannot watch handles, an asyncio\.SelectorEventLoop can'),
+        'says what it needs',
+    )
+    reactor.remove(a)
+    a.close()
+    b.close()
+    loop.close()
+
 with subtest('The event loop of a reactor that exists at the exit is closed'):
     script = (
         'import Pyjo.Reactor.Asyncio\n'
