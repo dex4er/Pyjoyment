@@ -30,13 +30,13 @@ scratch directory and adapt them to what it measures, keeping the rules in
 
 ## Scripts
 
-| Script                                         | What it does                                                                                                                                                                                                 |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `bench.sh [SCENARIO...]`                       | Every server, or the scenarios named: keep-alive 3 times, a new connection per request, and `ab -c 1`                                                                                                        |
-| `ab.sh [-n PAIRS] [-r REACTOR]... [REF]`       | `Pyjo.Server.Daemon` of a git ref (default `master`) against the working tree, interleaved, with the medians and the gain                                                                                    |
-| `profile.sh [-n REQUESTS] [-r REACTOR] [ROOT]` | `cProfile` of `Pyjo.Server.Daemon` under keep-alive requests, with the function calls per request and the top of the profile                                                                                 |
-| `ka.py PORT N`                                 | The client: `GET /` on one connection, reads by `Content-Length`; `RECONNECT=1` opens a connection for every request, `WARMUP` sets the requests before the measurement                                      |
-| `workers.sh [PATTERN...]`                      | `Pyjo.Server.Prefork` and `Pyjo.Server.Prethread` on a CPython with the GIL and free-threaded, and the other servers with as many workers, rounds of oha at several numbers of connections, with the medians |
+| Script                                         | What it does                                                                                                                                                                                                                                |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bench.sh [SCENARIO...]`                       | Every server, or the scenarios named: keep-alive 3 times, a new connection per request, and `ab -c 1`                                                                                                                                       |
+| `ab.sh [-n PAIRS] [-r REACTOR]... [REF]`       | `Pyjo.Server.Daemon` of a git ref (default `master`) against the working tree, interleaved, with the medians and the gain                                                                                                                   |
+| `profile.sh [-n REQUESTS] [-r REACTOR] [ROOT]` | `cProfile` of `Pyjo.Server.Daemon` under keep-alive requests, with the function calls per request and the top of the profile                                                                                                                |
+| `ka.py PORT N`                                 | The client: `GET /` on one connection, reads by `Content-Length`; `RECONNECT=1` opens a connection for every request, `WARMUP` sets the requests before the measurement                                                                     |
+| `workers.sh [PATTERN...]`                      | `Pyjo.Server.Prefork` and `Pyjo.Server.Prethread` on a CPython with the GIL and free-threaded, `Pyjo.Server.Prefork` on PyPy, and the other servers with as many workers, rounds of oha at several numbers of connections, with the medians |
 
 The applications answer `Your Pyjo is working!`: `hello.py` and
 `pyjo_daemon.py` are `Pyjo.HelloWorld` on `Pyjo.Server.Reload` and
@@ -69,6 +69,16 @@ uv python install 3.15 3.15t
 PYTHON=$(uv python find --managed-python cpython-3.15.0-macos-aarch64-none) \
   PYTHON_FT=$(uv python find --managed-python 3.15t) \
   benchmarks/workers.sh
+```
+
+`Pyjo.Server.Prefork` runs on PyPy too, from `PYTHON_PYPY`, after a warmup of
+20000 requests for its JIT; the threads of PyPy take turns, as those of a
+CPython with the GIL, so it has no `Pyjo.Server.Prethread`. Without PyPy, its
+scenarios are left out:
+
+```sh
+uv python install pypy3.12
+PYTHON_PYPY=$(uv python find --managed-python pypy3.12) benchmarks/workers.sh '*-pypy'
 ```
 
 The client is [oha](https://github.com/hatoo/oha), which `mise exec` runs
