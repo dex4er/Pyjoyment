@@ -1,0 +1,6 @@
+# The files are checked out with the line endings of the repository on every system, as the tests read the lines of
+# the sources, and Git for Windows would turn them into CRLF; a batch file of Windows keeps the CRLF it has
+* text=auto eol=lf
+*.bat -text
+*.ico binary
+*.png binary
