@@ -1059,6 +1059,18 @@ back here.
   keeps the callback, and what it refers to, as a controller, until the
   garbage collector runs, which `t/Pyjoyment/longpolling_lite_app.py` catches.
   A finalizer removes what an object leaves in the loop.
+- **The direction of the dependencies.** A distribution depends on
+  Pyjoyment, never the other way: its code imports Pyjoyment, its CI checks
+  Pyjoyment out, and its documentation may link to the one of Pyjoyment, with
+  intersphinx too. Pyjoyment knows a distribution only by a plain link on the
+  page of the documentation that lists them, which the distribution adds with
+  a pull request: no import, no autodoc, no intersphinx and no CI of a
+  distribution, which would make Pyjoyment depend on its dependencies, and
+  fail its build with -W where the site of the distribution does not answer.
+- **The formats.** The docstrings are reStructuredText, as those of
+  Pyjoyment, so that they read the same; the README and `AGENTS.md` are
+  Markdown, which GitHub and PyPI render, as a distribution has no Sphinx to
+  include its README.
 
 ## Linting and Formatting
 
