@@ -12,6 +12,7 @@ import Pyjo.UserAgent
 
 from Pyjo.Test import *
 
+import gc
 import socket
 
 
@@ -32,7 +33,8 @@ app.log.level = 'fatal'
 # Unlike Mojolicious: the remote hosts are those of GitHub, where Mojo requests mojolicious.org, metacpan.org and
 # wikipedia.org, as the runners of GitHub Actions reach them the most reliably; github.com answers a form POST without
 # a CSRF token with 422, where metacpan.org answers it with 200, and redirects from HTTP to HTTPS in one step, where
-# wikipedia.org takes two
+# wikipedia.org takes two; a form is posted to the page of a repository, as the search of GitHub limits the requests
+# of a client, which the jobs of CI, all of them online, would reach
 
 
 @get('/remote_address')
@@ -53,6 +55,8 @@ with subtest('Make sure user agents dont taint the ioloop'):
     ua.get('http://github.com', cb)
     loop.start()
     ua = None
+    # Not in Mojolicious: the garbage collector runs, as PyPy frees the user agent only then, where Perl frees it at once
+    gc.collect()
     loop.timer(0.25, lambda loop: loop.stop())
     loop.start()
     ok(not loop.stream(result['id']), 'loop not tainted')
@@ -153,9 +157,9 @@ with subtest('One-liner'):
     is_ok(g('github.com').code, 200, 'right status')
     is_ok(h('github.com').code, 200, 'right status')
     is_ok(h('github.com').body, b'', 'no content')
-    is_ok(p('github.com/mojolicious/lalalala').code, 404, 'right status')
+    is_ok(p('github.com/dex4er/lalalala').code, 404, 'right status')
     is_ok(g('http://github.com').code, 200, 'right status')
-    res = p('https://github.com/search', form={'q': 'mojolicious'})
+    res = p('https://github.com/dex4er/Pyjoyment', form={'q': 'mojolicious'})
     like_ok(res.body, rb'GitHub', 'right content')
     is_ok(res.code, 422, 'right status')
 
@@ -195,17 +199,17 @@ with subtest('Simple HTTPS request'):
 ua = Pyjo.UserAgent.new()
 
 with subtest('Simple keep-alive form POST'):
-    tx = ua.post('https://github.com/search', form={'q': 'mojolicious'})
+    tx = ua.post('https://github.com/dex4er/Pyjoyment', form={'q': 'mojolicious'})
     is_ok(tx.req.method, 'POST', 'right method')
-    is_ok(str(tx.req.url), 'https://github.com/search', 'right url')
+    is_ok(str(tx.req.url), 'https://github.com/dex4er/Pyjoyment', 'right url')
     is_ok(tx.req.headers.content_length, '13', 'right content length')
     is_ok(tx.req.body, b'q=mojolicious', 'right content')
     like_ok(tx.res.body, rb'GitHub', 'right content')
     is_ok(tx.res.code, 422, 'right status')
     ok(tx.keep_alive, 'connection will be kept alive')
-    tx = ua.post('https://github.com/search', form={'q': 'mojolicious'})
+    tx = ua.post('https://github.com/dex4er/Pyjoyment', form={'q': 'mojolicious'})
     is_ok(tx.req.method, 'POST', 'right method')
-    is_ok(str(tx.req.url), 'https://github.com/search', 'right url')
+    is_ok(str(tx.req.url), 'https://github.com/dex4er/Pyjoyment', 'right url')
     is_ok(tx.req.headers.content_length, '13', 'right content length')
     is_ok(tx.req.body, b'q=mojolicious', 'right content')
     like_ok(tx.res.body, rb'GitHub', 'right content')
@@ -219,16 +223,16 @@ with subtest('Simple keep-alive form POST'):
 
 with subtest('Simple request with redirect'):
     ua.max_redirects = 3
-    tx = ua.get('http://github.com/mojolicious')
+    tx = ua.get('http://github.com/dex4er')
     ua.max_redirects = 0
     is_ok(tx.req.method, 'GET', 'right method')
-    is_ok(str(tx.req.url), 'https://github.com/mojolicious', 'right url')
+    is_ok(str(tx.req.url), 'https://github.com/dex4er', 'right url')
     is_ok(tx.res.code, 200, 'right status')
     is_ok(tx.previous.req.method, 'GET', 'right method')
-    is_ok(str(tx.previous.req.url), 'http://github.com/mojolicious', 'right url')
+    is_ok(str(tx.previous.req.url), 'http://github.com/dex4er', 'right url')
     is_ok(tx.previous.res.code, 301, 'right status')
     is_ok(tx.redirects()[-1].req.method, 'GET', 'right method')
-    is_ok(str(tx.redirects()[-1].req.url), 'http://github.com/mojolicious', 'right url')
+    is_ok(str(tx.redirects()[-1].req.url), 'http://github.com/dex4er', 'right url')
     is_ok(tx.redirects()[-1].res.code, 301, 'right status')
 
 with subtest('Connect timeout (non-routable address)'):

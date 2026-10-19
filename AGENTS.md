@@ -127,10 +127,10 @@ because the output is standard TAP; `.proverc` supplies its
 
 A test that requests remote hosts, as `t/Pyjo/UserAgent_online.py`, is
 skipped unless `TEST_ONLINE` is set, as in Mojolicious. Its hosts are those of
-GitHub, which the runners of GitHub Actions reach the most reliably, and CI
-sets `TEST_ONLINE` on the Python of `mise.toml` only, so that one job, not
-each of them, depends on the network; that job runs it on both reactors, as
-every other test.
+GitHub, which the runners of GitHub Actions reach the most reliably, as are
+the pages that the examples of the guides request, where Mojolicious requests
+its own site, which Pyjoyment does not have yet, so CI sets `TEST_ONLINE` in
+every job of its matrix.
 
 CI runs the tests with `--timeout 60`: a test script that hangs, such as a
 reactor that never stops, is killed with the processes it started and fails

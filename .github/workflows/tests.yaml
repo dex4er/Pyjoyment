@@ -17,10 +17,10 @@ permissions:
   contents: read
 
 jobs:
-  # The version pinned in mise.toml and verified against mise.lock, with the
-  # tests that request remote hosts, which are those of GitHub. Each version
+  # The version pinned in mise.toml and verified against mise.lock. Each version
   # runs the tests on the reactor of asyncio, the default, and on the reactor
-  # without asyncio, as a reactor has to pass them all.
+  # without asyncio, as a reactor has to pass them all, with the tests that
+  # request remote hosts, which are those of GitHub.
   prove-mise:
     name: prove (python mise, ${{ matrix.reactor }})
 
@@ -99,6 +99,7 @@ jobs:
           PYJO_REACTOR: Pyjo.Reactor.${{ matrix.reactor }}
           PYTHONDEVMODE: "1"
           PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
+          TEST_ONLINE: "1"
         run: |-
           python --version
           python -m Pyjo.Prove -l --color -j 4 --timeout 60 --capture-stderr --stderr-lines 1000 -r t 2>&1 | tee prove.log
