@@ -1,8 +1,0 @@
-# The configuration of actionlint, which runs shellcheck on the steps with
-# --norc, so that .shellcheckrc does not apply to them.
-paths:
-  .github/workflows/tests.yaml:
-    ignore:
-      # SC2086 "Double quote to prevent globbing and word splitting": POLL_TESTS
-      # is a list of globs, which the shell expands
-      - "SC2086:"

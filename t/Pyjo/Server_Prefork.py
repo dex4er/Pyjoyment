@@ -270,25 +270,28 @@ with subtest('Second INT and TERM'):
         def request(prefork, tx):
             pass
 
-        finished, connections = [], []
+        finished, connections, signalled = [], [], []
         prefork.on('finish', lambda prefork, graceful: finished.append(graceful))
 
         @prefork.once('heartbeat')
         def heartbeat(prefork, pid):
             connections.append(connection := socket.create_connection(('127.0.0.1', prefork.ports()[0])))
             connection.sendall(b'GET / HTTP/1.1\r\nHost: x\r\n\r\n')
+            signalled.append(time.monotonic())
             os.kill(os.getpid(), signal.SIGINT)
 
-            @prefork.once('wait')
-            def again(prefork):
+            # The second signal once the manager has handled the first, as Python handles two of the same signal that
+            # come before its handler runs once
+            @prefork.once('finish')
+            def again(prefork, graceful):
                 os.kill(os.getpid(), second)
 
         prefork.graceful_timeout = 2
-        started = time.monotonic()
         prefork.run()
         for connection in connections:
             connection.close()
-        return finished, time.monotonic() - started
+        # The time since the first signal, without the start of the workers
+        return finished, time.monotonic() - signalled[0]
 
     finished, elapsed = second_signal(signal.SIGTERM)
     is_deeply_ok(finished, [True], 'a second TERM does nothing')

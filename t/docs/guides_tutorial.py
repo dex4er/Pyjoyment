@@ -254,7 +254,7 @@ with subtest('User agent'):
     if os.environ.get('TEST_ONLINE'):
         t.get_ok('/title').status_is(200).content_like(re.compile(r'Mojolicious'))
         t.get_ok('/titles').status_is(200).json_like('/mojo', re.compile(r'Mojolicious'))
-        t.json_like('/pypi', re.compile(r'PyPI'))
+        t.json_like('/pyjo', re.compile(r'Pyjoyment'))
 
 with subtest('WebSockets'):
     t = tutorial('websockets')

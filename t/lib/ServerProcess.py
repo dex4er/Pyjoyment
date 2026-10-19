@@ -4,6 +4,8 @@ import socket
 import subprocess
 import time
 
+import ServerStart
+
 
 # A server of the dependency group "servers", started in a process of its own on a free port, for the tests in
 # t/servers
@@ -12,10 +14,8 @@ import time
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 
-def free_port():
-    with socket.socket() as sock:
-        sock.bind(('127.0.0.1', 0))
-        return sock.getsockname()[1]
+# A port below the ephemeral ones, which no other socket takes before the server binds it
+free_port = ServerStart.port
 
 
 class Server:

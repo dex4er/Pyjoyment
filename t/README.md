@@ -60,7 +60,7 @@ PYTHONDEVMODE=1 PYTHONWARNINGS=error::SyntaxWarning,error::DeprecationWarning \
 ```
 
 With the tests that request remote hosts, which are those of GitHub, as CI
-runs them on the Python of `mise.toml`:
+runs them:
 
 ```sh
 TEST_ONLINE=1 mise exec -- python -m Pyjo.Prove -l -j 4 -r t
@@ -69,7 +69,7 @@ TEST_ONLINE=1 mise exec -- python -m Pyjo.Prove -l -j 4 -r t
 On the reactor without asyncio:
 
 ```sh
-PYJO_REACTOR=Pyjo.Reactor.Poll mise exec -- python -m Pyjo.Prove -l -j 4 t/Pyjo/IOLoop*.py
+PYJO_REACTOR=Pyjo.Reactor.Poll mise exec -- python -m Pyjo.Prove -l -j 4 -r t
 ```
 
 The tests of the servers, which install their dependency group:
