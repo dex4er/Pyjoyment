@@ -183,7 +183,8 @@ with subtest('Blocking request in a running event loop of asyncio'):
             tx = ua.get(f'{url}/blocking')
         return tx, caught
 
-    tx, caught = asyncio.run(blocking())
+    # A SelectorEventLoop, as the ProactorEventLoop that asyncio.run makes on Windows cannot watch handles
+    tx, caught = asyncio.run(blocking(), loop_factory=asyncio.SelectorEventLoop)
     is_ok(tx.res.code, None, 'no response')
     is_ok(len(caught), 1, 'one warning')
     is_ok(caught[0].category, RuntimeWarning, 'RuntimeWarning')
@@ -194,7 +195,7 @@ with subtest('Blocking request in a running event loop of asyncio'):
         with Pyjo.UserAgent.new() as ua:
             return await ua.get_p(f'{url}/awaited')
 
-    tx = asyncio.run(awaited())
+    tx = asyncio.run(awaited(), loop_factory=asyncio.SelectorEventLoop)
     is_ok(tx.res.json()['path'], '/awaited', 'awaited request')
     Pyjo.IOLoop.singleton.reactor = reactor
 

@@ -42,6 +42,15 @@ already, :meth:`start` and :meth:`one_tick` return right away, as asyncio
 does not nest event loops, and the handles and timers are watched by that
 loop.
 
+The loop watches handles with ``add_reader`` and ``add_writer``, which the
+default event loop of asyncio on Windows, :class:`asyncio.ProactorEventLoop`,
+does not have. There, a loop of its own is an
+:class:`asyncio.SelectorEventLoop`, and a loop that the reactor is given or
+that is running has to be one too, as of
+``asyncio.run(main(), loop_factory=asyncio.SelectorEventLoop)``. The
+:class:`asyncio.SelectorEventLoop` of Windows watches sockets only, not pipes
+or files.
+
 The end of a ``with`` block closes the event loop that the reactor made.
 
 See also
@@ -63,6 +72,7 @@ import asyncio
 import atexit
 import os
 import random
+import sys
 import time
 import weakref
 
@@ -151,7 +161,7 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
     # collector calls before the finalizers of the objects that it frees, as the loop warns when it is freed before the
     # reactor closes it, as among the objects that a free-threaded Python frees only when the garbage collector runs
     def _own_loop(self) -> asyncio.AbstractEventLoop:
-        loop = self._own = asyncio.new_event_loop()
+        loop = self._own = _new_event_loop()
         _OWN.add(loop)
         self._finalizer = weakref.finalize(self, _close, loop)
         return loop
@@ -220,9 +230,9 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
                 if io['write']:
                     old.remove_writer(fd)
             if io['read']:
-                new.add_reader(fd, Pyjo_Reactor_Asyncio._weak_ready, weakref.ref(self), fd, False)
+                self._add(new, fd, False)
             if io['write']:
-                new.add_writer(fd, Pyjo_Reactor_Asyncio._weak_ready, weakref.ref(self), fd, True)
+                self._add(new, fd, True)
 
     def again(self, id: str, after: float | None = None) -> None:
         """::
@@ -528,17 +538,27 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
         read, write = bool(read), bool(write)
         if read != io['read']:
             if read:
-                loop.add_reader(fd, Pyjo_Reactor_Asyncio._weak_ready, weakref.ref(self), fd, False)
+                self._add(loop, fd, False)
             else:
                 loop.remove_reader(fd)
         if write != io['write']:
             if write:
-                loop.add_writer(fd, Pyjo_Reactor_Asyncio._weak_ready, weakref.ref(self), fd, True)
+                self._add(loop, fd, True)
             else:
                 loop.remove_writer(fd)
         io['read'], io['write'] = read, write
 
         return self
+
+    # Not in Mojolicious: a loop without add_reader and add_writer, as the ProactorEventLoop of Windows, which
+    # asyncio.run makes there, cannot watch handles, and says so
+    def _add(self, loop: asyncio.AbstractEventLoop, fd: int, writable: bool) -> None:
+        add = loop.add_writer if writable else loop.add_reader
+        try:
+            add(fd, Pyjo_Reactor_Asyncio._weak_ready, weakref.ref(self), fd, writable)
+        except NotImplementedError:
+            name = f'{type(loop).__module__}.{type(loop).__qualname__}'
+            Pyjo.Exception.object.throw(f'Event loop {name} cannot watch handles, an asyncio.SelectorEventLoop can')
 
     # A timer of no time runs before the I/O of the next iteration of the loop, as the timers of Mojo's reactor run in
     # the same tick, after its I/O; call_later would run it after the I/O of the next iteration
@@ -647,6 +667,12 @@ def _fileno(handle: Handle) -> int:
     if fd < 0:
         Pyjo.Exception.object.throw('Handle is closed')
     return fd
+
+
+# Not in Mojolicious: a loop of its own is a SelectorEventLoop on Windows, where the default of asyncio is the
+# ProactorEventLoop, which has no add_reader and add_writer
+def _new_event_loop() -> asyncio.AbstractEventLoop:
+    return asyncio.SelectorEventLoop() if sys.platform == 'win32' else asyncio.new_event_loop()
 
 
 # Not in Mojolicious: the event loops that the reactors make for themselves, which are closed at the exit of the
