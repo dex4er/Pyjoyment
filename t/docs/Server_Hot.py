@@ -1,6 +1,7 @@
 from Pyjo.Test import *
 
 import atexit
+import http.client
 import importlib
 import os
 import signal
@@ -20,6 +21,7 @@ if sys.platform == 'darwin' and getattr(sys, 'pypy_translation_info', {}).get('t
 import Pyjo.IOLoop.Server
 import Pyjo.Server.Hot
 import Pyjo.Server.Prefork
+import Pyjo.Server.Prethread
 
 from Pyjo.File import curfile, tempdir
 from Pyjo.Util import extract_usage
@@ -40,12 +42,13 @@ def application(port):
         .child('myapp.py')
         .spew(
             f"""
-import sys
+import sys, threading
 sys.path.insert(0, {LIB!r})
 from Pyjoyment.Lite import app, get
 app.log.level = 'fatal'
 app.config(hot={{'listen': ['http://127.0.0.1:{port}'], 'workers': 1}})
 get('/', {{'text': 'Hello!'}})
+get('/thread', lambda c: c.render(text=threading.current_thread().name))
 app.start()
 """.encode()
         )
@@ -80,6 +83,15 @@ def wait_for(condition):
 def stop(app, port):
     os.kill(pid(app), signal.SIGTERM)
     return wait_for(lambda: not listening(port) and not os.path.exists(app.sibling('hot.pid')))
+
+
+def get(port, path):
+    conn = http.client.HTTPConnection('127.0.0.1', port, timeout=10)
+    try:
+        conn.request('GET', path)
+        return conn.getresponse().read().decode()
+    finally:
+        conn.close()
 
 
 def alive(pid):
@@ -146,6 +158,33 @@ with subtest('Settings'):
     is_deeply_ok(hot.prefork.listen, ['http://*:80'], 'listen')
     is_ok(hot.prefork.workers, 10, 'workers')
 
+with subtest('threads'):
+    hot = Pyjo.Server.Hot.new()
+    hot.prefork.app.config(hot={'threads': True, 'workers': 2})
+    hot.configure('hot')
+    isa_ok(hot.prefork, Pyjo.Server.Prethread.object, 'workers are threads')
+    is_deeply_ok(hot.prefork.listen, ['http://*:8080'], 'listen')
+    is_ok(hot.prefork.workers, 2, 'settings')
+
+    # The option --threads, with a hot deployment
+    port, myapp, result = daemonized('-m', 'Pyjo.Server.Hot', '--threads', '{myapp}')
+    is_ok(result.returncode, 0, 'python -m Pyjo.Server.Hot --threads')
+    ok(wait_for(lambda: listening(port) and pid(myapp)), 'listening')
+    is_ok(get(port, '/thread'), 'Pyjo.Server.Prethread', 'served by a thread')
+    old = pid(myapp)
+    result = command('-m', 'Pyjo.Server.Hot', '--threads', myapp.to_str())
+    is_ok(result.stdout, f'Starting hot deployment for Hot server {old}.\n', 'hot deployment')
+    ok(wait_for(lambda: pid(myapp) not in (None, old)), 'new manager')
+    ok(wait_for(lambda: not alive(old)), 'old manager stopped')
+    is_ok(get(port, '/thread'), 'Pyjo.Server.Prethread', 'served by a thread of the new manager')
+    ok(stop(myapp, port), 'stopped')
+
+    # Without it, a worker process
+    port, myapp, result = daemonized('-m', 'Pyjo.Server.Hot', '{myapp}')
+    ok(wait_for(lambda: listening(port) and pid(myapp)), 'listening')
+    is_ok(get(port, '/thread'), 'MainThread', 'served by a process')
+    ok(stop(myapp, port), 'stopped')
+
 with subtest('pyjo-hot'):
     result = subprocess.run(
         [sys.executable, '-m', 'Pyjo.Server.Hot', '--help'], env=ENV, capture_output=True, text=True
@@ -154,7 +193,7 @@ with subtest('pyjo-hot'):
     is_ok(result.returncode, 1, 'help')
     is_ok(result.stderr, extract_usage(Pyjo.Server.Hot.__file__, section='pyjo-hot'), 'usage')
     like_ok(result.stderr, r'^Usage: pyjo-hot \[OPTIONS\] \[APPLICATION\]\n', 'usage of pyjo-hot')
-    for option in ('--foreground', '--stop', '--test'):
+    for option in ('--foreground', '--stop', '--test', '--threads'):
         like_ok(result.stderr, rf'{option}', option)
 
 with subtest('new'):

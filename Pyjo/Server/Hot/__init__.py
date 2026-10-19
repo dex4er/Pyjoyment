@@ -253,6 +253,18 @@ This allows for new workers to be started while old ones are still shutting
 down gracefully, drastically reducing the performance cost of worker
 restarts.
 
+threads
+~~~~~~~
+::
+
+    'threads': True
+
+Run the workers as threads of a :mod:`Pyjo.Server.Prethread` in the place of
+the processes of :mod:`Pyjo.Server.Prefork`, as the option ``--threads`` of
+``pyjo-hot`` does, which sets the ``PYJO_HOT_THREADS`` environment variable,
+defaults to a false value. The server, its manager and the hot deployment are
+the same.
+
 trusted_proxies
 ~~~~~~~~~~~~~~~
 ::
@@ -298,6 +310,7 @@ pyjo-hot
       -h, --help         Show this message
       -s, --stop         Stop server gracefully
       -t, --test         Test application and exit
+          --threads      Run the workers as threads
 
 Start :mod:`Pyjoyment` applications with the :mod:`Pyjo.Server.Hot` web
 server.
@@ -318,6 +331,7 @@ import Pyjo.Base
 import Pyjo.File
 import Pyjo.GetOpt
 import Pyjo.Server.Prefork
+import Pyjo.Server.Prethread
 
 from Pyjo.Util import die, extract_usage, getopt
 
@@ -396,6 +410,14 @@ class Pyjo_Server_Hot(Pyjo.Base.object):
         if c.get('upgrade_timeout'):
             self.upgrade_timeout = c['upgrade_timeout']
 
+        # Not in Mojolicious: the workers are threads of a Pyjo.Server.Prethread, with the application and the listen
+        # locations of the server that it replaces
+        if (c.get('threads') or os.environ.get('PYJO_HOT_THREADS')) and not isinstance(
+            prefork, Pyjo.Server.Prethread.object
+        ):
+            cleanup, prefork.cleanup = prefork.cleanup, False
+            prefork = self.prefork = Pyjo.Server.Prethread.new(app=prefork.app, cleanup=cleanup, listen=prefork.listen)
+
         # Pre-fork settings
         if c.get('proxy') is not None:
             prefork.reverse_proxy = c['proxy']
@@ -454,6 +476,7 @@ class Pyjo_Server_Hot(Pyjo.Base.object):
         if settings.get('pid_file') is None:
             settings['pid_file'] = Pyjo.File.new(os.environ['PYJO_HOT_APP']).sibling('hot.pid').to_str()
         self.configure('hot')
+        prefork = self.prefork
         ref = weakref.ref(self)
 
         def wait(prefork: Any) -> None:
@@ -601,6 +624,8 @@ def main(argv: Sequence[str] | None = None) -> None:
             'h|help': None,
             's|stop': Pyjo.GetOpt.env('PYJO_HOT_STOP'),
             't|test': Pyjo.GetOpt.env('PYJO_HOT_TEST'),
+            # Not in Mojolicious: the workers are threads, as the setting "threads"
+            'threads': Pyjo.GetOpt.env('PYJO_HOT_THREADS'),
         },
     )
 
