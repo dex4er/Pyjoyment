@@ -23,8 +23,8 @@ env:
   POLL_TESTS: >-
     t/Pyjo/IOLoop*.py t/Pyjo/TLS.py t/Pyjo/Promise*.py t/Pyjo/Subprocess.py t/stdlib/IOLoop*.py t/Pyjo/UserAgent*.py
     t/stdlib/UserAgent*.py t/Pyjo/WebSocket*.py t/Pyjo/Server_Daemon*.py t/stdlib/Server_Daemon.py t/Pyjo/Server_FastCGI.py
-    t/Pyjo/Server_Hot.py t/stdlib/Server_Hot.py t/Pyjo/Server_Prefork.py t/stdlib/Server_Prefork.py t/Pyjo/Server_Reload.py
-    t/stdlib/Server_Reload.py t/Pyjo/File_download.py
+    t/Pyjo/Server_Hot.py t/stdlib/Server_Hot.py t/Pyjo/Server_Prefork.py t/stdlib/Server_Prefork.py t/Pyjo/Server_Prethread.py
+    t/Pyjo/Server_Reload.py t/stdlib/Server_Reload.py t/Pyjo/File_download.py
 
 jobs:
   # The version pinned in mise.toml and verified against mise.lock, with the

@@ -239,7 +239,7 @@ PYJO_REACTOR=Pyjo.Reactor.Poll mise exec -- python -m Pyjo.Prove -l -j 4 --captu
   t/Pyjo/IOLoop*.py t/Pyjo/TLS.py t/Pyjo/Promise*.py t/Pyjo/Subprocess.py t/stdlib/IOLoop*.py \
   t/Pyjo/UserAgent*.py t/stdlib/UserAgent*.py t/Pyjo/WebSocket*.py t/Pyjo/Server_Daemon*.py t/stdlib/Server_Daemon.py \
   t/Pyjo/Server_FastCGI.py t/Pyjo/Server_Hot.py t/stdlib/Server_Hot.py t/Pyjo/Server_Prefork.py t/stdlib/Server_Prefork.py \
-  t/Pyjo/Server_Reload.py t/stdlib/Server_Reload.py t/Pyjo/File_download.py
+  t/Pyjo/Server_Prethread.py t/Pyjo/Server_Reload.py t/stdlib/Server_Reload.py t/Pyjo/File_download.py
 ```
 
 CI runs the tests in `t/servers` on Python 3.12 and 3.15, the oldest and the
@@ -395,6 +395,11 @@ connections of the listen locations `fcgi://` and `fcgi+unix://` of
 `Pyjo.Server.Daemon`, written from the specification of FastCGI 1.0, and the
 command of a web server that starts the application with its listen socket
 as the file descriptor 0, inspired by `Pyjo.Server.CGI` and its command),
+`Pyjo.Server.Prethread` and `Pyjoyment.Command.prethread` (the server of
+`Pyjo.Server.Prefork` with threads for the worker processes, each a copy of
+the server with the event loop of its thread and the duplicates of the listen
+sockets of the manager, as Thrall is Starlight with threads, and its command,
+a subclass of the one of `prefork`),
 `Pyjoyment.Plugin.PyRenderer` (the renderer of template strings, inspired by
 `Mojolicious::Plugin::EPLRenderer`), `Pyjoyment.Plugin.TOMLConfig` (inspired
 by `Mojolicious::Plugin::NotYAMLConfig`, for the format of configuration of

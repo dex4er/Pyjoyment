@@ -197,6 +197,15 @@ prefork
 Use :mod:`Pyjoyment.Command.prefork` to start application with standalone
 pre-forking HTTP and WebSocket server.
 
+prethread
+~~~~~~~~~
+::
+
+    $ ./myapp.py prethread
+
+Use :mod:`Pyjoyment.Command.prethread` to start application with standalone
+pre-threading HTTP and WebSocket server.
+
 routes
 ~~~~~~
 ::
