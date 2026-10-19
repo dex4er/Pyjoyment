@@ -62,6 +62,8 @@ pyjo-reload
       -m, --mode <name>              Operating mode for your application,
                                      defaults to the value of PYJO_MODE or
                                      "development"
+          --threads                  Run the application with the workers of
+                                     Pyjo.Server.Prethread
       -v, --verbose                  Print details about what files changed to
                                      sys.stdout
       -w, --watch <directory/file>   One or more directories and files to watch
@@ -88,6 +90,8 @@ import Pyjo.Base
 import Pyjo.Exception
 import Pyjo.GetOpt
 import Pyjo.Server.Daemon
+import Pyjo.Server.Prefork
+import Pyjo.Server.Prethread
 
 from Pyjo.Loader import load_class
 from Pyjo.Util import die, extract_usage, getopt
@@ -95,6 +99,7 @@ from Pyjo.Util import die, extract_usage, getopt
 import os
 import signal
 import sys
+import tempfile
 import traceback
 
 from collections.abc import Sequence
@@ -265,7 +270,17 @@ class Pyjo_Server_Reload(Pyjo.Base.object):
         try:
             daemon = self.daemon
             daemon.load_app(self.backend.watch[0]).server(daemon)
-            daemon.ioloop.recurring(1, lambda loop: None if _kill(0, manager) else loop.stop())
+            # Not in Mojolicious: a server of workers, as Pyjo.Server.Prethread, waits for them in a loop of its own,
+            # where it stops immediately once the manager is gone
+            if isinstance(daemon, Pyjo.Server.Prefork.object):
+
+                def wait(daemon: Any) -> None:
+                    if not _kill(0, manager):
+                        _kill(signal.SIGQUIT, os.getpid())
+
+                daemon.on('wait', wait)
+            else:
+                daemon.ioloop.recurring(1, lambda loop: None if _kill(0, manager) else loop.stop())
             daemon.run()
 
         # Not in Mojolicious: sys.exit() is the exit of the worker, as exit is in Perl, and os._exit leaves what the
@@ -301,6 +316,9 @@ def main(argv: Sequence[str] | None = None) -> NoReturn:
             # Not in Mojolicious: the format of the log messages of Pyjo.Log, as the option of the commands
             'log-format=s': Pyjo.GetOpt.env('PYJO_LOG_FORMAT'),
             'm|mode=s': Pyjo.GetOpt.env('PYJO_MODE'),
+            # Not in Mojolicious: the server of the worker is a Pyjo.Server.Prethread, with a process id file of its own,
+            # which the server of the manager removes at its end
+            'threads': None,
             'v|verbose': None,
             'w|watch=s': watch,
         },
@@ -310,6 +328,9 @@ def main(argv: Sequence[str] | None = None) -> NoReturn:
         # The usage without its last newline, as SystemExit writes the message with one
         die(extract_usage(section='pyjo-reload').rstrip('\n'))
     reload = Pyjo_Server_Reload.new(silent=not opts.verbose)
+    if opts.threads:
+        pid_file = os.path.join(tempfile.gettempdir(), f'pyjo-reload-{os.getpid()}.pid')
+        reload.daemon = Pyjo.Server.Prethread.new(pid_file=pid_file)
     if listen:
         reload.daemon.listen = listen
     if watch:

@@ -1,11 +1,13 @@
 from Pyjo.Test import *
 
 import atexit
+import http.client
 import importlib
 import os
 import signal
 import subprocess
 import sys
+import tempfile
 
 
 if not hasattr(os, 'fork'):
@@ -33,11 +35,12 @@ ServerStart = importlib.import_module('ServerStart')
 dir = tempdir()
 myapp = dir.child('myapp.py').spew(
     f"""
-import sys
+import sys, threading
 sys.path.insert(0, {LIB!r})
 from Pyjoyment.Lite import app, get
 app.log.level = 'fatal'
 get('/', {{'text': 'Hello!'}})
+get('/thread', lambda c: c.render(text=threading.current_thread().name))
 app.start()
 """.encode()
 )
@@ -91,6 +94,18 @@ with subtest('Description'):
     is_ok(status, 0, 'python -m Pyjo.Server.Reload')
     like_ok(output, rf'Web application available at http://127.0.0.1:{port}', 'listening')
 
+with subtest('threads'):
+    port, process = server('-m', 'Pyjo.Server.Reload', '--threads', '-l', 'http://127.0.0.1:{port}', myapp.to_str())
+    conn = http.client.HTTPConnection('127.0.0.1', port, timeout=10)
+    conn.request('GET', '/thread')
+    is_ok(conn.getresponse().read(), b'Pyjo.Server.Prethread', 'served by a thread')
+    conn.close()
+    pid_file = os.path.join(tempfile.gettempdir(), f'pyjo-reload-{process.pid}.pid')
+    ok(ServerStart.wait_for(lambda: os.path.exists(pid_file), 'the process id file') is None, 'process id file')
+    status, output = stop(process)
+    is_ok(status, 0, 'stopped')
+    ok(not os.path.exists(pid_file), 'process id file removed')
+
 with subtest('pyjo-reload'):
     result = subprocess.run(
         [sys.executable, '-m', 'Pyjo.Server.Reload', '--help'],
@@ -102,7 +117,7 @@ with subtest('pyjo-reload'):
     is_ok(result.returncode, 1, 'help')
     is_ok(result.stderr, extract_usage(Pyjo.Server.Reload.__file__, section='pyjo-reload'), 'usage')
     like_ok(result.stderr, r'^Usage: pyjo-reload \[OPTIONS\] \[APPLICATION\]\n', 'usage of pyjo-reload')
-    for option in ('--backend', '--listen', '--log-format', '--mode', '--verbose', '--watch'):
+    for option in ('--backend', '--listen', '--log-format', '--mode', '--threads', '--verbose', '--watch'):
         like_ok(result.stderr, rf'{option}', option)
 
 with subtest('new'):
