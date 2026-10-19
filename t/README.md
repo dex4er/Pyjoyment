@@ -87,8 +87,13 @@ UV_PROJECT_ENVIRONMENT=.venv-3.14 mise exec -- uv run --python 3.14 \
   --only-group servers python -m Pyjo.Prove -l --timeout 120 -r t/servers
 ```
 
-The output is standard TAP, so Perl's `prove -lr t` works too; `.proverc`
-gives it the extension and the interpreter.
+The output is standard TAP, so Perl's `prove` works too, from the root of the
+repository: `.proverc` gives it the extension and the interpreter, and
+`PYTHONPATH` the directory of the modules, as its `-l` is for Perl:
+
+```sh
+PYTHONPATH=. mise exec -- prove -r -j 4 t
+```
 
 A test with the syntax of a newer Python, as the t-strings of Python 3.14,
 names the version in its inline metadata (PEP 723), and the harness skips it

@@ -122,8 +122,17 @@ mise exec -- python -m Pyjo.Prove -l -j 4 -r t
 
 A single file runs on its own as well:
 `PYTHONPATH=. mise exec -- python t/Pyjo/URL.py`. Perl's `prove` still works,
-because the output is standard TAP; `.proverc` supplies its
-`--ext=py --exec=python`.
+because the output is standard TAP: `.proverc` supplies its
+`--ext=py --exec=python`, and `PYTHONPATH` the directory of the modules, as
+the `-l` of `prove` adds `lib` to the path of Perl, not of Python:
+
+```sh
+PYTHONPATH=. mise exec -- prove -r -j 4 t
+```
+
+`.proverc` cannot set the variable itself: `prove` keeps the quotes of an
+option of the file, so a command with arguments, as `env PYTHONPATH=. python`,
+does not fit in its `--exec`.
 
 A test that requests remote hosts, as `t/Pyjo/UserAgent_online.py`, is
 skipped unless `TEST_ONLINE` is set, as in Mojolicious. Its hosts are those of
