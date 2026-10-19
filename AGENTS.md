@@ -344,6 +344,23 @@ goes, so code must not rely on that: resizing a `bytearray` that a regex
 iterator still scans raises `BufferError`, and `__del__` may not run at all
 before the interpreter exits.
 
+CI runs them on the free-threaded build of the newest CPython too, without
+the global interpreter lock, on which the threads of `Pyjo.Server.Prethread`
+run at the same time. It counts the references of a function made at the top
+level of a module in a deferred way, so it frees such a function, and what
+only the function refers to, only when its garbage collector runs, and a
+test that checks that an object is freed without the garbage collector makes
+its callback in a function. The garbage collector then frees all of them
+together and calls their `__del__` in any order, so a resource that an object
+opens for itself, as the loop of its own of `Pyjo.Reactor.Asyncio`, is closed
+by `weakref.finalize`, whose callback the garbage collector calls before
+them. Locally, uv installs the free-threaded build next to the one of
+`mise.toml`, as mise has it only as a flavor of all its versions of Python:
+
+```sh
+PYTHONDEVMODE=1 mise exec -- uv run --no-project --python 3.15t python -m Pyjo.Prove -l -j 4 -r t
+```
+
 A test script with the syntax of a newer Python, as the t-strings of Python
 3.14, cannot skip itself on an older one with `plan(skip_all=...)`, as that
 Python does not compile it. It names the version in the inline metadata of

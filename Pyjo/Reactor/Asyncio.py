@@ -63,7 +63,6 @@ import asyncio
 import atexit
 import os
 import random
-import sys
 import time
 import weakref
 
@@ -106,6 +105,7 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
         self._fixed = loop is not None
         self._loop = loop
         self._own: asyncio.AbstractEventLoop | None = None
+        self._finalizer: weakref.finalize[..., Any] | None = None
 
         self._error: BaseException | None = None
         self._io: dict[int, _IO] = {}
@@ -117,15 +117,6 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
         self._tasks: set[asyncio.Task[Any]] = set()
         self._timers: dict[str, _Timer] = {}
         _REACTORS.add(self)
-
-    def __del__(self) -> None:
-        # Not in Mojolicious: the event loop of the reactor is closed with it, unless the interpreter is finishing
-        # Module globals may be gone at the end of the interpreter
-        try:
-            if not sys.is_finalizing():
-                self._close_loop()
-        except Exception:
-            pass
 
     # Not in Mojolicious: a context manager, which closes the event loop that the reactor made where the block ends, as
     # PyPy frees the object only when its garbage collector runs
@@ -153,9 +144,17 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
             self._stop()
 
     def _close_loop(self) -> None:
-        loop = getattr(self, '_own', None)
-        if loop is not None and not loop.is_running() and not loop.is_closed():
-            loop.close()
+        if (loop := self._own) is not None:
+            _close(loop)
+
+    # Not in Mojolicious: a loop of its own, which is closed with the reactor by weakref.finalize, which the garbage
+    # collector calls before the finalizers of the objects that it frees, as the loop warns when it is freed before the
+    # reactor closes it, as among the objects that a free-threaded Python frees only when the garbage collector runs
+    def _own_loop(self) -> asyncio.AbstractEventLoop:
+        loop = self._own = asyncio.new_event_loop()
+        _OWN.add(loop)
+        self._finalizer = weakref.finalize(self, _close, loop)
+        return loop
 
     # Not in Mojolicious: the asyncio event loop
     @property
@@ -186,8 +185,8 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
                 self._move(running)
         elif loop is None or loop.is_closed() or (loop is not self._own and not loop.is_running()):
             if self._own is None or self._own.is_closed():
-                self._own = asyncio.new_event_loop()
-                _OWN.add(self._own)
+                self._own_loop()
+            assert self._own is not None
             self._move(self._own)
 
         assert self._loop is not None
@@ -199,10 +198,10 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
         if self._fixed or self._loop is None:
             return
         _FORKED.append(self._loop)
+        if self._finalizer is not None:
+            self._finalizer.detach()
         self._loop = self._own = None
-        self._own = asyncio.new_event_loop()
-        _OWN.add(self._own)
-        self._move(self._own)
+        self._move(self._own_loop())
 
     # Move the handles and timers to another loop
     def _move(self, new: asyncio.AbstractEventLoop) -> None:
@@ -674,11 +673,15 @@ if hasattr(os, 'register_at_fork'):
     os.register_at_fork(after_in_child=_after_fork_in_child)
 
 
+def _close(loop: asyncio.AbstractEventLoop) -> None:
+    if not loop.is_running() and not loop.is_closed():
+        loop.close()
+
+
 @atexit.register
-def _close() -> None:
+def _close_own() -> None:
     for loop in list(_OWN):
-        if not loop.is_running() and not loop.is_closed():
-            loop.close()
+        _close(loop)
 
 
 new = Pyjo_Reactor_Asyncio.new
