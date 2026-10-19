@@ -70,6 +70,10 @@ if TYPE_CHECKING:
 
 _random = random.SystemRandom()
 
+# The bytes of a file as they are, as sysread and syswrite of Perl pass them, where the text mode of the C runtime of
+# Windows, the default of os.open there, writes \n as CRLF and reads CRLF as \n
+_BINARY: int = getattr(os, 'O_BINARY', 0)
+
 
 type Anything = builtins.object
 
@@ -512,7 +516,7 @@ class Pyjo_File(Pyjo.Base.object, Pyjo.String.Mixin.object):
         it fails.
         """
         try:
-            fd = os.open(self._path, os.O_RDONLY)
+            fd = os.open(self._path, os.O_RDONLY | _BINARY)
         except OSError as e:
             _croak(e, f'Can\'t open file "{self._path}"')
         try:
@@ -541,7 +545,7 @@ class Pyjo_File(Pyjo.Base.object, Pyjo.String.Mixin.object):
             # Perl writes the characters 0-255 as bytes and dies of a wider one
             content = encode(encoding, content) if encoding else content.encode('UTF-8')
         try:
-            fd = os.open(self._path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o666)
+            fd = os.open(self._path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | _BINARY, 0o666)
         except OSError as e:
             _croak(e, f'Can\'t open file "{self._path}"')
         try:
