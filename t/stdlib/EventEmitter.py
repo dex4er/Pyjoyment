@@ -100,10 +100,15 @@ with subtest('Once leaves no cycle'):
         class Object:
             pass
 
+        # The callback is made in a function, as a free-threaded Python frees a function made at the top level of a
+        # module only when its garbage collector runs
+        def subscribe(emitter, thing):
+            emitter.once('foo', lambda e, thing=thing: ...)
+
         emitter = Pyjo.EventEmitter.new()
         thing = Object()
         ref = weakref.ref(thing)
-        emitter.once('foo', lambda e, thing=thing: ...)
+        subscribe(emitter, thing)
         del thing
         ok(ref() is not None, 'subscriber keeps the object')
         emitter.emit('foo')
