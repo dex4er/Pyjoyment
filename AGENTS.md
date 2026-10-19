@@ -1038,8 +1038,12 @@ back here.
   `Pyjo.Reactor` or `Pyjoyment.Plugin`, which `extend_path` keeps open: its
   wheel has only the module (`only-include` of hatchling), without the
   `__init__.py` of the packages, which are those of Pyjoyment. Until the
-  revival of Pyjoyment is on PyPI, `tool.uv.sources` takes Pyjoyment from the
-  checkout next to it, `../Pyjoyment`, editable.
+  revival of Pyjoyment is on PyPI, `tool.uv.sources` takes Pyjoyment from its
+  Git repository, never from a path to the checkout next to it: uv applies the
+  sources of a dependency of Git, so whoever installs the distribution from Git
+  would get a subdirectory of its repository that does not exist. Its tests
+  lay the checkout next to it over the one of Git with `uv run --with-editable
+../Pyjoyment`, so that they test what is there.
 - **The tests.** Its CI checks out Pyjoyment next to it and runs the whole
   suite of Pyjoyment with the distribution, as `PYJO_REACTOR` set to the
   reactor, on the Pythons of the matrix of Pyjoyment, daily too, as Pyjoyment
