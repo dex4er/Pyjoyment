@@ -1,8 +1,10 @@
 from Pyjo.Test import *
 
+import importlib
 import io
 import os
 import socket
+import sys
 import tempfile
 
 from contextlib import redirect_stdout
@@ -12,10 +14,10 @@ from contextlib import redirect_stdout
 os.environ.pop('PYJO_REACTOR', None)
 
 
-def free_port():
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-        s.bind(('127.0.0.1', 0))
-        return s.getsockname()[1]
+# A port below the ephemeral ones, which no other socket takes before the datagram socket binds it
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
+ServerStart = importlib.import_module('ServerStart')
+free_port = ServerStart.port
 
 
 port = free_port()

@@ -1,6 +1,7 @@
 from Pyjo.Test import *
 
 import contextlib
+import importlib
 import io
 import os
 import socket
@@ -12,13 +13,13 @@ import sys
 os.environ.pop('PYJO_REACTOR', None)
 
 
-def free_port():
-    with socket.create_server(('127.0.0.1', 0)) as s:
-        return s.getsockname()[1]
+# A port below the ephemeral ones, which no other socket takes before the server binds it
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
+ServerStart = importlib.import_module('ServerStart')
 
 
 with subtest('Synopsis'):
-    port = free_port()
+    port = ServerStart.port()
     output = io.StringIO()
     with contextlib.redirect_stdout(output):
         import Pyjo.IOLoop

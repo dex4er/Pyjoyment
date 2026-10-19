@@ -251,13 +251,14 @@ with subtest('Second INT and TERM'):
         def request(prethread, tx):
             pass
 
-        finished, connections = [], []
+        finished, connections, signalled = [], [], []
         prethread.on('finish', lambda prethread, graceful: finished.append(graceful))
 
         @prethread.once('heartbeat')
         def heartbeat(prethread, id):
             connections.append(connection := socket.create_connection(('127.0.0.1', prethread.ports()[0])))
             connection.sendall(b'GET / HTTP/1.1\r\nHost: x\r\n\r\n')
+            signalled.append(time.monotonic())
             os.kill(os.getpid(), signal.SIGINT)
 
             # The second signal once the manager has handled the first, as Python handles two of the same signal that
@@ -267,11 +268,11 @@ with subtest('Second INT and TERM'):
                 os.kill(os.getpid(), second)
 
         prethread.graceful_timeout = 2
-        started = time.monotonic()
         prethread.run()
         for connection in connections:
             connection.close()
-        return finished, time.monotonic() - started
+        # The time since the first signal, without the start of the workers
+        return finished, time.monotonic() - signalled[0]
 
     finished, elapsed = second_signal(signal.SIGTERM)
     is_deeply_ok(finished, [True], 'a second TERM does nothing')
