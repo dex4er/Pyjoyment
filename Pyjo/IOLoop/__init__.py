@@ -126,7 +126,7 @@ import weakref
 
 from collections.abc import Callable, Iterator
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, Self, overload
+from typing import TYPE_CHECKING, Any, Concatenate, Self, overload
 
 
 if TYPE_CHECKING:
@@ -888,53 +888,37 @@ def _cleanup() -> None:
     Pyjo.Reactor._drain(every=True)  # pyright: ignore[reportPrivateUsage]
 
 
-# What Mojo calls on the class works with the singleton, the one of the thread that calls it
-_SHORTCUTS = frozenset(
-    (
-        'acceptor',
-        'client',
-        'datagram',
-        'next_tick',
-        'one_tick',
-        'recurring',
-        'remove',
-        'reset',
-        'server',
-        'start',
-        'stop',
-        'stop_gracefully',
-        'stream',
-        'subprocess',
-        'timer',
-    )
-)
-
-if TYPE_CHECKING:
-    acceptor = Pyjo_IOLoop.singleton().acceptor
-    client = Pyjo_IOLoop.singleton().client
-    datagram = Pyjo_IOLoop.singleton().datagram
-    next_tick = Pyjo_IOLoop.singleton().next_tick
-    one_tick = Pyjo_IOLoop.singleton().one_tick
-    recurring = Pyjo_IOLoop.singleton().recurring
-    remove = Pyjo_IOLoop.singleton().remove
-    reset = Pyjo_IOLoop.singleton().reset
-    server = Pyjo_IOLoop.singleton().server
-    start = Pyjo_IOLoop.singleton().start
-    stop = Pyjo_IOLoop.singleton().stop
-    stop_gracefully = Pyjo_IOLoop.singleton().stop_gracefully
-    stream = Pyjo_IOLoop.singleton().stream
-    subprocess = Pyjo_IOLoop.singleton().subprocess
-    timer = Pyjo_IOLoop.singleton().timer
-
-
-# Not in Mojolicious: the singleton and the shortcuts are found in the thread that asks for them, as a module has the
-# same attributes in all threads
+# Not in Mojolicious: the singleton is found in the thread that asks for it, as a module has the same attributes in all
+# threads
 def __getattr__(name: str) -> Any:
     if name == 'singleton':
         return Pyjo_IOLoop.singleton()
-    if name in _SHORTCUTS:
-        return getattr(Pyjo_IOLoop.singleton(), name)
     raise AttributeError(f'module {__name__!r} has no attribute {name!r}')
+
+
+# What Mojo calls on the class works with the singleton, the one of the thread that calls it
+def _shortcut[**P, R](method: Callable[Concatenate[Pyjo_IOLoop, P], R]) -> Callable[P, R]:
+    def shortcut(*args: P.args, **kwargs: P.kwargs) -> R:
+        return method(Pyjo_IOLoop.singleton(), *args, **kwargs)
+
+    return shortcut
+
+
+acceptor = _shortcut(Pyjo_IOLoop.acceptor)
+client = _shortcut(Pyjo_IOLoop.client)
+datagram = _shortcut(Pyjo_IOLoop.datagram)
+next_tick = _shortcut(Pyjo_IOLoop.next_tick)
+one_tick = _shortcut(Pyjo_IOLoop.one_tick)
+recurring = _shortcut(Pyjo_IOLoop.recurring)
+remove = _shortcut(Pyjo_IOLoop.remove)
+reset = _shortcut(Pyjo_IOLoop.reset)
+server = _shortcut(Pyjo_IOLoop.server)
+start = _shortcut(Pyjo_IOLoop.start)
+stop = _shortcut(Pyjo_IOLoop.stop)
+stop_gracefully = _shortcut(Pyjo_IOLoop.stop_gracefully)
+stream = _shortcut(Pyjo_IOLoop.stream)
+subprocess = _shortcut(Pyjo_IOLoop.subprocess)
+timer = _shortcut(Pyjo_IOLoop.timer)
 
 
 def is_running() -> bool:

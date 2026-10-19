@@ -908,10 +908,10 @@ pattern.match_partial(path)`.
   makes the garbage collector run all the time.
 - Each thread of Perl has a copy of the interpreter, with a `Mojo::IOLoop`
   singleton of its own; Python shares the module, so `Pyjo.IOLoop.singleton`
-  and the functions of the module, as `Pyjo.IOLoop.timer`, are found with
-  `__getattr__` of the module in a `threading.local`, and a reactor runs in
-  the thread that made it. Threads run event loops of their own at the same
-  time, as `t/stdlib/IOLoop_threading.py` checks.
+  is found with `__getattr__` of the module in a `threading.local`, the
+  functions of the module, as `Pyjo.IOLoop.timer`, call their methods on it,
+  and a reactor runs in the thread that made it. Threads run event loops of
+  their own at the same time, as `t/stdlib/IOLoop_threading.py` checks.
 - An optional module of Perl that Mojo uses when it is installed has a
   counterpart in the standard library, one of the port's own where the
   standard library has none, or is left out until something needs it:
