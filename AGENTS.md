@@ -354,7 +354,12 @@ its callback in a function. The garbage collector then frees all of them
 together and calls their `__del__` in any order, so a resource that an object
 opens for itself, as the loop of its own of `Pyjo.Reactor.Asyncio`, is closed
 by `weakref.finalize`, whose callback the garbage collector calls before
-them.
+them. Locally, uv installs the free-threaded build next to the one of
+`mise.toml`, as mise has it only as a flavor of all its versions of Python:
+
+```sh
+PYTHONDEVMODE=1 mise exec -- uv run --no-project --python 3.15t python -m Pyjo.Prove -l -j 4 -r t
+```
 
 A test script with the syntax of a newer Python, as the t-strings of Python
 3.14, cannot skip itself on an older one with `plan(skip_all=...)`, as that

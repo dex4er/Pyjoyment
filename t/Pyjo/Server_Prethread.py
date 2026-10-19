@@ -7,6 +7,7 @@ from Pyjo.File import curfile, path, tempdir
 from Pyjo.Test import *
 
 import gc
+import logging
 import os
 import re
 import signal
@@ -334,10 +335,21 @@ with subtest('A worker that does not stop is left'):
         connection.sendall(b'GET / HTTP/1.1\r\nHost: x\r\n\r\n')
         prethread.once('wait', lambda prethread: os.kill(os.getpid(), signal.SIGTERM))
 
-    started = time.monotonic()
-    prethread.run()
-    elapsed = time.monotonic() - started
-    release.set()
+    # The debug mode of asyncio, which PYTHONDEVMODE turns on, logs the callback that blocks the worker, as it is slow,
+    # until the worker that is left ends
+    logger = logging.getLogger('asyncio')
+    level = logger.level
+    logger.setLevel(logging.ERROR)
+    try:
+        started = time.monotonic()
+        prethread.run()
+        elapsed = time.monotonic() - started
+        release.set()
+        for thread in threading.enumerate():
+            if thread.name == 'Pyjo.Server.Prethread':
+                thread.join(10)
+    finally:
+        logger.setLevel(level)
     for connection in connections:
         connection.close()
     prethread.app.log.unsubscribe('message', cb)
