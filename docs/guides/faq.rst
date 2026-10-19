@@ -30,14 +30,12 @@ Why doesn't Pyjoyment have any dependencies?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 We are optimizing :mod:`Pyjoyment` for user-friendliness and development
-speed, without compromises. The rules of `Mojolicious::Guides::Contributing
-<https://docs.mojolicious.org/Mojolicious/Guides/Contributing>`_ discourage
-non-optional dependencies in favor of a faster and more painless installation
-process, and Pyjoyment has none at all. Where Mojolicious uses optional CPAN
-modules such as Cpanel::JSON::XS, EV, IO::Socket::SSL and Net::DNS::Native to
-provide advanced functionality, the standard library of Python has
-:mod:`json`, :mod:`asyncio`, :mod:`ssl` and :func:`socket.getaddrinfo` in a
-thread. And a reactor on another event loop, as uvloop, can come from another
+speed, without compromises. The rules of :doc:`contributing` allow no
+dependencies at run time, in favor of a faster and more painless installation
+process. Where Mojolicious uses optional CPAN modules such as Cpanel::JSON::XS,
+EV, IO::Socket::SSL and Net::DNS::Native to provide advanced functionality,
+the standard library of Python has :mod:`json`, :mod:`asyncio`, :mod:`ssl`
+and :func:`socket.getaddrinfo` in a thread. And a reactor on another event loop, as uvloop, can come from another
 distribution, in the namespace ``Pyjo.Reactor``.
 
 Why reinvent wheels?
