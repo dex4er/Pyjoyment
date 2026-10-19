@@ -197,7 +197,7 @@ port 0 instead, which `ports()` gives.
   ones, against the target Mojolicious.
 - `t/servers/` runs `Pyjo.Server.ASGI`, `Pyjo.Server.WSGI` and
   `Pyjo.Server.CGI` on real ASGI, WSGI and CGI servers, and the examples of
-  the quick start in `README.rst`, each in a process of its own, as the ASGI server of the tests in `t/lib` and the validator of
+  the quick start in `README.md`, each in a process of its own, as the ASGI server of the tests in `t/lib` and the validator of
   `wsgiref` cannot show how a server differs. The servers are in the
   dependency group `servers`, not in `dependencies`; without it, the tests
   are skipped.
@@ -1059,6 +1059,17 @@ back here.
   keeps the callback, and what it refers to, as a controller, until the
   garbage collector runs, which `t/Pyjoyment/longpolling_lite_app.py` catches.
   A finalizer removes what an object leaves in the loop.
+- **The direction of the dependencies.** A distribution depends on
+  Pyjoyment, never the other way: its code imports Pyjoyment, its CI checks
+  Pyjoyment out, and its documentation may link to the one of Pyjoyment, with
+  intersphinx too. Pyjoyment knows a distribution only by a plain link on the
+  page of the documentation that lists them, which the distribution adds with
+  a pull request: no import, no autodoc, no intersphinx and no CI of a
+  distribution, which would make Pyjoyment depend on its dependencies, and
+  fail its build with -W where the site of the distribution does not answer.
+- **The formats.** The docstrings are reStructuredText, as those of
+  Pyjoyment, so that they read the same; the README and `AGENTS.md` are
+  Markdown, which GitHub and PyPI render, as those of Pyjoyment.
 
 ## Linting and Formatting
 
@@ -1210,8 +1221,9 @@ keys.
 
 ## Documentation
 
-`README.rst` is for a user: what Pyjoyment is, its status, how to install
-it, examples, and where the documentation is. This file is for whoever
+`README.md` is for a user, the front page of the repository on GitHub and of
+the project on PyPI: what Pyjoyment is, its status, how to install it,
+examples, and where the documentation is. This file is for whoever
 changes the code: how it works and why. Module documentation lives in the
 module docstrings, ported from Mojo's POD in the same layout (synopsis,
 events, attributes, methods), and Sphinx builds the API reference in `docs/`
@@ -1224,12 +1236,14 @@ reStructuredText, fails the pull request that makes it:
 mise exec -- uv run --with-requirements docs/requirements.txt sphinx-build -W --keep-going -b html docs docs/_build/html
 ```
 
-The intro, status, installation and license pages in `docs/` include their
-text from `README.rst`, between `.. begin-<name>` and `.. end-<name>`
-comments, so the text is edited in `README.rst` only. The examples are
-included from `examples/` the same way, never copied: a copy is not tested
-and goes stale. `README.rst` is the exception, as it has to render on GitHub,
-which does not support `include`: its examples are copies of `examples/`.
+The documentation on Read the Docs and the front page on GitHub are two
+things with two readers, so the intro, status, installation and license
+pages in `docs/` have the same text as the sections of `README.md`, in
+reStructuredText and in Markdown, and a change of one goes to the other.
+`README.md` has examples of its own besides, a choice of the short ones. The
+pages of `docs/` include the examples from `examples/`, never copied: a copy
+is not tested and goes stale. `README.md` is the exception, as GitHub does
+not include files: its examples are copies of `examples/`.
 `docs/conf.py` takes the name, the authors and the version from
 `pyproject.toml`.
 

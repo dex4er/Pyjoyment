@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "Pyjoyment"
 version = "0.0.2"
 description = "A real-time web framework for the Python programming language, ported from Mojolicious."
-readme = "README.rst"
+readme = "README.md"
 license = "Artistic-2.0"
 license-files = ["LICENSE"]
 authors = [{ name = "Piotr Roszatycki", email = "piotr.roszatycki@gmail.com" }]
@@ -92,7 +92,7 @@ include = [
   "/docs",
   "/.proverc",
   "/LICENSE",
-  "/README.rst",
+  "/README.md",
 ]
 
 [tool.ruff]
