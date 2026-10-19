@@ -12,4 +12,5 @@ The guides of Pyjoyment, ported from the guides of Mojolicious.
     rendering
     testing
     cookbook
+    contributing
     faq
