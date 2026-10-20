@@ -14,6 +14,7 @@ from Pyjo.Test import *
 
 import gc
 import socket
+import sys
 
 
 if not (os.environ.get('TEST_ONLINE') or os.environ.get('TEST_ALL')):
@@ -76,7 +77,11 @@ with subtest('Local address'):
     ok(not ua.ioloop.stream(tx.connection), 'connection is not active')
     is_ok(tx.res.body, b'127.0.0.1', 'right address')
     ua.source_address = (address, 0)
-    is_ok(ua.get('/remote_address').res.body, address.encode(), 'right address')
+    # Unlike Mojolicious: Windows connects to the loopback from a loopback address only (WSAEADDRNOTAVAIL)
+    if sys.platform == 'win32':
+        skip('no loopback from another address on Windows', 1)
+    else:
+        is_ok(ua.get('/remote_address').res.body, address.encode(), 'right address')
 
 ua = Pyjo.UserAgent.new()
 port = Pyjo.IOLoop.Server.object.generate_port()
