@@ -113,9 +113,41 @@ def prove(home, name):
     return result
 
 
+def generated_app():
+    # A project of generate app, as the guide makes it in "An example"
+    home = tempfile.mkdtemp()
+    run(home, '-m', 'Pyjoyment', 'generate', 'app', 'MyApp')
+    return home, Pyjo.File.path(home, 'my_app')
+
+
 with subtest('Overview'):
     home = project()
     prove(home, 'celestial')
+    shutil.rmtree(home)
+
+with subtest('Test scripts'):
+    home = tempfile.mkdtemp()
+    Pyjo.File.path(home, 't').make_path().child('equal.py').spew(
+        b"from Pyjo.Test import *\n\nis_ok(1 + 1, 3, 'addition')\n\n"
+        b"with subtest('Strings'):\n    ok('Pyjo'.startswith('P'), 'starts with P')\n"
+        b"    is_ok('Pyjo'.lower(), 'pyjo', 'lower case')\n\ndone_testing()\n"
+    )
+    result = run(home, 't/equal.py')
+    is_ok(
+        result.stdout,
+        'not ok 1 - addition\n# Subtest: Strings\n    ok 1 - starts with P\n    ok 2 - lower case\n    1..2\n'
+        'ok 2 - Strings\n1..2\n',
+        'TAP',
+    )
+    like_ok(
+        result.stderr,
+        re.compile(
+            r"^#   Failed test 'addition'\n#   at .*[/\\]t[/\\]equal\.py line 3\.\n#          got: 2\n#     expected: 3\n"
+            r'# Looks like you failed 1 test of 2\.\n$'
+        ),
+        'diagnostics',
+    )
+    is_ok(result.returncode, 1, 'exit status of the failed tests')
     shutil.rmtree(home)
 
 # An application with the resources of the snippets
@@ -261,6 +293,119 @@ with subtest('Testing application helpers'):
             'correct header value',
         )
 
+with subtest('A single test script'):
+    home, my_app = generated_app()
+    result = run(my_app.to_str(), 't/basic.py', PYTHONPATH=os.pathsep.join(['.', os.getcwd()]))
+    is_ok(
+        result.stdout,
+        'ok 1 - GET /\nok 2 - 200 OK\nok 3 - content is similar\n1..3\n',
+        'PYTHONPATH=. python t/basic.py',
+    )
+    shutil.rmtree(home)
+
+with subtest('pyjo-prove'):
+    home, my_app = generated_app()
+    result = run(my_app.to_str(), '-m', 'Pyjo.Prove', '-l', 't')
+    like_ok(
+        result.stdout,
+        re.compile(
+            r'^t/basic\.py \.+ ok\nAll tests successful\.\nFiles=1, Tests=3, \d+ wallclock secs\nResult: PASS\n$'
+        ),
+        'pyjo-prove -l t',
+    )
+    result = run(my_app.to_str(), '-m', 'Pyjo.Prove', '-l', '-r', '-j', '0', '--timeout', '60', 't')
+    like_ok(result.stdout, re.compile(r'^Result: PASS$', re.M), 'pyjo-prove -l -r -j 0 --timeout 60 t')
+    # A variable before the command is of a shell of POSIX, which the cmd.exe of Windows is not
+    if sys.platform == 'win32' or not shutil.which('prove'):
+        skip('Perl prove on a system of POSIX is required', 1)
+    else:
+        # A python on PATH which is the interpreter running this test
+        bindir = Pyjo.File.path(home, 'bin').make_path()
+        os.symlink(sys.executable, bindir.child('python').to_str())
+        env = {**os.environ, 'PYTHONPATH': os.pathsep.join(['.', os.getcwd()])}
+        env['PATH'] = os.pathsep.join([bindir.to_str(), env.get('PATH', '')])
+        for name in ('PYJO_EXE', 'PYJO_HOME', 'PYJO_LOG_LEVEL', 'PYJO_HARNESS_IS_VERBOSE'):
+            env.pop(name, None)
+        p = subprocess.run(
+            ['prove', '--ext=py', '--exec=python', '-r', 't'],
+            cwd=my_app.to_str(),
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=120,
+        )
+        like_ok(p.stdout, re.compile(r'^Result: PASS$', re.M), 'PYTHONPATH=. prove --ext=py --exec=python -r t')
+    shutil.rmtree(home)
+
+with subtest('pytest'):
+    if importlib.util.find_spec('pytest') is None:
+        plan(skip_all='pytest is required, as of the dependency group "pytest"')
+    # The plugin of the entry point where Pyjoyment is installed, or of the checkout otherwise
+    pytest_plugin = importlib.metadata.entry_points(group='pytest11').select(value='Pyjo.Test.pytest_plugin')
+    pytest = ['-m', 'pytest', '-p', 'no:cacheprovider', *([] if pytest_plugin else ['-p', 'Pyjo.Test.pytest_plugin'])]
+    home, my_app = generated_app()
+    result = run(my_app.to_str(), *pytest)
+    # The paths of the progress of pytest have the separator of the system, \ on Windows
+    like_ok(result.stdout.replace('\\', '/'), re.compile(r'^t/basic\.py \.\s+\[100%\]$', re.M), 'pytest')
+    if importlib.util.find_spec('xdist') is None:
+        skip('pytest-xdist is required, as of the dependency group "pytest"', 1)
+    else:
+        result = run(my_app.to_str(), *pytest, '-n', 'auto')
+        like_ok(result.stdout, re.compile(r'^=+ 1 passed in ', re.M), 'pytest -n auto')
+    my_app.child('tests').make_path().child('conftest.py').spew(
+        b"import pytest\n\n\n@pytest.fixture\ndef app():\n    return 'MyApp'\n"
+    )
+    my_app.child('tests', 'test_basic.py').spew(
+        b"def test_index(t):\n    t.get_ok('/').status_is(200).content_like(r'(?i)Pyjoyment')\n"
+    )
+    result = run(my_app.to_str(), *pytest, 'tests')
+    like_ok(result.stdout.replace('\\', '/'), re.compile(r'^tests/test_basic\.py \.\s+\[100%\]$', re.M), 'pytest tests')
+    shutil.rmtree(home)
+
+with subtest('Basic assertions'):
+    home = tempfile.mkdtemp()
+    Pyjo.File.path(home, 't').make_path().child('basic.py').spew(
+        b"""from Pyjo.Test import *
+
+import re
+
+ok(1 + 1 == 2, 'a true value')
+is_ok(int('42'), 42, 'equal, with ==')
+isnt_ok('pyjo', 'mojo', 'not equal, with !=')
+like_ok('Hello Pyjo', r'Pyjo$', 'matches a regular expression')
+unlike_ok('Hello Pyjo', re.compile(r'(?i)mojo'), "doesn't match a regular expression")
+cmp_ok(3, '<', 4, 'compared with an operator')
+is_deeply_ok({'a': [1, 2]}, {'a': [1, 2]}, 'the same data structure')
+isa_ok([], list, 'an instance of a class')
+in_ok(['foo', 'bar'], 'foo', 'contains an element')
+not_in_ok({'a': 1}, 'b', "doesn't contain an element")
+none_ok({}.get('missing'), 'None')
+throws_ok(lambda: int('x'), ValueError, 'raises an exception')
+pass_ok('passes always')
+
+done_testing()
+"""
+    )
+    result = run(home, 't/basic.py')
+    like_ok(result.stdout, re.compile(r'^ok 13 - passes always\n1\.\.13\n\Z', re.M), 'all assertions pass')
+    unlike_ok(result.stdout, re.compile(r'^not ok', re.M), 'no failed assertion')
+    is_ok(result.stderr, '', 'no diagnostics')
+    is_ok(result.returncode, 0, 'right exit status')
+
+    with Pyjo.Test.Pyjo.new(app) as t:
+        t.get_ok('/frogs')
+        if not is_ok(t.tx.res.code, 200, 'right status'):
+            diag(t.tx.res.text)
+
+    Pyjo.File.path(home, 't', 'online.py').spew(
+        b'from Pyjo.Test import *\n\nimport os\n\n'
+        b"if not os.getenv('TEST_ONLINE'):\n    plan(skip_all='set TEST_ONLINE to enable this test')\n\n"
+        b'ok(True)\n\ndone_testing()\n'
+    )
+    result = run(home, 't/online.py', TEST_ONLINE='')
+    is_ok(result.stdout, '1..0 # SKIP set TEST_ONLINE to enable this test\n', 'skipped without TEST_ONLINE')
+    shutil.rmtree(home)
+
 with subtest('Using HTTP request assertions'):
     with Pyjo.Test.Pyjo.new(app) as t:
         t.post_ok('/calls', form={'to': '+43.55.555.5555'}).content_is('to=%2B43.55.555.5555')
@@ -370,28 +515,6 @@ with subtest('Extending Test.Pyjo'):
     like_ok(result.stdout, re.compile(r'^ok 3 - Location: https://pyjoyment\.readthedocs\.io$', re.M), 'location_is')
     like_ok(result.stdout, re.compile(r'^not ok 4 - Location: https://mojolicious\.org$', re.M), 'fails')
     like_ok(result.stdout + result.stderr, re.compile(r'# I miss tempire\.'), 'otherwise')
-    shutil.rmtree(home)
-
-with subtest('Running the tests with pytest'):
-    if importlib.util.find_spec('pytest') is None:
-        plan(skip_all='pytest is required, as of the dependency group "pytest"')
-    # The plugin of the entry point where Pyjoyment is installed, or of the checkout otherwise
-    pytest_plugin = importlib.metadata.entry_points(group='pytest11').select(value='Pyjo.Test.pytest_plugin')
-    pytest = ['-m', 'pytest', '-p', 'no:cacheprovider', *([] if pytest_plugin else ['-p', 'Pyjo.Test.pytest_plugin'])]
-    home = tempfile.mkdtemp()
-    run(home, '-m', 'Pyjoyment', 'generate', 'app', 'MyApp')
-    my_app = Pyjo.File.path(home, 'my_app')
-    result = run(my_app.to_str(), *pytest)
-    # The paths of the progress of pytest have the separator of the system, \ on Windows
-    like_ok(result.stdout.replace('\\', '/'), re.compile(r'^t/basic\.py \.\s+\[100%\]$', re.M), 'pytest')
-    my_app.child('tests').make_path().child('conftest.py').spew(
-        b"import pytest\n\n\n@pytest.fixture\ndef app():\n    return 'MyApp'\n"
-    )
-    my_app.child('tests', 'test_basic.py').spew(
-        b"def test_index(t):\n    t.get_ok('/').status_is(200).content_like(r'(?i)Pyjoyment')\n"
-    )
-    result = run(my_app.to_str(), *pytest, 'tests')
-    like_ok(result.stdout.replace('\\', '/'), re.compile(r'^tests/test_basic\.py \.\s+\[100%\]$', re.M), 'pytest tests')
     shutil.rmtree(home)
 
 done_testing()

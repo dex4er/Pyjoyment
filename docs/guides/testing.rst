@@ -29,6 +29,76 @@ Concepts
 
 Essentials every :mod:`Pyjoyment` developer should know.
 
+Test scripts
+~~~~~~~~~~~~
+
+A test of Pyjoyment is a Python script of its own, usually in the ``t``
+directory of the application, which runs from its start to its end, as any
+script does, and prints the results of its tests to the standard output in
+the `Test Anything Protocol <https://testanything.org/>`_ (TAP). The
+functions of :mod:`Pyjo.Test` print them:
+
+.. code-block:: python
+    :caption: t/equal.py
+
+    from Pyjo.Test import *
+
+    is_ok(1 + 1, 3, 'addition')
+
+    with subtest('Strings'):
+        ok('Pyjo'.startswith('P'), 'starts with P')
+        is_ok('Pyjo'.lower(), 'pyjo', 'lower case')
+
+    done_testing()
+
+Each assertion is a test, which prints a line ``ok`` or ``not ok`` with its
+number and its description. A failed test does not stop the script, as an
+``assert`` would: its diagnostic message, with the got and the expected
+values, goes to the standard error, and the script goes on with the next
+test. A subtest groups tests, which it numbers on its own and indents, and
+counts as one test, which passes when all of its tests pass.
+:func:`~Pyjo.Test.done_testing` ends the output with the plan, ``1..2``, the
+number of the tests that ran, so that a script that dies in the middle is not
+taken for one that passed:
+
+.. code-block:: console
+
+    $ python t/equal.py
+    not ok 1 - addition
+    #   Failed test 'addition'
+    #   at /home/user/my_app/t/equal.py line 3.
+    #          got: 2
+    #     expected: 3
+    # Subtest: Strings
+        ok 1 - starts with P
+        ok 2 - lower case
+        1..2
+    ok 2 - Strings
+    1..2
+    # Looks like you failed 1 test of 2.
+
+The exit status of the script is the number of its failed tests, here ``1``,
+and ``0`` when all of them passed. Each script runs in a process of its own,
+with an interpreter, an event loop and an environment of its own, so that
+what one script does to them does not break another one.
+
+The harness
+~~~~~~~~~~~
+
+A test harness runs many test scripts, reads their TAP output and their exit
+status, and reports which of them failed and why. It is the harness that
+checks that a script declared its plan and ran as many tests as it planned.
+:mod:`Pyjo.Prove`, the command ``pyjo-prove``, is the harness of Pyjoyment,
+inspired by Perl's ``prove``, which runs the same scripts too, as their
+output is standard TAP. pytest is one as well, through the plugin
+:mod:`Pyjo.Test.pytest_plugin`, which runs each script as a test of its own.
+`Running`_ shows how to use them.
+
+A harness tells its scripts that they run under it with
+``PYJO_HARNESS_ACTIVE``, and with ``PYJO_HARNESS_IS_VERBOSE`` that its output
+is verbose, which makes :mod:`Pyjo.Test.Pyjo` log everything that the
+application does.
+
 Pyjo.Test.Pyjo at a glance
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -319,6 +389,112 @@ Any aspect of the application (helpers, plugins, routes, etc.) can be
 introspected from :mod:`Pyjo.Test.Pyjo` through the application object. This
 enables us to get deep test coverage of :mod:`Pyjoyment`-based applications.
 
+Running
+-------
+
+The ways to run the test scripts of an application.
+
+A single test script
+~~~~~~~~~~~~~~~~~~~~
+
+A test script runs on its own, as any Python script, with the directory of
+the application in ``PYTHONPATH``, so that it finds the modules of the
+application:
+
+.. code-block:: console
+
+    $ PYTHONPATH=. python t/basic.py
+    ok 1 - GET /
+    ok 2 - 200 OK
+    ok 3 - content is similar
+    1..3
+
+pyjo-prove
+~~~~~~~~~~
+
+``pyjo-prove``, or ``python -m Pyjo.Prove``, runs the test scripts of a
+directory, ``t`` by default, and prints a line for each of them and a
+summary:
+
+.. code-block:: console
+
+    $ pyjo-prove -l t
+    t/basic.py ... ok
+    All tests successful.
+    Files=1, Tests=3, 0 wallclock secs
+    Result: PASS
+
+``-l`` adds the current directory to ``PYTHONPATH``, ``-r`` runs the scripts
+of the subdirectories too, ``-v`` prints the TAP output of each script,
+``-j 4`` runs four scripts at the same time and ``-j 0`` as many as the
+processors, and ``--timeout 60`` kills a script that runs longer than a
+minute:
+
+.. code-block:: console
+
+    $ pyjo-prove -l -r -j 0 --timeout 60 t
+
+Perl's ``prove`` runs them as well:
+
+.. code-block:: console
+
+    $ PYTHONPATH=. prove --ext=py --exec=python -r t
+
+:mod:`Pyjo.Prove` describes all of its options.
+
+pytest
+~~~~~~
+
+pytest runs the test scripts too, where it is installed, through the plugin
+:mod:`Pyjo.Test.pytest_plugin`, as a test explorer of an IDE or a coding
+agent runs them. Each script is a test of pytest, whose failure shows the
+failed tests of the script with their diagnostic messages. The
+``pyproject.toml`` of ``pyjo generate app`` names ``t`` in ``testpaths``, so
+``pytest`` runs it:
+
+.. code-block:: console
+
+    $ pytest
+    ...
+    t/basic.py .                                                       [100%]
+
+pytest runs its tests one after another, and pytest-xdist several at the same
+time, as ``-j`` of ``pyjo-prove`` does:
+
+.. code-block:: console
+
+    $ pytest -n auto
+
+A test of pytest uses :mod:`Pyjo.Test.Pyjo` through the fixture ``t``, made
+of the application of the fixture ``app``, and its first failed test raises
+:exc:`AssertionError` with the description, the got and the expected values:
+
+.. code-block:: python
+
+    # tests/conftest.py
+    import pytest
+
+
+    @pytest.fixture
+    def app():
+        return 'MyApp'
+
+
+    # tests/test_basic.py
+    def test_index(t):
+        t.get_ok('/').status_is(200).content_like(r'(?i)Pyjoyment')
+
+Such tests go to a directory of their own, as ``tests``, since ``pyjo-prove``
+runs every script of ``t``:
+
+.. code-block:: console
+
+    $ pytest tests
+    ...
+    tests/test_basic.py .                                              [100%]
+
+:mod:`Pyjo.Test.pytest_plugin` says what else differs from a test script.
+
 Assertions
 ----------
 
@@ -335,6 +511,61 @@ HTTP requests:
 * HTTP response content/body
 
 WebSocket test assertions are covered in `Testing WebSocket web services`_.
+
+Basic assertions
+~~~~~~~~~~~~~~~~
+
+The assertions of :mod:`Pyjo.Test.Pyjo` are made of the functions of
+:mod:`Pyjo.Test`, which a test script uses for whatever else it checks, as
+the value of a helper or a part of a response. Each of them is a test, takes
+its description as the last argument, and returns whether it passed:
+
+.. code-block:: python
+
+    from Pyjo.Test import *
+
+    import re
+
+    ok(1 + 1 == 2, 'a true value')
+    is_ok(int('42'), 42, 'equal, with ==')
+    isnt_ok('pyjo', 'mojo', 'not equal, with !=')
+    like_ok('Hello Pyjo', r'Pyjo$', 'matches a regular expression')
+    unlike_ok('Hello Pyjo', re.compile(r'(?i)mojo'), "doesn't match a regular expression")
+    cmp_ok(3, '<', 4, 'compared with an operator')
+    is_deeply_ok({'a': [1, 2]}, {'a': [1, 2]}, 'the same data structure')
+    isa_ok([], list, 'an instance of a class')
+    in_ok(['foo', 'bar'], 'foo', 'contains an element')
+    not_in_ok({'a': 1}, 'b', "doesn't contain an element")
+    none_ok({}.get('missing'), 'None')
+    throws_ok(lambda: int('x'), ValueError, 'raises an exception')
+    pass_ok('passes always')
+
+    done_testing()
+
+They have the names of the functions of Perl's ``Test::More``, with the
+suffix ``_ok``, as ``is`` is a keyword of Python: ``is_ok`` for ``is`` and
+``is_deeply_ok`` for ``is_deeply``. A failed one shows what differs: the got
+and the expected values, or for :func:`~Pyjo.Test.is_deeply_ok` the place in
+the structures where they begin to differ.
+
+:func:`~Pyjo.Test.diag` prints a diagnostic message to the standard error,
+which the harness shows, and :func:`~Pyjo.Test.note` a comment to the standard
+output, which ``pyjo-prove`` shows with ``-v`` only:
+
+.. code-block:: python
+
+    if not is_ok(t.tx.res.code, 200, 'right status'):
+        diag(t.tx.res.text)
+
+:func:`~Pyjo.Test.plan` with ``skip_all`` skips the whole script, as one that
+needs the network:
+
+.. code-block:: python
+
+    if not os.getenv('TEST_ONLINE'):
+        plan(skip_all='set TEST_ONLINE to enable this test')
+
+:mod:`Pyjo.Test` describes all of them.
 
 HTTP request assertions
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -725,54 +956,6 @@ assertion:
 
 In this section we've covered how to add custom test assertions to
 :mod:`Pyjo.Test.Pyjo` with a subclass and how to use it to simplify testing.
-
-.. Not in Mojolicious: pytest, which runs the same test scripts, and the tests of pytest with Pyjo.Test.Pyjo
-
-Running the tests with pytest
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The test scripts run with ``pyjo-prove``, and with pytest too, where it is
-installed, through the plugin :mod:`Pyjo.Test.pytest_plugin`, as a test
-explorer of an IDE or a coding agent runs them. Each script is a test of
-pytest, whose failure shows the failed tests of the script with their
-diagnostic messages. The ``pyproject.toml`` of ``pyjo generate app`` names
-``t`` in ``testpaths``, so ``pytest`` runs it:
-
-.. code-block:: console
-
-    $ pytest
-    ...
-    t/basic.py .                                                       [100%]
-
-A test of pytest uses :mod:`Pyjo.Test.Pyjo` through the fixture ``t``, made
-of the application of the fixture ``app``, and its first failed test raises
-:exc:`AssertionError` with the description, the got and the expected values:
-
-.. code-block:: python
-
-    # tests/conftest.py
-    import pytest
-
-
-    @pytest.fixture
-    def app():
-        return 'MyApp'
-
-
-    # tests/test_basic.py
-    def test_index(t):
-        t.get_ok('/').status_is(200).content_like(r'(?i)Pyjoyment')
-
-Such tests go to a directory of their own, as ``tests``, since ``pyjo-prove``
-runs every script of ``t``:
-
-.. code-block:: console
-
-    $ pytest tests
-    ...
-    tests/test_basic.py .                                              [100%]
-
-:mod:`Pyjo.Test.pytest_plugin` says what else differs from a test script.
 
 More
 ----
