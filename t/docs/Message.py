@@ -45,6 +45,7 @@ with subtest('Synopsis'):
     isa_ok(MyMessage(), Message, 'subclass')
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Message
 
     class MyMessage(Pyjo.Message.object):

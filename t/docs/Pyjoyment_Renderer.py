@@ -17,6 +17,7 @@ with subtest('Synopsis'):
     is_deeply_ok(renderer.classes, ['__main__', 'MyApp.Controller.Foo'], 'classes')
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjoyment.Renderer
 
     renderer = Pyjoyment.Renderer.new()

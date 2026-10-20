@@ -52,9 +52,10 @@ with subtest('Synopsis'):
         print(req.body)
 
     is_ok(output(parse), "GET\ntext/plain\nb'Hello World!'\n", 'parse')
-    # Or import the module, as in Google Python Style Guide
 
     def parse():
+        # Or import the module, as in Google Python Style Guide
+
         import Pyjo.Message.Request
 
         # Parse

@@ -9,6 +9,7 @@ Pyjo.Log - Simple logger
     log = Log()
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Log
 
     # Log to STDERR

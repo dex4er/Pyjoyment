@@ -13,6 +13,7 @@ Pyjo.Message - HTTP message base class
         def start_line_size(self): ...
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Message
 
     class MyMessage(Pyjo.Message.object):

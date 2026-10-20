@@ -31,6 +31,7 @@ with subtest('Synopsis'):
     is_ok(dir.child('home', 'sri', 'foo.txt').slurp(), b'foo', 'moved')
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Upload
 
     out = io.StringIO()

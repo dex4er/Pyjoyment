@@ -11,6 +11,7 @@ Pyjo.JSON.Pointer - JSON Pointers
         print('Contains "/foo".')
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.JSON.Pointer
 
     pointer = Pyjo.JSON.Pointer.new({'foo': [23, 'bar']})

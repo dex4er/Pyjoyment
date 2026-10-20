@@ -49,6 +49,7 @@ with subtest('Synopsis'):
     is_ok(output(synopsis_python), 'I ♥ Pyjoyment!\n', 'subprocess')
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.IOLoop.Subprocess
 
     # The second form of the synopsis imports time again, which the function of the first form uses

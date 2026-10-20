@@ -27,6 +27,7 @@ with subtest('Synopsis'):
     isa_ok(MyContent(), Content, 'subclass')
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Content
 
     class MyContent(Pyjo.Content.object):

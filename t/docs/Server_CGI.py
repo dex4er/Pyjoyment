@@ -38,6 +38,7 @@ with subtest('Synopsis'):
     stdout = io.BytesIO()
     with patch.dict(os.environ, env), patch.object(sys, 'stdout', io.TextIOWrapper(stdout, write_through=True)):
         # Or import the module, as in Google Python Style Guide
+
         import Pyjo.Server.CGI
 
         cgi = Pyjo.Server.CGI.new()

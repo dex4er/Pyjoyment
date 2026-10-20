@@ -10,6 +10,7 @@ Pyjo.String.Bytes - String of bytes
     print(data.md5_sum())
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.String.Bytes
 
     # Manipulate bytes

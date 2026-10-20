@@ -10,6 +10,7 @@ Pyjo.UserAgent.Proxy - User agent proxy manager
     print(proxy.http)
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.UserAgent.Proxy
 
     proxy = Pyjo.UserAgent.Proxy.new()

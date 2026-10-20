@@ -10,6 +10,7 @@ Pyjo.Asset.Memory - In-memory storage for HTTP content
     print(mem.slurp())
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Asset.Memory
 
     mem = Pyjo.Asset.Memory.new()

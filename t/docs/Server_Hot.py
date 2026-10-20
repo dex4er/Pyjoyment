@@ -140,6 +140,7 @@ hot.run({myapp!r})
     ok(stop(myapp, port), 'stopped')
 
     # Or import the module, as in Google Python Style Guide
+
     code = """
 import Pyjo.Server.Hot
 

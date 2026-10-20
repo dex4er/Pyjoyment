@@ -21,6 +21,7 @@ with subtest('Synopsis'):
     is_deeply_ok(match(r, '/'), [{'controller': 'blog', 'action': 'welcome'}], 'simple route')
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjoyment.Routes
 
     # Simple route

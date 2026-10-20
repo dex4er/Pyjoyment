@@ -12,6 +12,7 @@ Pyjo.Cookie - HTTP cookie base class
         def to_str(self): ...
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Cookie
 
     class MyCookie(Pyjo.Cookie.object):

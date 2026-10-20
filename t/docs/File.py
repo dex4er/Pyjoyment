@@ -47,6 +47,7 @@ with subtest('Synopsis'):
     )
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.File
 
     output = io.StringIO()

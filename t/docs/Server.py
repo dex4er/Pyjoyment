@@ -20,6 +20,7 @@ with subtest('Synopsis'):
     ok(isinstance(server.app, Pyjo.HelloWorld.object), 'run')
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Server
 
     class Pyjo_Server_MyServer(Pyjo.Server.object):

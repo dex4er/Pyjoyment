@@ -8,6 +8,7 @@ Pyjoyment.Routes.Route - Route
     r = Route()
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjoyment.Routes.Route
 
     r = Pyjoyment.Routes.Route.new()

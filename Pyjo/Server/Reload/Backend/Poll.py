@@ -10,6 +10,7 @@ Pyjo.Server.Reload.Backend.Poll - Auto-restarting development server backend usi
         print('Files have been changed')
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Server.Reload.Backend.Poll
 
     backend = Pyjo.Server.Reload.Backend.Poll.new()

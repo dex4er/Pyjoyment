@@ -41,6 +41,7 @@ with subtest('Synopsis'):
     server.close()
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.IOLoop.Datagram
 
     stdout = io.StringIO()

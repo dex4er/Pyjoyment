@@ -15,6 +15,7 @@ with subtest('Synopsis'):
     is_ok(url.fragment, '23', 'url.fragment')
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.URL
 
     from urllib.parse import urlsplit

@@ -10,6 +10,7 @@ Pyjo.Content.MultiPart - HTTP multipart content
     single = multi.parts[4]
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Content.MultiPart
 
     multi = Pyjo.Content.MultiPart.new()

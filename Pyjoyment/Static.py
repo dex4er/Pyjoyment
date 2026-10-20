@@ -10,6 +10,7 @@ Pyjoyment.Static - Serve static files
     static.paths.append('/home/sri/public')
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjoyment.Static
 
     static = Pyjoyment.Static.new()

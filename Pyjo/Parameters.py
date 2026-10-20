@@ -10,6 +10,7 @@ Pyjo.Parameters - Parameters
     print(params.param('baz'))
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Parameters
 
     # Parse

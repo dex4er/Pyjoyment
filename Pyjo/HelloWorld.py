@@ -9,6 +9,7 @@ Pyjo.HelloWorld - Hello World!
     hello.start()
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.HelloWorld
 
     hello = Pyjo.HelloWorld.new()

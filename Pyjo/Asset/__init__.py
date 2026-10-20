@@ -18,6 +18,7 @@ Pyjo.Asset - HTTP content storage base class
         def to_file(self): ...
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Asset
 
     class MyAsset(Pyjo.Asset.object):

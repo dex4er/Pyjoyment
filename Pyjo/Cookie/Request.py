@@ -11,6 +11,7 @@ Pyjo.Cookie.Request - HTTP request cookie
     print(cookie)
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Cookie.Request
 
     cookie = Pyjo.Cookie.Request.new()

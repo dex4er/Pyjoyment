@@ -21,6 +21,7 @@ Pyjo.EventEmitter - Event emitter base class
     tiger.poke()
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.EventEmitter
 
     class Cat(Pyjo.EventEmitter.object):

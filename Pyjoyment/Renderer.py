@@ -10,6 +10,7 @@ Pyjoyment.Renderer - Generate dynamic content
     renderer.paths.append('/home/sri/templates')
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjoyment.Renderer
 
     renderer = Pyjoyment.Renderer.new()

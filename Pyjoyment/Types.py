@@ -10,6 +10,7 @@ Pyjoyment.Types - MIME types
     print(types.type('foo'))
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjoyment.Types
 
     types = Pyjoyment.Types.new()

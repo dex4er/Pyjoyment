@@ -9,6 +9,7 @@ Pyjo.Server.Hot - Production web server with hot deployment
     hot.run('/home/sri/myapp.py')
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Server.Hot
 
     hot = Pyjo.Server.Hot.new()

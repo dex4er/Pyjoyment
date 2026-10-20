@@ -26,6 +26,7 @@ Pyjo.Server.Daemon - Non-blocking I/O HTTP and WebSocket server
     daemon.run()
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Server.Daemon
 
     daemon = Pyjo.Server.Daemon.new(listen=['http://*:8080'])

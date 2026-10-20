@@ -59,6 +59,7 @@ object = Pyjoyment_Command_mycommand
     del sys.modules['mycommand']
 
     # Or import the module, as in Google Python Style Guide
+
     # The module of the example, in a temporary directory, as a test writes nothing into t
     tmp = Pyjo.File.tempdir()
     tmp.child('mycommand.py').spew(b'''\

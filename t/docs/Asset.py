@@ -19,6 +19,7 @@ with subtest('Synopsis'):
     isa_ok(MyAsset(), Asset, 'subclass')
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Asset
 
     class MyAsset(Pyjo.Asset.object):

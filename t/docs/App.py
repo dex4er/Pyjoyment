@@ -30,6 +30,7 @@ with subtest('Synopsis'):
     is_ok(ua.get('/foo').res.text, 'GET request for /foo!', 'handler')
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.App
 
     class MyApp(Pyjo.App.object):

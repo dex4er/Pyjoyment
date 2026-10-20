@@ -11,6 +11,7 @@ Pyjo.Cookie.Response - HTTP response cookie
     print(cookie)
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Cookie.Response
 
     cookie = Pyjo.Cookie.Response.new()

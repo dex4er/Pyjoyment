@@ -29,6 +29,7 @@ with subtest('Synopsis'):
     is_ok(output.getvalue(), 'File contains "bar"\nb\'foo bar baz\'\n', 'output')
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Asset.File
 
     output = io.StringIO()

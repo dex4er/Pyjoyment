@@ -24,6 +24,7 @@ Pyjo.Promise - Promises/A+
         return promise
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Promise
     import Pyjo.UserAgent
 

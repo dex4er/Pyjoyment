@@ -84,6 +84,7 @@ with subtest('Synopsis'):
     ua.close()
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.IOLoop
     import Pyjo.Promise
     import Pyjo.URL

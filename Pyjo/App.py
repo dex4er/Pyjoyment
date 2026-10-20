@@ -24,6 +24,7 @@ Pyjo.App - Duct tape for the HTML5 web
                 tx.res.body = f'{method} request for {path}!'.encode()
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.App
 
     class MyApp(Pyjo.App.object):

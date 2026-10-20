@@ -20,6 +20,7 @@ with subtest('Synopsis'):
         print(mew.age)
 
         # Or import the module, as in Google Python Style Guide
+
         import Pyjo.Base
 
         from dataclasses import dataclass, field
@@ -64,6 +65,7 @@ with subtest('Constructors'):
     is_ok(str(path), '/foo/bar', 'new')
 
     # Or import the class
+
     from Pyjo.Path import Path
 
     path = Path('/foo/bar')

@@ -9,6 +9,7 @@ Pyjoyment.Routes.Pattern - Route pattern
     pattern = Pattern('/test/:name')
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjoyment.Routes.Pattern
 
     # Create pattern

@@ -29,6 +29,7 @@ with subtest('Synopsis'):
     stream.steal_handle()
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.IOLoop.Stream
 
     got = []

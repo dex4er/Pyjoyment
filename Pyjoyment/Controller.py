@@ -17,6 +17,7 @@ Pyjoyment.Controller - Controller base class
     object = MyApp_Controller_Foo
 
     # Or import the module, as in Google Python Style Guide
+
     # Controller
     import Pyjoyment.Controller
 

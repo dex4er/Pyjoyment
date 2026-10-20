@@ -31,6 +31,7 @@ with subtest('Synopsis'):
     output = io.StringIO()
     with contextlib.redirect_stdout(output):
         # Or import the module, as in Google Python Style Guide
+
         import Pyjo.Reactor.Asyncio
 
         # Watch if handle becomes readable or writable

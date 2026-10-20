@@ -51,6 +51,7 @@ with subtest('Synopsis'):
     is_ok(tx.res.headers.cache_control, 'max-age=1, no-cache', 'header')
 
     # Or import the module, as in Google Python Style Guide
+
     # Controller
     import Pyjoyment.Controller
 

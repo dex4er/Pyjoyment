@@ -30,6 +30,7 @@ with subtest('Synopsis'):
     connected[0].close()
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.IOLoop.Client
 
     connected = []

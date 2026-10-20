@@ -14,6 +14,7 @@ Pyjoyment.Plugin - Plugin base class
     object = Pyjoyment_Plugin_MyPlugin
 
     # Or import the module, as in Google Python Style Guide
+
     # CamelCase plugin name
     import Pyjoyment.Plugin
 

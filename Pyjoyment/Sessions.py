@@ -10,6 +10,7 @@ Pyjoyment.Sessions - Session manager based on signed cookies
     sessions.default_expiration = 86400
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjoyment.Sessions
 
     sessions = Pyjoyment.Sessions.new()

@@ -21,6 +21,7 @@ Pyjo.Reactor - Low-level event reactor base class
         def watch(self, handle, read, write): ...
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Reactor
 
     class MyEventLoop(Pyjo.Reactor.object):

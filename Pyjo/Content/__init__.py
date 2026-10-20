@@ -12,6 +12,7 @@ Pyjo.Content - HTTP content base class
         def get_body_chunk(self, offset): ...
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Content
 
     class MyContent(Pyjo.Content.object):

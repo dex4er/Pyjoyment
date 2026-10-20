@@ -10,6 +10,7 @@ Pyjo.Content.Single - HTTP content
     print(single.headers.content_length)
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Content.Single
 
     single = Pyjo.Content.Single.new()

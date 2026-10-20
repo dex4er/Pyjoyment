@@ -17,6 +17,7 @@ with subtest('Synopsis'):
     is_ok(app.config('foo'), 'bar', 'registered')
 
     # Or import the module, as in Google Python Style Guide
+
     # CamelCase plugin name
     import Pyjoyment.Plugin
 

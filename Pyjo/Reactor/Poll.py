@@ -12,6 +12,7 @@ Pyjo.Reactor.Poll - Low-level event reactor with poll support
     ))
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Reactor.Poll
 
     # Watch if handle becomes readable or writable

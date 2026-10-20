@@ -16,6 +16,7 @@ Pyjo.GetOpt - Command line options
     print(opts.mode)
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.GetOpt
 
     getopt = Pyjo.GetOpt.new()

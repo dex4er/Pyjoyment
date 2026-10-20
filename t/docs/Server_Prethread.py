@@ -88,6 +88,7 @@ prethread.run()
     process.stdout.close()
 
     # Or import the module, as in Google Python Style Guide
+
     pid_file = tempdir().child('prethread.pid')
     port, process = server(
         lambda port: (

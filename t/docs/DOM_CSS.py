@@ -16,6 +16,7 @@ with subtest('Synopsis'):
     is_deeply_ok([e[1] for e in elements], ['h1', 'h2'], 'elements')
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.DOM.CSS
 
     # Select elements from DOM tree

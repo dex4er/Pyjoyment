@@ -58,6 +58,7 @@ with subtest('Synopsis'):
     is_deeply_ok(results, [200], 'resolved')
 
     # Or import the module, as in Google Python Style Guide
+
     output = io.StringIO()
     with contextlib.redirect_stdout(output):
         import Pyjo.Promise

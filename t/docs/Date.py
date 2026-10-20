@@ -9,6 +9,7 @@ with subtest('Synopsis'):
     is_ok(date.epoch, 784111777, 'date.epoch')
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Date
 
     import time

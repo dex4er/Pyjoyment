@@ -14,6 +14,7 @@ Pyjo.Server - HTTP/WebSocket server base class
             self.emit('request', tx)
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Server
 
     class Pyjo_Server_MyServer(Pyjo.Server.object):

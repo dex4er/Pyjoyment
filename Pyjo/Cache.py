@@ -10,6 +10,7 @@ Pyjo.Cache - Naive in-memory cache
     foo = cache.get('foo')
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Cache
 
     cache = Pyjo.Cache.new(max_keys=50)

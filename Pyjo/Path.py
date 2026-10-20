@@ -10,6 +10,7 @@ Pyjo.Path - Path
     print(path[0])
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Path
 
     # Parse

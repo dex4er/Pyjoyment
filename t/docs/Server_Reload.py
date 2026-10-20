@@ -89,6 +89,7 @@ reload.run({myapp.to_str()!r})
     like_ok(output, rf'Web application available at http://127.0.0.1:{port}', 'listening')
 
     # Or import the module, as in Google Python Style Guide
+
     code = f"""
 import Pyjo.Server.Reload
 

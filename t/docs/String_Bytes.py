@@ -20,6 +20,7 @@ with subtest('Synopsis'):
     )
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.String.Bytes
 
     output = io.TextIOWrapper(io.BytesIO(), encoding='UTF-8', newline='\n')

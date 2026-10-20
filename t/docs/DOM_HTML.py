@@ -11,6 +11,7 @@ with subtest('Synopsis'):
     is_ok(tree[1][1], 'div', 'tree')
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.DOM.HTML
 
     # Turn HTML into DOM tree

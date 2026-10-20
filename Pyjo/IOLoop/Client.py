@@ -12,6 +12,7 @@ Pyjo.IOLoop.Client - Non-blocking TCP/IP and UNIX domain socket client
     client.connect(address='example.com', port=80)
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.IOLoop.Client
 
     # Create socket connection

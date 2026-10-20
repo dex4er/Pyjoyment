@@ -10,6 +10,7 @@ Pyjo.String.Unicode - String of characters
     print(string.camelize())
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.String.Unicode
 
     # Manipulate string

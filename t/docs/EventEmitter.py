@@ -29,6 +29,7 @@ with subtest('Synopsis'):
     is_ok(output.getvalue(), 'RAWR!\nRAWR!\nRAWR!\n', 'roars three times')
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.EventEmitter
 
     class Cat(Pyjo.EventEmitter.object):

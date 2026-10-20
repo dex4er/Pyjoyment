@@ -20,6 +20,7 @@ Pyjo.String.Mixin - Object with to_bytes/to_str methods
     print(obj + '!')
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Base
     import Pyjo.String.Mixin
 

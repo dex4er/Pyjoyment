@@ -22,6 +22,7 @@ with subtest('Synopsis'):
     isa_ok(r, Route, 'route')
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjoyment.Routes.Route
 
     r = Pyjoyment.Routes.Route.new()

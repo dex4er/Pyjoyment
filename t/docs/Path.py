@@ -9,6 +9,7 @@ with subtest('Synopsis'):
     is_ok(path[0], 'foo', 'path[0]')
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Path
 
     # Parse

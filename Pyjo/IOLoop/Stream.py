@@ -12,6 +12,7 @@ Pyjo.IOLoop.Stream - Non-blocking I/O stream
     stream.on('error', lambda stream, err: ...)
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.IOLoop.Stream
 
     # Create stream

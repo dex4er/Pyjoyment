@@ -41,6 +41,7 @@ with subtest('Synopsis'):
     body.close()
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Server.WSGI
 
     wsgi = Pyjo.Server.WSGI.new()

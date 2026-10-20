@@ -11,6 +11,7 @@ Pyjo.Collection - Collection
     print(collection.join("\n"))
 
     # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Collection
 
     # Manipulate collection
