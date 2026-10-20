@@ -230,11 +230,15 @@ jobs:
           if grep -n 'ResourceWarning:' prove.log; then exit 1; fi
 
       # pytest shows the standard error of a test script that failed only, so
-      # the ResourceWarning of the scripts is checked by the jobs of prove
+      # the ResourceWarning of the scripts is checked by the jobs of prove;
+      # pytest-xdist runs four test scripts at the same time, as -j 4 of prove,
+      # and with -v writes a line of the path alone when a script starts, before
+      # the line of its result, which grep leaves out, with the CR of the CRLF
+      # that Python writes to a pipe on Windows
       - name: Run all tests with pytest
         shell: bash
         env:
           PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
           TEST_ONLINE: "1"
         run: |-
-          uv run --python "${{ matrix.python }}" --group pytest pytest -p no:cacheprovider --color=yes -o pyjo_prove_timeout=60
+          uv run --python "${{ matrix.python }}" --group pytest pytest -p no:cacheprovider --color=yes -v -n 4 -o pyjo_prove_timeout=60 | grep -Ev '^t[/\\][^ ]* [[:cntrl:]]?$'

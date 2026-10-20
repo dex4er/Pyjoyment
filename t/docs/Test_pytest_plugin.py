@@ -64,7 +64,7 @@ with subtest('Synopsis'):
     is_ok(code, 0, 'right exit status')
 
     out, code = pytest(project, '-v', 't/basic.py')
-    like_ok(out, r'(?m)^t/basic\.py::tap PASSED\b', 'pytest -v t/basic.py')
+    like_ok(out, r'(?m)^t/basic\.py PASSED\b', 'pytest -v t/basic.py')
     is_ok(code, 0, 'right exit status')
 
     pyproject = project.child('pyproject.toml')

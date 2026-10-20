@@ -421,10 +421,12 @@ script are known only from its TAP output, so a script is not split into
 tests. The wrapper of `pytest_collect_file` replaces what other plugins make
 of a file of the directories of `pyjo_prove_paths`, as the module of pytest
 for a `t/test_*.py`. `testpaths = ["t"]` of `pyproject.toml` makes `pytest`
-without arguments run the whole suite:
+without arguments run the whole suite, and pytest-xdist of the group
+`pytest` runs the scripts at the same time, as `-j` of `Pyjo.Prove`, where
+pytest alone runs them one after another, four times slower:
 
 ```sh
-mise exec -- uv run --group pytest pytest
+mise exec -- uv run --group pytest pytest -n 4
 ```
 
 The plugin also calls `Pyjo.Test.raise_failures`, so that the functions of
@@ -446,7 +448,7 @@ without pytest, which is in the dependency group `pytest`, not in
 `dependencies`. CI runs them in the job `pytest`, with the group installed by
 uv, which installs the project too, so that pytest loads the plugin of its
 entry point, where the tests pass `-p Pyjo.Test.pytest_plugin` without it,
-and runs all the test scripts with pytest there:
+and runs all the test scripts with pytest and pytest-xdist there:
 
 ```sh
 mise exec -- uv run --group pytest python -m Pyjo.Prove -l t/Pyjo/Test_pytest_plugin.py t/docs/Test_pytest_plugin.py

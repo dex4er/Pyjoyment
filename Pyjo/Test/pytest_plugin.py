@@ -42,12 +42,17 @@ A file with the extension ``.py`` in the directories of ``pyjo_prove_paths``,
 ``t`` by default, is a test script, whatever its name, but ``conftest.py``,
 and pytest does not import it. The script runs in a process of its own, in the
 root directory of pytest, with :func:`Pyjo.Prove.run_script`, and is a test of
-pytest of its own, ``t/basic.py::tap``, which passes, fails or is skipped as
+pytest of its own, ``t/basic.py``, which passes, fails or is skipped as
 :mod:`Pyjo.Prove` reports the script. The report of a failure shows the
 failed tests, the standard error of the script with their diagnostic
 messages, and what is wrong with the plan or the exit status; the whole TAP
 output of the script is its captured standard output. ``Bail out!`` stops the
 run.
+
+pytest runs its tests one after another, and so the test scripts, where
+:mod:`Pyjo.Prove` runs several at the same time with ``-j``; ``-n`` of
+`pytest-xdist <https://pytest-xdist.readthedocs.io>`_ does so, as each test
+script is a test of its own.
 
 The scripts get the environment that pytest started with, as
 ``python -m Pyjo.Prove -l`` gives it to them: the root directory in
@@ -178,8 +183,17 @@ def pytest_collect_file(
 ) -> Generator[None, list[pytest.Collector | None], list[pytest.Collector | None]]:
     collectors = yield
     if _is_script(file_path, parent.config):
+        # The test of pytest without a collector of the file, as it has one test, whose node is the path alone
+        config = parent.config
+        try:
+            nodeid = file_path.relative_to(config.rootpath).as_posix()
+        except ValueError:
+            nodeid = file_path.as_posix()
         # pytest leaves the keyword arguments of from_parent without types
-        return [Script.from_parent(parent, path=file_path)]  # pyright: ignore[reportUnknownMemberType]
+        item = ScriptItem.from_parent(  # pyright: ignore[reportUnknownMemberType]
+            parent, name=file_path.name, path=file_path, nodeid=nodeid
+        )
+        return [cast(pytest.Collector, item)]
     return collectors
 
 
@@ -210,22 +224,6 @@ def t(app: Any) -> Iterator['Pyjo.Test.Pyjo.Pyjo_Test_Pyjo']:
 
     with Pyjo.Test.Pyjo.new(app) as t:
         yield t
-
-
-class Script(pytest.File):
-    """
-    A test script, which :meth:`collect` gives as a :class:`ScriptItem`.
-    """
-
-    def collect(self) -> Iterator['ScriptItem']:
-        """::
-
-            items = list(script.collect())
-
-        The test of the script, ``tap``.
-        """
-        # pytest leaves the keyword arguments of from_parent without types
-        yield ScriptItem.from_parent(self, name='tap')  # pyright: ignore[reportUnknownMemberType]
 
 
 class ScriptItem(pytest.Item):
@@ -281,10 +279,11 @@ class ScriptItem(pytest.Item):
 
             path, line, name = item.reportinfo()
 
-        The path of the test script, without a line, and the path relative to
-        the root directory as its name in the report.
+        The path of the test script, without a line, and its name in the
+        headline of the report of a failure, as ``t/basic.py (TAP)``.
         """
-        return self.path, None, Path(os.path.relpath(self.path, self.config.rootpath)).as_posix()
+        # Not the node alone: pytest shows the dots of a name that ends the node as ::, of Class.method
+        return self.path, None, f'{self.nodeid} (TAP)'
 
 
 def _failed(line: str) -> bool:

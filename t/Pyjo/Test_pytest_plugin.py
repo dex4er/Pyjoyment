@@ -56,14 +56,24 @@ with subtest('Test scripts'):
     like_ok(out, r'(?m)^t/requires\.py s$', 'skipped for requires-python')
     like_ok(out, r'(?m)^t/skip\.py s$', 'skipped')
     like_ok(out, r'(?m)^t/test_named\.py \.$', 'test script with the name of a test module')
-    like_ok(out, r'(?m)^FAILED t/fail\.py::tap - Failed: Failed 1/2 subtests', 'summary of the failure')
+    like_ok(out, r'(?m)^FAILED t/fail\.py - Failed: Failed 1/2 subtests', 'summary of the failure')
+    like_ok(out, r'(?m)^_+ t/fail\.py \(TAP\) _+$', 'headline of the failure')
     like_ok(out, r'(?m)^    not ok 1 - right status\nnot ok 2 - Group$', 'failed tests')
     like_ok(out, r'(?m)^    #          got: 200\n    #     expected: 404$', 'diagnostics')
     like_ok(out, r'(?m)^Non-zero exit status: 1$', 'exit status')
     like_ok(out, r'(?m)^-+ Captured stdout call -+\nok 1 - same\n# Subtest: Group$', 'TAP output')
-    like_ok(out, r'(?m)^FAILED t/died\.py::tap - Failed: No plan found', 'summary of the death')
+    like_ok(out, r'(?m)^FAILED t/died\.py - Failed: No plan found', 'summary of the death')
     like_ok(out, r'(?m)^RuntimeError: Died in the middle$', 'exception')
     like_ok(out, r'(?m)^SKIPPED \[1\] t/requires\.py: requires Python >=99$', 'reason of requires-python')
+    like_ok(out, r'(?m)^SKIPPED \[1\] t/skip\.py: set TEST_ONLINE to enable this test$', 'reason')
+    like_ok(out, r'(?m)^=+ 2 failed, 2 passed, 2 skipped in ', 'right summary')
+    is_ok(code, 1, 'right exit status')
+
+with subtest('pytest-xdist'):
+    if importlib.util.find_spec('xdist') is None:
+        plan(skip_all='pytest-xdist is required, as of the dependency group "pytest"')
+    out, code = pytest('-rfEs', '-n', '2', 't')
+    like_ok(out, r'(?m)^FAILED t/fail\.py - Failed: Failed 1/2 subtests', 'summary of the failure')
     like_ok(out, r'(?m)^SKIPPED \[1\] t/skip\.py: set TEST_ONLINE to enable this test$', 'reason')
     like_ok(out, r'(?m)^=+ 2 failed, 2 passed, 2 skipped in ', 'right summary')
     is_ok(code, 1, 'right exit status')
@@ -75,7 +85,7 @@ with subtest('Passing test scripts'):
 
 with subtest('Verbose'):
     out, code = pytest('-v', 't/pass.py')
-    like_ok(out, r'(?m)^t/pass\.py::tap PASSED\b', 'item of the test script')
+    like_ok(out, r'(?m)^t/pass\.py PASSED\b', 'the test script as a test')
     is_ok(code, 0, 'right exit status')
 
 with subtest('Bail out of a test script'):
@@ -88,7 +98,7 @@ with subtest('Bail out of a test script'):
 
 with subtest('Timeout'):
     out, code = pytest('-o', 'pyjo_prove_paths=xt', '-o', 'pyjo_prove_timeout=1', 'xt/sleep.py')
-    like_ok(out, r'(?m)^FAILED xt/sleep\.py::tap - Failed: Timed out after 1 seconds$', 'timed out')
+    like_ok(out, r'(?m)^FAILED xt/sleep\.py - Failed: Timed out after 1 seconds$', 'timed out')
     is_ok(code, 1, 'right exit status')
 
 with subtest('No test scripts'):
