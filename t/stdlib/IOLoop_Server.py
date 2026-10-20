@@ -6,8 +6,10 @@ import Pyjo.Reactor.Poll
 from Pyjo.Test import *
 
 import os
+import re
 import socket
 import ssl
+import sys
 import tempfile
 import threading
 
@@ -66,22 +68,31 @@ with subtest('IPv6'):
             server.close()
 
 with subtest('UNIX domain socket'):
-    with tempfile.TemporaryDirectory() as dir:
-        path = os.path.join(dir, 'test.sock')
-        server = Pyjo.IOLoop.Server.new()
-        server.listen(path=path)
-        is_ok(server.port, None, 'no port')
-        ok(f'unix:{path}:' in os.environ['PYJO_REUSE'], 'reusable')
+    # Python has no UNIX domain sockets on Windows, which the server says
+    if sys.platform == 'win32':
+        throws_ok(
+            lambda: Pyjo.IOLoop.Server.new().listen(path='test.sock'),
+            re.compile(r"^Can't create listen socket: UNIX domain sockets are not supported"),
+            'not on Windows',
+        )
+        skip('no UNIX domain sockets', 2)
+    else:
+        with tempfile.TemporaryDirectory() as dir:
+            path = os.path.join(dir, 'test.sock')
+            server = Pyjo.IOLoop.Server.new()
+            server.listen(path=path)
+            is_ok(server.port, None, 'no port')
+            ok(f'unix:{path}:' in os.environ['PYJO_REUSE'], 'reusable')
 
-        def client():
-            s = socket.socket(socket.AF_UNIX)
-            s.connect(path)
-            s.close()
+            def client():
+                s = socket.socket(socket.AF_UNIX)
+                s.connect(path)
+                s.close()
 
-        got = serve(server, client)
-        is_ok(got[0].family, socket.AF_UNIX, 'accepted')
-        got[0].close()
-        server.close()
+            got = serve(server, client)
+            is_ok(got[0].family, socket.AF_UNIX, 'accepted')
+            got[0].close()
+            server.close()
 
 with subtest('TLS'):
     server = Pyjo.IOLoop.Server.new()
