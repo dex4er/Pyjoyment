@@ -1,8 +1,10 @@
 from Pyjo.Test import *
 
 import os
+import re
 import socket
 import ssl
+import sys
 import tempfile
 
 
@@ -64,16 +66,28 @@ with subtest('handle, is_accepting and port'):
 with subtest('listen'):
     port = Pyjo.IOLoop.Server.object.generate_port()
     server = Pyjo.IOLoop.Server.new()
-    server.listen(port=port, address='127.0.0.1', backlog=128, reuse=True, single_accept=True)
+    # Windows has no SO_REUSEPORT, which the server says
+    if sys.platform == 'win32':
+        throws_ok(
+            lambda: server.listen(port=port, address='127.0.0.1', backlog=128, reuse=True, single_accept=True),
+            re.compile(r"^Can't create listen socket: SO_REUSEPORT is not supported"),
+            'no reuse on Windows',
+        )
+        server.listen(port=port, address='127.0.0.1', backlog=128, single_accept=True)
+    else:
+        server.listen(port=port, address='127.0.0.1', backlog=128, reuse=True, single_accept=True)
     is_ok(server.port, port, 'port')
     server.close()
 
-    with tempfile.TemporaryDirectory() as dir:
-        path = os.path.join(dir, 'myapp.sock')
-        server = Pyjo.IOLoop.Server.new()
-        server.listen(path=path)
-        is_ok(server.handle.family, socket.AF_UNIX, 'UNIX domain socket')
-        server.close()
+    if not hasattr(socket, 'AF_UNIX'):
+        skip('no UNIX domain sockets', 1)
+    else:
+        with tempfile.TemporaryDirectory() as dir:
+            path = os.path.join(dir, 'myapp.sock')
+            server = Pyjo.IOLoop.Server.new()
+            server.listen(path=path)
+            is_ok(server.handle.family, socket.AF_UNIX, 'UNIX domain socket')
+            server.close()
 
     listening = socket.create_server(('127.0.0.1', 0))
     server = Pyjo.IOLoop.Server.new()

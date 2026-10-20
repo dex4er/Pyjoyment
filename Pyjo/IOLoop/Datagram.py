@@ -113,6 +113,9 @@ type SendCallback = Callable[[Any], object]
 # The largest datagram that UDP carries
 _SIZE = 65535
 
+# Python has no UNIX domain sockets on Windows
+_NO_UNIX = 'UNIX domain sockets are not supported'
+
 
 @dataclass
 class _Datagram:
@@ -252,7 +255,8 @@ class Pyjo_IOLoop_Datagram(Pyjo.EventEmitter.object):
                 reuse=True
 
             Allow multiple sockets to use the same port with the
-            ``SO_REUSEPORT`` socket option.
+            ``SO_REUSEPORT`` socket option, or ``SO_REUSEADDR`` on Windows,
+            which has no ``SO_REUSEPORT``.
         """
         path = options.get('path')
         created: socket.socket | None = None
@@ -261,6 +265,8 @@ class Pyjo_IOLoop_Datagram(Pyjo.EventEmitter.object):
             if path:
                 if os.path.exists(path) and stat.S_ISSOCK(os.stat(path).st_mode):
                     os.remove(path)
+                if sys.platform == 'win32':
+                    raise OSError(errno.EAFNOSUPPORT, _NO_UNIX)
                 handle = created = self._handle or socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
                 handle.bind(path)
 
@@ -271,8 +277,13 @@ class Pyjo_IOLoop_Datagram(Pyjo.EventEmitter.object):
                     host, options.get('port') or 0, type=socket.SOCK_DGRAM, flags=socket.AI_PASSIVE
                 )[0]
                 handle = created = self._handle or socket.socket(family, socket.SOCK_DGRAM)
+                # SO_REUSEADDR on Windows, which has no SO_REUSEPORT, and lets several sockets of datagrams have the
+                # same port there, as reuseAddr of dgram of Node.js does
                 if options.get('reuse'):
-                    handle.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+                    if sys.platform == 'win32':
+                        handle.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                    else:
+                        handle.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
                 if options.get('ipv6_only') and family == socket.AF_INET6:
                     handle.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
                 handle.bind(sockaddr)
@@ -621,7 +632,7 @@ class Pyjo_IOLoop_Datagram(Pyjo.EventEmitter.object):
                 return
             except OSError as e:
                 queue.popleft()
-                self.emit('error', e)
+                self.emit('error', _refused(e))
                 if self._closed():
                     return
                 continue
@@ -661,7 +672,7 @@ class Pyjo_IOLoop_Datagram(Pyjo.EventEmitter.object):
         except (BlockingIOError, InterruptedError):
             return
         except OSError as e:
-            self.emit('error', e)
+            self.emit('error', _refused(e))
             return
         self.emit('message', data, peer)
 
@@ -687,8 +698,10 @@ class Pyjo_IOLoop_Datagram(Pyjo.EventEmitter.object):
             reactor.next_tick(lambda reactor: done(family, address, err))
             return True
 
-        # UNIX domain socket
+        # UNIX domain socket, which Python has not on Windows
         if unix:
+            if sys.platform == 'win32':
+                return finish(family, host, _NO_UNIX)
             return finish(socket.AF_UNIX, host, None)
 
         # Numeric address, kept as it is with the flow information and the scope of IPv6
@@ -763,6 +776,14 @@ def _error(e: OSError, message: str) -> OSError:
     error = type(e)(f'{message}: {e.strerror}' if e.strerror else message)
     error.errno = e.errno
     return error
+
+
+# Windows reports a datagram that a port refused as a reset of the connection (WSAECONNRESET), where other systems
+# report it as refused
+def _refused(e: OSError) -> OSError:
+    if sys.platform == 'win32' and e.winerror == 10054:
+        return ConnectionRefusedError(errno.ECONNREFUSED, 'Connection refused')
+    return e
 
 
 new = Pyjo_IOLoop_Datagram.new

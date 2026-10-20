@@ -21,7 +21,8 @@ def unverified():
 
 
 with subtest('Built-in certificate'):
-    client_sock, server_sock = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)
+    # Unlike Mojolicious: the family of the system, AF_UNIX, or AF_INET on Windows, which has no AF_UNIX in Python
+    client_sock, server_sock = socket.socketpair()
     client_sock.setblocking(False)
     server_sock.setblocking(False)
     promise = Pyjo.Promise.new()
@@ -44,7 +45,8 @@ with subtest('Built-in certificate'):
 
 with subtest('Built-in certificate (custom event loop and cipher)'):
     loop = Pyjo.IOLoop.new()
-    client_sock2, server_sock2 = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)
+    # Unlike Mojolicious: the family of the system
+    client_sock2, server_sock2 = socket.socketpair()
     client_sock2.setblocking(False)
     server_sock2.setblocking(False)
     promise = Pyjo.Promise.new().set(ioloop=loop)

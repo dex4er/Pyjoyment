@@ -96,10 +96,13 @@ with subtest('bind'):
     datagram = Pyjo.IOLoop.Datagram.new().bind(address='127.0.0.1', ipv6_only=True, reuse=True)
     ok(datagram.port, 'options')
     datagram.close()
-    with tempfile.TemporaryDirectory() as dir:
-        datagram = Pyjo.IOLoop.Datagram.new().bind(path=os.path.join(dir, 'myapp.sock'))
-        is_ok(datagram.port, None, 'path')
-        datagram.close()
+    if not hasattr(socket, 'AF_UNIX'):
+        skip('no UNIX domain sockets', 1)
+    else:
+        with tempfile.TemporaryDirectory() as dir:
+            datagram = Pyjo.IOLoop.Datagram.new().bind(path=os.path.join(dir, 'myapp.sock'))
+            is_ok(datagram.port, None, 'path')
+            datagram.close()
 
 with subtest('broadcast'):
     datagram = Pyjo.IOLoop.Datagram.new().bind(address='127.0.0.1')
@@ -169,16 +172,19 @@ with subtest('send'):
     is_deeply_ok(got, [b'Hello!', b'Hello!', b'Hello!'], 'sent')
     connected.close()
     datagram.close()
-    with tempfile.TemporaryDirectory() as dir:
-        path = os.path.join(dir, 'myapp.sock')
-        unix = Pyjo.IOLoop.Datagram.new().bind(path=path)
-        unix.on('message', lambda unix, data, peer: [got.append(data), unix.reactor.stop()])
-        datagram = Pyjo.IOLoop.Datagram.new()
-        datagram = datagram.send(b'Hello!', path)
-        datagram.reactor.start()
-        is_ok(len(got), 4, 'UNIX domain socket')
-        datagram.close()
-        unix.close()
+    if not hasattr(socket, 'AF_UNIX'):
+        skip('no UNIX domain sockets', 1)
+    else:
+        with tempfile.TemporaryDirectory() as dir:
+            path = os.path.join(dir, 'myapp.sock')
+            unix = Pyjo.IOLoop.Datagram.new().bind(path=path)
+            unix.on('message', lambda unix, data, peer: [got.append(data), unix.reactor.stop()])
+            datagram = Pyjo.IOLoop.Datagram.new()
+            datagram = datagram.send(b'Hello!', path)
+            datagram.reactor.start()
+            is_ok(len(got), 4, 'UNIX domain socket')
+            datagram.close()
+            unix.close()
 
 with subtest('start and stop'):
     server.start()

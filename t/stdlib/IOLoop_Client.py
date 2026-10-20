@@ -202,15 +202,18 @@ Pyjo.IOLoop.start()
     proxy.close()
 
 with subtest('UNIX domain socket'):
-    with tempfile.TemporaryDirectory() as dir:
-        path = os.path.join(dir, 'test.sock')
-        listening = socket.socket(socket.AF_UNIX)
-        listening.bind(path)
-        listening.listen()
-        got = connect(path=path)
-        is_ok(got['handle'].family, socket.AF_UNIX, 'connected')
-        got['handle'].close()
-        listening.close()
+    if not hasattr(socket, 'AF_UNIX'):
+        skip('no UNIX domain sockets', 1)
+    else:
+        with tempfile.TemporaryDirectory() as dir:
+            path = os.path.join(dir, 'test.sock')
+            listening = socket.socket(socket.AF_UNIX)
+            listening.bind(path)
+            listening.listen()
+            got = connect(path=path)
+            is_ok(got['handle'].family, socket.AF_UNIX, 'connected')
+            got['handle'].close()
+            listening.close()
 
 with subtest('Context manager'):
     listening = socket.create_server(('127.0.0.1', 0))
