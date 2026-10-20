@@ -7,6 +7,7 @@ from Pyjo.Util import decode, encode
 import gc
 import os
 import re
+import stat
 import sys
 import tempfile as _tempfile
 import time
@@ -246,7 +247,12 @@ with subtest('lstat'):
     except (AttributeError, NotImplementedError, OSError):
         plan(skip_all='symlink unimplemented')
     is_ok(link.stat().st_size, 0, 'target file is empty')
-    isnt_ok(link.lstat().st_size, 0, 'link is not empty')
+    # Unlike Mojolicious: a symbolic link of Windows, a reparse point of NTFS, has the size 0, where the one of POSIX has
+    # the length of its target, so lstat is known there by the link it sees
+    if sys.platform == 'win32':
+        ok(stat.S_ISLNK(link.lstat().st_mode), 'link is not empty')
+    else:
+        isnt_ok(link.lstat().st_size, 0, 'link is not empty')
 
 with subtest('list/list_tree'):
     is_deeply_ok(path('does_not_exist').list().to_list(), [], 'no files')
