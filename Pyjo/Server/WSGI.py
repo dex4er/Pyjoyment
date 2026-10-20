@@ -57,14 +57,14 @@ Pyjo.Server.WSGI - WSGI server
 
     make_server('', 3000, app).serve_forever()
 
-The response is given in the ``request`` event, as ``WSGI`` is synchronous;
-its content can come later, as the event loop of :mod:`Pyjo.IOLoop` runs
-while the server waits for it. The request is read from the environment of
-:pep:`3333` with ``read``, a body of unknown length when the server sets
-``wsgi.input_terminated``, as for a chunked request. The response goes
-without the hop-by-hop headers that :pep:`3333` forbids, so chunked content is
-sent without its framing, which the server adds. The transaction is finished
-when the server closes the body of the response.
+The response can be given later than the ``request`` event, and its content
+later than the response, as the event loop of :mod:`Pyjo.IOLoop` runs while
+the server waits for them, since ``WSGI`` is synchronous. The request is read
+from the environment of :pep:`3333` with ``read``, a body of unknown length
+when the server sets ``wsgi.input_terminated``, as for a chunked request. The
+response goes without the hop-by-hop headers that :pep:`3333` forbids, so
+chunked content is sent without its framing, which the server adds. The
+transaction is finished when the server closes the body of the response.
 
 WSGI servers
 ------------
@@ -160,7 +160,18 @@ class Pyjo_Server_WSGI(Pyjo.Server.object):
                 if length <= 0:
                     break
 
+        # Unlike Mojolicious: a response given later than the request event, as the one of an application that a route
+        # embeds, is waited for while the event loop runs, where Mojo takes the response at the end of the event
+        resumed = False
+
+        def resume(tx: Pyjo.Transaction.object) -> None:
+            nonlocal resumed
+            resumed = True
+
+        tx.once('resume', resume)
         self.emit('request', tx)
+        while not resumed:
+            Pyjo.IOLoop.one_tick()
 
         # Response headers
         res = tx.res.fix_headers()

@@ -1,11 +1,12 @@
 import Pyjo.App.WSGI
 import Pyjo.IOLoop
 import Pyjo.Promise
+import Pyjo.Server.WSGI
 import Pyjo.Test.Pyjo
 import Pyjo.Transaction.HTTP
 import Pyjoyment
 
-from Pyjo.JSON import encode_json
+from Pyjo.JSON import decode_json, encode_json
 from Pyjo.Test import *
 
 import concurrent.futures
@@ -16,6 +17,7 @@ import sys
 import threading
 import time
 import warnings
+import wsgiref.util
 
 from wsgiref.validate import validator
 
@@ -191,6 +193,24 @@ with subtest('Base path'):
         is_ok(t.tx.res.json('/SCRIPT_NAME'), '/outer/prefix', 'right script name')
         is_ok(t.tx.res.json('/PATH_INFO'), '/foo', 'right path')
         is_ok(t.tx.res.json('/QUERY_STRING'), 'x=1', 'right query')
+
+
+with subtest('Under a WSGI server'):
+    # An application of Pyjoyment on a WSGI server, whose script name is the base path, waits for the response
+    with Pyjo.App.WSGI.new(app=echo) as wsgi:
+        env = {'SCRIPT_NAME': '/outer', 'PATH_INFO': '/prefix/foo', 'QUERY_STRING': 'x=1'}
+        wsgiref.util.setup_testing_defaults(env)
+        res = []
+        server = Pyjo.Server.WSGI.new(app=application(wsgi))
+        body = server.to_wsgi_app()(env, lambda status, headers, exc_info=None: res.extend([status, headers]))
+        try:
+            env = decode_json(b''.join(body))
+        finally:
+            body.close()
+        is_ok(res[0], '200 OK', 'right status')
+        is_ok(env['SCRIPT_NAME'], '/outer/prefix', 'right script name')
+        is_ok(env['PATH_INFO'], '/foo', 'right path')
+        is_ok(env['QUERY_STRING'], 'x=1', 'right query')
 
 
 # A list, without the validator, whose iterator would hide it
