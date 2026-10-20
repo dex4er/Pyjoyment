@@ -9,6 +9,7 @@ Pyjo.UserAgent.Transactor - User agent transactor
     t = Transactor()
     print(t.tx('GET', 'http://example.com', {'Accept': '*/*'}).req.to_bytes())
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.UserAgent.Transactor
 
     # GET request with Accept header

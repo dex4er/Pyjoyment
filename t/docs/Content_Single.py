@@ -18,6 +18,7 @@ with subtest('Synopsis'):
         print(single.headers.content_length)
     is_ok(out.getvalue(), '12\n', 'output')
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Content.Single
 
     out = io.StringIO()

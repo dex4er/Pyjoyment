@@ -19,6 +19,7 @@ with subtest('Synopsis'):
     ok(opts, 'success')
     is_ok(opts.mode, 'production', 'result')
 
+    # Or import the module, as in Google Python Style Guide
     getopt = Pyjo.GetOpt.new()
 
     # The value goes to the result

@@ -12,6 +12,7 @@ with subtest('Synopsis'):
 
     isa_ok(MyCookie(), Cookie, 'MyCookie()')
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Cookie
 
     class MyCookie(Pyjo.Cookie.object):

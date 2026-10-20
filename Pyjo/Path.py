@@ -9,6 +9,7 @@ Pyjo.Path - Path
     path = Path('/foo%2Fbar%3B/baz.html')
     print(path[0])
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Path
 
     # Parse

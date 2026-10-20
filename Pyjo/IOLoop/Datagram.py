@@ -10,6 +10,7 @@ Pyjo.IOLoop.Datagram - Non-blocking datagram socket
     server.on('message', lambda server, data, peer: server.send(b'Echo: ' + data, peer))
     server.bind(address='127.0.0.1', port=9999)
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.IOLoop.Datagram
 
     # Echo server

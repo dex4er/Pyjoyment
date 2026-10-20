@@ -10,6 +10,7 @@ Pyjo.DOM.HTML - HTML/XML engine
     html.parse('<div><p id="a">Test</p><p id="b">123</p></div>')
     tree = html.tree
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.DOM.HTML
 
     # Turn HTML into DOM tree

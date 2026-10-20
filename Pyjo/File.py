@@ -13,6 +13,7 @@ Pyjo.File - File system paths
     print(path.extname)
     print(path.sibling('.bashrc'))
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.File
 
     # Portably deal with file system paths

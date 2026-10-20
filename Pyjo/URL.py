@@ -15,6 +15,7 @@ Pyjo.URL - Uniform Resource Locator
     print(url.query)
     print(url.fragment)
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.URL
 
     # Parse

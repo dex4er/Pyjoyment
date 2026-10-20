@@ -15,6 +15,7 @@ Pyjo.Template - Python-ish templates
     </div>
     '''))
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Template
 
     # Use Python modules

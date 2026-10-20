@@ -11,6 +11,7 @@ Pyjo.Home - Home sweet home
     print(home.child('templates', 'layouts', 'default.html.ep'))
     print(f'{home}')
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Home
 
     # Find and manage the project root directory

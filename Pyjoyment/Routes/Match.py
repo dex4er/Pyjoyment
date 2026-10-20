@@ -19,6 +19,7 @@ Pyjoyment.Routes.Match - Find routes
     match.find(c, method='PUT', path='/user/23')
     print(match.stack[0]['id'])
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjoyment.Controller
     import Pyjoyment.Routes
     import Pyjoyment.Routes.Match

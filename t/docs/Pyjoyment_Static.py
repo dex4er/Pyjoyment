@@ -17,6 +17,7 @@ with subtest('Synopsis'):
     is_deeply_ok(static.classes, ['__main__', 'MyApp.Controller.Foo'], 'classes')
     is_deeply_ok(static.paths, ['/home/sri/public'], 'paths')
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjoyment.Static
 
     static = Pyjoyment.Static.new()

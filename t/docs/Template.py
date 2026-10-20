@@ -24,6 +24,7 @@ with subtest('Synopsis'):
         )
     is_ok(output.getvalue(), '\n<div>\n  Time: 00:00:00\n</div>\n\n', 'output')
 
+    # Or import the module, as in Google Python Style Guide
     output = io.StringIO()
     with contextlib.redirect_stdout(output):
         import Pyjo.Template

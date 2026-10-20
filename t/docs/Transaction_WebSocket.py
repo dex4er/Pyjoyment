@@ -42,6 +42,7 @@ with subtest('Synopsis'):
         ws.closed()
 
     is_ok(output(synopsis_python), 'Message: Hi\nWebSocket closed with status 1006.\n', 'messages')
+    # Or import the module, as in Google Python Style Guide
 
     def synopsis():
         import Pyjo.Transaction.WebSocket

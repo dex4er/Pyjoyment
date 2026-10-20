@@ -25,6 +25,7 @@ Pyjo.Server.CGI - CGI server
 
     cgi.run()
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Server.CGI
 
     cgi = Pyjo.Server.CGI.new()

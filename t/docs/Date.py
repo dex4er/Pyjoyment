@@ -8,6 +8,7 @@ with subtest('Synopsis'):
     date = Date('Sun, 06 Nov 1994 08:49:37 GMT')
     is_ok(date.epoch, 784111777, 'date.epoch')
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Date
 
     import time

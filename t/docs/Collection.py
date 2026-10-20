@@ -16,6 +16,7 @@ with subtest('Synopsis'):
         print(collection.join('\n'))
     is_ok(output.getvalue(), 'it\njust\nworks\n', 'join')
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Collection
 
     output = io.StringIO()

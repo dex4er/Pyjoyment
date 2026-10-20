@@ -15,6 +15,7 @@ with subtest('Synopsis'):
     v.required('foo').like(re.compile(r'ar$'))
     is_ok(v.param('foo'), 'bar', 'validated')
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjoyment.Validator
 
     validator = Pyjoyment.Validator.new()

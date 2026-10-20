@@ -9,6 +9,7 @@ with subtest('Synopsis'):
     foo = cache.get('foo')
     is_ok(foo, 'bar', 'cached value')
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Cache
 
     cache = Pyjo.Cache.new(max_keys=50)

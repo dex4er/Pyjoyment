@@ -7,6 +7,7 @@ with subtest('Synopsis'):
     server = Server()
     like_ok(str(server.url()), r'^http://127\.0\.0\.1:\d+/$', 'print(server.url())')
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.UserAgent.Server
 
     server = Pyjo.UserAgent.Server.new()

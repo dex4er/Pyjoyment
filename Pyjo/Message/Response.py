@@ -15,6 +15,7 @@ Pyjo.Message.Response - HTTP response
     print(res.headers.content_type)
     print(res.body)
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Message.Response
 
     # Parse

@@ -16,6 +16,7 @@ with subtest('Synopsis'):
     Pyjoyment_Plugin_MyPlugin().register(app, {'foo': 'bar'})
     is_ok(app.config('foo'), 'bar', 'registered')
 
+    # Or import the module, as in Google Python Style Guide
     # CamelCase plugin name
     import Pyjoyment.Plugin
 

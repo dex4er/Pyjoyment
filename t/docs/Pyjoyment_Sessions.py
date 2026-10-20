@@ -14,6 +14,7 @@ with subtest('Synopsis'):
     sessions.default_expiration = 86400
     is_ok(sessions.cookie_name, 'myapp', 'cookie name')
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjoyment.Sessions
 
     sessions = Pyjoyment.Sessions.new()

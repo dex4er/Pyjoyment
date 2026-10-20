@@ -17,6 +17,7 @@ with subtest('Synopsis'):
         'print(...)',
     )
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.UserAgent.Transactor
 
     # GET request with Accept header

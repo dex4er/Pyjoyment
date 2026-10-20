@@ -21,6 +21,7 @@ with subtest('Synopsis'):
     )
     is_deeply_ok([(cookie.name, cookie.value) for cookie in jar.all()], [('foo', 'bar')], 'jar.add(...)')
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Cookie.Response
     import Pyjo.URL
     import Pyjo.UserAgent.CookieJar

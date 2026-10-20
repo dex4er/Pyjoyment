@@ -30,6 +30,7 @@ with subtest('Synopsis'):
         print(tx.remote_address)
 
     is_ok(output(client_python), "None\nNone\nb''\nNone\n", 'client')
+    # Or import the module, as in Google Python Style Guide
 
     def client():
         import Pyjo.Transaction.HTTP

@@ -15,6 +15,7 @@ Pyjo.Message.Request - HTTP request
     print(req.headers.content_type)
     print(req.body)
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Message.Request
 
     # Parse

@@ -14,6 +14,7 @@ Pyjo.Server.Reload.Backend - Auto-restarting development server backend
     new = Pyjo_Server_Reload_Backend_Inotify.new
     object = Pyjo_Server_Reload_Backend_Inotify
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Server.Reload.Backend
 
 

@@ -18,6 +18,7 @@ with subtest('Synopsis'):
         print(dom.find('[id]').map('attr', 'id').join('\n'))
     is_ok(output.getvalue(), '123\nTest\n123\na\nb\n', 'output')
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.DOM
 
     output = io.StringIO()

@@ -8,6 +8,7 @@ Pyjoyment.HelloWorld - Hello World!
     hello = HelloWorld()
     hello.start()
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjoyment.HelloWorld
 
     hello = Pyjoyment.HelloWorld.new()

@@ -25,6 +25,7 @@ Pyjo.Server.Prethread - Pre-threading non-blocking I/O HTTP and WebSocket server
 
     prethread.run()
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Server.Prethread
 
     prethread = Pyjo.Server.Prethread.new(listen=['http://*:8080'])

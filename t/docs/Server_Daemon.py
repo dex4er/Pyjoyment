@@ -47,6 +47,7 @@ with subtest('Synopsis'):
     is_deeply_ok(results, [b'GET request for /foo!'], 'daemon.run()')
     daemon.close()
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Server.Daemon
 
     daemon = Pyjo.Server.Daemon.new(listen=['http://127.0.0.1'], silent=True)

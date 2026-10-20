@@ -13,6 +13,7 @@ with subtest('Synopsis'):
     is_ok(headers.content_length, '42', 'headers.content_length')
     is_ok(headers.content_type, 'text/html', 'headers.content_type')
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Headers
 
     # Parse

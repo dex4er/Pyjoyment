@@ -17,6 +17,7 @@ with subtest('Synopsis'):
 
     is_deeply_ok(new().modified_files(), ['changed.py'], 'backend of its own')
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Server.Reload.Backend
 
     class Pyjo_Server_Reload_Backend_Inotify(Pyjo.Server.Reload.Backend.object):

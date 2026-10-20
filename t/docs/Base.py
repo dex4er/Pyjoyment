@@ -19,6 +19,7 @@ with subtest('Synopsis'):
         mew = Cat(name='Longcat')
         print(mew.age)
 
+        # Or import the module, as in Google Python Style Guide
         import Pyjo.Base
 
         from dataclasses import dataclass, field
@@ -62,6 +63,7 @@ with subtest('Constructors'):
     path = Pyjo.Path.new('/foo/bar')
     is_ok(str(path), '/foo/bar', 'new')
 
+    # Or import the class
     from Pyjo.Path import Path
 
     path = Path('/foo/bar')

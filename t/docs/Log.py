@@ -20,6 +20,7 @@ with subtest('Synopsis'):
         log.debug('To STDERR')
     like_ok(stderr.getvalue(), r'\[debug\] To STDERR\n', 'to STDERR')
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Log
 
     with contextlib.redirect_stderr(io.StringIO()) as stderr:

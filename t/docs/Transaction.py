@@ -28,6 +28,7 @@ with subtest('Synopsis'):
 
     isa_ok(MyTransaction(), Transaction, 'subclass')
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Transaction
 
     class MyTransaction(Pyjo.Transaction.object):

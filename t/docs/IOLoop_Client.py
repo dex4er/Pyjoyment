@@ -29,6 +29,7 @@ with subtest('Synopsis'):
     isa_ok(connected[0], socket.socket, 'connected')
     connected[0].close()
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.IOLoop.Client
 
     connected = []

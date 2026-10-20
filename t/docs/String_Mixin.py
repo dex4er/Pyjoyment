@@ -20,6 +20,7 @@ with subtest('Synopsis'):
     is_ok(f'{obj:>10}', '     value', "f'{obj:>10}'")
     is_ok(obj + '!', 'value!', "obj + '!'")
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Base
     import Pyjo.String.Mixin
 

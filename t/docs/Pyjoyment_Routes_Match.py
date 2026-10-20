@@ -21,6 +21,7 @@ with subtest('Synopsis'):
     match.find(c, method='PUT', path='/user/23')
     is_ok(match.stack[0]['id'], '23', 'captured')
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjoyment.Routes
     import Pyjoyment.Routes.Match
 

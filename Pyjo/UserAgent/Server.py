@@ -8,6 +8,7 @@ Pyjo.UserAgent.Server - Application server
     server = Server()
     print(server.url())
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.UserAgent.Server
 
     server = Pyjo.UserAgent.Server.new()

@@ -30,6 +30,7 @@ with subtest('Synopsis'):
 
     isa_ok(MyEventLoop(), Reactor, 'subclass')
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Reactor
 
     class MyEventLoop(Pyjo.Reactor.object):

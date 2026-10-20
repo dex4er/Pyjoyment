@@ -14,6 +14,7 @@ with subtest('Synopsis'):
         print(string.camelize())
     is_ok(output.getvalue(), 'FooBarBaz\n', 'output')
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.String.Unicode
 
     output = io.StringIO()

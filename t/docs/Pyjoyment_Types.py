@@ -10,6 +10,7 @@ with subtest('Synopsis'):
     types.type('foo', 'text/foo')
     is_ok(types.type('foo'), 'text/foo', 'type of foo')
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjoyment.Types
 
     types = Pyjoyment.Types.new()

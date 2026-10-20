@@ -9,6 +9,7 @@ Pyjo.Parameters - Parameters
     params = Parameters('foo=bar&baz=23')
     print(params.param('baz'))
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Parameters
 
     # Parse

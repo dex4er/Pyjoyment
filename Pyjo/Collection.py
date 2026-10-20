@@ -10,6 +10,7 @@ Pyjo.Collection - Collection
     collection.insert(0, 'it')
     print(collection.join("\n"))
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Collection
 
     # Manipulate collection

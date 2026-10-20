@@ -15,6 +15,7 @@ Pyjo.Base - Minimal base class for Pyjo projects
     mew = Cat(name='Longcat')
     print(mew.age)
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Base
 
     from dataclasses import dataclass, field
@@ -65,6 +66,7 @@ for the constructor of Python, after ``from ... import`` of the class. ::
 
     path = Pyjo.Path.new('/foo/bar')
 
+    # Or import the class
     from Pyjo.Path import Path
 
     path = Path('/foo/bar')

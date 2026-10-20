@@ -25,6 +25,7 @@ Pyjo.Server.WSGI - WSGI server
 
     app = wsgi.to_wsgi_app()
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Server.WSGI
 
     wsgi = Pyjo.Server.WSGI.new()

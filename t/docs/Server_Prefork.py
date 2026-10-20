@@ -90,6 +90,7 @@ prefork.run()
     like_ok(process.stdout.read(), rf'Web application available at http://127.0.0.1:{port}', 'listening')
     process.stdout.close()
 
+    # Or import the module, as in Google Python Style Guide
     pid_file = tempdir().child('prefork.pid')
     port, process = server(
         lambda port: (

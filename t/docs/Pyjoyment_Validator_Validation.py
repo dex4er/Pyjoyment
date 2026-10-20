@@ -14,6 +14,7 @@ with subtest('Synopsis'):
     v.required('foo').one_of('bar', 'baz')
     is_ok(v.param('foo'), 'bar', 'validated')
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjoyment.Validator
     import Pyjoyment.Validator.Validation
 

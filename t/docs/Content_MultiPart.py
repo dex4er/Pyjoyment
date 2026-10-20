@@ -18,6 +18,7 @@ with subtest('Synopsis'):
     single = multi.parts[4]
     is_ok(single.asset.slurp(), b'4', 'fifth part')
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Content.MultiPart
 
     multi = Pyjo.Content.MultiPart.new()

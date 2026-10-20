@@ -11,6 +11,7 @@ Pyjo.Reactor.Poll - Low-level event reactor with poll support
         'First handle is writable' if writable else 'First handle is readable'
     ))
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Reactor.Poll
 
     # Watch if handle becomes readable or writable

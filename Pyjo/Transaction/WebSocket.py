@@ -11,6 +11,7 @@ Pyjo.Transaction.WebSocket - WebSocket transaction
     ws.on('message', lambda ws, msg: print(f'Message: {msg}'))
     ws.on('finish', lambda ws, code, reason: print(f'WebSocket closed with status {code}.'))
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Transaction.WebSocket
 
     # Send and receive WebSocket messages

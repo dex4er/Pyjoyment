@@ -9,6 +9,7 @@ Pyjo.Content.Single - HTTP content
     single.parse(b'Content-Length: 12\x0d\x0a\x0d\x0aHello World!')
     print(single.headers.content_length)
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Content.Single
 
     single = Pyjo.Content.Single.new()

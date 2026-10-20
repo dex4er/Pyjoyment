@@ -19,6 +19,7 @@ Pyjo.String.Mixin - Object with to_bytes/to_str methods
     print(f'{obj:>10}')
     print(obj + '!')
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Base
     import Pyjo.String.Mixin
 

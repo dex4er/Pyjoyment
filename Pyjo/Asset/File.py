@@ -12,6 +12,7 @@ Pyjo.Asset.File - File storage for HTTP content
         print('File contains "bar"')
     print(file.slurp())
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Asset.File
 
     # Temporary file

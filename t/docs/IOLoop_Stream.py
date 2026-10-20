@@ -28,6 +28,7 @@ with subtest('Synopsis'):
     is_deeply_ok(got, [b'data'], 'read')
     stream.steal_handle()
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.IOLoop.Stream
 
     got = []

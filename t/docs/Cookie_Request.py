@@ -9,6 +9,7 @@ with subtest('Synopsis'):
     cookie.value = 'bar'
     is_ok(str(cookie), 'foo=bar', 'print(cookie)')
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Cookie.Request
 
     from http.cookies import SimpleCookie

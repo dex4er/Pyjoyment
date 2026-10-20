@@ -24,6 +24,7 @@ with subtest('Synopsis'):
         print(mem.slurp())
     is_ok(output.getvalue(), "b'foo bar baz'\n", 'output')
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Asset.Memory
 
     output = io.StringIO()

@@ -20,6 +20,7 @@ with subtest('Synopsis'):
     cwd = path().to_abs()
     is_ok(output.getvalue(), f'{cwd.child("templates", "layouts", "default.html.ep")}\n{cwd}\n', 'printed')
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Home
 
     output = io.StringIO()

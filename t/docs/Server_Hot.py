@@ -139,6 +139,7 @@ hot.run({myapp!r})
     ok(wait_for(lambda: listening(port) and pid(myapp)), 'listening')
     ok(stop(myapp, port), 'stopped')
 
+    # Or import the module, as in Google Python Style Guide
     code = """
 import Pyjo.Server.Hot
 

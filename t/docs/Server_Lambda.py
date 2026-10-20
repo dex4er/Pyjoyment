@@ -39,6 +39,7 @@ with subtest('Synopsis'):
     is_ok(response['body'], 'GET request for /foo!', 'body')
     is_ok(response['isBase64Encoded'], False, 'text')
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Server.Lambda
 
     server = Pyjo.Server.Lambda.new()

@@ -11,6 +11,7 @@ Pyjo.Reactor.Asyncio - Low-level event reactor on asyncio
         'First handle is writable' if writable else 'First handle is readable'
     ))
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Reactor.Asyncio
 
     # Watch if handle becomes readable or writable

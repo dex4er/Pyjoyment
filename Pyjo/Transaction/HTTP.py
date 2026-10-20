@@ -15,6 +15,7 @@ Pyjo.Transaction.HTTP - HTTP transaction
     print(tx.res.body)
     print(tx.remote_address)
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Transaction.HTTP
 
     # Client

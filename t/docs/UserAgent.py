@@ -83,6 +83,7 @@ with subtest('Synopsis'):
     like_ok(stdout.getvalue(), r'<title>Mojolicious</title>', 'print(res.body)')
     ua.close()
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.IOLoop
     import Pyjo.Promise
     import Pyjo.URL

@@ -9,6 +9,7 @@ Pyjo.Asset.Memory - In-memory storage for HTTP content
     mem.add_chunk(b'foo bar baz')
     print(mem.slurp())
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Asset.Memory
 
     mem = Pyjo.Asset.Memory.new()

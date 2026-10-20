@@ -17,6 +17,7 @@ Pyjo.UserAgent - Non-blocking I/O HTTP and WebSocket user agent
     else:
         print('Whatever...')
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.IOLoop
     import Pyjo.Promise
     import Pyjo.URL

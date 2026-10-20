@@ -8,6 +8,7 @@ Pyjoyment.Plugins - Plugin manager
     plugins = Plugins()
     plugins.namespaces.append('MyApp.Plugin')
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjoyment.Plugins
 
     plugins = Pyjoyment.Plugins.new()

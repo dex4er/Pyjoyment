@@ -18,6 +18,7 @@ Pyjo.UserAgent.CookieJar - Cookie jar for HTTP user agents
         )
     )
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Cookie.Response
     import Pyjo.URL
     import Pyjo.UserAgent.CookieJar

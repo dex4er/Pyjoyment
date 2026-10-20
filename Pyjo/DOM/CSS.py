@@ -9,6 +9,7 @@ Pyjo.DOM.CSS - CSS selector engine
     css = CSS(tree=tree)
     elements = css.select('h1, h2, h3')
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.DOM.CSS
 
     # Select elements from DOM tree

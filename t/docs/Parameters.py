@@ -8,6 +8,7 @@ with subtest('Synopsis'):
     params = Parameters('foo=bar&baz=23')
     is_ok(params.param('baz'), '23', "params.param('baz')")
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Parameters
 
     from urllib.parse import parse_qsl, urlencode

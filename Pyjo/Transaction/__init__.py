@@ -11,6 +11,7 @@ Pyjo.Transaction - Transaction base class
         def server_read(self, chunk): ...
         def server_write(self): ...
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Transaction
 
     class MyTransaction(Pyjo.Transaction.object):

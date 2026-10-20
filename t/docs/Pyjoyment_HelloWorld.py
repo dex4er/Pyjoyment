@@ -14,6 +14,7 @@ with subtest('Synopsis'):
     os.environ['PYJO_HARNESS_ACTIVE'] = '1'
     is_ok(hello.start(), True, 'started, without the list of the commands')
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjoyment.HelloWorld
 
     hello = Pyjoyment.HelloWorld.new()

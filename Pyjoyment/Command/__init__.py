@@ -23,6 +23,7 @@ Pyjoyment.Command - Command base class
 
     object = Pyjoyment_Command_mycommand
 
+    # Or import the module, as in Google Python Style Guide
     # Lowercase command name, in the module Pyjoyment.Command.mycommand
     import Pyjoyment.Command
 

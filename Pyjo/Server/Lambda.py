@@ -25,6 +25,7 @@ Pyjo.Server.Lambda - AWS Lambda server
 
     handler = server.to_lambda_app()
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.Server.Lambda
 
     server = Pyjo.Server.Lambda.new()

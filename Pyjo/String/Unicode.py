@@ -9,6 +9,7 @@ Pyjo.String.Unicode - String of characters
     string = Unicode('foo_bar_baz')
     print(string.camelize())
 
+    # Or import the module, as in Google Python Style Guide
     import Pyjo.String.Unicode
 
     # Manipulate string
