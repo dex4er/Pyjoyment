@@ -42,6 +42,9 @@ a free-threaded Python. A worker that does not stop when it is told to, as
 one in a blocking call, cannot be killed, as a process can, so the manager
 leaves it, and it ends with the process.
 
+The workers need no :func:`os.fork`, so the server runs on Windows too, where
+:mod:`Pyjo.Server.Prefork` does not.
+
 Manager signals
 ---------------
 
@@ -57,7 +60,8 @@ shuts it down immediately, a second ``TERM`` does nothing.
 QUIT
 ~~~~
 
-Shut down server immediately.
+Shut down server immediately. On Windows, which has no ``QUIT``, ``BREAK``
+does it, as of Ctrl-Break.
 
 HUP
 ~~~
@@ -77,6 +81,10 @@ Decrease worker pool by one.
 
 The manager does not handle ``CHLD``, so that the application gets the exit
 status of its child processes.
+
+Windows has no ``HUP``, ``TTIN`` and ``TTOU``, and a ``TERM`` from another
+process terminates the process there without its handler, so Ctrl-C and
+Ctrl-Break of the console are what shut the server down.
 
 Events
 ------
@@ -145,6 +153,9 @@ class Pyjo_Server_Prethread(Pyjo.Server.Prefork.object):
     # The seconds that a worker has to stop once it is told to stop immediately, before the manager leaves it
     _LEAVE = 1
 
+    # The workers are threads, which need no fork
+    _FORKS = False
+
     def __init__(self, *, pid_file: str | os.PathLike[str] | None = None, **kwargs: Any) -> None:
         """::
 
@@ -158,11 +169,31 @@ class Pyjo_Server_Prethread(Pyjo.Server.Prefork.object):
             **kwargs,
         )
         self._threads: dict[int, _Thread] = {}
+        self._pair: tuple[socket.socket, socket.socket] | None = None
+
+    # The heartbeats go through a socket pair in the place of a pipe, as select of Windows watches sockets only
+    def _pipe(self) -> tuple[int, int]:
+        reader, writer = self._pair = socket.socketpair()
+        return reader.fileno(), writer.fileno()
+
+    def _read_pipe(self, reader: int) -> bytes:
+        assert self._pair is not None
+        return self._pair[0].recv(4194304)
+
+    def _close_pipe(self, reader: int, writer: int) -> None:
+        if (pair := self._pair) is not None:
+            self._pair = None
+            pair[0].close()
+            pair[1].close()
+
+    def _send(self, data: bytes) -> None:
+        if (pair := self._pair) is None:
+            raise OSError('No pipe')
+        pair[1].sendall(data)
 
     def _heartbeat(self, finished: bool) -> None:
         try:
-            assert self._writer is not None
-            os.write(self._writer, f'{threading.get_native_id()}:{int(finished)}\n'.encode())
+            self._send(f'{threading.get_native_id()}:{int(finished)}\n'.encode())
         except Exception:
             Pyjo.IOLoop.singleton.stop()
 
@@ -188,8 +219,7 @@ class Pyjo_Server_Prethread(Pyjo.Server.Prefork.object):
         # The listen sockets of the manager, which the worker duplicates
         loop = self.ioloop
         listen = [
-            (location, loop.acceptor(id).handle.fileno())
-            for location, id in zip(self.listen, self.acceptors, strict=True)
+            (location, loop.acceptor(id).handle) for location, id in zip(self.listen, self.acceptors, strict=True)
         ]
         control, wakee = socket.socketpair()
         ended = threading.Event()
@@ -216,18 +246,22 @@ class Pyjo_Server_Prethread(Pyjo.Server.Prefork.object):
             self.emit('reap', id)._stopped(id)
 
     # The worker, a copy of the server in a thread, which runs the event loop of the thread until it stops
-    def _serve(self, listen: list[tuple[Any, int]], control: socket.socket, ended: threading.Event) -> None:
+    def _serve(
+        self, listen: list[tuple[Any, socket.socket | None]], control: socket.socket, ended: threading.Event
+    ) -> None:
         worker = copy.copy(self)
         loop = worker.ioloop = Pyjo.IOLoop.singleton
         worker.acceptors, worker._connections, worker._servers = [], {}, {}
         worker.cleanup, worker.silent = False, True
         try:
-            # The listen sockets of the manager, duplicated, as the worker closes them
+            # The listen sockets of the manager, duplicated, as the worker closes them, by the socket, as a socket of
+            # Windows is not a file descriptor that os.dup takes
             loop.max_accepts = self.accepts
             if max := worker.max_clients:
                 loop.max_connections = max
-            for location, fd in listen:
-                worker._listen(_location(location, os.dup(fd)))
+            for location, handle in listen:
+                assert handle is not None
+                worker._listen(_location(location, handle.dup().detach()))
 
             # Heartbeat messages
             finished = False
@@ -274,8 +308,7 @@ class Pyjo_Server_Prethread(Pyjo.Server.Prefork.object):
             # The manager is woken up, to reap the worker at once
             ended.set()
             try:
-                if (writer := self._writer) is not None:
-                    os.write(writer, b'\n')
+                self._send(b'\n')
             except OSError:
                 pass
 

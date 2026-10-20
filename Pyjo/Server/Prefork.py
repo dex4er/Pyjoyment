@@ -33,7 +33,8 @@ Note that the server uses signals for process management, so you should avoid
 modifying signal handlers in your applications.
 
 The workers are forks of the manager, made with :func:`os.fork`, so the
-server runs where :func:`os.fork` exists, not on Windows. Name resolution in
+server runs where :func:`os.fork` exists, not on Windows, where
+:mod:`Pyjo.Server.Prethread` has the workers in threads. Name resolution in
 a thread, SOCKS5 and TLS support can be disabled with the ``PYJO_NO_NNR``,
 ``PYJO_NO_SOCKS`` and ``PYJO_NO_TLS`` environment variables.
 
@@ -199,6 +200,9 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
     :mod:`Pyjo.Server.Prefork` inherits all methods from
     :mod:`Pyjo.Server.Daemon` and implements the following new ones.
     """
+
+    # Not in Mojolicious: the workers are forks of the manager, which Pyjo.Server.Prethread changes
+    _FORKS = True
 
     # Not in Mojolicious: the signals of the manager, as a class attribute, which Pyjo.Server.Prethread changes; Windows
     # has INT, TERM and BREAK of Ctrl-Break, which takes the place of QUIT
@@ -411,13 +415,13 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
         Run server and wait for the manager signals.
         """
         # Unlike Mojolicious: no fork at all, where Mojo has no fork emulation of Perl on Windows
-        if not hasattr(os, 'fork'):
+        if self._FORKS and not hasattr(os, 'fork'):
             print('Pre-forking needs os.fork.')
             sys.exit(0)
 
         # Pipe for worker communication
         try:
-            reader, writer = self._reader, self._writer = os.pipe()
+            reader, writer = self._reader, self._writer = self._pipe()
         except OSError as e:
             raise OSError(e.errno, f"Can't create pipe: {e.strerror}") from e
 
@@ -449,20 +453,35 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
             signal.set_wakeup_fd(wakeup)
 
             # Not in Mojolicious: the signals are blocked while the handlers are set back, so that a signal that comes
-            # in between is not left to a handler that is gone, which Python reports as a race condition
-            signal.pthread_sigmask(signal.SIG_BLOCK, handlers)
-            try:
+            # in between is not left to a handler that is gone, which Python reports as a race condition; Windows
+            # blocks no signal
+            if sys.platform == 'win32':
                 for name, handler in handlers.items():
                     signal.signal(name, handler)
-            finally:
-                signal.pthread_sigmask(signal.SIG_UNBLOCK, handlers)
+            else:
+                signal.pthread_sigmask(signal.SIG_BLOCK, handlers)
+                try:
+                    for name, handler in handlers.items():
+                        signal.signal(name, handler)
+                finally:
+                    signal.pthread_sigmask(signal.SIG_UNBLOCK, handlers)
 
             # Not in Mojolicious: the pipe is closed at the end, as Perl closes it with the object
-            os.close(reader)
-            os.close(writer)
+            self._close_pipe(reader, writer)
             waker.close()
             self._wakee.close()
             self._reader = self._writer = self._wakee = None
+
+    # Not in Mojolicious: the pipe of the heartbeats in methods of their own, which Pyjo.Server.Prethread changes
+    def _pipe(self) -> tuple[int, int]:
+        return os.pipe()
+
+    def _read_pipe(self, reader: int) -> bytes:
+        return os.read(reader, 4194304)
+
+    def _close_pipe(self, reader: int, writer: int) -> None:
+        os.close(reader)
+        os.close(writer)
 
     # DESTROY: the process id file is deleted with the object, after the listen sockets of the daemon are closed
     def _cleanup(self) -> None:
@@ -540,7 +559,7 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
     def _signal(self) -> None:
         while len(self._signals):
             signum = self._signals.pop(0)
-            if signum == signal.SIGCHLD:
+            if sys.platform != 'win32' and signum == signal.SIGCHLD:
                 while True:
                     try:
                         pid, _ = os.waitpid(-1, os.WNOHANG)
@@ -557,9 +576,12 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
                     self._term(True)
                 elif signum == signal.SIGINT:
                     self._term()
-            elif signum == signal.SIGQUIT:
+            elif signum == _QUIT:
                 self._term()
-            # Not in Mojolicious: HUP restarts the workers gracefully, as gunicorn does, unless something else reloads
+            # Not in Mojolicious: HUP restarts the workers gracefully, as gunicorn does, unless something else reloads;
+            # Windows has no HUP, TTIN and TTOU
+            elif sys.platform == 'win32':
+                continue
             elif signum == signal.SIGHUP:
                 self._reload()
             elif signum == signal.SIGTTIN:
@@ -634,7 +656,7 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
         if reader not in readable:
             return
         try:
-            chunk = os.read(reader, 4194304)
+            chunk = self._read_pipe(reader)
         except OSError:
             return
         if not chunk:
@@ -737,9 +759,11 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
         _exit(code)
 
 
-# Not in Mojolicious: the signals that the workers handle, which the manager blocks while it forks, with BREAK in the
-# place of QUIT on Windows
-_WORKER = {signal.SIGTERM, signal.SIGBREAK if sys.platform == 'win32' else signal.SIGQUIT}
+# Not in Mojolicious: Windows has no QUIT, of Ctrl-\ in a terminal, and BREAK of Ctrl-Break takes its place in a console
+_QUIT = signal.SIGBREAK if sys.platform == 'win32' else signal.SIGQUIT
+
+# Not in Mojolicious: the signals that the workers handle, which the manager blocks while it forks
+_WORKER = {signal.SIGTERM, _QUIT}
 
 
 # Not in Mojolicious: os._exit, as the worker leaves what the manager does at its end, with the buffers of the standard
