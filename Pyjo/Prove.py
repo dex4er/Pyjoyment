@@ -65,6 +65,7 @@ Options
 
 ``--exec CMD``
     Command that runs a test script, the current Python interpreter by default.
+    A script whose command cannot start fails with the reason.
 
 ``--timeout SECONDS``
     The most time a test script may run, no limit by default. A test script
@@ -311,15 +312,20 @@ async def run_script(
         result.errors.append(f'Invalid script metadata: {e}')
         return result
 
-    # The script leads a process group of its own, so that the processes it starts are killed with it
-    process = await asyncio.create_subprocess_exec(
-        *command,
-        path,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE if capture_stderr else None,
-        env=env,
-        process_group=0 if hasattr(os, 'killpg') else None,
-    )
+    # The script leads a process group of its own, so that the processes it starts are killed with it; a command that
+    # cannot start fails the script with the reason, and the run goes on
+    try:
+        process = await asyncio.create_subprocess_exec(
+            *command,
+            path,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE if capture_stderr else None,
+            env=env,
+            process_group=0 if hasattr(os, 'killpg') else None,
+        )
+    except OSError as e:
+        result.errors.append(f"Can't run {command[0]}: {e.strerror or e}")
+        return result
     job = _job(process.pid)
     assert process.stdout is not None
     if progress is not None:
