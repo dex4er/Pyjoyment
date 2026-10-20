@@ -3,6 +3,11 @@ Pyjo.Server.Hot - Production web server with hot deployment
 ============================================================
 ::
 
+    from Pyjo.Server.Hot import Hot
+
+    hot = Hot()
+    hot.run('/home/sri/myapp.py')
+
     import Pyjo.Server.Hot
 
     hot = Pyjo.Server.Hot.new()

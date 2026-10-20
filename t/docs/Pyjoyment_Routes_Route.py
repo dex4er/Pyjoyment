@@ -16,6 +16,11 @@ def match(r, path, method='GET', websocket=False):
 
 
 with subtest('Synopsis'):
+    from Pyjoyment.Routes.Route import Route
+
+    r = Route()
+    isa_ok(r, Route, 'route')
+
     import Pyjoyment.Routes.Route
 
     r = Pyjoyment.Routes.Route.new()

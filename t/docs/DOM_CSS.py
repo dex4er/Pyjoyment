@@ -2,12 +2,20 @@ from Pyjo.Test import *
 
 
 with subtest('Synopsis'):
-    import Pyjo.DOM.CSS
     import Pyjo.DOM.HTML
+
+    from Pyjo.DOM.CSS import CSS
 
     tree = (
         Pyjo.DOM.HTML.new().parse('<html><head><title>Test</title></head><body><h1>A</h1><h2>B</h2></body></html>').tree
     )
+
+    # Select elements from DOM tree
+    css = CSS(tree=tree)
+    elements = css.select('h1, h2, h3')
+    is_deeply_ok([e[1] for e in elements], ['h1', 'h2'], 'elements')
+
+    import Pyjo.DOM.CSS
 
     # Select elements from DOM tree
     css = Pyjo.DOM.CSS.new(tree=tree)

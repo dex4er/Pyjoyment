@@ -5,6 +5,20 @@ from Pyjo.Test import *
 
 
 with subtest('Synopsis'):
+    from Pyjo.Server import Server
+
+    class Pyjo_Server_MyServer(Server):
+        def run(self):
+            # Get a transaction
+            tx = self.build_tx()
+
+            # Emit "request" event
+            self.emit('request', tx)
+
+    server = Pyjo_Server_MyServer()
+    server.run()
+    ok(isinstance(server.app, Pyjo.HelloWorld.object), 'run')
+
     import Pyjo.Server
 
     class Pyjo_Server_MyServer(Pyjo.Server.object):

@@ -3,6 +3,28 @@ Pyjo.Server.WSGI - WSGI server
 ==============================
 ::
 
+    from Pyjo.Server.WSGI import WSGI
+
+    wsgi = WSGI()
+
+
+    @wsgi.unsubscribe('request').on('request')
+    def request(wsgi, tx):
+        # Request
+        method = tx.req.method
+        path = tx.req.url.path
+
+        # Response
+        tx.res.code = 200
+        tx.res.headers.content_type = 'text/plain'
+        tx.res.body = f'{method} request for {path}!'.encode()
+
+        # Resume transaction
+        tx.resume()
+
+
+    app = wsgi.to_wsgi_app()
+
     import Pyjo.Server.WSGI
 
     wsgi = Pyjo.Server.WSGI.new()

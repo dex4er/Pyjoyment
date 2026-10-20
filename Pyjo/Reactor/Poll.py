@@ -3,6 +3,14 @@ Pyjo.Reactor.Poll - Low-level event reactor with poll support
 =============================================================
 ::
 
+    from Pyjo.Reactor.Poll import Poll
+
+    # Watch if handle becomes readable or writable
+    reactor = Poll()
+    reactor.io(first, lambda reactor, writable: print(
+        'First handle is writable' if writable else 'First handle is readable'
+    ))
+
     import Pyjo.Reactor.Poll
 
     # Watch if handle becomes readable or writable

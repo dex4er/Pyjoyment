@@ -9,6 +9,23 @@ import tempfile
 with subtest('Synopsis'):
     output = io.StringIO()
     with contextlib.redirect_stdout(output):
+        from Pyjo.Template import Template
+
+        # Use Python modules
+        mt = Template()
+        print(
+            mt.render("""
+% import time
+<div>
+  % now = time.gmtime(0)
+  Time: <%= time.strftime('%H:%M:%S', now) %>
+</div>
+""")
+        )
+    is_ok(output.getvalue(), '\n<div>\n  Time: 00:00:00\n</div>\n\n', 'output')
+
+    output = io.StringIO()
+    with contextlib.redirect_stdout(output):
         import Pyjo.Template
 
         # Use Python modules

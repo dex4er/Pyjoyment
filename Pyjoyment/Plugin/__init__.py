@@ -4,6 +4,16 @@ Pyjoyment.Plugin - Plugin base class
 ::
 
     # CamelCase plugin name
+    from Pyjoyment.Plugin import Plugin
+
+    class Pyjoyment_Plugin_MyPlugin(Plugin):
+        def register(self, app, conf):
+            # Magic here! :)
+            ...
+
+    object = Pyjoyment_Plugin_MyPlugin
+
+    # CamelCase plugin name
     import Pyjoyment.Plugin
 
     class Pyjoyment_Plugin_MyPlugin(Pyjoyment.Plugin.object):

@@ -39,6 +39,21 @@ port = server.server_address[1]
 with subtest('Synopsis'):
 
     def parse():
+        from Pyjo.Message.Request import Request
+
+        # Parse
+        req = Request()
+        req.parse(b'GET /foo HTTP/1.0\x0d\x0a')
+        req.parse(b'Content-Length: 12\x0d\x0a')
+        req.parse(b'Content-Type: text/plain\x0d\x0a\x0d\x0a')
+        req.parse(b'Hello World!')
+        print(req.method)
+        print(req.headers.content_type)
+        print(req.body)
+
+    is_ok(output(parse), "GET\ntext/plain\nb'Hello World!'\n", 'parse')
+
+    def parse():
         import Pyjo.Message.Request
 
         # Parse

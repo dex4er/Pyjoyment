@@ -12,6 +12,52 @@ import sys
 
 
 with subtest('Synopsis'):
+    # The module of the example in the Python form, in a temporary directory of its own
+    tmp = Pyjo.File.tempdir()
+    tmp.child('mycommand.py').spew(b'''\
+"""
+Pyjoyment.Command.mycommand - My command
+========================================
+::
+
+    Usage: APPLICATION mycommand [OPTIONS]
+
+    Options:
+      -s, --something   Does something
+"""
+
+from Pyjoyment.Command import Command
+
+from Pyjo.Util import extract_usage
+
+
+class Pyjoyment_Command_mycommand(Command):
+    # Short description
+    description = 'My first Pyjoyment command'
+
+    # Usage message from the synopsis of the docstring of the module
+    usage = extract_usage()
+
+    def run(self, *args):
+        # Magic here! :)
+        return 'magic'
+
+
+object = Pyjoyment_Command_mycommand
+''')
+    sys.path.insert(0, tmp.to_str())
+    try:
+        import mycommand  # pyright: ignore[reportMissingImports]
+    finally:
+        sys.path.remove(tmp.to_str())
+    command = mycommand.object()
+    isa_ok(command, Pyjoyment.Command.Command, 'command')
+    is_ok(command.description, 'My first Pyjoyment command', 'description')
+    like_ok(command.usage, r'^Usage: APPLICATION mycommand \[OPTIONS\]\n\nOptions:\n  -s, --something', 'usage')
+    is_ok(command.run(), 'magic', 'run')
+    # The example in the form of Mojolicious is imported again from its own directory
+    del sys.modules['mycommand']
+
     # The module of the example, in a temporary directory, as a test writes nothing into t
     tmp = Pyjo.File.tempdir()
     tmp.child('mycommand.py').spew(b'''\

@@ -58,6 +58,42 @@ with subtest('Synopsis'):
     port, process = server(
         lambda port: (
             f"""
+from Pyjo.Server.Prefork import Prefork
+
+prefork = Prefork(listen=['http://*:{port}'])
+prefork.pid_file = {str(pid_file)!r}
+prefork.workers = 2
+
+
+@prefork.unsubscribe('request').on('request')
+def request(prefork, tx):
+    # Request
+    method = tx.req.method
+    path = tx.req.url.path
+
+    # Response
+    tx.res.code = 200
+    tx.res.headers.content_type = 'text/plain'
+    tx.res.body = f'{{method}} request for {{path}}!'.encode()
+
+    # Resume transaction
+    tx.resume()
+
+
+prefork.run()
+"""
+        )
+    )
+    is_ok(get(port, '/foo'), b'GET request for /foo!', 'served by a worker')
+    process.send_signal(signal.SIGTERM)
+    is_ok(process.wait(30), 0, 'stopped gracefully')
+    like_ok(process.stdout.read(), rf'Web application available at http://127.0.0.1:{port}', 'listening')
+    process.stdout.close()
+
+    pid_file = tempdir().child('prefork.pid')
+    port, process = server(
+        lambda port: (
+            f"""
 import Pyjo.Server.Prefork
 
 prefork = Pyjo.Server.Prefork.new(listen=['http://*:{port}'])

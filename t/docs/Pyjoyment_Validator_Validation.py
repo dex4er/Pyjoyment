@@ -5,6 +5,16 @@ import re
 
 with subtest('Synopsis'):
     import Pyjoyment.Validator
+
+    from Pyjoyment.Validator.Validation import Validation
+
+    validator = Pyjoyment.Validator.new()
+    v = Validation(validator=validator)
+    v.input = {'foo': 'bar'}
+    v.required('foo').one_of('bar', 'baz')
+    is_ok(v.param('foo'), 'bar', 'validated')
+
+    import Pyjoyment.Validator
     import Pyjoyment.Validator.Validation
 
     validator = Pyjoyment.Validator.new()

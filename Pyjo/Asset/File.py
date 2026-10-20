@@ -3,6 +3,15 @@ Pyjo.Asset.File - File storage for HTTP content
 ===============================================
 ::
 
+    from Pyjo.Asset.File import File
+
+    # Temporary file
+    file = File()
+    file.add_chunk(b'foo bar baz')
+    if file.contains(b'bar') >= 0:
+        print('File contains "bar"')
+    print(file.slurp())
+
     import Pyjo.Asset.File
 
     # Temporary file

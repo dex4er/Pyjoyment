@@ -4,6 +4,21 @@ Pyjo.UserAgent.CookieJar - Cookie jar for HTTP user agents
 ::
 
     import Pyjo.Cookie.Response
+
+    from Pyjo.UserAgent.CookieJar import CookieJar
+
+    # Add response cookies
+    jar = CookieJar()
+    jar.add(
+        Pyjo.Cookie.Response.new(
+            name='foo',
+            value='bar',
+            domain='localhost',
+            path='/test',
+        )
+    )
+
+    import Pyjo.Cookie.Response
     import Pyjo.URL
     import Pyjo.UserAgent.CookieJar
 

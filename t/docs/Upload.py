@@ -18,6 +18,18 @@ def documented(path):
 
 
 with subtest('Synopsis'):
+    from Pyjo.Upload import Upload
+
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        upload = Upload()
+        # An upload has its asset and its filename once it has been parsed
+        upload.set(asset=Pyjo.Asset.Memory.new().add_chunk(b'foo'), filename='foo.txt')
+        print(upload.filename)
+        upload.move_to(documented('/home/sri/foo.txt'))
+    is_ok(out.getvalue(), 'foo.txt\n', 'output')
+    is_ok(dir.child('home', 'sri', 'foo.txt').slurp(), b'foo', 'moved')
+
     import Pyjo.Upload
 
     out = io.StringIO()

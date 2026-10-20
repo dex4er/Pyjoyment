@@ -4,6 +4,19 @@ Pyjoyment.Controller - Controller base class
 ::
 
     # Controller
+    from Pyjoyment.Controller import Controller
+
+    class MyApp_Controller_Foo(Controller):
+
+        # Action
+        def bar(self):
+            name = self.param('name')
+            self.res.headers.cache_control = 'max-age=1, no-cache'
+            self.render(json={'hello': name})
+
+    object = MyApp_Controller_Foo
+
+    # Controller
     import Pyjoyment.Controller
 
     class MyApp_Controller_Foo(Pyjoyment.Controller.object):

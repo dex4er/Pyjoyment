@@ -15,6 +15,15 @@ def documented(path):
 
 
 with subtest('Synopsis'):
+    from Pyjo.Asset.Memory import Memory
+
+    output = io.StringIO()
+    with contextlib.redirect_stdout(output):
+        mem = Memory()
+        mem.add_chunk(b'foo bar baz')
+        print(mem.slurp())
+    is_ok(output.getvalue(), "b'foo bar baz'\n", 'output')
+
     import Pyjo.Asset.Memory
 
     output = io.StringIO()

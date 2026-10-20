@@ -8,6 +8,26 @@ import sys
 
 
 with subtest('Synopsis'):
+    from Pyjo.EventEmitter import EventEmitter
+
+    class Cat(EventEmitter):
+        # Emit events
+        def poke(self):
+            self.emit('roar', 3)
+
+    # Subscribe to events
+    tiger = Cat()
+
+    @tiger.on('roar')
+    def roar(tiger, times):
+        for _ in range(times):
+            print('RAWR!')
+
+    output = io.StringIO()
+    with contextlib.redirect_stdout(output):
+        tiger.poke()
+    is_ok(output.getvalue(), 'RAWR!\nRAWR!\nRAWR!\n', 'roars three times')
+
     import Pyjo.EventEmitter
 
     class Cat(Pyjo.EventEmitter.object):
@@ -18,8 +38,9 @@ with subtest('Synopsis'):
     # Subscribe to events
     tiger = Cat.new()
 
+    # F811 "Redefinition of unused `roar`": the synopsis defines it in both forms
     @tiger.on('roar')
-    def roar(tiger, times):
+    def roar(tiger, times):  # noqa: F811
         for _ in range(times):
             print('RAWR!')
 

@@ -3,6 +3,13 @@ Pyjo.JSON.Pointer - JSON Pointers
 =================================
 ::
 
+    from Pyjo.JSON.Pointer import Pointer
+
+    pointer = Pointer({'foo': [23, 'bar']})
+    print(pointer.get('/foo/1'))
+    if pointer.contains('/foo'):
+        print('Contains "/foo".')
+
     import Pyjo.JSON.Pointer
 
     pointer = Pyjo.JSON.Pointer.new({'foo': [23, 'bar']})

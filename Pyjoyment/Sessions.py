@@ -3,6 +3,12 @@ Pyjoyment.Sessions - Session manager based on signed cookies
 ============================================================
 ::
 
+    from Pyjoyment.Sessions import Sessions
+
+    sessions = Sessions()
+    sessions.cookie_name = 'myapp'
+    sessions.default_expiration = 86400
+
     import Pyjoyment.Sessions
 
     sessions = Pyjoyment.Sessions.new()

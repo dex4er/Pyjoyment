@@ -3,6 +3,15 @@ Pyjo.Headers - HTTP headers
 ===========================
 ::
 
+    from Pyjo.Headers import Headers
+
+    # Parse
+    headers = Headers()
+    headers.parse('Content-Length: 42\x0d\x0a')
+    headers.parse('Content-Type: text/html\x0d\x0a\x0d\x0a')
+    print(headers.content_length)
+    print(headers.content_type)
+
     import Pyjo.Headers
 
     # Parse

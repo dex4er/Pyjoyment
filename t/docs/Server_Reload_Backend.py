@@ -6,6 +6,17 @@ from unittest.mock import patch
 
 
 with subtest('Synopsis'):
+    from Pyjo.Server.Reload.Backend import Backend
+
+    class Pyjo_Server_Reload_Backend_Inotify(Backend):
+        def modified_files(self):
+            return ['changed.py']
+
+    new = Pyjo_Server_Reload_Backend_Inotify.new
+    object = Pyjo_Server_Reload_Backend_Inotify
+
+    is_deeply_ok(new().modified_files(), ['changed.py'], 'backend of its own')
+
     import Pyjo.Server.Reload.Backend
 
     class Pyjo_Server_Reload_Backend_Inotify(Pyjo.Server.Reload.Backend.object):

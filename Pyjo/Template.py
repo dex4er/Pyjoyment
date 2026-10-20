@@ -3,6 +3,18 @@ Pyjo.Template - Python-ish templates
 ====================================
 ::
 
+    from Pyjo.Template import Template
+
+    # Use Python modules
+    mt = Template()
+    print(mt.render('''
+    % import time
+    <div>
+      % now = time.gmtime(0)
+      Time: <%= time.strftime('%H:%M:%S', now) %>
+    </div>
+    '''))
+
     import Pyjo.Template
 
     # Use Python modules

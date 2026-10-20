@@ -3,6 +3,12 @@ Pyjo.Server.Reload.Backend.Poll - Auto-restarting development server backend usi
 =======================================================================================
 ::
 
+    from Pyjo.Server.Reload.Backend.Poll import Poll
+
+    backend = Poll()
+    if files := backend.modified_files():
+        print('Files have been changed')
+
     import Pyjo.Server.Reload.Backend.Poll
 
     backend = Pyjo.Server.Reload.Backend.Poll.new()

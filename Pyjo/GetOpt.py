@@ -3,6 +3,18 @@ Pyjo.GetOpt - Command line options
 ==================================
 ::
 
+    from Pyjo.GetOpt import GetOpt
+
+    getopt = GetOpt()
+
+    # The value goes to the result
+    getopt.option('m|mode=s')
+
+    opts = getopt.parse(['-m', 'production', 'myapp.py'])
+    if not opts:
+        raise SystemExit('Usage: ...')
+    print(opts.mode)
+
     import Pyjo.GetOpt
 
     getopt = Pyjo.GetOpt.new()

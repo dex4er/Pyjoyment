@@ -9,6 +9,13 @@ import tempfile
 
 
 with subtest('Synopsis'):
+    from Pyjoyment.Renderer import Renderer
+
+    renderer = Renderer()
+    renderer.classes.append('MyApp.Controller.Foo')
+    renderer.paths.append('/home/sri/templates')
+    is_deeply_ok(renderer.classes, ['__main__', 'MyApp.Controller.Foo'], 'classes')
+
     import Pyjoyment.Renderer
 
     renderer = Pyjoyment.Renderer.new()

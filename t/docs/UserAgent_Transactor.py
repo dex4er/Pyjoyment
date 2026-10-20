@@ -7,6 +7,16 @@ from contextlib import redirect_stdout
 
 
 with subtest('Synopsis'):
+    from Pyjo.UserAgent.Transactor import Transactor
+
+    # GET request with Accept header
+    t = Transactor()
+    like_ok(
+        t.tx('GET', 'http://example.com', {'Accept': '*/*'}).req.to_bytes(),
+        rb'^GET / HTTP/1\.1\r\nAccept: \*/\*\r\n',
+        'print(...)',
+    )
+
     import Pyjo.UserAgent.Transactor
 
     # GET request with Accept header

@@ -9,6 +9,14 @@ import os
 
 
 with subtest('Synopsis'):
+    from Pyjoyment.Static import Static
+
+    static = Static()
+    static.classes.append('MyApp.Controller.Foo')
+    static.paths.append('/home/sri/public')
+    is_deeply_ok(static.classes, ['__main__', 'MyApp.Controller.Foo'], 'classes')
+    is_deeply_ok(static.paths, ['/home/sri/public'], 'paths')
+
     import Pyjoyment.Static
 
     static = Pyjoyment.Static.new()

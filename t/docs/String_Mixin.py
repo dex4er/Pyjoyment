@@ -5,6 +5,22 @@ import math
 
 with subtest('Synopsis'):
     import Pyjo.Base
+
+    from Pyjo.String.Mixin import Mixin
+
+    class SubClass(Pyjo.Base.object, Mixin):
+        def to_bytes(self):
+            return b'value'
+
+        def to_str(self):
+            return 'value'
+
+    # Use it as a string
+    obj = SubClass()
+    is_ok(f'{obj:>10}', '     value', "f'{obj:>10}'")
+    is_ok(obj + '!', 'value!', "obj + '!'")
+
+    import Pyjo.Base
     import Pyjo.String.Mixin
 
     class SubClass(Pyjo.Base.object, Pyjo.String.Mixin.object):

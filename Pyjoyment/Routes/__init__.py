@@ -3,6 +3,12 @@ Pyjoyment.Routes - Always find your destination with routes
 ===========================================================
 ::
 
+    from Pyjoyment.Routes import Routes
+
+    # Simple route
+    r = Routes()
+    r.any('/').to(controller='blog', action='welcome')
+
     import Pyjoyment.Routes
 
     # Simple route

@@ -3,6 +3,12 @@ Pyjo.UserAgent.Proxy - User agent proxy manager
 ===============================================
 ::
 
+    from Pyjo.UserAgent.Proxy import Proxy
+
+    proxy = Proxy()
+    proxy.detect()
+    print(proxy.http)
+
     import Pyjo.UserAgent.Proxy
 
     proxy = Pyjo.UserAgent.Proxy.new()

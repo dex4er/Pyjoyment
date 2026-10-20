@@ -3,6 +3,16 @@ Pyjo.DOM - Minimalistic HTML/XML DOM parser with CSS selectors
 ==============================================================
 ::
 
+    from Pyjo.DOM import DOM
+
+    # Parse
+    dom = DOM('<div><p id="a">Test</p><p id="b">123</p></div>')
+
+    # Find
+    print(dom.at('#b').text)
+    print(dom.find('p').map('text').join("\n"))
+    print(dom.find('[id]').map('attr', 'id').join("\n"))
+
     import Pyjo.DOM
 
     # Parse

@@ -3,6 +3,11 @@ Pyjo.HelloWorld - Hello World!
 ==============================
 ::
 
+    from Pyjo.HelloWorld import HelloWorld
+
+    hello = HelloWorld()
+    hello.start()
+
     import Pyjo.HelloWorld
 
     hello = Pyjo.HelloWorld.new()

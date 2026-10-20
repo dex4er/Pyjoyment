@@ -3,6 +3,14 @@ Pyjo.IOLoop.Stream - Non-blocking I/O stream
 ============================================
 ::
 
+    from Pyjo.IOLoop.Stream import Stream
+
+    # Create stream
+    stream = Stream(handle)
+    stream.on('read', lambda stream, chunk: ...)
+    stream.on('close', lambda stream: ...)
+    stream.on('error', lambda stream, err: ...)
+
     import Pyjo.IOLoop.Stream
 
     # Create stream

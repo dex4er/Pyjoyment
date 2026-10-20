@@ -2,6 +2,12 @@ from Pyjo.Test import *
 
 
 with subtest('Synopsis'):
+    from Pyjo.Parameters import Parameters
+
+    # Parse
+    params = Parameters('foo=bar&baz=23')
+    is_ok(params.param('baz'), '23', "params.param('baz')")
+
     import Pyjo.Parameters
 
     from urllib.parse import parse_qsl, urlencode

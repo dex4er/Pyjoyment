@@ -29,6 +29,20 @@ def frames(data):
 
 with subtest('Synopsis'):
 
+    def synopsis_python():
+        from Pyjo.Transaction.WebSocket import WebSocket
+
+        # Send and receive WebSocket messages
+        ws = WebSocket()
+        ws.send('Hello World!')
+        ws.on('message', lambda ws, msg: print(f'Message: {msg}'))
+        ws.on('finish', lambda ws, code, reason: print(f'WebSocket closed with status {code}.'))
+
+        ws.server_read(build_frame(0, 1, 0, 0, 0, WS_TEXT, b'Hi'))
+        ws.closed()
+
+    is_ok(output(synopsis_python), 'Message: Hi\nWebSocket closed with status 1006.\n', 'messages')
+
     def synopsis():
         import Pyjo.Transaction.WebSocket
 

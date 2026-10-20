@@ -3,6 +3,13 @@ Pyjo.Collection - Collection
 ============================
 ::
 
+    from Pyjo.Collection import Collection
+
+    # Manipulate collection
+    collection = Collection(['just', 'works'])
+    collection.insert(0, 'it')
+    print(collection.join("\n"))
+
     import Pyjo.Collection
 
     # Manipulate collection

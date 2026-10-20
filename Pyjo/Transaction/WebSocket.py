@@ -3,6 +3,14 @@ Pyjo.Transaction.WebSocket - WebSocket transaction
 ==================================================
 ::
 
+    from Pyjo.Transaction.WebSocket import WebSocket
+
+    # Send and receive WebSocket messages
+    ws = WebSocket()
+    ws.send('Hello World!')
+    ws.on('message', lambda ws, msg: print(f'Message: {msg}'))
+    ws.on('finish', lambda ws, code, reason: print(f'WebSocket closed with status {code}.'))
+
     import Pyjo.Transaction.WebSocket
 
     # Send and receive WebSocket messages

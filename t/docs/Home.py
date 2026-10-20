@@ -8,6 +8,18 @@ import sys
 
 
 with subtest('Synopsis'):
+    from Pyjo.Home import Home
+
+    output = io.StringIO()
+    with contextlib.redirect_stdout(output):
+        # Find and manage the project root directory
+        home = Home()
+        home.detect()
+        print(home.child('templates', 'layouts', 'default.html.ep'))
+        print(f'{home}')
+    cwd = path().to_abs()
+    is_ok(output.getvalue(), f'{cwd.child("templates", "layouts", "default.html.ep")}\n{cwd}\n', 'printed')
+
     import Pyjo.Home
 
     output = io.StringIO()

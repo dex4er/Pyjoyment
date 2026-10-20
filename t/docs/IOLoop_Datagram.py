@@ -23,6 +23,23 @@ free_port = ServerStart.port
 port = free_port()
 
 with subtest('Synopsis'):
+    from Pyjo.IOLoop.Datagram import Datagram
+
+    # Echo server
+    server = Datagram()
+    server.on('message', lambda server, data, peer: server.send(b'Echo: ' + data, peer))
+    server.bind(address='127.0.0.1', port=port)
+
+    got = []
+    client = Datagram()
+    client.on('message', lambda client, data, peer: got.append(data) or client.reactor.stop())
+    client.send(b'Hello!', ('127.0.0.1', port))
+    if not client.reactor.is_running:
+        client.reactor.start()
+    is_deeply_ok(got, [b'Echo: Hello!'], 'echo')
+    client.close()
+    server.close()
+
     import Pyjo.IOLoop.Datagram
 
     stdout = io.StringIO()

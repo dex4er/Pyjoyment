@@ -3,6 +3,26 @@ Pyjo.Promise - Promises/A+
 ==========================
 ::
 
+    import Pyjo.UserAgent
+
+    from Pyjo.Promise import Promise
+
+    # Wrap continuation-passing style APIs with promises
+    ua = Pyjo.UserAgent.new()
+
+    def get_p(url):
+        promise = Promise()
+
+        def cb(ua, tx):
+            err = tx.error
+            if not err or err.get('code'):
+                promise.resolve(tx)
+            else:
+                promise.reject(err['message'])
+
+        ua.get(url, cb)
+        return promise
+
     import Pyjo.Promise
     import Pyjo.UserAgent
 
@@ -826,6 +846,7 @@ def _values(values: tuple[Any, ...]) -> Any:
 
 new = Pyjo_Promise.new
 object = Pyjo_Promise
+Promise = Pyjo_Promise
 
 all = Pyjo_Promise.all
 all_settled = Pyjo_Promise.all_settled
@@ -836,4 +857,3 @@ reject = Pyjo_Promise.reject
 resolve = Pyjo_Promise.resolve
 timer = Pyjo_Promise.timer
 timeout = Pyjo_Promise.timeout
-Promise = Pyjo_Promise

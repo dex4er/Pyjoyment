@@ -3,6 +3,11 @@ Pyjo.UserAgent.Server - Application server
 ==========================================
 ::
 
+    from Pyjo.UserAgent.Server import Server
+
+    server = Server()
+    print(server.url())
+
     import Pyjo.UserAgent.Server
 
     server = Pyjo.UserAgent.Server.new()

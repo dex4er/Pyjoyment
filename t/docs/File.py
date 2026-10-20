@@ -29,6 +29,23 @@ home.mkdir(parents=True)
 (home / 'test').write_text('test\n', newline='\n')
 
 with subtest('Synopsis'):
+    from Pyjo.File import File
+
+    output = io.StringIO()
+    with contextlib.redirect_stdout(output):
+        # Portably deal with file system paths
+        path = File(str(home / '.vimrc'))
+        print(path.slurp())
+        print(path.dirname())
+        print(path.basename())
+        print(path.extname)
+        print(path.sibling('.bashrc'))
+    is_ok(
+        output.getvalue(),
+        f"b'set nocompatible\\n'\n{home}\n.vimrc\n\n{home / '.bashrc'}\n",
+        'output',
+    )
+
     import Pyjo.File
 
     output = io.StringIO()

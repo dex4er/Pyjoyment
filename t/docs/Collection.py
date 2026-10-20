@@ -6,6 +6,16 @@ import re
 
 
 with subtest('Synopsis'):
+    from Pyjo.Collection import Collection
+
+    output = io.StringIO()
+    with contextlib.redirect_stdout(output):
+        # Manipulate collection
+        collection = Collection(['just', 'works'])
+        collection.insert(0, 'it')
+        print(collection.join('\n'))
+    is_ok(output.getvalue(), 'it\njust\nworks\n', 'join')
+
     import Pyjo.Collection
 
     output = io.StringIO()

@@ -3,6 +3,11 @@ Pyjoyment.Plugins - Plugin manager
 ==================================
 ::
 
+    from Pyjoyment.Plugins import Plugins
+
+    plugins = Plugins()
+    plugins.namespaces.append('MyApp.Plugin')
+
     import Pyjoyment.Plugins
 
     plugins = Pyjoyment.Plugins.new()

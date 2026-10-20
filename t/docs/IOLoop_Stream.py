@@ -10,6 +10,24 @@ os.environ.pop('PYJO_REACTOR', None)
 handle, peer = socket.socketpair()
 
 with subtest('Synopsis'):
+    from Pyjo.IOLoop.Stream import Stream
+
+    got = []
+
+    # Create stream
+    stream = Stream(handle)
+    stream.on('read', lambda stream, chunk: ...)
+    stream.on('close', lambda stream: ...)
+    stream.on('error', lambda stream, err: ...)
+    stream.on('read', lambda stream, chunk: got.append(chunk) or stream.reactor.stop())
+
+    stream.start()
+    peer.sendall(b'data')
+    if not stream.reactor.is_running:
+        stream.reactor.start()
+    is_deeply_ok(got, [b'data'], 'read')
+    stream.steal_handle()
+
     import Pyjo.IOLoop.Stream
 
     got = []

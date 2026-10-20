@@ -3,6 +3,11 @@ Pyjoyment.Routes.Pattern - Route pattern
 ========================================
 ::
 
+    from Pyjoyment.Routes.Pattern import Pattern
+
+    # Create pattern
+    pattern = Pattern('/test/:name')
+
     import Pyjoyment.Routes.Pattern
 
     # Create pattern

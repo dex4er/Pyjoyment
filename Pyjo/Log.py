@@ -3,6 +3,11 @@ Pyjo.Log - Simple logger
 ========================
 ::
 
+    from Pyjo.Log import Log
+
+    # Log to STDERR
+    log = Log()
+
     import Pyjo.Log
 
     # Log to STDERR

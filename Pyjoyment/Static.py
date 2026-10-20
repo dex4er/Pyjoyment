@@ -3,6 +3,12 @@ Pyjoyment.Static - Serve static files
 =====================================
 ::
 
+    from Pyjoyment.Static import Static
+
+    static = Static()
+    static.classes.append('MyApp.Controller.Foo')
+    static.paths.append('/home/sri/public')
+
     import Pyjoyment.Static
 
     static = Pyjoyment.Static.new()

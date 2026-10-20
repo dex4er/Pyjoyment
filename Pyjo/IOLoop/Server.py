@@ -3,6 +3,13 @@ Pyjo.IOLoop.Server - Non-blocking TCP and UNIX domain socket server
 ===================================================================
 ::
 
+    from Pyjo.IOLoop.Server import Server
+
+    # Create listen socket
+    server = Server()
+    server.on('accept', lambda server, handle: ...)
+    server.listen(port=3000)
+
     import Pyjo.IOLoop.Server
 
     # Create listen socket

@@ -3,6 +3,18 @@ Pyjo.Base - Minimal base class for Pyjo projects
 ================================================
 ::
 
+    from Pyjo.Base import Base
+
+    from dataclasses import dataclass
+
+    @dataclass
+    class Cat(Base):
+        name: str = 'Nyan'
+        age: int = 4
+
+    mew = Cat(name='Longcat')
+    print(mew.age)
+
     import Pyjo.Base
 
     from dataclasses import dataclass, field
@@ -39,6 +51,25 @@ Mojolicious. ::
             if not hasattr(self, '_pride'):
                 self._pride = [Cat.new(), Cat.new()]
             return self._pride
+
+Constructors
+------------
+
+The constructor of a class and :meth:`~Pyjo_Base.new` make the same object, and
+both are correct. :meth:`~Pyjo_Base.new` is the constructor of Mojolicious,
+which the documentation uses, after ``import`` of the module. Each module has
+its class under the name of the module too, as ``Path`` of :mod:`Pyjo.Path`,
+for the constructor of Python, after ``from ... import`` of the class. ::
+
+    import Pyjo.Path
+
+    path = Pyjo.Path.new('/foo/bar')
+
+    from Pyjo.Path import Path
+
+    path = Path('/foo/bar')
+
+The synopsis of each module shows its first example in both forms.
 
 Fluent interfaces
 -----------------

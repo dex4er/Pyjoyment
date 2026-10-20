@@ -4,6 +4,22 @@ Pyjo.String.Mixin - Object with to_bytes/to_str methods
 ::
 
     import Pyjo.Base
+
+    from Pyjo.String.Mixin import Mixin
+
+    class SubClass(Pyjo.Base.object, Mixin):
+        def to_bytes(self):
+            return b'value'
+
+        def to_str(self):
+            return 'value'
+
+    # Use it as a string
+    obj = SubClass()
+    print(f'{obj:>10}')
+    print(obj + '!')
+
+    import Pyjo.Base
     import Pyjo.String.Mixin
 
     class SubClass(Pyjo.Base.object, Pyjo.String.Mixin.object):

@@ -3,6 +3,14 @@ Pyjoyment.Validator - Validate values
 =====================================
 ::
 
+    from Pyjoyment.Validator import Validator
+
+    validator = Validator()
+    v = validator.validation()
+    v.input = {'foo': 'bar'}
+    v.required('foo').like(re.compile(r'ar$'))
+    print(v.param('foo'))
+
     import Pyjoyment.Validator
 
     validator = Pyjoyment.Validator.new()

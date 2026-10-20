@@ -31,6 +31,26 @@ def controller():
 
 with subtest('Synopsis'):
     # Controller
+    from Pyjoyment.Controller import Controller
+
+    class MyApp_Controller_Foo(Controller):
+        # Action
+        def bar(self):
+            name = self.param('name')
+            self.res.headers.cache_control = 'max-age=1, no-cache'
+            self.render(json={'hello': name})
+
+    # The module of the controller, where the routes find it
+    sys.modules['MyApp_Controller_Foo'] = types.ModuleType('MyApp_Controller_Foo')
+    sys.modules['MyApp_Controller_Foo'].object = MyApp_Controller_Foo
+    app = Pyjoyment.new()
+    app.log.level = 'fatal'
+    app.routes.get('/bar').to('MyApp_Controller_Foo#bar', namespace='')
+    tx = request(app, '/bar?name=sri')
+    is_deeply_ok(decode_json(tx.res.body), {'hello': 'sri'}, 'action')
+    is_ok(tx.res.headers.cache_control, 'max-age=1, no-cache', 'header')
+
+    # Controller
     import Pyjoyment.Controller
 
     class MyApp_Controller_Foo(Pyjoyment.Controller.object):

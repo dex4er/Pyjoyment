@@ -3,6 +3,11 @@ Pyjo.Server.Reload - Auto-restarting development server
 ========================================================
 ::
 
+    from Pyjo.Server.Reload import Reload
+
+    reload = Reload()
+    reload.run('/home/sri/myapp.py')
+
     import Pyjo.Server.Reload
 
     reload = Pyjo.Server.Reload.new()

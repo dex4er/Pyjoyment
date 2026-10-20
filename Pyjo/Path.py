@@ -3,6 +3,12 @@ Pyjo.Path - Path
 ================
 ::
 
+    from Pyjo.Path import Path
+
+    # Parse
+    path = Path('/foo%2Fbar%3B/baz.html')
+    print(path[0])
+
     import Pyjo.Path
 
     # Parse

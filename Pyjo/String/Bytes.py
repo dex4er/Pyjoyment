@@ -3,6 +3,12 @@ Pyjo.String.Bytes - String of bytes
 ===================================
 ::
 
+    from Pyjo.String.Bytes import Bytes
+
+    # Manipulate bytes
+    data = Bytes(b'foo bar baz')
+    print(data.md5_sum())
+
     import Pyjo.String.Bytes
 
     # Manipulate bytes

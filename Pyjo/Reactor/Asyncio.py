@@ -3,6 +3,14 @@ Pyjo.Reactor.Asyncio - Low-level event reactor on asyncio
 =========================================================
 ::
 
+    from Pyjo.Reactor.Asyncio import Asyncio
+
+    # Watch if handle becomes readable or writable
+    reactor = Asyncio()
+    reactor.io(first, lambda reactor, writable: print(
+        'First handle is writable' if writable else 'First handle is readable'
+    ))
+
     import Pyjo.Reactor.Asyncio
 
     # Watch if handle becomes readable or writable

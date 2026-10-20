@@ -3,6 +3,16 @@ Pyjo.Server - HTTP/WebSocket server base class
 ==============================================
 ::
 
+    from Pyjo.Server import Server
+
+    class Pyjo_Server_MyServer(Server):
+        def run(self):
+            # Get a transaction
+            tx = self.build_tx()
+
+            # Emit "request" event
+            self.emit('request', tx)
+
     import Pyjo.Server
 
     class Pyjo_Server_MyServer(Pyjo.Server.object):

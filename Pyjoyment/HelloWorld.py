@@ -3,6 +3,11 @@ Pyjoyment.HelloWorld - Hello World!
 ===================================
 ::
 
+    from Pyjoyment.HelloWorld import HelloWorld
+
+    hello = HelloWorld()
+    hello.start()
+
     import Pyjoyment.HelloWorld
 
     hello = Pyjoyment.HelloWorld.new()

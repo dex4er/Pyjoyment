@@ -66,6 +66,23 @@ def output():
 
 
 with subtest('Synopsis'):
+    from Pyjo.UserAgent import UserAgent
+
+    with output() as stdout:
+        # Fine grained response handling (raises on connection errors)
+        ua = local(UserAgent())
+        res = ua.get('docs.mojolicious.org').result
+        if res.is_success:
+            print(res.body)
+        elif res.is_error:
+            print(res.message)
+        elif res.code == 301:
+            print(res.headers.location)
+        else:
+            print('Whatever...')
+    like_ok(stdout.getvalue(), r'<title>Mojolicious</title>', 'print(res.body)')
+    ua.close()
+
     import Pyjo.IOLoop
     import Pyjo.Promise
     import Pyjo.URL

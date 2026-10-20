@@ -5,6 +5,19 @@ import io
 
 
 with subtest('Synopsis'):
+    from Pyjo.DOM import DOM
+
+    output = io.StringIO()
+    with contextlib.redirect_stdout(output):
+        # Parse
+        dom = DOM('<div><p id="a">Test</p><p id="b">123</p></div>')
+
+        # Find
+        print(dom.at('#b').text)
+        print(dom.find('p').map('text').join('\n'))
+        print(dom.find('[id]').map('attr', 'id').join('\n'))
+    is_ok(output.getvalue(), '123\nTest\n123\na\nb\n', 'output')
+
     import Pyjo.DOM
 
     output = io.StringIO()

@@ -3,6 +3,12 @@ Pyjo.Parameters - Parameters
 ============================
 ::
 
+    from Pyjo.Parameters import Parameters
+
+    # Parse
+    params = Parameters('foo=bar&baz=23')
+    print(params.param('baz'))
+
     import Pyjo.Parameters
 
     # Parse

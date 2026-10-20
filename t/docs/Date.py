@@ -2,6 +2,12 @@ from Pyjo.Test import *
 
 
 with subtest('Synopsis'):
+    from Pyjo.Date import Date
+
+    # Parse
+    date = Date('Sun, 06 Nov 1994 08:49:37 GMT')
+    is_ok(date.epoch, 784111777, 'date.epoch')
+
     import Pyjo.Date
 
     import time

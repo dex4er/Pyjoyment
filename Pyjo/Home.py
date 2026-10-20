@@ -3,6 +3,14 @@ Pyjo.Home - Home sweet home
 ===========================
 ::
 
+    from Pyjo.Home import Home
+
+    # Find and manage the project root directory
+    home = Home()
+    home.detect()
+    print(home.child('templates', 'layouts', 'default.html.ep'))
+    print(f'{home}')
+
     import Pyjo.Home
 
     # Find and manage the project root directory

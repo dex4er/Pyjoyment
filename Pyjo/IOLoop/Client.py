@@ -3,6 +3,14 @@ Pyjo.IOLoop.Client - Non-blocking TCP/IP and UNIX domain socket client
 ======================================================================
 ::
 
+    from Pyjo.IOLoop.Client import Client
+
+    # Create socket connection
+    client = Client()
+    client.on('connect', lambda client, handle: ...)
+    client.on('error', lambda client, err: ...)
+    client.connect(address='example.com', port=80)
+
     import Pyjo.IOLoop.Client
 
     # Create socket connection

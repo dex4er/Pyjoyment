@@ -129,6 +129,17 @@ def daemonized(*args, **kwargs):
 
 with subtest('Synopsis'):
     code = """
+from Pyjo.Server.Hot import Hot
+
+hot = Hot()
+hot.run({myapp!r})
+"""
+    port, myapp, result = daemonized('-c', code)
+    is_ok(result.returncode, 0, 'daemonized')
+    ok(wait_for(lambda: listening(port) and pid(myapp)), 'listening')
+    ok(stop(myapp, port), 'stopped')
+
+    code = """
 import Pyjo.Server.Hot
 
 hot = Pyjo.Server.Hot.new()

@@ -33,6 +33,17 @@ UPLOAD = (
 HTML = b'<html><head><title>Test</title></head><body><h1>One</h1><p>Two</p><h2>Three</h2><p>Four</p></body></html>'
 
 with subtest('Synopsis'):
+    from Pyjo.Message import Message
+
+    class MyMessage(Message):
+        def cookies(self, *cookies): ...
+        def extract_start_line(self, buffer): ...
+        def get_start_line_chunk(self, offset): ...
+        @property
+        def start_line_size(self): ...
+
+    isa_ok(MyMessage(), Message, 'subclass')
+
     import Pyjo.Message
 
     class MyMessage(Pyjo.Message.object):

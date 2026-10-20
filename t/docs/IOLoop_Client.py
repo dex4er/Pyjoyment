@@ -13,6 +13,22 @@ listening.setblocking(False)
 port = listening.getsockname()[1]
 
 with subtest('Synopsis'):
+    from Pyjo.IOLoop.Client import Client
+
+    connected = []
+
+    # Create socket connection
+    client = Client()
+    client.on('connect', lambda client, handle: ...)
+    client.on('error', lambda client, err: ...)
+    client.on('connect', lambda client, handle: connected.append(handle) or client.reactor.stop())
+    client.connect(address='127.0.0.1', port=port)
+
+    if not client.reactor.is_running:
+        client.reactor.start()
+    isa_ok(connected[0], socket.socket, 'connected')
+    connected[0].close()
+
     import Pyjo.IOLoop.Client
 
     connected = []

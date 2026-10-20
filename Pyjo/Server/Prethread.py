@@ -3,6 +3,28 @@ Pyjo.Server.Prethread - Pre-threading non-blocking I/O HTTP and WebSocket server
 ================================================================================
 ::
 
+    from Pyjo.Server.Prethread import Prethread
+
+    prethread = Prethread(listen=['http://*:8080'])
+
+
+    @prethread.unsubscribe('request').on('request')
+    def request(prethread, tx):
+        # Request
+        method = tx.req.method
+        path = tx.req.url.path
+
+        # Response
+        tx.res.code = 200
+        tx.res.headers.content_type = 'text/plain'
+        tx.res.body = f'{method} request for {path}!'.encode()
+
+        # Resume transaction
+        tx.resume()
+
+
+    prethread.run()
+
     import Pyjo.Server.Prethread
 
     prethread = Pyjo.Server.Prethread.new(listen=['http://*:8080'])

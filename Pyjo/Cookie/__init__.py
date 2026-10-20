@@ -3,6 +3,14 @@ Pyjo.Cookie - HTTP cookie base class
 ====================================
 ::
 
+    from Pyjo.Cookie import Cookie
+
+    class MyCookie(Cookie):
+        @classmethod
+        def parse(cls, string=None): ...
+
+        def to_str(self): ...
+
     import Pyjo.Cookie
 
     class MyCookie(Pyjo.Cookie.object):

@@ -13,6 +13,13 @@ def match(r, path, method='GET'):
 
 
 with subtest('Synopsis'):
+    from Pyjoyment.Routes import Routes
+
+    # Simple route
+    r = Routes()
+    r.any('/').to(controller='blog', action='welcome')
+    is_deeply_ok(match(r, '/'), [{'controller': 'blog', 'action': 'welcome'}], 'simple route')
+
     import Pyjoyment.Routes
 
     # Simple route

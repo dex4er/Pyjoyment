@@ -3,6 +3,13 @@ Pyjo.IOLoop.Datagram - Non-blocking datagram socket
 ===================================================
 ::
 
+    from Pyjo.IOLoop.Datagram import Datagram
+
+    # Echo server
+    server = Datagram()
+    server.on('message', lambda server, data, peer: server.send(b'Echo: ' + data, peer))
+    server.bind(address='127.0.0.1', port=9999)
+
     import Pyjo.IOLoop.Datagram
 
     # Echo server

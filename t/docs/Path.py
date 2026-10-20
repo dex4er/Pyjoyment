@@ -2,6 +2,12 @@ from Pyjo.Test import *
 
 
 with subtest('Synopsis'):
+    from Pyjo.Path import Path
+
+    # Parse
+    path = Path('/foo%2Fbar%3B/baz.html')
+    is_ok(path[0], 'foo', 'path[0]')
+
     import Pyjo.Path
 
     # Parse

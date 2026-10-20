@@ -4,6 +4,12 @@ import re
 
 
 with subtest('Synopsis'):
+    from Pyjoyment.Routes.Pattern import Pattern
+
+    # Create pattern
+    pattern = Pattern('/test/:name')
+    is_ok(pattern.unparsed, '/test/:name', 'unparsed')
+
     import Pyjoyment.Routes.Pattern
 
     # Create pattern

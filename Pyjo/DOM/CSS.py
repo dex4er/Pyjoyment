@@ -3,6 +3,12 @@ Pyjo.DOM.CSS - CSS selector engine
 ==================================
 ::
 
+    from Pyjo.DOM.CSS import CSS
+
+    # Select elements from DOM tree
+    css = CSS(tree=tree)
+    elements = css.select('h1, h2, h3')
+
     import Pyjo.DOM.CSS
 
     # Select elements from DOM tree

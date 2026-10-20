@@ -3,6 +3,12 @@ Pyjoyment.Renderer - Generate dynamic content
 =============================================
 ::
 
+    from Pyjoyment.Renderer import Renderer
+
+    renderer = Renderer()
+    renderer.classes.append('MyApp.Controller.Foo')
+    renderer.paths.append('/home/sri/templates')
+
     import Pyjoyment.Renderer
 
     renderer = Pyjoyment.Renderer.new()

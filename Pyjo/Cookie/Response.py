@@ -3,6 +3,13 @@ Pyjo.Cookie.Response - HTTP response cookie
 ===========================================
 ::
 
+    from Pyjo.Cookie.Response import Response
+
+    cookie = Response()
+    cookie.name = 'foo'
+    cookie.value = 'bar'
+    print(cookie)
+
     import Pyjo.Cookie.Response
 
     cookie = Pyjo.Cookie.Response.new()

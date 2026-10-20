@@ -21,7 +21,16 @@ of them is a regression.
 - **The spirit of Mojo over strict PEP 8.** Pyjoyment uses Python creatively,
   the way Mojo bends Perl. Module and class names follow Mojo
   (`Pyjo.URL`, `Pyjo.IOLoop.Client`), objects are created with `Class.new()`,
-  and setters return `self` so calls chain.
+  and setters return `self` so calls chain. The constructor of Python is
+  correct too: a module ends with `new = Pyjo_URL.new`, `object = Pyjo_URL`
+  and the class under the name of the module, `URL = Pyjo_URL`, so that
+  `from Pyjo.URL import URL` and `URL(...)` work. The documentation keeps
+  `import Pyjo.URL` and `Pyjo.URL.new(...)`, as the Google Python Style Guide
+  imports modules, not classes. A module has no such name where it would
+  hide a builtin (`Pyjo.Exception`), the package (`Pyjo.Test.Pyjo`,
+  `Pyjoyment`) or a name that the module has (`TLS` of `Pyjo.IOLoop.TLS`,
+  `Template` of `Pyjo.String.Template`), and a module of a command is named
+  after the command, not after a class.
 - **Every statement has an expression form.** Helpers in `Pyjo.Util` such as
   `die`, `setenv`, `slurp` and `spurt` look redundant next to `raise`,
   `os.environ[...] = ...` and `pathlib`, but statements cannot appear in a
@@ -481,8 +490,11 @@ For each module:
    (synopsis, description, events, attributes, methods, operators, see also)
    and Mojo's wording, with Python names and examples. The POD is the source of
    the Python documentation. Sphinx lists the classes after the module
-   docstring, so "See also" ends the module docstring, before them. A test in
-   `t/docs/` runs the examples.
+   docstring, so "See also" ends the module docstring, before them. The
+   synopsis of a module whose class it makes or subclasses starts with its
+   first example in the form of Python, `from Pyjo.URL import URL` and
+   `URL(...)`, which shows that both forms are correct. A test in `t/docs/`
+   runs the examples.
 4. Name the source at the end of "See also", as a link to the file at the tag
    of the release (`https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/Date.pm`),
    annotate the module and put it on pyright's strict list.

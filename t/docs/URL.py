@@ -2,6 +2,18 @@ from Pyjo.Test import *
 
 
 with subtest('Synopsis'):
+    from Pyjo.URL import URL
+
+    # Parse
+    url = URL('http://sri:foo@example.com:3000/foo?foo=bar#23')
+    is_ok(url.scheme, 'http', 'url.scheme')
+    is_ok(url.userinfo, 'sri:foo', 'url.userinfo')
+    is_ok(url.host, 'example.com', 'url.host')
+    is_ok(url.port, 3000, 'url.port')
+    is_ok(str(url.path), '/foo', 'url.path')
+    is_ok(str(url.query), 'foo=bar', 'url.query')
+    is_ok(url.fragment, '23', 'url.fragment')
+
     import Pyjo.URL
 
     from urllib.parse import urlsplit

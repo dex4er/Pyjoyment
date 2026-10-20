@@ -3,6 +3,12 @@ Pyjo.String.Unicode - String of characters
 ==========================================
 ::
 
+    from Pyjo.String.Unicode import Unicode
+
+    # Manipulate string
+    string = Unicode('foo_bar_baz')
+    print(string.camelize())
+
     import Pyjo.String.Unicode
 
     # Manipulate string

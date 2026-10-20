@@ -2,6 +2,13 @@ from Pyjo.Test import *
 
 
 with subtest('Synopsis'):
+    from Pyjo.Cache import Cache
+
+    cache = Cache(max_keys=50)
+    cache.set('foo', 'bar')
+    foo = cache.get('foo')
+    is_ok(foo, 'bar', 'cached value')
+
     import Pyjo.Cache
 
     cache = Pyjo.Cache.new(max_keys=50)

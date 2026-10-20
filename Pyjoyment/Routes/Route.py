@@ -3,6 +3,10 @@ Pyjoyment.Routes.Route - Route
 ==============================
 ::
 
+    from Pyjoyment.Routes.Route import Route
+
+    r = Route()
+
     import Pyjoyment.Routes.Route
 
     r = Pyjoyment.Routes.Route.new()

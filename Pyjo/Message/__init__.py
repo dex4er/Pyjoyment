@@ -3,6 +3,15 @@ Pyjo.Message - HTTP message base class
 ======================================
 ::
 
+    from Pyjo.Message import Message
+
+    class MyMessage(Message):
+        def cookies(self, *cookies): ...
+        def extract_start_line(self, buffer): ...
+        def get_start_line_chunk(self, offset): ...
+        @property
+        def start_line_size(self): ...
+
     import Pyjo.Message
 
     class MyMessage(Pyjo.Message.object):

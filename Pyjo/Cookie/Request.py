@@ -3,6 +3,13 @@ Pyjo.Cookie.Request - HTTP request cookie
 =========================================
 ::
 
+    from Pyjo.Cookie.Request import Request
+
+    cookie = Request()
+    cookie.name = 'foo'
+    cookie.value = 'bar'
+    print(cookie)
+
     import Pyjo.Cookie.Request
 
     cookie = Pyjo.Cookie.Request.new()

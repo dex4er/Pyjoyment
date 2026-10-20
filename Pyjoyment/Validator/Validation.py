@@ -4,6 +4,16 @@ Pyjoyment.Validator.Validation - Perform validations
 ::
 
     import Pyjoyment.Validator
+
+    from Pyjoyment.Validator.Validation import Validation
+
+    validator = Pyjoyment.Validator.new()
+    v = Validation(validator=validator)
+    v.input = {'foo': 'bar'}
+    v.required('foo').one_of('bar', 'baz')
+    print(v.param('foo'))
+
+    import Pyjoyment.Validator
     import Pyjoyment.Validator.Validation
 
     validator = Pyjoyment.Validator.new()
