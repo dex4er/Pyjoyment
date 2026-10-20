@@ -111,6 +111,7 @@ import copy
 import os
 import signal
 import socket
+import sys
 import tempfile
 import threading
 import time
@@ -134,8 +135,12 @@ class Pyjo_Server_Prethread(Pyjo.Server.Prefork.object):
     directory for the default of :attr:`~Pyjo.Server.Prefork.Pyjo_Server_Prefork.pid_file`.
     """
 
-    # The signals of the manager, without CHLD, which is the one of the children of the application
-    _MANAGED = (signal.SIGHUP, signal.SIGINT, signal.SIGTERM, signal.SIGQUIT, signal.SIGTTIN, signal.SIGTTOU)
+    # The signals of the manager, without CHLD, which is the one of the children of the application; Windows has INT,
+    # TERM and BREAK of Ctrl-Break, which takes the place of QUIT
+    if sys.platform == 'win32':
+        _MANAGED = (signal.SIGINT, signal.SIGTERM, signal.SIGBREAK)
+    else:
+        _MANAGED = (signal.SIGHUP, signal.SIGINT, signal.SIGTERM, signal.SIGQUIT, signal.SIGTTIN, signal.SIGTTOU)
 
     # The seconds that a worker has to stop once it is told to stop immediately, before the manager leaves it
     _LEAVE = 1

@@ -200,16 +200,20 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
     :mod:`Pyjo.Server.Daemon` and implements the following new ones.
     """
 
-    # Not in Mojolicious: the signals of the manager, as a class attribute, which Pyjo.Server.Prethread changes
-    _MANAGED: tuple[signal.Signals, ...] = (
-        signal.SIGCHLD,
-        signal.SIGHUP,
-        signal.SIGINT,
-        signal.SIGTERM,
-        signal.SIGQUIT,
-        signal.SIGTTIN,
-        signal.SIGTTOU,
-    )
+    # Not in Mojolicious: the signals of the manager, as a class attribute, which Pyjo.Server.Prethread changes; Windows
+    # has INT, TERM and BREAK of Ctrl-Break, which takes the place of QUIT
+    if sys.platform == 'win32':
+        _MANAGED: tuple[signal.Signals, ...] = (signal.SIGINT, signal.SIGTERM, signal.SIGBREAK)
+    else:
+        _MANAGED = (
+            signal.SIGCHLD,
+            signal.SIGHUP,
+            signal.SIGINT,
+            signal.SIGTERM,
+            signal.SIGQUIT,
+            signal.SIGTTIN,
+            signal.SIGTTOU,
+        )
 
     def __init__(
         self,
@@ -733,8 +737,9 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
         _exit(code)
 
 
-# Not in Mojolicious: the signals that the workers handle, which the manager blocks while it forks
-_WORKER = {signal.SIGTERM, signal.SIGQUIT}
+# Not in Mojolicious: the signals that the workers handle, which the manager blocks while it forks, with BREAK in the
+# place of QUIT on Windows
+_WORKER = {signal.SIGTERM, signal.SIGBREAK if sys.platform == 'win32' else signal.SIGQUIT}
 
 
 # Not in Mojolicious: os._exit, as the worker leaves what the manager does at its end, with the buffers of the standard
