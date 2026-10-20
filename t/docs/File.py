@@ -4,6 +4,7 @@ import contextlib
 import io
 import os
 import pathlib
+import sys
 import tempfile
 import warnings
 
@@ -14,6 +15,14 @@ warnings.filterwarnings('ignore', message='Implicitly cleaning up', category=Res
 
 tmp = tempfile.TemporaryDirectory()
 home = pathlib.Path(tmp.name, 'home', 'sri')
+
+
+# A path as Pyjo.File makes it on Windows, with the separators and the parents of File::Spec::Win32, and as it is
+# elsewhere, where the examples of the documentation are
+def native(p):
+    return os.path.normpath(p) if sys.platform == 'win32' else p
+
+
 home.mkdir(parents=True)
 (home / '.vimrc').write_text('set nocompatible\n', newline='\n')
 (home / '.bashrc').write_text('export EDITOR=vim\n', newline='\n')
@@ -59,16 +68,16 @@ with subtest('new'):
     p = Pyjo.File.new('/home/sri/.vimrc')
     is_ok(p, '/home/sri/.vimrc', 'path')
     p = Pyjo.File.new('/home', 'sri', '.vimrc')
-    is_ok(p, '/home/sri/.vimrc', 'parts')
+    is_ok(p, native('/home/sri/.vimrc'), 'parts')
     p = Pyjo.File.new(pathlib.Path('/home/sri/.vimrc'))
-    is_ok(p, '/home/sri/.vimrc', 'pathlib.Path')
+    is_ok(p, native('/home/sri/.vimrc'), 'pathlib.Path')
     p = Pyjo.File.new(tempfile.NamedTemporaryFile())
     ok(os.path.isfile(p), 'temporary file')
     p = Pyjo.File.new(tempfile.TemporaryDirectory())
     ok(os.path.isdir(p), 'temporary directory')
 
     # "foo/bar/baz.txt" (on UNIX)
-    is_ok(Pyjo.File.new('foo', 'bar', 'baz.txt'), 'foo/bar/baz.txt', 'parts')
+    is_ok(Pyjo.File.new('foo', 'bar', 'baz.txt'), native('foo/bar/baz.txt'), 'parts')
 
 with subtest('__bool__'):
     boolean = bool(path(''))
@@ -101,17 +110,21 @@ with subtest('basename'):
 
 with subtest('child'):
     # "/home/sri/.vimrc" (on UNIX)
-    is_ok(path('/home').child('sri', '.vimrc'), '/home/sri/.vimrc', 'child')
+    is_ok(path('/home').child('sri', '.vimrc'), native('/home/sri/.vimrc'), 'child')
 
 with subtest('chmod'):
     p = path(str(home / 'test'))
     p = p.chmod(0o644)
-    is_ok(p.stat().st_mode & 0o777, 0o644, 'mode')
+    # Windows keeps the bit of read-only of a mode only
+    if sys.platform == 'win32':
+        skip('no mode of files on Windows', 1)
+    else:
+        is_ok(p.stat().st_mode & 0o777, 0o644, 'mode')
 
 with subtest('copy_to'):
     p = path(str(home / '.vimrc'))
     destination = p.copy_to(str(home / '..'))
-    is_ok(destination, str(home / '..' / '.vimrc'), 'directory')
+    is_ok(destination, native(str(home / '..' / '.vimrc')), 'directory')
     destination = p.copy_to(str(home / '.vimrc.backup'))
     is_ok(destination, str(home / '.vimrc.backup'), 'file')
 
@@ -187,7 +200,12 @@ with subtest('lstat'):
 
         # Get symlink modification time
         print(path(str(link)).lstat().st_mtime)
-    is_ok(output.getvalue().split('\n')[0], str(len(str(home / 'test'))), 'size')
+    # A symbolic link of Windows, a reparse point of NTFS, has the size 0, where the one of POSIX has the length of
+    # its target
+    if sys.platform == 'win32':
+        skip('no size of a symbolic link on Windows', 1)
+    else:
+        is_ok(output.getvalue().split('\n')[0], str(len(str(home / 'test'))), 'size')
 
 with subtest('make_path'):
     p = path(tmp.name, 'a', 'b')
@@ -198,7 +216,7 @@ with subtest('make_path'):
 with subtest('move_to'):
     p = path(str(home / '.vimrc.backup'))
     destination = p.move_to(str(home / '..'))
-    is_ok(destination, str(home / '..' / '.vimrc.backup'), 'directory')
+    is_ok(destination, native(str(home / '..' / '.vimrc.backup')), 'directory')
     destination = destination.move_to(str(home / '.vimrc.backup'))
     is_ok(destination, str(home / '.vimrc.backup'), 'file')
 
@@ -231,10 +249,10 @@ with subtest('remove_tree'):
 
 with subtest('sibling'):
     # "/home/sri/.vimrc" (on UNIX)
-    is_ok(path('/home/sri/.bashrc').sibling('.vimrc'), '/home/sri/.vimrc', 'sibling')
+    is_ok(path('/home/sri/.bashrc').sibling('.vimrc'), native('/home/sri/.vimrc'), 'sibling')
 
     # "/home/sri/.ssh/known_hosts" (on UNIX)
-    is_ok(path('/home/sri/.bashrc').sibling('.ssh', 'known_hosts'), '/home/sri/.ssh/known_hosts', 'sibling')
+    is_ok(path('/home/sri/.bashrc').sibling('.ssh', 'known_hosts'), native('/home/sri/.ssh/known_hosts'), 'sibling')
 
 with subtest('slurp'):
     p = path(str(home / 'test'))
@@ -278,7 +296,7 @@ with subtest('to_path'):
 
 with subtest('to_rel'):
     # "sri/.vimrc" (on UNIX)
-    is_ok(path('/home/sri/.vimrc').to_rel('/home'), 'sri/.vimrc', 'to_rel')
+    is_ok(path('/home/sri/.vimrc').to_rel('/home'), native('sri/.vimrc'), 'to_rel')
 
 with subtest('to_str'):
     string = path('/home/sri').to_str()
@@ -305,12 +323,12 @@ with subtest('path'):
     p = path('/home/sri/.vimrc')
     is_ok(p, '/home/sri/.vimrc', 'path')
     p = path('/home', 'sri', '.vimrc')
-    is_ok(p, '/home/sri/.vimrc', 'parts')
+    is_ok(p, native('/home/sri/.vimrc'), 'parts')
     p = path(tempfile.TemporaryDirectory())
     ok(os.path.isdir(p), 'temporary directory')
 
     # "foo/bar/baz.txt" (on UNIX)
-    is_ok(path('foo', 'bar', 'baz.txt'), 'foo/bar/baz.txt', 'parts')
+    is_ok(path('foo', 'bar', 'baz.txt'), native('foo/bar/baz.txt'), 'parts')
 
 with subtest('tempdir'):
     p = Pyjo.File.tempdir()

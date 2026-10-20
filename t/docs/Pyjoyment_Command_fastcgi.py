@@ -8,6 +8,7 @@ import os
 import signal
 import socket
 import struct
+import sys
 import threading
 
 
@@ -38,6 +39,8 @@ with subtest('Attributes'):
     is_ok(fastcgi_command.description, 'Start application with FastCGI of the web server', 'description')
 
 with subtest('run'):
+    if sys.platform == 'win32':
+        plan(skip_all='a socket of Windows is not a file descriptor')
     app = Pyjoyment.new()
     app.log.level = 'fatal'
     app.routes.get('/', {'text': 'Hello FastCGI!'})
