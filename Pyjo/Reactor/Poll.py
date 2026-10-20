@@ -32,9 +32,9 @@ Pyjo.Reactor.Poll - Low-level event reactor with poll support
         reactor.start()
 
 :mod:`Pyjo.Reactor.Poll` is a low-level event reactor based on
-:func:`select.poll`, without asyncio. It is available where
-:func:`select.poll` is, which is not on Windows, and ``PYJO_REACTOR``
-selects it for :mod:`Pyjo.IOLoop`::
+:func:`select.poll`, without asyncio. Windows has no :func:`select.poll`,
+and :func:`select.select` takes its place there, which watches sockets only,
+not pipes or files. ``PYJO_REACTOR`` selects it for :mod:`Pyjo.IOLoop`::
 
     PYJO_REACTOR=Pyjo.Reactor.Poll
 
@@ -60,6 +60,7 @@ from Pyjo.Util import md5_sum
 
 import random
 import select
+import sys
 import threading
 import time
 
@@ -188,17 +189,13 @@ class Pyjo_Reactor_Poll(Pyjo.Reactor.object):
 
                 # I/O
                 if len(self._io):
-                    poll = select.poll()
-                    for fd, io in self._io.items():
-                        poll.register(fd, io['mode'])
-
-                    for fd, mode in poll.poll(timeout):
-                        if mode & (select.POLLIN | select.POLLPRI | select.POLLNVAL | select.POLLHUP | select.POLLERR):
+                    for fd, mode in _poll({fd: io['mode'] for fd, io in self._io.items()}, timeout):
+                        if mode & (_POLLIN | _POLLPRI | _POLLNVAL | _POLLHUP | _POLLERR):
                             if (io := self._io.get(fd)) is None:
                                 continue
                             i += 1
                             self._try('I/O watcher', io['cb'], False)
-                        if not mode & select.POLLOUT or (io := self._io.get(fd)) is None:
+                        if not mode & _POLLOUT or (io := self._io.get(fd)) is None:
                             continue
                         i += 1
                         self._try('I/O watcher', io['cb'], True)
@@ -329,9 +326,9 @@ class Pyjo_Reactor_Poll(Pyjo.Reactor.object):
             Pyjo.Exception.object.throw('I/O watcher not active')
         io['mode'] = 0
         if read:
-            io['mode'] |= select.POLLIN | select.POLLPRI
+            io['mode'] |= _POLLIN | _POLLPRI
         if write:
-            io['mode'] |= select.POLLOUT
+            io['mode'] |= _POLLOUT
         return self
 
     def _id(self) -> str:
@@ -366,6 +363,58 @@ def _fileno(handle: Handle) -> int:
     if fd < 0:
         Pyjo.Exception.object.throw('Handle is closed')
     return fd
+
+
+# The events of poll, which Windows does not have, with the values of Linux there
+if sys.platform == 'win32':
+    _POLLIN, _POLLPRI, _POLLOUT, _POLLERR, _POLLHUP, _POLLNVAL = 0x001, 0x002, 0x004, 0x008, 0x010, 0x020
+else:
+    _POLLIN, _POLLPRI, _POLLOUT = select.POLLIN, select.POLLPRI, select.POLLOUT
+    _POLLERR, _POLLHUP, _POLLNVAL = select.POLLERR, select.POLLHUP, select.POLLNVAL
+
+
+# The events of the handles that are ready, in the time in milliseconds
+def _poll(modes: dict[int, int], timeout: int) -> list[tuple[int, int]]:
+    if sys.platform == 'win32':
+        return _select(modes, timeout)
+    poll = select.poll()
+    for fd, mode in modes.items():
+        poll.register(fd, mode)
+    return poll.poll(timeout)
+
+
+# Not in Mojolicious: Windows has no poll, and its select, which watches sockets only, takes the place of it; a
+# connection that failed is an exceptional condition there, which poll reports as an error and writable, and the
+# selector of asyncio as writable
+def _select(modes: dict[int, int], timeout: int) -> list[tuple[int, int]]:
+    readers = [fd for fd, mode in modes.items() if mode & (_POLLIN | _POLLPRI)]
+    writers = [fd for fd, mode in modes.items() if mode & _POLLOUT]
+    if not len(readers) and not len(writers):
+        time.sleep(timeout / 1000)
+        return []
+    try:
+        readable, writable, failed = select.select(readers, writers, writers, timeout / 1000)
+    except OSError:
+        # A handle that is closed, which poll reports as invalid
+        if not len(invalid := [fd for fd in modes if not _is_valid(fd)]):
+            raise
+        return [(fd, _POLLNVAL) for fd in invalid]
+    events: dict[int, int] = {}
+    for fd in readable:
+        events[fd] = events.get(fd, 0) | _POLLIN
+    for fd in writable:
+        events[fd] = events.get(fd, 0) | _POLLOUT
+    for fd in failed:
+        events[fd] = events.get(fd, 0) | _POLLERR | _POLLOUT
+    return list(events.items())
+
+
+def _is_valid(fd: int) -> bool:
+    try:
+        select.select([fd], [], [], 0)
+    except OSError:
+        return False
+    return True
 
 
 new = Pyjo_Reactor_Poll.new
