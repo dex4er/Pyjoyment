@@ -5,6 +5,8 @@ import Pyjoyment
 from Pyjo.Test import *
 from Pyjo.Util import b64_encode
 
+import importlib.metadata
+import importlib.util
 import os
 import re
 import shutil
@@ -368,6 +370,27 @@ with subtest('Extending Test.Pyjo'):
     like_ok(result.stdout, re.compile(r'^ok 3 - Location: https://pyjoyment\.readthedocs\.io$', re.M), 'location_is')
     like_ok(result.stdout, re.compile(r'^not ok 4 - Location: https://mojolicious\.org$', re.M), 'fails')
     like_ok(result.stdout + result.stderr, re.compile(r'# I miss tempire\.'), 'otherwise')
+    shutil.rmtree(home)
+
+with subtest('Running the tests with pytest'):
+    if importlib.util.find_spec('pytest') is None:
+        plan(skip_all='pytest is required, as of the dependency group "pytest"')
+    # The plugin of the entry point where Pyjoyment is installed, or of the checkout otherwise
+    pytest_plugin = importlib.metadata.entry_points(group='pytest11').select(value='Pyjo.Test.pytest_plugin')
+    pytest = ['-m', 'pytest', '-p', 'no:cacheprovider', *([] if pytest_plugin else ['-p', 'Pyjo.Test.pytest_plugin'])]
+    home = tempfile.mkdtemp()
+    run(home, '-m', 'Pyjoyment', 'generate', 'app', 'MyApp')
+    my_app = Pyjo.File.path(home, 'my_app')
+    result = run(my_app.to_str(), *pytest)
+    like_ok(result.stdout, re.compile(r'^t/basic\.py \.\s+\[100%\]$', re.M), 'pytest')
+    my_app.child('tests').make_path().child('conftest.py').spew(
+        b"import pytest\n\n\n@pytest.fixture\ndef app():\n    return 'MyApp'\n"
+    )
+    my_app.child('tests', 'test_basic.py').spew(
+        b"def test_index(t):\n    t.get_ok('/').status_is(200).content_like(r'(?i)Pyjoyment')\n"
+    )
+    result = run(my_app.to_str(), *pytest, 'tests')
+    like_ok(result.stdout, re.compile(r'^tests/test_basic\.py \.\s+\[100%\]$', re.M), 'pytest tests')
     shutil.rmtree(home)
 
 done_testing()

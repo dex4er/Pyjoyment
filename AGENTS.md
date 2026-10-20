@@ -218,8 +218,11 @@ port 0 instead, which `ports()` gives.
   applications of `tt/external`, which `Pyjoyment.Plugin.Mount` mounts,
   outside `t/`, as `-r t` runs every Python file there. `tt/templates_native` holds the ones with the
   t-strings of Python 3.14, which only the tests of 3.14 render, and which
-  ruff and pyright check as Python 3.14. A test does not write files into
-  `t/` or `tt/`: what it makes goes to a temporary directory.
+  ruff and pyright check as Python 3.14. `tt/pytest` is a project of test
+  scripts and tests of pytest, which the tests of
+  `Pyjo.Test.pytest_plugin` copy to a temporary directory and run pytest
+  on. A test does not write files into `t/` or `tt/`: what it makes goes to
+  a temporary directory.
 
 A test script imports the test functions and groups its tests in subtests,
 like Mojo's tests do; Python keywords give some functions an `_ok` suffix
@@ -405,6 +408,50 @@ not read it.
 # ///
 ```
 
+pytest runs the test scripts too, through `Pyjo.Test.pytest_plugin`, which
+`[project.entry-points.pytest11]` registers, so that pytest loads it wherever
+Pyjoyment is installed, with nothing of Pyjoyment importing pytest. It is
+for whoever runs `pytest` by habit, as a coding agent or the test explorer of
+an IDE, not a second runner of the project: each script is one test of
+pytest, which `Pyjo.Prove.run_script` runs in a process of its own, as
+`Pyjo.Prove` does, not a fork of the process of pytest, whose modules,
+threads and environment the script would inherit, and which Windows does not
+have. pytest collects its items before it runs them, and the subtests of a
+script are known only from its TAP output, so a script is not split into
+tests. The wrapper of `pytest_collect_file` replaces what other plugins make
+of a file of the directories of `pyjo_prove_paths`, as the module of pytest
+for a `t/test_*.py`. `testpaths = ["t"]` of `pyproject.toml` makes `pytest`
+without arguments run the whole suite:
+
+```sh
+mise exec -- uv run --group pytest pytest
+```
+
+The plugin also calls `Pyjo.Test.raise_failures`, so that the functions of
+`Pyjo.Test`, and with them the chains of `Pyjo.Test.Pyjo`, raise
+`AssertionError` in a test of pytest: printing TAP there, the `atexit`
+handler of `Pyjo.Test` would see tests without a plan and replace the exit
+status of pytest with 254. A skip is `unittest.SkipTest`, which pytest and
+unittest both know, so `Pyjo.Test` imports nothing of pytest. The module
+variable `__tracebackhide__` of `Pyjo.Test` and `Pyjo.Test.Pyjo`, which pytest
+reads from the globals of a frame too, leaves their frames out of the
+traceback of a failed test. The plugin takes the environment of the scripts
+when pytest starts, as the import of `Pyjo.Test.Pyjo` sets `PYJO_LOG_LEVEL`,
+and imports `Pyjo.Test.Pyjo` only in the fixture `t`.
+
+The tests of the plugin, `t/Pyjo/Test_pytest_plugin.py`,
+`t/docs/Test_pytest_plugin.py` and the section of pytest of
+`t/docs/guides_testing.py`, run pytest in a process of their own, and skip
+without pytest, which is in the dependency group `pytest`, not in
+`dependencies`. CI runs them in the job `pytest`, with the group installed by
+uv, which installs the project too, so that pytest loads the plugin of its
+entry point, where the tests pass `-p Pyjo.Test.pytest_plugin` without it,
+and runs all the test scripts with pytest there:
+
+```sh
+mise exec -- uv run --group pytest python -m Pyjo.Prove -l t/Pyjo/Test_pytest_plugin.py t/docs/Test_pytest_plugin.py
+```
+
 ## Benchmarks
 
 `benchmarks/` measures hello world servers with one connection and one
@@ -454,6 +501,8 @@ a subclass of the one of `prefork`),
 `Mojolicious::Plugin::EPLRenderer`), `Pyjoyment.Plugin.TOMLConfig` (inspired
 by `Mojolicious::Plugin::NotYAMLConfig`, for the format of configuration of
 the standard library), `Pyjo.TOML` (the dumper of TOML, which the standard library only reads),
+`Pyjo.Test.pytest_plugin` (the plugin of pytest, which runs the test scripts
+as `Pyjo.Prove` does and the functions of `Pyjo.Test` in the tests of pytest),
 `Pyjo.YAML` (the subset of YAML of `CPAN::Meta::YAML`,
 which `Mojolicious::Plugin::NotYAMLConfig` reads, written anew, as the license
 of the Perl module is that of Perl 5, with its regular expressions) and the
@@ -1201,7 +1250,13 @@ lists the annotated modules under `strict`. A ported module goes on that list
 in the same change. Trunk passes the changed files to pyright explicitly,
 which makes pyright ignore `include` and `exclude`, so the per-file mode is
 what limits the checks. Examples that need libraries the project does not
-install are excluded from pyright in `.trunk/trunk.yaml`.
+install are excluded from pyright in `.trunk/trunk.yaml`, and so is
+`Pyjo.Test.pytest_plugin`, which imports pytest, so it is not on the strict
+list: check it in strict mode with pytest installed, from a configuration
+outside the repository that names it in `include` and the virtual
+environment with pytest in `venvPath` and `venv`. pyright, as Python with a
+script, resolves an import against the directory of the file first, so a
+module named `pytest.py` would import itself.
 
 Trunk reports only the issues that a change introduces, and counts an issue
 in a file that already exists upstream as existing, even when the file has
@@ -1285,7 +1340,8 @@ changes the code: how it works and why. Module documentation lives in the
 module docstrings, ported from Mojo's POD in the same layout (synopsis,
 events, attributes, methods), and Sphinx builds the API reference in `docs/`
 from them. Read the Docs builds the documentation with the Sphinx of
-`docs/requirements.txt`, and so does the workflow Docs, with `-W`, so that
+`docs/requirements.txt`, which has pytest too, as autodoc imports
+`Pyjo.Test.pytest_plugin`, and so does the workflow Docs, with `-W`, so that
 a warning, as a reference that is not found or a docstring that is not valid
 reStructuredText, fails the pull request that makes it:
 

@@ -726,6 +726,54 @@ assertion:
 In this section we've covered how to add custom test assertions to
 :mod:`Pyjo.Test.Pyjo` with a subclass and how to use it to simplify testing.
 
+.. Not in Mojolicious: pytest, which runs the same test scripts, and the tests of pytest with Pyjo.Test.Pyjo
+
+Running the tests with pytest
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The test scripts run with ``pyjo-prove``, and with pytest too, where it is
+installed, through the plugin :mod:`Pyjo.Test.pytest_plugin`, as a test
+explorer of an IDE or a coding agent runs them. Each script is a test of
+pytest, whose failure shows the failed tests of the script with their
+diagnostic messages. The ``pyproject.toml`` of ``pyjo generate app`` names
+``t`` in ``testpaths``, so ``pytest`` runs it:
+
+.. code-block:: console
+
+    $ pytest
+    ...
+    t/basic.py .                                                       [100%]
+
+A test of pytest uses :mod:`Pyjo.Test.Pyjo` through the fixture ``t``, made
+of the application of the fixture ``app``, and its first failed test raises
+:exc:`AssertionError` with the description, the got and the expected values:
+
+.. code-block:: python
+
+    # tests/conftest.py
+    import pytest
+
+
+    @pytest.fixture
+    def app():
+        return 'MyApp'
+
+
+    # tests/test_basic.py
+    def test_index(t):
+        t.get_ok('/').status_is(200).content_like(r'(?i)Pyjoyment')
+
+Such tests go to a directory of their own, as ``tests``, since ``pyjo-prove``
+runs every script of ``t``:
+
+.. code-block:: console
+
+    $ pytest tests
+    ...
+    tests/test_basic.py .                                              [100%]
+
+:mod:`Pyjo.Test.pytest_plugin` says what else differs from a test script.
+
 More
 ----
 
