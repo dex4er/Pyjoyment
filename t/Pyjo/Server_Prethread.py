@@ -331,11 +331,12 @@ with subtest('A worker that does not stop is left'):
         workers=1,
     )
     prethread.unsubscribe('request')
-    release = threading.Event()
+    release, blocked = threading.Event(), threading.Event()
 
     # A request that blocks the event loop of the worker
     @prethread.on('request')
     def request(prethread, tx):
+        blocked.set()
         release.wait(30)
 
     prethread.app.log.level = 'trace'
@@ -348,7 +349,13 @@ with subtest('A worker that does not stop is left'):
     def heartbeat(prethread, id):
         connections.append(connection := socket.create_connection(('127.0.0.1', prethread.ports()[0])))
         connection.sendall(b'GET / HTTP/1.1\r\nHost: x\r\n\r\n')
-        prethread.once('wait', lambda prethread: signal.raise_signal(signal.SIGTERM))
+
+        # TERM once the worker is blocked by the request, which a loaded system may give it later than the next wait
+        @prethread.on('wait')
+        def wait(prethread):
+            if blocked.is_set():
+                prethread.unsubscribe('wait', wait)
+                signal.raise_signal(signal.SIGTERM)
 
     # The debug mode of asyncio, which PYTHONDEVMODE turns on, logs the callback that blocks the worker, as it is slow,
     # until the worker that is left ends
