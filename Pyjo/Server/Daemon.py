@@ -486,6 +486,16 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
                 graceful = True
                 loop.next_tick(lambda loop: loop.stop_gracefully())
 
+        # Not in Mojolicious: the graceful stop closes a connection that is kept alive after its next response, as a
+        # worker of Mojo::Server::Prefork does, so that a client that keeps requesting does not keep the server from
+        # stopping; local $self->{max_requests}, the value is set back at the end
+        max_requests = self.max_requests
+
+        def finish(loop: Any) -> None:
+            self.max_requests = 1
+
+        finished = loop.once('finish', finish)
+
         # Not in Mojolicious: a thread other than the main one cannot handle signals, and HUP is ignored, as there is
         # nothing to reload
         handlers: dict[signal.Signals, Any] = {}
@@ -500,6 +510,8 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
             for name, handler in handlers.items():
                 signal.signal(name, handler)
             loop.remove(interval)
+            loop.unsubscribe('finish', finished)
+            self.max_requests = max_requests
 
     def start(self) -> Self:
         """::
