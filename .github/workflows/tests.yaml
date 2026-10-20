@@ -31,7 +31,7 @@ jobs:
           - Asyncio
           - Poll
 
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 10
 
     steps:
@@ -72,7 +72,7 @@ jobs:
           - Asyncio
           - Poll
 
-    runs-on: windows-latest
+    runs-on: windows-2025
     timeout-minutes: 15
 
     steps:
@@ -116,7 +116,7 @@ jobs:
           - Asyncio
           - Poll
 
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 10
 
     steps:
@@ -157,7 +157,7 @@ jobs:
           - "3.12"
           - "3.15"
 
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 10
 
     steps:
@@ -195,11 +195,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-24.04-arm
+          - os: ubuntu-26.04-arm
             python: "3.12"
-          - os: ubuntu-24.04-arm
+          - os: ubuntu-26.04-arm
             python: "3.15"
-          - os: windows-latest
+          - os: windows-2025
             python: "3.15"
 
     runs-on: ${{ matrix.os }}
