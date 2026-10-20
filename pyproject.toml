@@ -53,6 +53,10 @@ pyjo-prove = "Pyjo.Prove:main"
 pyjo-hot = "Pyjo.Server.Hot:main"
 pyjo-reload = "Pyjo.Server.Reload:main"
 
+# The plugin of pytest, which pytest loads only where it is installed
+[project.entry-points.pytest11]
+pyjo = "Pyjo.Test.pytest_plugin"
+
 [project.urls]
 Homepage = "https://github.com/dex4er/Pyjoyment"
 Documentation = "https://pyjoyment.readthedocs.io/"
@@ -74,6 +78,9 @@ servers = [
   "websockets>=17.2",
   "werkzeug>=3.1.9",
 ]
+# Not a dependency of the package: pytest, which the tests in t/Pyjo/Test_pytest.py run the plugin
+# Pyjo.Test.pytest_plugin with
+pytest = ["pytest>=9.1.1"]
 
 # uWSGI runs CGI scripts with its plugin "cgi", which the package builds into the binary only on request
 [tool.uv.extra-build-variables]
@@ -94,6 +101,10 @@ include = [
   "/LICENSE",
   "/README.md",
 ]
+
+# pytest runs the test scripts with the plugin Pyjo.Test.pytest_plugin
+[tool.pytest.ini_options]
+testpaths = ["t"]
 
 [tool.ruff]
 line-length = 120
@@ -145,6 +156,7 @@ ignore = [
 # and the benchmarks are the code of a user.
 "Pyjo/Reactor/**" = ["TID251"]
 "Pyjo/Prove.py" = ["TID251"]
+"Pyjo/Test/pytest_plugin.py" = ["TID251"]
 "benchmarks/**" = ["TID251"]
 "examples/**" = [
   "TID251",

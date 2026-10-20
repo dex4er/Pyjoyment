@@ -114,7 +114,7 @@ lint:
         - t/Pyjoyment/yaml_config_lite_app*.yml
     # Benchmarks, examples and tests that need other libraries, which are not
     # installed for the project, as the servers of the dependency group
-    # "servers"
+    # "servers" and pytest of "pytest"
     - linters:
         - pyright
       paths:
@@ -123,6 +123,7 @@ lint:
         - examples/servers/hello_world_uvicorn.py
         - examples/servers/hello_world_werkzeug.py
         - examples/servers/server_asgi_on_request.py
+        - Pyjo/Test/pytest_plugin.py
         - t/lib/ServerProcess.py
         - t/servers/**
 actions:

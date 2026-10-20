@@ -183,3 +183,58 @@ jobs:
         run: |-
           uv run --python "$(command -v python)" --only-group servers python -m Pyjo.Prove -l --color --timeout 120 -r t/servers 2>&1 | tee prove.log
           if grep -n 'ResourceWarning:' prove.log; then exit 1; fi
+
+  # The plugin of pytest, with pytest of the dependency group "pytest", which uv
+  # installs with the project, so that pytest loads the plugin of its entry
+  # point: the tests of the plugin, and all the test scripts run by pytest, on
+  # the oldest and the newest supported Python, and on Windows.
+  pytest:
+    name: pytest (python ${{ matrix.python }}, ${{ matrix.os }})
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04-arm
+            python: "3.12"
+          - os: ubuntu-24.04-arm
+            python: "3.15"
+          - os: windows-latest
+            python: "3.15"
+
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+          allow-prereleases: true
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.3.0
+        with:
+          version: 0.13.0 # datasource=github-releases depName=astral-sh/uv
+
+      - name: Run tests of the plugin of pytest
+        shell: bash
+        env:
+          PYTHONDEVMODE: "1"
+          PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
+        run: |-
+          uv run --python "${{ matrix.python }}" --group pytest python -m Pyjo.Prove -l --color --timeout 120 --capture-stderr t/Pyjo/Test_pytest_plugin.py t/docs/Test_pytest_plugin.py t/docs/guides_testing.py 2>&1 | tee prove.log
+          if grep -n 'ResourceWarning:' prove.log; then exit 1; fi
+
+      # pytest shows the standard error of a test script that failed only, so
+      # the ResourceWarning of the scripts is checked by the jobs of prove
+      - name: Run all tests with pytest
+        shell: bash
+        env:
+          PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
+          TEST_ONLINE: "1"
+        run: |-
+          uv run --python "${{ matrix.python }}" --group pytest pytest -p no:cacheprovider --color=yes -o pyjo_prove_timeout=60

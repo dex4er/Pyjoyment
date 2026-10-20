@@ -366,6 +366,7 @@ This is the class hierarchy of the :mod:`Pyjoyment` distribution.
 
 - :mod:`Pyjo.TOML`
 - :mod:`Pyjo.Test`
+- :mod:`Pyjo.Test.pytest_plugin`
 - :mod:`Pyjo.Util`
 - :mod:`Pyjo.WebSocket`
 - :mod:`Pyjo.YAML`
