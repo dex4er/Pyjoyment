@@ -34,7 +34,8 @@ Pyjo.Reactor.Poll - Low-level event reactor with poll support
 :mod:`Pyjo.Reactor.Poll` is a low-level event reactor based on
 :func:`select.poll`, without asyncio. Windows has no :func:`select.poll`,
 and :func:`select.select` takes its place there, which watches sockets only,
-not pipes or files. ``PYJO_REACTOR`` selects it for :mod:`Pyjo.IOLoop`::
+not pipes or files, up to 512 of them. ``PYJO_REACTOR`` selects it for
+:mod:`Pyjo.IOLoop`::
 
     PYJO_REACTOR=Pyjo.Reactor.Poll
 
