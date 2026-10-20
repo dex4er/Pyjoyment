@@ -369,7 +369,7 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
             pid = 0
 
         # Running
-        if pid and _kill(0, pid):
+        if pid and _alive(pid):
             return pid
 
         # Not running
@@ -779,6 +779,36 @@ def _flush() -> None:
             stream.flush()
         except Exception:
             pass
+
+
+# Perl's kill 0, true if the process runs. On Windows, os.kill with 0 is not a check: 0 is CTRL_C_EVENT there, which
+# goes to every process of the console, and another signal is TerminateProcess, so the process is opened and asked for
+# its exit code instead
+if sys.platform == 'win32':
+    import ctypes
+
+    from ctypes import wintypes
+
+    _kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
+    _kernel32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+    _kernel32.OpenProcess.restype = wintypes.HANDLE
+    _kernel32.GetExitCodeProcess.argtypes = (wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD))
+    _kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+
+    # PROCESS_QUERY_LIMITED_INFORMATION, ERROR_ACCESS_DENIED of a process that runs as someone else, and STILL_ACTIVE
+    _QUERY, _DENIED, _ACTIVE = 0x1000, 5, 259
+
+
+def _alive(pid: int) -> bool:
+    if sys.platform != 'win32':
+        return _kill(0, pid)
+    if not (handle := _kernel32.OpenProcess(_QUERY, False, pid)):
+        return ctypes.get_last_error() == _DENIED
+    try:
+        code = wintypes.DWORD()
+        return bool(_kernel32.GetExitCodeProcess(handle, ctypes.byref(code))) and code.value == _ACTIVE
+    finally:
+        _kernel32.CloseHandle(handle)
 
 
 # Perl's kill, true if the signal was sent
