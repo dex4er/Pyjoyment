@@ -16,7 +16,8 @@ Pyjoyment.Command.Author.generate.plugin - Plugin generator command
 :mod:`Pyjoyment.Command.Author.generate.plugin` generates directory structures
 for fully functional :mod:`Pyjoyment` plugins: a distribution with
 ``pyproject.toml``, which builds with hatchling, and a test, which
-``uv run python -m Pyjo.Prove -l -r t`` runs. The module of a plugin is in the
+``uv run python -m Pyjo.Prove -l -r t`` runs, as does ``uv run pytest``,
+with pytest of the dependency group ``dev``. The module of a plugin is in the
 namespace ``Pyjoyment.Plugin``, which the distribution adds to without the
 ``__init__.py`` files of the namespace.
 
@@ -201,4 +202,11 @@ path = "<%= path %>"
 
 [tool.hatch.build.targets.wheel]
 only-include = ["<%= path %>"]
+
+[dependency-groups]
+dev = ["pytest>=9", "pytest-xdist>=3"]
+
+[tool.pytest.ini_options]
+testpaths = ["t"]
+pythonpath = ["."]
 '''

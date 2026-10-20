@@ -345,4 +345,74 @@ with subtest('Deep structure differences'):
     )
     is_ok(code, 1, 'right exit status')
 
+with subtest('Exceptions'):
+    out, err, code = run("""
+        import Pyjo.Test
+        from Pyjo.Test import *
+        Pyjo.Test.raise_failures()
+        ok(True, 'passed')
+        try:
+            is_ok(1, 2, 'different')
+        except AssertionError as e:
+            print(e)
+        try:
+            ok(False)
+        except AssertionError as e:
+            print(e)
+    """)
+    is_ok(out, "Failed test 'different'\n         got: 1\n    expected: 2\nFailed test\n", 'raised, no TAP')
+    is_ok(err, '', 'no diagnostics')
+    is_ok(code, 0, 'no plan needed')
+
+    out, err, code = run("""
+        import unittest
+        import Pyjo.Test
+        from Pyjo.Test import *
+        Pyjo.Test.raise_failures()
+        print(bool(plan(tests=3)), done_testing(), skip('later', 2))
+        with subtest('Skipped'):
+            plan(skip_all='not here')
+            ok(False, 'never')
+        print(subtest('Passed', lambda: ok(True)))
+        diag('a diagnostic message')
+        note('a note')
+        try:
+            plan(skip_all='not now')
+        except unittest.SkipTest as e:
+            print(f'skipped: {e}')
+        try:
+            bail_out('No database connection')
+        except Pyjo.Test.BailOut as e:
+            print(f'bailed out: {e}')
+    """)
+    is_ok(
+        out,
+        'True True True\nTrue\n# a note\nskipped: not now\nbailed out: No database connection\n',
+        'plans, skips, subtests and bail out',
+    )
+    is_ok(err, '# a diagnostic message\n', 'diagnostic message')
+    is_ok(code, 0, 'right exit status')
+
+    out, err, code = run("""
+        import Pyjo.Test
+        from Pyjo.Test import *
+        Pyjo.Test.raise_failures()
+        with subtest('Failed'):
+            ok(False, 'inner')
+    """)
+    like_ok(err, r"(?m)^AssertionError: Failed test 'inner'$", 'raised out of the subtest')
+    is_ok(out, '', 'no TAP')
+    is_ok(code, 1, 'died of the exception')
+
+    out, err, code = run("""
+        import Pyjo.Test
+        from Pyjo.Test import *
+        Pyjo.Test.raise_failures()
+        Pyjo.Test.raise_failures(False)
+        ok(True)
+        done_testing()
+    """)
+    is_ok(out, 'ok 1\n1..1\n', 'TAP again')
+    is_ok(code, 0, 'right exit status')
+
 done_testing()

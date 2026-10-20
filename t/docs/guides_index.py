@@ -31,7 +31,14 @@ def documented():
     ]
     classes = {}
     for name in names:
-        cls = getattr(importlib.import_module(name), 'object', None)
+        try:
+            module = importlib.import_module(name)
+        except ModuleNotFoundError as e:
+            # A module of a library that is not installed, as Pyjo.Test.pytest_plugin of pytest, names no class
+            if e.name is not None and e.name.split('.')[0] in ('Pyjo', 'Pyjoyment'):
+                raise
+            continue
+        cls = getattr(module, 'object', None)
         if isinstance(cls, type) and cls.__module__ == name:
             classes[cls] = name
     parents = dict.fromkeys(names)

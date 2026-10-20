@@ -177,6 +177,39 @@ with subtest('Subtests'):
     )
     is_ok(code, 0, 'right exit status')
 
+with subtest('Exceptions'):
+    with tempfile.TemporaryDirectory() as tmp:
+        with open(os.path.join(tmp, 'test_url.py'), 'w') as f:
+            f.write(
+                textwrap.dedent("""\
+                    import unittest
+
+                    import Pyjo.Test
+                    import Pyjo.URL
+
+
+                    def setUpModule():
+                        Pyjo.Test.raise_failures()
+
+
+                    def tearDownModule():
+                        Pyjo.Test.raise_failures(False)
+
+
+                    class TestURL(unittest.TestCase):
+                        def test_host(self):
+                            url = Pyjo.URL.new('HtTp://Example.Com')
+                            Pyjo.Test.is_ok(url.host, 'Example.Com', 'right host')
+                """)
+            )
+        env = dict(os.environ, PYTHONPATH=ROOT)
+        p = subprocess.run(
+            [sys.executable, '-m', 'unittest', '-v', 'test_url'], cwd=tmp, capture_output=True, text=True, env=env
+        )
+        like_ok(p.stderr, r'(?m)^test_host \(test_url\.TestURL\.test_host\) \.\.\. ok$', 'test of unittest')
+        is_ok(p.stdout, '', 'no TAP')
+        is_ok(p.returncode, 0, 'right exit status')
+
 with subtest('bail_out'):
     out, err, code = run(
         """
@@ -427,6 +460,21 @@ with subtest('plan_tests'):
         after='ok(True)\nok(True)\nok(True)',
     )
     is_ok(out, '1..3\nok 1\nok 2\nok 3\n', 'planned')
+    is_ok(code, 0, 'right exit status')
+
+with subtest('raise_failures'):
+    out, err, code = run(
+        """
+        raise_failures()
+        try:
+            ok(False, 'raised')
+        except AssertionError as e:
+            print(e)
+        raise_failures(False)
+        """,
+        after='ok(True)\ndone_testing()',
+    )
+    is_ok(out, "Failed test 'raised'\nok 1\n1..1\n", 'raised, then printed')
     is_ok(code, 0, 'right exit status')
 
 with subtest('skip'):

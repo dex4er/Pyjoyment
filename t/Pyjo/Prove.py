@@ -380,6 +380,10 @@ with subtest('Directories, recursion and parallel jobs'):
     out, code = prove('-r', '-j', '3', scripts=scripts)
     like_ok(out, r'(?m)^Files=3, Tests=4, ', 'recursive, in parallel')
     is_ok(code, 0, 'right exit status')
+    # Not in prove: as many jobs as the processors
+    out, code = prove('-r', '-j', '0', scripts=scripts)
+    like_ok(out, r'(?m)^Files=3, Tests=4, ', 'recursive, in parallel on the processors')
+    is_ok(code, 0, 'right exit status')
 
 with subtest('Timeout'):
     started = time.monotonic()
