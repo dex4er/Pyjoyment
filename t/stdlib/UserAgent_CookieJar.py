@@ -85,6 +85,12 @@ with subtest('A cookie with an empty value is saved and loaded'):
     mozilla.load(ignore_discard=True, ignore_expires=True)
     is_deeply_ok([(c.name, c.value) for c in mozilla], [('a', '')], 'loaded by http.cookiejar')
 
+with subtest('A file with the CRLF of Windows'):
+    file = tempdir().child('cookies.txt')
+    file.spew('# Netscape HTTP Cookie File\r\n\r\n.example.com\tTRUE\t/\tFALSE\t0\ta\tb\r\n')
+    jar = Pyjo.UserAgent.CookieJar.new(file=file.to_str()).load()
+    is_deeply_ok([(c.domain, c.name, c.value) for c in jar.all()], [('example.com', 'a', 'b')], 'without the CR')
+
 with subtest('The file of curl in the tests is read by http.cookiejar'):
     mozilla = MozillaCookieJar(curfile().dirname().sibling('cookies').child('curl.txt').to_str())
     mozilla.load(ignore_discard=True, ignore_expires=True)

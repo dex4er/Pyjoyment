@@ -263,7 +263,10 @@ class Pyjo_UserAgent_CookieJar(Pyjo.Base.object):
         # Unlike Mojolicious: the file is UTF-8, where Mojo reads and writes characters as they are, and warns about
         # wide characters
         content = str(Pyjo.File.path(file).slurp('UTF-8'))
-        for line in split('\n', content):
+
+        # Unlike Mojolicious: a line may end with CRLF, as curl and http.cookiejar write the file on Windows, where Mojo
+        # keeps the carriage return in the value of the cookie
+        for line in split(r'\r?\n', content):
             # Prefix used by curl for HttpOnly cookies
             line = line or ''
             httponly = line.startswith('#HttpOnly_')
