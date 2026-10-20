@@ -52,6 +52,14 @@ blocking it:
     .. include:: ../examples/user_agent.py
        :code: python
 
+A request on a loopback
+-----------------------
+
+A blocking request of the user agent to the server, in the same event loop:
+
+    .. include:: ../examples/loopback.py
+       :code: python
+
 Web scraping
 ------------
 
