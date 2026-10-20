@@ -216,7 +216,7 @@ class Pyjo_Server_Prethread(Pyjo.Server.Prefork.object):
         return True
 
     def _spawn(self) -> None:
-        # The listen sockets of the manager, which the worker duplicates
+        # The listen sockets of the manager, which the worker duplicates, or shares on Windows
         loop = self.ioloop
         listen = [
             (location, loop.acceptor(id).handle) for location, id in zip(self.listen, self.acceptors, strict=True)
@@ -254,14 +254,18 @@ class Pyjo_Server_Prethread(Pyjo.Server.Prefork.object):
         worker.acceptors, worker._connections, worker._servers = [], {}, {}
         worker.cleanup, worker.silent = False, True
         try:
-            # The listen sockets of the manager, duplicated, as the worker closes them, by the socket, as a socket of
-            # Windows is not a file descriptor that os.dup takes
+            # The listen sockets of the manager, duplicated, as the worker closes them. On Windows, the workers share the
+            # sockets of the manager and leave them open, as accept of a duplicate, of WSADuplicateSocket or of
+            # DuplicateHandle, can block, also on a non-blocking socket, when the duplicate of another worker accepts the
+            # connection that select reported to both
             loop.max_accepts = self.accepts
             if max := worker.max_clients:
                 loop.max_connections = max
             for location, handle in listen:
                 assert handle is not None
-                worker._listen(_location(location, handle.dup().detach()))
+                worker._listen(
+                    _location(location, handle.fileno() if sys.platform == 'win32' else handle.dup().detach())
+                )
 
             # Heartbeat messages
             finished = False
@@ -302,6 +306,11 @@ class Pyjo_Server_Prethread(Pyjo.Server.Prefork.object):
         finally:
             loop.reactor.remove(control)
             control.close()
+            if sys.platform == 'win32':
+                for acceptor in [*(loop.acceptor(id) for id in worker.acceptors), *worker._servers.values()]:
+                    if acceptor is not None and (handle := acceptor.handle) is not None:
+                        acceptor.stop()
+                        handle.detach()
             worker._cleanup()
             loop.reset()
 
@@ -313,8 +322,8 @@ class Pyjo_Server_Prethread(Pyjo.Server.Prefork.object):
                 pass
 
 
-# A listen location for the duplicate of a listen socket, without the port and the path that would find the socket of
-# the manager in PYJO_REUSE
+# A listen location for the duplicate of a listen socket, or the socket on Windows, without the port and the path that
+# would find the socket of the manager in PYJO_REUSE
 def _location(location: Any, fd: int) -> str:
     url = Pyjo.URL.new(str(location))
     if url.protocol.endswith('+unix'):

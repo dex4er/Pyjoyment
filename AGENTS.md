@@ -437,7 +437,8 @@ as the file descriptor 0, inspired by `Pyjo.Server.CGI` and its command),
 `Pyjo.Server.Prethread` and `Pyjoyment.Command.prethread` (the server of
 `Pyjo.Server.Prefork` with threads for the worker processes, each a copy of
 the server with the event loop of its thread and the duplicates of the listen
-sockets of the manager, as Thrall is Starlight with threads, and its command,
+sockets of the manager, or the sockets themselves on Windows, where `accept` of
+a duplicate can block when another one accepts the connection, as Thrall is Starlight with threads, and its command,
 a subclass of the one of `prefork`),
 `Pyjoyment.Plugin.PyRenderer` (the renderer of template strings, inspired by
 `Mojolicious::Plugin::EPLRenderer`), `Pyjoyment.Plugin.TOMLConfig` (inspired
