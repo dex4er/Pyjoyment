@@ -49,7 +49,7 @@ does not have. There, a loop of its own is an
 that is running has to be one too, as of
 ``asyncio.run(main(), loop_factory=asyncio.SelectorEventLoop)``. The
 :class:`asyncio.SelectorEventLoop` of Windows watches sockets only, not pipes
-or files.
+or files, up to 512 of them, with :func:`select.select`.
 
 The end of a ``with`` block closes the event loop that the reactor made.
 

@@ -62,7 +62,7 @@ of them is a regression.
   comes from another distribution, in the namespace `Pyjo.Reactor` that
   `extend_path` keeps open, and `PYJO_REACTOR` selects it, as
   `Mojo::Reactor::EV` replaces `Mojo::Reactor::Poll`. `Pyjo.Reactor.Poll`, the port of
-  `Mojo::Reactor::Poll` on `select.poll`, is a reactor without asyncio that
+  `Mojo::Reactor::Poll` on `select.poll`, or `select.select` on Windows, is a reactor without asyncio that
   runs the same tests, the example of such a reactor. Mojo 9 moved from
   callbacks and `Mojo::IOLoop::Delay` to promises and async/await; a promise
   is a port of `Mojo::Promise`, which follows the Promise of ECMAScript, and
@@ -153,10 +153,10 @@ free when it is found, but not necessarily when the process binds it a second
 later: a server of a test that runs at the same time, which listens on a port
 that the system picks, or an outgoing connection, whose local port the system
 picks, can get it, and the test then takes that server for its own. The system
-picks them from its ephemeral ports, from 32768 on Linux and 49152 on macOS,
-so `port` finds one below them, and a lock of its byte in a file of the
-temporary directory, which the system releases when the test ends, keeps it
-from the other tests. Such a test starts its server with `retry`, which tries
+picks them from its ephemeral ports, from 32768 on Linux and 49152 on macOS
+and Windows, so `port` finds one below them, and a lock of its byte in a file
+of the temporary directory, with `fcntl` or the `msvcrt` of Windows, which the
+system releases when the test ends, keeps it from the other tests. Such a test starts its server with `retry`, which tries
 again on new ports when a port is taken anyway, and waits for it with a limit
 of time, so that a server that does not start fails the test instead of
 hanging it. A server that runs in the process of the test can listen on the
@@ -248,6 +248,19 @@ reactor runs in the loop of the ASGI server, or a coroutine that awaits
 ```sh
 PYJO_REACTOR=Pyjo.Reactor.Poll mise exec -- python -m Pyjo.Prove -l -j 4 --capture-stderr --stderr-lines 1000 -r t
 ```
+
+CI runs them on Windows too, on the Python of `mise.toml` and on both
+reactors. A test of what Windows does not have, as `os.fork`, UNIX domain
+sockets, the signals of POSIX, a command of a shell of POSIX or the mode of a
+file, skips there with the reason. A test of paths compares them as Windows
+makes them, with the drive, both separators and the short names of 8.3 that
+`os.path.realpath` resolves, as `C:\Users\RUNNER~1` of the runner, and a test
+that captures output reads it with LF, as Windows writes CRLF in text mode. A
+test signals its own process with `signal.raise_signal`, as `os.kill` of
+Windows terminates the process, and stops a server of a process of its own
+with `CTRL_BREAK_EVENT` in a process group of its own, as Windows sends no INT
+or TERM to one process. It closes a file before it removes its directory, as
+Windows removes no file that is open.
 
 CI runs the tests in `t/servers` on Python 3.12 and 3.15, the oldest and the
 newest supported, of setup-python, with the dependency group `servers`
@@ -920,7 +933,15 @@ pattern.match_partial(path)`.
   is 25 seconds, where Mojo has 120, below the 30 seconds that Kubernetes
   gives a container to stop, so that the server forces its workers and stops
   by itself before the orchestrator kills it. The tests of Mojo that send
-  these signals have `# Unlike Mojolicious:` comments.
+  these signals have `# Unlike Mojolicious:` comments. Windows has INT, TERM
+  and BREAK only, and a TERM of another process terminates the process there
+  without its handler, so BREAK, of Ctrl-Break, takes the place of QUIT, and
+  a server stops from its console.
+- `File::Spec` and `File::Basename` follow the system, so `Pyjo.File` has
+  their rules of Unix and, on Windows, of `File::Spec::Win32` and of
+  `MSWin32`, with the volume of a path and both separators. A file is read
+  and written with `os.O_BINARY` there, as `sysread` and `syswrite` pass the
+  bytes as they are, where the text mode of Windows writes `\n` as CRLF.
 - `local` on an attribute, as `local $self->{running}`, is the value saved
   before and set back in a `finally`.
 - `__del__`, the counterpart of `DESTROY`, does nothing when
