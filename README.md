@@ -3,6 +3,15 @@
 
 # Pyjoyment
 
+<p align="center">
+<a href="https://pyjoyment.readthedocs.io/">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/dex4er/Pyjoyment/master/Pyjoyment/resources/public/pyjo/logo-white-4x.png">
+    <img src="https://raw.githubusercontent.com/dex4er/Pyjoyment/master/Pyjoyment/resources/public/pyjo/logo-black-4x.png" alt="Pyjoyment" width="322">
+  </picture>
+</a>
+</p>
+
 A real-time web framework for the Python programming language, ported from
 [Mojolicious](https://mojolicious.org), the real-time web framework for Perl.
 Pyjoyment keeps the API of Mojolicious with Python names, so its documentation
