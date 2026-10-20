@@ -321,6 +321,8 @@ with subtest('subprocess'):
     # PyPy with its JIT on macOS: the child of a fork crashes now and then with a bus error, under load
     if sys.platform == 'darwin' and getattr(sys, 'pypy_translation_info', {}).get('translation.jit'):
         skip('PyPy with its JIT on macOS: the child of a fork crashes now and then with SIGBUS', 4)
+    elif not hasattr(os, 'fork'):
+        skip('Pyjo.IOLoop.Subprocess needs os.fork', 4)
     else:
         subprocess = Pyjo.IOLoop.subprocess()
         isa_ok(subprocess, Pyjo.IOLoop.Subprocess.object, 'subprocess')

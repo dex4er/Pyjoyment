@@ -12,7 +12,8 @@ Pyjoyment.Plugin.JSONConfig - JSON configuration plugin
       "baz": ["♥"],
 
       %# You have full access to the application
-      "music_dir": "<%= app.home.child('music') %>"
+      % import Pyjo.JSON
+      "music_dir": <%= Pyjo.JSON.to_json(app.home.child('music').to_str()) %>
     }
 
     # Pyjoyment
@@ -41,6 +42,10 @@ filename in the application home directory will be generated from the value
 of :attr:`Pyjoyment.Pyjoyment_App.moniker` (``$moniker.json``). You can extend
 the normal configuration file ``$moniker.json`` with ``mode`` specific ones
 like ``$moniker.$mode.json``, which will be detected automatically.
+
+A value of the application goes into the JSON through
+:func:`Pyjo.JSON.to_json`, which escapes what a string of JSON cannot hold
+as it is, as the backslashes of a path of Windows.
 
 These configuration values are currently reserved:
 

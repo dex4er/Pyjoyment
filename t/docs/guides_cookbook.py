@@ -174,8 +174,11 @@ with subtest('Hot deployment'):
     with cookbook('hot') as t:
         is_deeply_ok(t.app.config('hot'), {'listen': ['http://*:80']}, 'settings')
         t.get_ok('/').status_is(200).content_is('Hello World!')
-    result = command('-m', 'Pyjo.Server.Hot', '-t', EXAMPLES.child('hot.py').to_str())
-    is_ok(result.stdout, 'Everything looks good!\n', 'tested')
+    if not hasattr(os, 'fork'):
+        skip('Pyjo.Server.Hot needs os.fork', 1)
+    else:
+        result = command('-m', 'Pyjo.Server.Hot', '-t', EXAMPLES.child('hot.py').to_str())
+        is_ok(result.stdout, 'Everything looks good!\n', 'tested')
 
     with tempfile.TemporaryDirectory() as tmp:
         conf = Pyjo.File.path(tmp, 'myapp.conf')
@@ -266,7 +269,8 @@ app.start()
             os.chdir(cwd)
 
         # Access fully initialized application
-        is_ok(app.static.paths[0], os.path.join(os.path.realpath(tmp), 'public'), 'static paths')
+        # Both real, as a temporary directory of Windows may have the short names of 8.3, as C:\Users\RUNNER~1
+        is_ok(os.path.realpath(app.static.paths[0]), os.path.join(os.path.realpath(tmp), 'public'), 'static paths')
         is_ok(app.config('secret_identity'), 'Pyjo', 'config')
         is_ok(app.dumper({'just': 'a helper test'}), "{'just': 'a helper test'}\n", 'helper')
         is_ok(app.build_controller().render_to_string(template='foo'), 'Hello Pyjo!\n', 'template')
@@ -399,7 +403,10 @@ with subtest('Timers and subprocesses'):
         txs = concurrently((delayed, '/'), (counter, '/'), (blocking, '/'), (sleepy, '/'))
         is_ok(txs[0].res.text, 'Delayed by 3 seconds!', 'timer')
         is_ok(txs[1].res.text, '12345', 'recurring timer')
-        is_ok(txs[2].res.text, 'I ♥ Pyjoyment!', 'subprocess')
+        if not hasattr(os, 'fork'):
+            skip('Pyjo.IOLoop.Subprocess needs os.fork', 1)
+        else:
+            is_ok(txs[2].res.text, 'I ♥ Pyjoyment!', 'subprocess')
         if Pyjo.Reactor.object.detect() == 'Pyjo.Reactor.Asyncio':
             is_ok(txs[3].res.text, 'Delayed by 3 seconds!', 'asyncio')
         else:
@@ -566,6 +573,9 @@ with subtest('Content generators'):
             tx = ua.post('http://example.com/upload', stream=Pyjo.File.path(tmp, 'pyjo.png').to_str())
             is_ok(tx.result.json('/method'), 'POST', 'POST')
 
+            # The file is closed before its directory is removed, which Windows does not do with a file that is open
+            tx.req.content.asset.close()
+
     with Pyjo.UserAgent.new() as ua, remote(ua):
         # Send "application/json" content via PATCH
         tx = ua.patch('http://api.example.com', json={'foo': 'bar'})
@@ -620,6 +630,10 @@ with subtest('Large file downloads and uploads'):
         with Pyjo.UserAgent.new() as ua, remote(ua):
             tx = ua.post('example.com/upload', form={'image': {'file': Pyjo.File.path(tmp, 'hello.png').to_str()}})
             like_ok(tx.result.json('/body'), re.compile(r'name="image"; filename="hello\.png".*Hello PNG', re.S))
+
+            # The file is closed before its directory is removed, which Windows does not do with a file that is open
+            for part in tx.req.content.parts:
+                part.asset.close()
 
 with subtest('Streaming response and request'):
     # Accept responses of indefinite size
@@ -767,6 +781,8 @@ with subtest('WebSockets'):
     is_ok(out.getvalue(), 'WebSocket message: Hi!\nWebSocket closed with status 1005.\n', 'echo')
 
 with subtest('UNIX domain sockets'):
+    if sys.platform == 'win32':
+        plan(skip_all='no UNIX domain sockets on Windows')
     app = Pyjoyment.new()
     app.routes.get('/index.html').to(text='Index')
     app.routes.get('/').to(cb=lambda c: c.render(text=f'Host {c.req.headers.host}'))

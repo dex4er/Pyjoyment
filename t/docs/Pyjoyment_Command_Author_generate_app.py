@@ -56,7 +56,8 @@ with subtest('Description'):
     result = python('-m', 'MyApp', 'get', '/', dir=dir)
     like_ok(result.stdout, r'<h2>Welcome to the Pyjoyment real-time web framework!</h2>', 'python -m MyApp')
     result = python('-m', 'MyApp', 'eval', '-v', 'app.home', dir=dir)
-    is_ok(result.stdout.strip(), Pyjo.File.path(dir).realpath().to_str(), 'home')
+    # Both real, as a temporary directory of Windows may have the short names of 8.3, as C:\Users\RUNNER~1
+    is_ok(Pyjo.File.path(result.stdout.strip()).realpath().to_str(), Pyjo.File.path(dir).realpath().to_str(), 'home')
     result = python('-m', 'Pyjo.Prove', '-l', '-r', 't', dir=dir)
     like_ok(result.stdout, r'Result: PASS', 'python -m Pyjo.Prove -l -r t')
 

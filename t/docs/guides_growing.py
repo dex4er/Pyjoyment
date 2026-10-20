@@ -44,7 +44,11 @@ with subtest('Foundation'):
     stage(home, 'foundation')
     t = Pyjo.Test.Pyjo.new(Pyjo.File.path(home, 'myapp.py'))
     t.get_ok('/').status_is(200).content_is('Hello World!')
-    is_ok(os.stat(Pyjo.File.path(home, 'myapp.py').to_str()).st_mode & 0o700, 0o700, 'executable')
+    # Windows keeps the bit of read-only of a mode only
+    if sys.platform == 'win32':
+        skip('no mode of files on Windows', 1)
+    else:
+        is_ok(os.stat(Pyjo.File.path(home, 'myapp.py').to_str()).st_mode & 0o700, 0o700, 'executable')
 
 with subtest('Model'):
     stage(home, 'model')

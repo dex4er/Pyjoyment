@@ -213,7 +213,7 @@ with subtest('The Test.Pyjo object'):
 with subtest('An example'):
     home = tempfile.mkdtemp()
     result = run(home, '-m', 'Pyjoyment', 'generate', 'app', 'MyApp')
-    like_ok(result.stdout, re.compile(r'^  \[write\] .*/my_app/t/basic\.py$', re.M), 'test written')
+    like_ok(result.stdout, re.compile(r'^  \[write\] .*[/\\]my_app[/\\]t[/\\]basic\.py$', re.M), 'test written')
     basic = Pyjo.File.path(home, 'my_app', 't', 'basic.py').slurp().decode()
     is_ok(
         basic,
