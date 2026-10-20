@@ -806,3 +806,4 @@ def _single(content: Pyjo.Content.object) -> Pyjo.Content.Single.object:
 
 new = Pyjo_Message.new
 object = Pyjo_Message
+Message = Pyjo_Message

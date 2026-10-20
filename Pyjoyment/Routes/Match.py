@@ -230,3 +230,4 @@ class Pyjoyment_Routes_Match(Pyjo.Base.object):
 
 new = Pyjoyment_Routes_Match.new
 object = Pyjoyment_Routes_Match
+Match = Pyjoyment_Routes_Match

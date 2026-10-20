@@ -92,3 +92,4 @@ class Pyjoyment_Plugin_Mount(Pyjoyment.Plugin.object):
 
 new = Pyjoyment_Plugin_Mount.new
 object = Pyjoyment_Plugin_Mount
+Mount = Pyjoyment_Plugin_Mount

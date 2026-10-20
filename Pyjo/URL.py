@@ -634,3 +634,4 @@ def _encode(string: str, pattern: bytes) -> str:
 
 new = Pyjo_URL.new
 object = Pyjo_URL
+URL = Pyjo_URL

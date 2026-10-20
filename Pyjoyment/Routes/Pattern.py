@@ -430,3 +430,4 @@ def _regex_source(regex: re.Pattern[str]) -> str:
 
 new = Pyjoyment_Routes_Pattern.new
 object = Pyjoyment_Routes_Pattern
+Pattern = Pyjoyment_Routes_Pattern

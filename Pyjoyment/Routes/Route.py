@@ -758,3 +758,4 @@ class Pyjoyment_Routes_Route(Pyjo.Base.object):
 
 new = Pyjoyment_Routes_Route.new
 object = Pyjoyment_Routes_Route
+Route = Pyjoyment_Routes_Route

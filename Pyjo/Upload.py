@@ -128,3 +128,4 @@ class Pyjo_Upload(Pyjo.Base.object):
 
 new = Pyjo_Upload.new
 object = Pyjo_Upload
+Upload = Pyjo_Upload

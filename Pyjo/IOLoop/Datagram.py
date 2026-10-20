@@ -788,3 +788,4 @@ def _refused(e: OSError) -> OSError:
 
 new = Pyjo_IOLoop_Datagram.new
 object = Pyjo_IOLoop_Datagram
+Datagram = Pyjo_IOLoop_Datagram

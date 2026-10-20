@@ -65,3 +65,4 @@ __path__ = extend_path(__path__, __name__)
 
 new = Pyjoyment_Plugin.new
 object = Pyjoyment_Plugin
+Plugin = Pyjoyment_Plugin

@@ -989,3 +989,4 @@ def _value(op: str, value: str | None, insensitive: str | None = None) -> re.Pat
 
 new = Pyjo_DOM_CSS.new
 object = Pyjo_DOM_CSS
+CSS = Pyjo_DOM_CSS

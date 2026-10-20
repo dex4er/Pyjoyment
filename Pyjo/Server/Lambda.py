@@ -327,3 +327,4 @@ def _unchunk(body: bytes) -> bytes:
 
 new = Pyjo_Server_Lambda.new
 object = Pyjo_Server_Lambda
+Lambda = Pyjo_Server_Lambda

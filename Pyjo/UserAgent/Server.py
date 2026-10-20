@@ -229,3 +229,4 @@ def _weak(app: Any) -> Any:
 
 new = Pyjo_UserAgent_Server.new
 object = Pyjo_UserAgent_Server
+Server = Pyjo_UserAgent_Server

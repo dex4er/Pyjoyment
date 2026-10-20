@@ -307,3 +307,4 @@ __path__ = extend_path(__path__, __name__)
 
 new = Pyjoyment_Command.new
 object = Pyjoyment_Command
+Command = Pyjoyment_Command

@@ -46,3 +46,4 @@ class Pyjoyment_HelloWorld(Pyjoyment.object):
 
 new = Pyjoyment_HelloWorld.new
 object = Pyjoyment_HelloWorld
+HelloWorld = Pyjoyment_HelloWorld

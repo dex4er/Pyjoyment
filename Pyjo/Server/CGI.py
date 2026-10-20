@@ -173,3 +173,4 @@ def _write(res: Pyjo.Message.Response.object, method: str) -> bool:
 
 new = Pyjo_Server_CGI.new
 object = Pyjo_Server_CGI
+CGI = Pyjo_Server_CGI

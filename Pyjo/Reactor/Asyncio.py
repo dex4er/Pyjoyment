@@ -729,3 +729,4 @@ def _close_own() -> None:
 
 new = Pyjo_Reactor_Asyncio.new
 object = Pyjo_Reactor_Asyncio
+Asyncio = Pyjo_Reactor_Asyncio

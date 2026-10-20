@@ -706,3 +706,4 @@ def _request_id() -> str:
 
 new = Pyjo_Message_Request.new
 object = Pyjo_Message_Request
+Request = Pyjo_Message_Request

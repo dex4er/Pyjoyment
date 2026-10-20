@@ -601,3 +601,4 @@ class Pyjo_Transaction_WebSocket(Pyjo.Transaction.object):
 
 new = Pyjo_Transaction_WebSocket.new
 object = Pyjo_Transaction_WebSocket
+WebSocket = Pyjo_Transaction_WebSocket

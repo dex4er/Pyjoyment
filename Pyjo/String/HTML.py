@@ -207,3 +207,4 @@ def _escape(value: Anything) -> str:
 
 new = Pyjo_String_HTML.new
 object = Pyjo_String_HTML
+HTML = Pyjo_String_HTML

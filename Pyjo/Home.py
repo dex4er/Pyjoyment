@@ -96,3 +96,4 @@ def _module(cls: type | ModuleType | str) -> ModuleType | None:
 
 new = Pyjo_Home.new
 object = Pyjo_Home
+Home = Pyjo_Home

@@ -579,3 +579,4 @@ def format_usage(usage: str, width: int = WIDTH) -> str:
 
 new = Pyjo_GetOpt.new
 object = Pyjo_GetOpt
+GetOpt = Pyjo_GetOpt

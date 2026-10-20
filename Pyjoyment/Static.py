@@ -410,3 +410,4 @@ def _get_file(path: str) -> Pyjo.Asset.File.object | None:
 
 new = Pyjoyment_Static.new
 object = Pyjoyment_Static
+Static = Pyjoyment_Static

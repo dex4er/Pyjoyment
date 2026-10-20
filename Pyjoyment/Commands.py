@@ -512,3 +512,4 @@ start_app = Pyjoyment_Commands.start_app
 
 new = Pyjoyment_Commands.new
 object = Pyjoyment_Commands
+Commands = Pyjoyment_Commands

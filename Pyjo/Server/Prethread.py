@@ -336,3 +336,4 @@ def _location(location: Any, fd: int) -> str:
 
 new = Pyjo_Server_Prethread.new
 object = Pyjo_Server_Prethread
+Prethread = Pyjo_Server_Prethread

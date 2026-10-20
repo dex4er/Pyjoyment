@@ -542,3 +542,4 @@ def _str(part: Anything) -> str:
 
 new = Pyjo_String_Unicode.new
 object = Pyjo_String_Unicode
+Unicode = Pyjo_String_Unicode

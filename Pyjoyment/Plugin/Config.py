@@ -245,3 +245,4 @@ def _run(content: str, file: str, app: 'Pyjoyment.object') -> Any:
 
 new = Pyjoyment_Plugin_Config.new
 object = Pyjoyment_Plugin_Config
+Config = Pyjoyment_Plugin_Config

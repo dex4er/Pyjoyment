@@ -312,3 +312,4 @@ class Pyjo_Content_MultiPart(Pyjo.Content.object):
 
 new = Pyjo_Content_MultiPart.new
 object = Pyjo_Content_MultiPart
+MultiPart = Pyjo_Content_MultiPart

@@ -459,3 +459,4 @@ class _Socket:
 
 new = Pyjo_Message_Response.new
 object = Pyjo_Message_Response
+Response = Pyjo_Message_Response

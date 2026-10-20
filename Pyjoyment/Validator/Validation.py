@@ -380,3 +380,4 @@ def _values(result: Any) -> tuple[Any, ...]:
 
 new = Pyjoyment_Validator_Validation.new
 object = Pyjoyment_Validator_Validation
+Validation = Pyjoyment_Validator_Validation

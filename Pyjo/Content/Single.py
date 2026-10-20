@@ -182,3 +182,4 @@ def _read(single: Pyjo_Content_Single, chunk: bytes) -> None:
 
 new = Pyjo_Content_Single.new
 object = Pyjo_Content_Single
+Single = Pyjo_Content_Single

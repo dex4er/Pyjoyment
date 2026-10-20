@@ -188,3 +188,4 @@ def _teardown(module: types.ModuleType, names: list[str], ns: str | None) -> Non
 
 new = Pyjoyment_Plugin_EPRenderer.new
 object = Pyjoyment_Plugin_EPRenderer
+EPRenderer = Pyjoyment_Plugin_EPRenderer

@@ -199,3 +199,4 @@ def _wrap(cb: Callable[..., Any], next: Callable[[], Any] | None, args: tuple[An
 
 new = Pyjoyment_Plugins.new
 object = Pyjoyment_Plugins
+Plugins = Pyjoyment_Plugins

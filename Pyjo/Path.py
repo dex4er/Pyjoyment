@@ -408,3 +408,4 @@ class Pyjo_Path(Pyjo.Base.object, Pyjo.String.Mixin.object):
 
 new = Pyjo_Path.new
 object = Pyjo_Path
+Path = Pyjo_Path

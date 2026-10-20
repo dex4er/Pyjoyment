@@ -39,6 +39,11 @@ with subtest('Synopsis'):
     )
     ok(os.path.isfile(tmp.child('MyApp-Ext-Test', 'MyApp', 'Ext', 'Test.py').to_str()), 'full name')
 
+    # Not in Mojolicious: the class under the name of its module
+    module = tmp.child('Pyjoyment-Plugin-MyPlugin', 'Pyjoyment', 'Plugin', 'MyPlugin.py').slurp('UTF-8')
+    like_ok(module, r'\nMyPlugin = Pyjoyment_Plugin_MyPlugin\n', 'class under the name of its module')
+    like_ok(tmp.child('MyApp-Ext-Test', 'MyApp', 'Ext', 'Test.py').slurp('UTF-8'), r'\nTest = MyApp_Ext_Test\n', 'full')
+
 with subtest('Description'):
     application = Pyjoyment.new()
     plugin = Pyjoyment.Command.Author.generate.plugin.new(app=application)

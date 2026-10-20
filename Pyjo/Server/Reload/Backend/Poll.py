@@ -101,3 +101,4 @@ def _files(path: str) -> list[str]:
 
 new = Pyjo_Server_Reload_Backend_Poll.new
 object = Pyjo_Server_Reload_Backend_Poll
+Poll = Pyjo_Server_Reload_Backend_Poll

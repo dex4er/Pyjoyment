@@ -674,3 +674,4 @@ def _number(value: float) -> str:
 
 new = Pyjo_Server_Hot.new
 object = Pyjo_Server_Hot
+Hot = Pyjo_Server_Hot

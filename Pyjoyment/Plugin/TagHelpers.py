@@ -904,3 +904,4 @@ def _validation(c: 'Controller', name: str, tag: str, content: Any, /, **attrs: 
 
 new = Pyjoyment_Plugin_TagHelpers.new
 object = Pyjoyment_Plugin_TagHelpers
+TagHelpers = Pyjoyment_Plugin_TagHelpers

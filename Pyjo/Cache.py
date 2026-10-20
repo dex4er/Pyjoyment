@@ -108,3 +108,4 @@ class Pyjo_Cache[K: Hashable, V](Pyjo.Base.object):
 
 new = Pyjo_Cache.new
 object = Pyjo_Cache
+Cache = Pyjo_Cache

@@ -312,3 +312,4 @@ def _concat(string: str | bytes, other: Anything) -> 'Pyjo.String.Unicode.object
 
 
 object = Pyjo_String_Mixin
+Mixin = Pyjo_String_Mixin

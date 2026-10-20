@@ -446,3 +446,4 @@ def _error(e: OSError, message: str) -> OSError:
 
 new = Pyjo_IOLoop_Server.new
 object = Pyjo_IOLoop_Server
+Server = Pyjo_IOLoop_Server

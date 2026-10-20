@@ -123,3 +123,4 @@ class Pyjo_JSON_Pointer(Pyjo.Base.object):
 
 new = Pyjo_JSON_Pointer.new
 object = Pyjo_JSON_Pointer
+Pointer = Pyjo_JSON_Pointer

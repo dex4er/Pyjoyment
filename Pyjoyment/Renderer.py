@@ -658,3 +658,4 @@ def _teardown(namespaces: list[type[Pyjoyment_Renderer_Helpers]]) -> None:
 
 new = Pyjoyment_Renderer.new
 object = Pyjoyment_Renderer
+Renderer = Pyjoyment_Renderer

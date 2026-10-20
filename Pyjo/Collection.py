@@ -553,3 +553,4 @@ def _str(element: Anything) -> str:
 # Any: the type of the elements is not known before they are given
 new = Pyjo_Collection[Any].new
 object = Pyjo_Collection
+Collection = Pyjo_Collection

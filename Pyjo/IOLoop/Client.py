@@ -723,3 +723,4 @@ def _port(args: dict[str, Any]) -> int:
 
 new = Pyjo_IOLoop_Client.new
 object = Pyjo_IOLoop_Client
+Client = Pyjo_IOLoop_Client

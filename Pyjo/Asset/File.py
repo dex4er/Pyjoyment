@@ -363,3 +363,4 @@ def _close() -> None:
 
 new = Pyjo_Asset_File.new
 object = Pyjo_Asset_File
+File = Pyjo_Asset_File

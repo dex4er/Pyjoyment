@@ -283,3 +283,4 @@ def _timegm(s: float, mi: int, h: int, day: int, month: int | None, year: int) -
 
 new = Pyjo_Date.new
 object = Pyjo_Date
+Date = Pyjo_Date

@@ -776,3 +776,4 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
 
 new = Pyjo_Content.new
 object = Pyjo_Content
+Content = Pyjo_Content

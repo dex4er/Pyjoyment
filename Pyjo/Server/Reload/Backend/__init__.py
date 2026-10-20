@@ -110,3 +110,4 @@ class Pyjo_Server_Reload_Backend(Pyjo.Base.object):
 
 new = Pyjo_Server_Reload_Backend.new
 object = Pyjo_Server_Reload_Backend
+Backend = Pyjo_Server_Reload_Backend

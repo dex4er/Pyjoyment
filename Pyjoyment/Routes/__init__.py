@@ -400,3 +400,4 @@ def _render(c: 'Pyjoyment.Controller.object') -> None:
 
 new = Pyjoyment_Routes.new
 object = Pyjoyment_Routes
+Routes = Pyjoyment_Routes

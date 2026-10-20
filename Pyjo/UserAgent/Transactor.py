@@ -755,3 +755,4 @@ def _type(headers: Pyjo.Headers.object, content_type: str) -> None:
 
 new = Pyjo_UserAgent_Transactor.new
 object = Pyjo_UserAgent_Transactor
+Transactor = Pyjo_UserAgent_Transactor

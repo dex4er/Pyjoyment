@@ -244,3 +244,4 @@ class Pyjoyment_Sessions(Pyjo.Base.object):
 
 new = Pyjoyment_Sessions.new
 object = Pyjoyment_Sessions
+Sessions = Pyjoyment_Sessions

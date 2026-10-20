@@ -357,3 +357,4 @@ def _kill(sig: int, pid: int) -> bool:
 
 new = Pyjo_Server_Reload.new
 object = Pyjo_Server_Reload
+Reload = Pyjo_Server_Reload

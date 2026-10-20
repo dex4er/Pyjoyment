@@ -356,3 +356,4 @@ class Pyjo_Transaction_HTTP(Pyjo.Transaction.object):
 
 new = Pyjo_Transaction_HTTP.new
 object = Pyjo_Transaction_HTTP
+HTTP = Pyjo_Transaction_HTTP

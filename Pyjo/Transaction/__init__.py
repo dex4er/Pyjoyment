@@ -406,3 +406,4 @@ class Pyjo_Transaction(Pyjo.EventEmitter.object):
 
 new = Pyjo_Transaction.new
 object = Pyjo_Transaction
+Transaction = Pyjo_Transaction

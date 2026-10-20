@@ -1205,3 +1205,4 @@ def _url(tx: Pyjo.Transaction.object) -> str:
 
 new = Pyjo_UserAgent.new
 object = Pyjo_UserAgent
+UserAgent = Pyjo_UserAgent

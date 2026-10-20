@@ -283,3 +283,4 @@ def _package(cls: type) -> str:
 
 new = Pyjo_App.new
 object = Pyjo_App
+App = Pyjo_App

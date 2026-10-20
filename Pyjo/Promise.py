@@ -836,3 +836,4 @@ reject = Pyjo_Promise.reject
 resolve = Pyjo_Promise.resolve
 timer = Pyjo_Promise.timer
 timeout = Pyjo_Promise.timeout
+Promise = Pyjo_Promise

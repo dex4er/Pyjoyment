@@ -1310,3 +1310,4 @@ def _text(nodes: list[Tree], xml: bool | None, all: bool) -> str:
 
 new = Pyjo_DOM.new
 object = Pyjo_DOM
+DOM = Pyjo_DOM

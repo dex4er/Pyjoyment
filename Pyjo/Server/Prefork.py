@@ -827,3 +827,4 @@ def _number(value: float) -> str:
 
 new = Pyjo_Server_Prefork.new
 object = Pyjo_Server_Prefork
+Prefork = Pyjo_Server_Prefork

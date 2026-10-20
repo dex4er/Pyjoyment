@@ -177,3 +177,4 @@ def tap(obj: Any, cb: Callable[..., Any] | str, *args: Any, **kwargs: Any) -> No
 
 new = Pyjo_Base.new
 object = Pyjo_Base
+Base = Pyjo_Base

@@ -416,3 +416,4 @@ def _environ(scope: Scope) -> dict[str, str]:
 
 new = Pyjo_Server_ASGI.new
 object = Pyjo_Server_ASGI
+ASGI = Pyjo_Server_ASGI

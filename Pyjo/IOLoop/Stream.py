@@ -454,3 +454,4 @@ class Pyjo_IOLoop_Stream(Pyjo.EventEmitter.object):
 
 new = Pyjo_IOLoop_Stream.new
 object = Pyjo_IOLoop_Stream
+Stream = Pyjo_IOLoop_Stream

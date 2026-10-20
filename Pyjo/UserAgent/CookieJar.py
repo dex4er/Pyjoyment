@@ -371,3 +371,4 @@ def _path(path1: str, path2: str) -> bool:
 
 new = Pyjo_UserAgent_CookieJar.new
 object = Pyjo_UserAgent_CookieJar
+CookieJar = Pyjo_UserAgent_CookieJar

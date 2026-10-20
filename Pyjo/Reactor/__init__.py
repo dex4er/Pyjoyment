@@ -491,3 +491,4 @@ def _name(cls: type) -> str:
 detect = Pyjo_Reactor.detect
 new = Pyjo_Reactor.new
 object = Pyjo_Reactor
+Reactor = Pyjo_Reactor

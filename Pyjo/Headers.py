@@ -743,3 +743,4 @@ class Pyjo_Headers(Pyjo.Base.object, Pyjo.String.Mixin.object):
 
 new = Pyjo_Headers.new
 object = Pyjo_Headers
+Headers = Pyjo_Headers

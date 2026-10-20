@@ -291,3 +291,4 @@ def _upload(v: Anything, name: str, value: Anything) -> bool:
 
 new = Pyjoyment_Validator.new
 object = Pyjoyment_Validator
+Validator = Pyjoyment_Validator

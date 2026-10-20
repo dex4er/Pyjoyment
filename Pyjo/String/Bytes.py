@@ -521,3 +521,4 @@ def _decode(data: bytes) -> tuple[str, str]:
 
 new = Pyjo_String_Bytes.new
 object = Pyjo_String_Bytes
+Bytes = Pyjo_String_Bytes

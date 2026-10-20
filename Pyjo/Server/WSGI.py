@@ -243,3 +243,4 @@ def _environ(environ: WSGIEnvironment) -> dict[str, Any]:
 
 new = Pyjo_Server_WSGI.new
 object = Pyjo_Server_WSGI
+WSGI = Pyjo_Server_WSGI

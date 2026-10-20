@@ -78,3 +78,4 @@ class Pyjo_Cookie_Request(Pyjo.Cookie.object):
 parse = Pyjo_Cookie_Request.parse
 new = Pyjo_Cookie_Request.new
 object = Pyjo_Cookie_Request
+Request = Pyjo_Cookie_Request

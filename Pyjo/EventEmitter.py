@@ -273,3 +273,4 @@ def _name(cls: type) -> str:
 
 new = Pyjo_EventEmitter.new
 object = Pyjo_EventEmitter
+EventEmitter = Pyjo_EventEmitter

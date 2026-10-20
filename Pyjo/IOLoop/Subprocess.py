@@ -392,3 +392,4 @@ def _results(value: Any) -> list[Any]:
 
 new = Pyjo_IOLoop_Subprocess.new
 object = Pyjo_IOLoop_Subprocess
+Subprocess = Pyjo_IOLoop_Subprocess

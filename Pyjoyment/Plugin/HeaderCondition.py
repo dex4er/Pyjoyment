@@ -95,3 +95,4 @@ def _headers(
 
 new = Pyjoyment_Plugin_HeaderCondition.new
 object = Pyjoyment_Plugin_HeaderCondition
+HeaderCondition = Pyjoyment_Plugin_HeaderCondition

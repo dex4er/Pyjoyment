@@ -461,3 +461,4 @@ def _pairs(args: tuple[Anything, ...], kwargs: dict[str, Anything]) -> Iterator[
 
 new = Pyjo_Parameters.new
 object = Pyjo_Parameters
+Parameters = Pyjo_Parameters

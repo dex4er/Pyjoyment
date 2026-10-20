@@ -713,3 +713,4 @@ def _short(time: float, level: str, *lines: Any) -> str:
 
 new = Pyjo_Log.new
 object = Pyjo_Log
+Log = Pyjo_Log

@@ -227,3 +227,4 @@ class Pyjoyment_Types(Pyjo.Base.object):
 
 new = Pyjoyment_Types.new
 object = Pyjoyment_Types
+Types = Pyjoyment_Types

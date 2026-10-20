@@ -420,3 +420,4 @@ def _is_valid(fd: int) -> bool:
 
 new = Pyjo_Reactor_Poll.new
 object = Pyjo_Reactor_Poll
+Poll = Pyjo_Reactor_Poll

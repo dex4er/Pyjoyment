@@ -853,3 +853,4 @@ def _cleanup() -> None:
 
 new = Pyjo_Server_Daemon.new
 object = Pyjo_Server_Daemon
+Daemon = Pyjo_Server_Daemon

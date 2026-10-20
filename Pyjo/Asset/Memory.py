@@ -224,3 +224,4 @@ class Pyjo_Asset_Memory(Pyjo.Asset.object):
 
 new = Pyjo_Asset_Memory.new
 object = Pyjo_Asset_Memory
+Memory = Pyjo_Asset_Memory

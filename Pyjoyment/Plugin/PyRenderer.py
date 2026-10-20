@@ -206,3 +206,4 @@ def _call(cb: Callable[..., Any], c: 'Pyjoyment.Controller.object', stash: dict[
 
 new = Pyjoyment_Plugin_PyRenderer.new
 object = Pyjoyment_Plugin_PyRenderer
+PyRenderer = Pyjoyment_Plugin_PyRenderer

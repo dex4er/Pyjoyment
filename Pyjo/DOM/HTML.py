@@ -490,3 +490,4 @@ def _tag(name: str, content: str | Callable[[], str] | None, attrs: dict[str, An
 
 new = Pyjo_DOM_HTML.new
 object = Pyjo_DOM_HTML
+HTML = Pyjo_DOM_HTML

@@ -1168,3 +1168,4 @@ def _hmac(data: str, secret: str) -> str:
 
 new = Pyjoyment_Controller.new
 object = Pyjoyment_Controller
+Controller = Pyjoyment_Controller

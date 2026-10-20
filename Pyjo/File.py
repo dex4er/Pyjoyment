@@ -944,3 +944,4 @@ def _str(value: Anything) -> str:
 
 new = Pyjo_File.new
 object = Pyjo_File
+File = Pyjo_File

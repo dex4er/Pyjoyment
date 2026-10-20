@@ -20,18 +20,18 @@ version = release = PROJECT['version']
 
 extensions = ['sphinx.ext.autodoc']
 
-# Each module ends with `object = Pyjo_X`, an alias that only repeats the class;
-# as targets named `object`, the aliases make the `object` type in annotations
-# ambiguous.
-autodoc_default_options = {'exclude-members': 'object'}
-
 
 # A function or a method under a second name, as `raise_` of `throw`, is an alias
 # that the documentation of the first one names, so it is not documented twice:
-# its own name is public and finds the same object.
+# its own name is public and finds the same object. So is a class under a second
+# name, as `object` and `Path` of `Pyjo_Path`, which each module has; as targets
+# named `object`, those aliases would also make the `object` type in annotations
+# ambiguous.
 def skip_alias(app, what, name, obj, skip, options):
     canonical = getattr(obj, '__name__', name)
-    if canonical == name or canonical.startswith('_') or isinstance(obj, type):
+    if isinstance(obj, type):
+        return True if canonical != name else None
+    if canonical == name or canonical.startswith('_'):
         return None
     found = sys.modules.get(getattr(obj, '__module__', None) or '')
     for part in getattr(obj, '__qualname__', '').split('.'):

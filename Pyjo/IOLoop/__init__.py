@@ -839,6 +839,7 @@ def _name(cls: type) -> str:
 
 new = Pyjo_IOLoop.new
 object = Pyjo_IOLoop
+IOLoop = Pyjo_IOLoop
 
 # Left out from Mojolicious: $SIG{PIPE} = 'IGNORE', which Python does already
 

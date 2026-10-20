@@ -67,3 +67,4 @@ class Pyjo_HelloWorld(Pyjo.App.object):
 
 new = Pyjo_HelloWorld.new
 object = Pyjo_HelloWorld
+HelloWorld = Pyjo_HelloWorld

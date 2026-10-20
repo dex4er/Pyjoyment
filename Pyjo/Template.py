@@ -1273,3 +1273,4 @@ def _trim(tree: list[list[str]]) -> None:
 
 new = Pyjo_Template.new
 object = Pyjo_Template
+Template = Pyjo_Template

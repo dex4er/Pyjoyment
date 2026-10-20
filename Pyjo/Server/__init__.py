@@ -371,3 +371,4 @@ def _croak(e: OSError, message: str) -> NoReturn:
 
 new = Pyjo_Server.new
 object = Pyjo_Server
+Server = Pyjo_Server
