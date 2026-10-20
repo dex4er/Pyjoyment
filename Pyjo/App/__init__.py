@@ -56,7 +56,7 @@ The end of a ``with`` block closes the connections and the servers of its
 See also
 --------
 
-:mod:`Pyjo.HelloWorld`, :mod:`Pyjoyment`, https://mojolicious.org.
+:mod:`Pyjo.App.WSGI`, :mod:`Pyjo.HelloWorld`, :mod:`Pyjoyment`, https://mojolicious.org.
 
 Inspired by `Mojo <https://github.com/mojolicious/mojo/blob/v6.0/lib/Mojo.pm>`_ of Mojolicious 6.0, the base class of
 Mojolicious until Mojolicious 7.
@@ -263,7 +263,10 @@ class Pyjo_App(Pyjo.Base.object):
         The handler is the main entry point to your application or framework
         and will be called for each new transaction, which will usually be a
         :mod:`Pyjo.Transaction.HTTP` or :mod:`Pyjo.Transaction.WebSocket`
-        object. Meant to be overloaded in a subclass. ::
+        object. A route of :mod:`Pyjoyment` that embeds the application, as
+        :mod:`Pyjoyment.Plugin.Mount` does, calls it with its controller
+        instead, whose ``tx`` is the transaction and whose stash has the rest of
+        the path in ``path``. Meant to be overloaded in a subclass. ::
 
             def handler(self, tx):
                 ...

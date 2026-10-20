@@ -208,9 +208,10 @@ port 0 instead, which `ports()` gives.
 - `t/servers/` runs `Pyjo.Server.ASGI`, `Pyjo.Server.WSGI` and
   `Pyjo.Server.CGI` on real ASGI, WSGI and CGI servers, and the examples of
   the quick start in `README.md`, each in a process of its own, as the ASGI server of the tests in `t/lib` and the validator of
-  `wsgiref` cannot show how a server differs. The servers are in the
-  dependency group `servers`, not in `dependencies`; without it, the tests
-  are skipped.
+  `wsgiref` cannot show how a server differs, and mounts the applications of
+  other frameworks, as Flask, with `Pyjoyment.Plugin.Mount`. The servers and
+  the frameworks are in the dependency group `servers`, not in
+  `dependencies`; without it, the tests are skipped.
 - `t/lib/` holds helpers shared by the tests. Run on their own, they skip with
   `plan(skip_all=...)`, so `-r t` reports them as skipped instead of failing.
 - `tt/` holds the Python files that the tests use as data, as the templates
@@ -485,7 +486,10 @@ targets of the options), `Pyjo.IOLoop.Datagram` (inspired by `dgram` of Node.js)
 `Pyjo.App` (inspired by `Mojo` of Mojolicious 6, the base class of
 `Mojolicious` until Mojolicious 7, as `Pyjo_App` is of `Pyjoyment_App`),
 `Pyjo.HelloWorld` (an application of pure Pyjo, where `Mojo::HelloWorld` is
-one of Mojolicious, which `Pyjoyment.HelloWorld` ports), `Pyjo.Server.Lambda`
+one of Mojolicious, which `Pyjoyment.HelloWorld` ports), `Pyjo.App.WSGI` (the
+application of Pyjo that runs a WSGI application, inspired by
+`Mojolicious::Plugin::MountPSGI` of CPAN, the reverse of `Pyjo.Server.WSGI`),
+`Pyjo.Server.Lambda`
 and `Pyjoyment.Command.lambda` (the server and the command of the event
 functions of AWS Lambda, inspired by `Pyjo.Server.WSGI` and its command),
 `Pyjo.Server.FastCGI` and `Pyjoyment.Command.fastcgi` (FastCGI on the
