@@ -1,7 +1,7 @@
-import fcntl
 import os
 import random
 import socket
+import sys
 import tempfile
 import time
 
@@ -9,11 +9,11 @@ import time
 # A server that a test starts in a process of its own listens on a port that the test gives it, which the test finds
 # free, but until the process binds it, which takes the start of an interpreter, another process can take it: a server
 # that listens on a port that the system picks, as many tests start, or an outgoing connection, whose local port the
-# system picks too. The system picks them from its ephemeral ports, which start at 32768 on Linux and 49152 on macOS,
-# so the port is found below them, and a lock of the byte of the port in a file of the temporary directory, which the
-# system releases when the process of the test ends, keeps it from the other tests. A server that cannot bind its port
-# anyway, as one of another program, is started again on a new port, and the test waits for it with a limit of time, so
-# that a server that does not start fails the test instead of hanging it until the timeout of Pyjo.Prove
+# system picks too. The system picks them from its ephemeral ports, which start at 32768 on Linux and 49152 on macOS
+# and Windows, so the port is found below them, and a lock of the byte of the port in a file of the temporary directory,
+# which the system releases when the process of the test ends, keeps it from the other tests. A server that cannot bind
+# its port anyway, as one of another program, is started again on a new port, and the test waits for it with a limit of
+# time, so that a server that does not start fails the test instead of hanging it until the timeout of Pyjo.Prove
 
 
 # The ports below the ephemeral ones of the systems
@@ -35,7 +35,7 @@ def port():
     while True:
         port = random.choice(PORTS)
         try:
-            fcntl.lockf(_locks, fcntl.LOCK_EX | fcntl.LOCK_NB, 1, port)
+            _lock(_locks, port)
         except OSError:
             continue
         try:
@@ -44,6 +44,19 @@ def port():
         except OSError:
             continue
         return port
+
+
+# The byte of the port, which Windows locks with msvcrt from the position of the file, where it has no fcntl
+def _lock(fd, port):
+    if sys.platform == 'win32':
+        import msvcrt
+
+        os.lseek(fd, port, os.SEEK_SET)
+        msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+    else:
+        import fcntl
+
+        fcntl.lockf(fd, fcntl.LOCK_EX | fcntl.LOCK_NB, 1, port)
 
 
 def retry(start):
@@ -56,8 +69,10 @@ def retry(start):
 
 
 def in_use(result):
-    # The result of subprocess.run of a server that could not bind a port, with its standard error captured
-    return result.returncode != 0 and 'Address already in use' in (result.stderr or '')
+    # The result of subprocess.run of a server that could not bind a port, with its standard error captured; Windows says
+    # it in its own words
+    stderr = result.stderr or ''
+    return result.returncode != 0 and ('Address already in use' in stderr or 'Only one usage of each socket' in stderr)
 
 
 def listening(port, process=None, timeout=20):
