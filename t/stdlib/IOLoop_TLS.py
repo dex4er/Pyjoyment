@@ -7,6 +7,7 @@ from Pyjo.Test import *
 import os
 import socket
 import ssl
+import sys
 
 
 CA = os.path.join(os.path.dirname(Pyjo.IOLoop.TLS.CERT), 'ca.crt')
@@ -115,5 +116,10 @@ with subtest('close'):
     Pyjo.IOLoop.TLS.new(a).close()
     is_ok(a.fileno(), -1, 'connection of the handshake closed')
     b.close()
+
+with subtest('Session tickets of TLS 1.3'):
+    context = Pyjo.IOLoop.TLS.context(server=True)
+    expected = 0 if sys.platform == 'win32' else ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER).num_tickets
+    is_ok(context.num_tickets, expected, 'none on Windows, the default of OpenSSL elsewhere')
 
 done_testing()

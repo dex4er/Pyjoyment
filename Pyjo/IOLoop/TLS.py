@@ -305,6 +305,10 @@ def _expand(options: dict[str, Any]) -> ssl.SSLContext:
 
         def server_context(cert: str, key: str) -> ssl.SSLContext:
             context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            # Not in Mojolicious: no session tickets of TLS 1.3 on Windows, which the server sends after the handshake
+            # of the client, where a write to a client that has closed already aborts the handshake of the server
+            if sys.platform == 'win32':
+                context.num_tickets = 0
             context.load_cert_chain(cert, key)
             if ca is not None:
                 context.load_verify_locations(ca)
@@ -345,7 +349,9 @@ def context(**options: Any) -> ssl.SSLContext:
         context = context(server=True, tls_cert='/etc/tls/server.crt', tls_key='/etc/tls/server.key')
 
     The :class:`ssl.SSLContext` that :meth:`Pyjo_IOLoop_TLS.negotiate` makes
-    of its options.
+    of its options. A context of a server sends no session tickets of TLS 1.3
+    on Windows, where a client that closes the connection right after its
+    handshake would make the handshake of the server fail.
     """
     return _expand(options)
 
