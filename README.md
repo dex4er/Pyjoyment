@@ -1,5 +1,5 @@
 [![Tests](https://github.com/dex4er/Pyjoyment/actions/workflows/tests.yaml/badge.svg?branch=master)](https://github.com/dex4er/Pyjoyment/actions/workflows/tests.yaml)
-[![Documentation Status](https://app.readthedocs.org/projects/pyjoyment/badge/?version=latest)](https://pyjoyment.readthedocs.io/en/latest/)
+[![Documentation](https://img.shields.io/badge/docs-Read_the_Docs-8CA1AF?logo=readthedocs&logoColor=white)](https://pyjoyment.readthedocs.io/en/latest/)
 
 # Pyjoyment
 
