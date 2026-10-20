@@ -29,7 +29,8 @@ SYNOPSIS = """\
   "baz": ["♥"],
 
   %# You have full access to the application
-  "music_dir": "<%= app.home.child('music') %>"
+  % import Pyjo.JSON
+  "music_dir": <%= Pyjo.JSON.to_json(app.home.child('music').to_str()) %>
 }
 """
 
