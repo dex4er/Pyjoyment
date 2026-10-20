@@ -57,12 +57,13 @@ shuts it down immediately, a second ``TERM`` does nothing.
 QUIT
 ~~~~
 
-Shut down server immediately.
+Shut down server immediately. On Windows, which has no ``QUIT``, ``BREAK``
+does it, as of Ctrl-Break.
 
 HUP
 ~~~
 
-Ignored, as there is nothing to reload.
+Ignored, as there is nothing to reload. Windows has no ``HUP``.
 
 Events
 ------
@@ -467,7 +468,7 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
         # middle of what the event loop does
         def stop(signum: int, frame: Any) -> None:
             nonlocal graceful
-            if signum == signal.SIGQUIT or (signum == signal.SIGINT and graceful):
+            if signum == _QUIT or (signum == signal.SIGINT and graceful):
                 loop.stop()
             elif not graceful:
                 graceful = True
@@ -477,9 +478,10 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
         # nothing to reload
         handlers: dict[signal.Signals, Any] = {}
         if threading.current_thread() is threading.main_thread():
-            for name in (signal.SIGINT, signal.SIGTERM, signal.SIGQUIT):
+            for name in (signal.SIGINT, signal.SIGTERM, _QUIT):
                 handlers[name] = signal.signal(name, stop)
-            handlers[signal.SIGHUP] = signal.signal(signal.SIGHUP, signal.SIG_IGN)
+            if sys.platform != 'win32':
+                handlers[signal.SIGHUP] = signal.signal(signal.SIGHUP, signal.SIG_IGN)
         try:
             self.start().ioloop.start()
         finally:
@@ -810,6 +812,9 @@ def _url(tx: Pyjo.Transaction.object) -> str:
 # Not in Mojolicious: the daemons that exist, whose listen sockets are closed at the end of the interpreter, as Perl
 # closes them then, before Pyjo.IOLoop closes the connections of its event loops
 _DAEMONS: 'weakref.WeakSet[Pyjo_Server_Daemon]' = weakref.WeakSet()
+
+# Not in Mojolicious: Windows has no QUIT, of Ctrl-\ in a terminal, and BREAK of Ctrl-Break takes its place in a console
+_QUIT = signal.SIGBREAK if sys.platform == 'win32' else signal.SIGQUIT
 
 
 @atexit.register
