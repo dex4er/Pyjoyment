@@ -382,7 +382,8 @@ with subtest('Running the tests with pytest'):
     run(home, '-m', 'Pyjoyment', 'generate', 'app', 'MyApp')
     my_app = Pyjo.File.path(home, 'my_app')
     result = run(my_app.to_str(), *pytest)
-    like_ok(result.stdout, re.compile(r'^t/basic\.py \.\s+\[100%\]$', re.M), 'pytest')
+    # The paths of the progress of pytest have the separator of the system, \ on Windows
+    like_ok(result.stdout.replace('\\', '/'), re.compile(r'^t/basic\.py \.\s+\[100%\]$', re.M), 'pytest')
     my_app.child('tests').make_path().child('conftest.py').spew(
         b"import pytest\n\n\n@pytest.fixture\ndef app():\n    return 'MyApp'\n"
     )
@@ -390,7 +391,7 @@ with subtest('Running the tests with pytest'):
         b"def test_index(t):\n    t.get_ok('/').status_is(200).content_like(r'(?i)Pyjoyment')\n"
     )
     result = run(my_app.to_str(), *pytest, 'tests')
-    like_ok(result.stdout, re.compile(r'^tests/test_basic\.py \.\s+\[100%\]$', re.M), 'pytest tests')
+    like_ok(result.stdout.replace('\\', '/'), re.compile(r'^tests/test_basic\.py \.\s+\[100%\]$', re.M), 'pytest tests')
     shutil.rmtree(home)
 
 done_testing()
