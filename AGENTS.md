@@ -853,7 +853,11 @@ pattern.match_partial(path)`.
   it when the last reference goes, and `with` says where it ends. So is an
   object that holds a resource, as a socket, a file, a server or an event
   loop, whose `__exit__` does what its finalizer does, and the module
-  documentation says what the end of the block releases. It is an interface
+  documentation says what the end of the block releases. Such an object has a
+  method `close` too, which `__exit__` calls, with `# Not in Mojolicious:`
+  where Perl releases it in `DESTROY`: the context manager is an option, not a
+  requirement, as for an object that lives longer than a block, as the user
+  agent of an application, which closes it when it stops. It is an interface
   for the code that uses Pyjoyment, its tests and examples: the modules call
   `close` and the like themselves, as `with` costs more than a call. An
   object in a cycle, as a user agent with its server, is freed by the

@@ -127,6 +127,15 @@ with subtest('awaitable and coroutine'):
     Pyjo.Promise.new().set(ioloop=loop).timer(0.05).wait()
     is_deeply_ok(got, ['done'], 'task of the loop')
 
+with subtest('close'):
+    import Pyjo.Reactor.Asyncio
+
+    reactor = Pyjo.Reactor.Asyncio.new()
+    loop = reactor.loop
+    reactor.close()
+    ok(loop.is_closed(), 'event loop of its own closed')
+
+
 with subtest('future'):
     reactor = Pyjo.Reactor.Asyncio.new()
     future = reactor.future()

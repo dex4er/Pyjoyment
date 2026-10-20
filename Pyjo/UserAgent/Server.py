@@ -92,7 +92,7 @@ class Pyjo_UserAgent_Server(Pyjo.Base.object):
     def __exit__(
         self, type: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None
     ) -> None:
-        self.restart()
+        self.close()
 
     @property
     def app(self) -> Pyjo.Server.Application | None:
@@ -109,6 +109,17 @@ class Pyjo_UserAgent_Server(Pyjo.Base.object):
     @app.setter
     def app(self, value: Pyjo.Server.Application) -> None:
         self._app = value
+
+    # Not in Mojolicious: the release of the servers, which Perl does in DESTROY, also at the end of a with block
+    def close(self) -> None:
+        """::
+
+            server.close()
+
+        Close the servers, as the end of a ``with`` block does, which start
+        again on new ports when they are used again.
+        """
+        self.restart()
 
     def nb_url(self, proto: str | None = None) -> Pyjo.URL.object:
         """::

@@ -136,7 +136,7 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
     def __exit__(
         self, type: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None
     ) -> None:
-        self._close_loop()
+        self.close()
 
     # The cleanups that finalizers deferred at the next tick, with call_soon_threadsafe of the event loop, which only
     # appends to a queue, where the timers of the reactor would change its structures, and works from any thread, as the
@@ -283,6 +283,19 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
 
         promise.then(settle, settle)
         return future
+
+    # Not in Mojolicious: the release of the event loop of its own, which Perl does in DESTROY, also at the end of a with
+    # block
+    def close(self) -> None:
+        """::
+
+            reactor.close()
+
+        Close the event loop that the reactor made for itself, as the end of a
+        ``with`` block does; an event loop that it was given, or that was
+        running, is left to its owner.
+        """
+        self._close_loop()
 
     # Not in Mojolicious: a task of the loop
     def run_coroutine(

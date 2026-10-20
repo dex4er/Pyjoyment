@@ -164,6 +164,16 @@ with subtest('silent'):
     daemon.silent = boolean
     is_ok(daemon.silent, True, 'daemon.silent')
 
+with subtest('close'):
+    import Pyjo.IOLoop
+    import Pyjo.Server.Daemon
+
+    with Pyjo.IOLoop.new() as loop:
+        daemon = Pyjo.Server.Daemon.new(ioloop=loop, listen=['http://127.0.0.1'], silent=True).start()
+        daemon.close()
+        is_deeply_ok(daemon.ports(), [], 'no listen sockets')
+
+
 with subtest('ports'):
     daemon = Pyjo.Server.Daemon.new(listen=['http://127.0.0.1', 'http://127.0.0.1'], silent=True).start()
     ports = daemon.ports()

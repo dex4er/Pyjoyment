@@ -257,4 +257,11 @@ with subtest('Context manager'):
         ok(not loop.is_closed(), 'event loop')
     ok(loop.is_closed(), 'event loop closed at the end of the block')
 
+with subtest('close'):
+    reactor = Pyjo.Reactor.Asyncio.new()
+    loop = reactor.loop
+    ok(not loop.is_closed(), 'event loop')
+    reactor.close()
+    ok(loop.is_closed(), 'event loop closed')
+
 done_testing()
