@@ -7,10 +7,10 @@ import tempfile
 
 
 # The script of examples/http_server.py, in a process of its own, as it runs its server, on a free port
-sys.path.insert(0, curfile().dirname().sibling('lib').to_str())
+sys.path.insert(0, curfile().dirname().dirname().sibling('lib').to_str())
 ServerProcess = importlib.import_module('ServerProcess')
 
-script = curfile().dirname().dirname().sibling('examples', 'http_server.py').to_str()
+script = curfile().dirname().dirname().dirname().sibling('examples', 'servers', 'http_server.py').to_str()
 
 with tempfile.TemporaryDirectory() as dir:
     server = ServerProcess.Server(dir, [sys.executable, script, '--address', '127.0.0.1', '--port', '{port}'])

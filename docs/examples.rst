@@ -6,7 +6,7 @@ Quick start
 
 A whole web application of ``Pyjoyment.Lite``:
 
-    .. include:: ../examples/hello.py
+    .. include:: ../examples/pyjoyment/hello.py
        :code: python
 
 
@@ -15,7 +15,7 @@ Duct tape for the HTML5 web
 
 A WebSocket service used by the template to extract the title from a website:
 
-    .. include:: ../examples/title.py
+    .. include:: ../examples/pyjoyment/title.py
        :code: python
 
 
@@ -24,22 +24,22 @@ Servers
 
 ``Pyjo.HelloWorld`` natively, on the web server of Pyjoyment:
 
-    .. include:: ../examples/hello_world.py
+    .. include:: ../examples/servers/hello_world.py
        :code: python
 
 On `uvicorn <https://www.uvicorn.org/>`_, an ASGI server:
 
-    .. include:: ../examples/hello_world_uvicorn.py
+    .. include:: ../examples/servers/hello_world_uvicorn.py
        :code: python
 
 On `Werkzeug <https://werkzeug.palletsprojects.com/>`_, a WSGI server:
 
-    .. include:: ../examples/hello_world_werkzeug.py
+    .. include:: ../examples/servers/hello_world_werkzeug.py
        :code: python
 
 As an event function of `AWS Lambda <https://aws.amazon.com/lambda/>`_:
 
-    .. include:: ../examples/hello_world_lambda.py
+    .. include:: ../examples/servers/hello_world_lambda.py
        :code: python
 
 
@@ -49,7 +49,7 @@ Requests on a timer
 The user agent requests the server every second, in the same event loop, without
 blocking it:
 
-    .. include:: ../examples/user_agent.py
+    .. include:: ../examples/ua/user_agent.py
        :code: python
 
 A request on a loopback
@@ -57,32 +57,32 @@ A request on a loopback
 
 A blocking request of the user agent to the server, in the same event loop:
 
-    .. include:: ../examples/loopback.py
+    .. include:: ../examples/ua/loopback.py
        :code: python
 
 Web scraping
 ------------
 
-    .. include:: ../examples/entities.py
+    .. include:: ../examples/ua/entities.py
        :code: python
 
 
 URL manipulation
 ----------------
 
-    .. include:: ../examples/url.py
+    .. include:: ../examples/pyjo/url.py
        :code: python
 
 
 Non-blocking TCP client/server
 ------------------------------
 
-    .. include:: ../examples/ioloop.py
+    .. include:: ../examples/pyjo/ioloop.py
        :code: python
 
 
 Standalone HTTP server serving embedded template file
 -----------------------------------------------------
 
-    .. include:: ../examples/http_server.py
+    .. include:: ../examples/servers/http_server.py
        :code: python

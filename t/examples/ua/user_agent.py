@@ -12,11 +12,11 @@ import tempfile
 
 # The example itself, on the port 3000 replaced by a free one, in a process of its own: its timer requests the server
 # every second, until INT stops the server gracefully, which the requests of the timer do not keep from stopping
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'lib'))
 ServerStart = importlib.import_module('ServerStart')
 
-ROOT = Pyjo.File.curfile().dirname().dirname().dirname().to_str()
-SOURCE = Pyjo.File.path(ROOT, 'examples', 'user_agent.py').slurp('UTF-8')
+ROOT = Pyjo.File.curfile().dirname().dirname().dirname().dirname().to_str()
+SOURCE = Pyjo.File.path(ROOT, 'examples', 'ua', 'user_agent.py').slurp('UTF-8')
 
 with tempfile.TemporaryDirectory() as dir:
     log = os.path.join(dir, 'output.log')
