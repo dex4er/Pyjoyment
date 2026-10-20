@@ -15,9 +15,9 @@ warnings.filterwarnings('ignore', message='Implicitly cleaning up', category=Res
 tmp = tempfile.TemporaryDirectory()
 home = pathlib.Path(tmp.name, 'home', 'sri')
 home.mkdir(parents=True)
-(home / '.vimrc').write_text('set nocompatible\n')
-(home / '.bashrc').write_text('export EDITOR=vim\n')
-(home / 'test').write_text('test\n')
+(home / '.vimrc').write_text('set nocompatible\n', newline='\n')
+(home / '.bashrc').write_text('export EDITOR=vim\n', newline='\n')
+(home / 'test').write_text('test\n', newline='\n')
 
 with subtest('Synopsis'):
     import Pyjo.File

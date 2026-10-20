@@ -7,7 +7,7 @@ import io
 with subtest('Synopsis'):
     import Pyjo.String.Bytes
 
-    output = io.TextIOWrapper(io.BytesIO(), encoding='UTF-8')
+    output = io.TextIOWrapper(io.BytesIO(), encoding='UTF-8', newline='\n')
     with contextlib.redirect_stdout(output):
         # Manipulate bytes
         data = Pyjo.String.Bytes.new(b'foo bar baz')
@@ -66,7 +66,7 @@ with subtest('split'):
     is_ok(b(b'one,two,three').split(b',').map('camelize').join(',').encode(), b'One,Two,Three', 'split')
 
 with subtest('term_escape'):
-    output = io.TextIOWrapper(io.BytesIO(), encoding='UTF-8')
+    output = io.TextIOWrapper(io.BytesIO(), encoding='UTF-8', newline='\n')
     with contextlib.redirect_stdout(output):
         # Print binary checksum to terminal
         b(b'foo').sha1_bytes().term_escape().say()

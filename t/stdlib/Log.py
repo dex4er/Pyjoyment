@@ -104,7 +104,7 @@ with subtest('Paths'):
     log = Pyjo.Log.new(path=dir.child('pyjo.log'))
     log.info('Pyjo.File')
     log.handle.close()
-    like_ok(dir.child('pyjo.log').slurp().decode(), r'\[info\] Pyjo.File\n$', 'Pyjo.File')
+    like_ok(dir.child('pyjo.log').to_path().read_text(encoding='UTF-8'), r'\[info\] Pyjo.File\n$', 'Pyjo.File')
 
 with subtest('Capture is a container'):
     log = Pyjo.Log.new(handle=None)
