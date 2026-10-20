@@ -1365,13 +1365,15 @@ not include files: its examples are copies of `examples/`.
 The guides of Mojolicious, `Mojolicious::Guides::*`, are pages of
 `docs/guides`, as `tutorial.rst` for `Mojolicious::Guides::Tutorial`, which
 start as ports, with the sections and the wording of Mojo and the forms of
-Pyjoyment, and end with the name of their source, as the modules do. Unlike
-the modules and their docstrings, a guide is not kept 1:1 with Mojo: it adds,
-moves and rewrites sections for what a Python developer needs, as the test
-scripts, the harness and the assertions of `Pyjo.Test` in `testing.rst`,
-which a Perl developer knows from `Test::More` and `prove`. So a guide has no
-`Not in Mojolicious:` comments; the ones that are left go when the guide is
-edited. `Mojolicious::Guides` is
+Pyjoyment, and end with the name of their source, as the modules do. The
+docstrings are the living documentation of the API and the modules, so they
+stay ports of the POD, while the guides are loose, additional documentation,
+whose divergence from Mojo nobody watches. So, unlike a docstring, a guide is
+not kept 1:1 with Mojo: it adds, moves and rewrites sections for what a Python
+developer needs, as the test scripts, the harness and the assertions of
+`Pyjo.Test` in `testing.rst`, which a Perl developer knows from `Test::More`
+and `prove`, and it has no `Not in Mojolicious:` comments; the ones that are
+left go when the guide is edited. `Mojolicious::Guides` is
 `docs/guides/index.rst`, whose section API is the class hierarchy of the
 modules of `docs/api`, each under the module of the base class of its
 class, which `t/docs/guides_index.py` checks, so that a new module goes into
