@@ -172,6 +172,20 @@ with subtest('Start stops from a callback of asyncio'):
     ok(not reactor.is_running, 'stopped')
     reactor.reset()
 
+with subtest('A handle removed while another loop runs'):
+    with Pyjo.Reactor.Asyncio.new() as reactor:
+        a, b = socket.socketpair()
+        reactor.io(a, lambda reactor, writable: None).watch(a, True, False)
+        loop = reactor.loop
+
+        async def remove():
+            reactor.remove(a)
+
+        asyncio.run(remove(), loop_factory=asyncio.SelectorEventLoop)
+        ok(not loop.remove_reader(a.fileno()), 'not left in the loop that watched it')
+        a.close()
+        b.close()
+
 with subtest('Handles'):
     reactor = Pyjo.Reactor.Asyncio.new()
     a, b = socket.socketpair()
