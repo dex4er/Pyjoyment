@@ -3,6 +3,30 @@ Pyjo.Server.Daemon - Non-blocking I/O HTTP and WebSocket server
 ===============================================================
 ::
 
+    from Pyjo.Server.Daemon import Daemon
+
+    daemon = Daemon(listen=['http://*:8080'])
+
+
+    @daemon.unsubscribe('request').on('request')
+    def request(daemon, tx):
+        # Request
+        method = tx.req.method
+        path = tx.req.url.path
+
+        # Response
+        tx.res.code = 200
+        tx.res.headers.content_type = 'text/plain'
+        tx.res.body = f'{method} request for {path}!'.encode()
+
+        # Resume transaction
+        tx.resume()
+
+
+    daemon.run()
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Server.Daemon
 
     daemon = Pyjo.Server.Daemon.new(listen=['http://*:8080'])
@@ -853,3 +877,4 @@ def _cleanup() -> None:
 
 new = Pyjo_Server_Daemon.new
 object = Pyjo_Server_Daemon
+Daemon = Pyjo_Server_Daemon

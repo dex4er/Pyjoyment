@@ -3,6 +3,13 @@ Pyjo.UserAgent.Server - Application server
 ==========================================
 ::
 
+    from Pyjo.UserAgent.Server import Server
+
+    server = Server()
+    print(server.url())
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.UserAgent.Server
 
     server = Pyjo.UserAgent.Server.new()
@@ -229,3 +236,4 @@ def _weak(app: Any) -> Any:
 
 new = Pyjo_UserAgent_Server.new
 object = Pyjo_UserAgent_Server
+Server = Pyjo_UserAgent_Server

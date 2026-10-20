@@ -3,6 +3,19 @@ Pyjo.Server.Reload.Backend - Auto-restarting development server backend
 =======================================================================
 ::
 
+    from Pyjo.Server.Reload.Backend import Backend
+
+
+    class Pyjo_Server_Reload_Backend_Inotify(Backend):
+        def modified_files(self):
+            ...
+
+
+    new = Pyjo_Server_Reload_Backend_Inotify.new
+    object = Pyjo_Server_Reload_Backend_Inotify
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Server.Reload.Backend
 
 
@@ -110,3 +123,4 @@ class Pyjo_Server_Reload_Backend(Pyjo.Base.object):
 
 new = Pyjo_Server_Reload_Backend.new
 object = Pyjo_Server_Reload_Backend
+Backend = Pyjo_Server_Reload_Backend

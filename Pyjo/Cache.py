@@ -3,6 +3,14 @@ Pyjo.Cache - Naive in-memory cache
 ==================================
 ::
 
+    from Pyjo.Cache import Cache
+
+    cache = Cache(max_keys=50)
+    cache.set('foo', 'bar')
+    foo = cache.get('foo')
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Cache
 
     cache = Pyjo.Cache.new(max_keys=50)
@@ -108,3 +116,4 @@ class Pyjo_Cache[K: Hashable, V](Pyjo.Base.object):
 
 new = Pyjo_Cache.new
 object = Pyjo_Cache
+Cache = Pyjo_Cache

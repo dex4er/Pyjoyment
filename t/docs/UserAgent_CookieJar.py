@@ -6,6 +6,24 @@ import os
 
 with subtest('Synopsis'):
     import Pyjo.Cookie.Response
+
+    from Pyjo.UserAgent.CookieJar import CookieJar
+
+    # Add response cookies
+    jar = CookieJar()
+    jar.add(
+        Pyjo.Cookie.Response.new(
+            name='foo',
+            value='bar',
+            domain='localhost',
+            path='/test',
+        )
+    )
+    is_deeply_ok([(cookie.name, cookie.value) for cookie in jar.all()], [('foo', 'bar')], 'jar.add(...)')
+
+    # Or import the module, as in Google Python Style Guide
+
+    import Pyjo.Cookie.Response
     import Pyjo.URL
     import Pyjo.UserAgent.CookieJar
 

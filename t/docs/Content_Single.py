@@ -9,6 +9,17 @@ import re
 
 
 with subtest('Synopsis'):
+    from Pyjo.Content.Single import Single
+
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        single = Single()
+        single.parse(b'Content-Length: 12\x0d\x0a\x0d\x0aHello World!')
+        print(single.headers.content_length)
+    is_ok(out.getvalue(), '12\n', 'output')
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Content.Single
 
     out = io.StringIO()

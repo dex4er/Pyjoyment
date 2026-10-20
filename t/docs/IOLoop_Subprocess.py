@@ -23,9 +23,37 @@ def output(cb):
 
 
 with subtest('Synopsis'):
-    import Pyjo.IOLoop.Subprocess
+    from Pyjo.IOLoop.Subprocess import Subprocess
 
     import time
+
+    def synopsis_python():
+        # Operation that would block the event loop for 5 seconds
+        subprocess = Subprocess()
+
+        def blocking(subprocess):
+            time.sleep(0.05)
+            return '♥', 'Pyjoyment'
+
+        def done(subprocess, err, *results):
+            if err:
+                print(f'Subprocess error: {err}')
+                return
+            print(f'I {results[0]} {results[1]}!')
+
+        subprocess.run(blocking, done)
+
+        if not subprocess.ioloop.is_running:
+            subprocess.ioloop.start()
+
+    is_ok(output(synopsis_python), 'I ♥ Pyjoyment!\n', 'subprocess')
+
+    # Or import the module, as in Google Python Style Guide
+
+    import Pyjo.IOLoop.Subprocess
+
+    # The second form of the synopsis imports time again, which the function of the first form uses
+    import time  # noqa: F811
 
     def synopsis():
         # Operation that would block the event loop for 5 seconds

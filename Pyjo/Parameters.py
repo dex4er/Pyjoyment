@@ -3,6 +3,14 @@ Pyjo.Parameters - Parameters
 ============================
 ::
 
+    from Pyjo.Parameters import Parameters
+
+    # Parse
+    params = Parameters('foo=bar&baz=23')
+    print(params.param('baz'))
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Parameters
 
     # Parse
@@ -461,3 +469,4 @@ def _pairs(args: tuple[Anything, ...], kwargs: dict[str, Anything]) -> Iterator[
 
 new = Pyjo_Parameters.new
 object = Pyjo_Parameters
+Parameters = Pyjo_Parameters

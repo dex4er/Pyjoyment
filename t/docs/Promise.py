@@ -33,6 +33,32 @@ def warn(msg):
 
 
 with subtest('Synopsis'):
+    from Pyjo.Promise import Promise
+
+    # Wrap continuation-passing style APIs with promises
+    ua = FakeUA()
+
+    def get_p(url):
+        promise = Promise()
+
+        def cb(ua, tx):
+            err = tx.error
+            if not err or err.get('code'):
+                promise.resolve(tx)
+            else:
+                promise.reject(err['message'])
+
+        ua.get(url, cb)
+        return promise
+
+    promise = get_p('https://mojolicious.org')
+    isa_ok(promise, Promise, 'get_p')
+    results = []
+    promise.then(lambda tx: results.append(tx.res.code)).wait()
+    is_deeply_ok(results, [200], 'resolved')
+
+    # Or import the module, as in Google Python Style Guide
+
     output = io.StringIO()
     with contextlib.redirect_stdout(output):
         import Pyjo.Promise

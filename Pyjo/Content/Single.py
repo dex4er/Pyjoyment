@@ -3,6 +3,14 @@ Pyjo.Content.Single - HTTP content
 ==================================
 ::
 
+    from Pyjo.Content.Single import Single
+
+    single = Single()
+    single.parse(b'Content-Length: 12\x0d\x0a\x0d\x0aHello World!')
+    print(single.headers.content_length)
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Content.Single
 
     single = Pyjo.Content.Single.new()
@@ -182,3 +190,4 @@ def _read(single: Pyjo_Content_Single, chunk: bytes) -> None:
 
 new = Pyjo_Content_Single.new
 object = Pyjo_Content_Single
+Single = Pyjo_Content_Single

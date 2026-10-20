@@ -5,6 +5,17 @@ import io
 
 
 with subtest('Synopsis'):
+    from Pyjo.String.Unicode import Unicode
+
+    output = io.StringIO()
+    with contextlib.redirect_stdout(output):
+        # Manipulate string
+        string = Unicode('foo_bar_baz')
+        print(string.camelize())
+    is_ok(output.getvalue(), 'FooBarBaz\n', 'output')
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.String.Unicode
 
     output = io.StringIO()

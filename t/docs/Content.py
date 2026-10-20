@@ -16,6 +16,18 @@ def output(cb):
 
 
 with subtest('Synopsis'):
+    from Pyjo.Content import Content
+
+    class MyContent(Content):
+        def body_contains(self, chunk): ...
+        @property
+        def body_size(self): ...
+        def get_body_chunk(self, offset): ...
+
+    isa_ok(MyContent(), Content, 'subclass')
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Content
 
     class MyContent(Pyjo.Content.object):

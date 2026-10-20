@@ -7,6 +7,16 @@ import re
 
 
 with subtest('Synopsis'):
+    from Pyjoyment.Validator import Validator
+
+    validator = Validator()
+    v = validator.validation()
+    v.input = {'foo': 'bar'}
+    v.required('foo').like(re.compile(r'ar$'))
+    is_ok(v.param('foo'), 'bar', 'validated')
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjoyment.Validator
 
     validator = Pyjoyment.Validator.new()

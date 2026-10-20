@@ -3,6 +3,28 @@ Pyjo.App - Duct tape for the HTML5 web
 ======================================
 ::
 
+    from Pyjo.App import App
+
+    class MyApp(App):
+
+        # All the complexities of CGI, WSGI, ASGI, HTTP and WebSockets get
+        # reduced to a single method call!
+        def handler(self, tx):
+
+            # Resume transaction at the end of the block
+            with tx:
+
+                # Request
+                method = tx.req.method
+                path = tx.req.url.path
+
+                # Response
+                tx.res.code = 200
+                tx.res.headers.content_type = 'text/plain'
+                tx.res.body = f'{method} request for {path}!'.encode()
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.App
 
     class MyApp(Pyjo.App.object):
@@ -283,3 +305,4 @@ def _package(cls: type) -> str:
 
 new = Pyjo_App.new
 object = Pyjo_App
+App = Pyjo_App

@@ -5,6 +5,22 @@ import io
 
 
 with subtest('Synopsis'):
+    from Pyjo.String.Bytes import Bytes
+
+    output = io.TextIOWrapper(io.BytesIO(), encoding='UTF-8', newline='\n')
+    with contextlib.redirect_stdout(output):
+        # Manipulate bytes
+        data = Bytes(b'foo bar baz')
+        print(data.md5_sum())
+    output.flush()
+    is_ok(
+        output.buffer.getvalue(),  # pyright: ignore[reportAttributeAccessIssue]
+        b'ab07acbb1e496801937adfa772424bf7\n',
+        'output',
+    )
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.String.Bytes
 
     output = io.TextIOWrapper(io.BytesIO(), encoding='UTF-8', newline='\n')

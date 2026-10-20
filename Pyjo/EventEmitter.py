@@ -3,6 +3,25 @@ Pyjo.EventEmitter - Event emitter base class
 ============================================
 ::
 
+    from Pyjo.EventEmitter import EventEmitter
+
+    class Cat(EventEmitter):
+        # Emit events
+        def poke(self):
+            self.emit('roar', 3)
+
+    # Subscribe to events
+    tiger = Cat()
+
+    @tiger.on('roar')
+    def roar(tiger, times):
+        for _ in range(times):
+            print('RAWR!')
+
+    tiger.poke()
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.EventEmitter
 
     class Cat(Pyjo.EventEmitter.object):
@@ -273,3 +292,4 @@ def _name(cls: type) -> str:
 
 new = Pyjo_EventEmitter.new
 object = Pyjo_EventEmitter
+EventEmitter = Pyjo_EventEmitter

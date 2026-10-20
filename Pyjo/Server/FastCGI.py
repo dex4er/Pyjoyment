@@ -514,3 +514,4 @@ def _record(type: int, id: int, content: bytes = b'') -> bytes:
 
 new = Pyjo_Server_FastCGI.new
 object = Pyjo_Server_FastCGI
+FastCGI = Pyjo_Server_FastCGI

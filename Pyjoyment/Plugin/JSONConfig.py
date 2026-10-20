@@ -169,3 +169,4 @@ class Pyjoyment_Plugin_JSONConfig(Pyjoyment.Plugin.Config.object):
 
 new = Pyjoyment_Plugin_JSONConfig.new
 object = Pyjoyment_Plugin_JSONConfig
+JSONConfig = Pyjoyment_Plugin_JSONConfig

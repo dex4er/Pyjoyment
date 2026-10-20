@@ -6,6 +6,18 @@ import re
 
 
 with subtest('Synopsis'):
+    from Pyjo.Collection import Collection
+
+    output = io.StringIO()
+    with contextlib.redirect_stdout(output):
+        # Manipulate collection
+        collection = Collection(['just', 'works'])
+        collection.insert(0, 'it')
+        print(collection.join('\n'))
+    is_ok(output.getvalue(), 'it\njust\nworks\n', 'join')
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Collection
 
     output = io.StringIO()
@@ -128,6 +140,10 @@ with subtest('map'):
 with subtest('new'):
     collection = Pyjo.Collection.new(1, 2, 3)
     is_deeply_ok(collection, [1, 2, 3], 'collection')
+    collection = Collection([1, 2, 3])
+    is_deeply_ok(collection, [1, 2, 3], 'constructor')
+    collection = Collection(n for n in range(3))
+    is_deeply_ok(collection, [0, 1, 2], 'constructor of a generator')
 
 with subtest('reduce'):
     collection = c(1, 2, 2, 3)

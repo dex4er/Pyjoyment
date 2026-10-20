@@ -4,6 +4,18 @@ Pyjoyment.Plugin - Plugin base class
 ::
 
     # CamelCase plugin name
+    from Pyjoyment.Plugin import Plugin
+
+    class Pyjoyment_Plugin_MyPlugin(Plugin):
+        def register(self, app, conf):
+            # Magic here! :)
+            ...
+
+    object = Pyjoyment_Plugin_MyPlugin
+
+    # Or import the module, as in Google Python Style Guide
+
+    # CamelCase plugin name
     import Pyjoyment.Plugin
 
     class Pyjoyment_Plugin_MyPlugin(Pyjoyment.Plugin.object):
@@ -65,3 +77,4 @@ __path__ = extend_path(__path__, __name__)
 
 new = Pyjoyment_Plugin.new
 object = Pyjoyment_Plugin
+Plugin = Pyjoyment_Plugin

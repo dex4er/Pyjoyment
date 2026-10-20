@@ -3,6 +3,13 @@ Pyjoyment.Plugins - Plugin manager
 ==================================
 ::
 
+    from Pyjoyment.Plugins import Plugins
+
+    plugins = Plugins()
+    plugins.namespaces.append('MyApp.Plugin')
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjoyment.Plugins
 
     plugins = Pyjoyment.Plugins.new()
@@ -199,3 +206,4 @@ def _wrap(cb: Callable[..., Any], next: Callable[[], Any] | None, args: tuple[An
 
 new = Pyjoyment_Plugins.new
 object = Pyjoyment_Plugins
+Plugins = Pyjoyment_Plugins

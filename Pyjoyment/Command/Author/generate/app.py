@@ -88,7 +88,9 @@ class Pyjoyment_Command_Author_generate_app(Pyjoyment.Command.object):
         # Application class
         # Unlike Mojolicious: a package in the directory of the project, as the current directory is on sys.path, where
         # Mojo has the lib directory
-        self.render_to_rel_file('appclass', f'{name}/{package}/__init__.py', {'class_': _identifier(class_)})
+        self.render_to_rel_file(
+            'appclass', f'{name}/{package}/__init__.py', {'class_': _identifier(class_), 'alias': _alias(class_)}
+        )
 
         # Config file (using the default moniker)
         self.render_to_rel_file('config', f'{name}/{decamelize(class_.replace(".", "::"))}.yml')
@@ -96,7 +98,9 @@ class Pyjoyment_Command_Author_generate_app(Pyjoyment.Command.object):
         # Controller
         controller = f'{class_}.Controller.Example'
         path = class_to_path(controller)
-        self.render_to_rel_file('controller', f'{name}/{path}', {'class_': _identifier(controller)})
+        self.render_to_rel_file(
+            'controller', f'{name}/{path}', {'class_': _identifier(controller), 'alias': _alias(controller)}
+        )
 
         # Test
         # Renamed from Mojolicious: t/basic.py, where Mojo has t/basic.t
@@ -120,6 +124,12 @@ class Pyjoyment_Command_Author_generate_app(Pyjoyment.Command.object):
 # Not in Mojolicious: the name of the class in its module, with underscores, as Pyjo_URL is of Pyjo.URL
 def _identifier(class_: str) -> str:
     return class_.replace('.', '_')
+
+
+# Not in Mojolicious: the name of the class for the constructor of Python, the last part of its module, as Path is of
+# Pyjo.Path
+def _alias(class_: str) -> str:
+    return class_.rsplit('.', 1)[-1]
 
 
 new = Pyjoyment_Command_Author_generate_app.new
@@ -155,6 +165,9 @@ class <%= class_ %>(Pyjoyment.object):
 
 new = <%= class_ %>.new
 object = <%= class_ %>
+% if alias != class_:
+<%= alias %> = <%= class_ %>
+% end
 
 @@ controller
 import Pyjoyment.Controller
@@ -168,6 +181,7 @@ class <%= class_ %>(Pyjoyment.Controller.object):
 
 
 object = <%= class_ %>
+<%= alias %> = <%= class_ %>
 
 @@ static
 <!DOCTYPE html>

@@ -3,6 +3,30 @@ Pyjo.Server.CGI - CGI server
 ============================
 ::
 
+    from Pyjo.Server.CGI import CGI
+
+    cgi = CGI()
+
+
+    @cgi.unsubscribe('request').on('request')
+    def request(cgi, tx):
+        # Request
+        method = tx.req.method
+        path = tx.req.url.path
+
+        # Response
+        tx.res.code = 200
+        tx.res.headers.content_type = 'text/plain'
+        tx.res.body = f'{method} request for {path}!'.encode()
+
+        # Resume transaction
+        tx.resume()
+
+
+    cgi.run()
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Server.CGI
 
     cgi = Pyjo.Server.CGI.new()
@@ -173,3 +197,4 @@ def _write(res: Pyjo.Message.Response.object, method: str) -> bool:
 
 new = Pyjo_Server_CGI.new
 object = Pyjo_Server_CGI
+CGI = Pyjo_Server_CGI

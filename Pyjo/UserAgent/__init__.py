@@ -3,6 +3,22 @@ Pyjo.UserAgent - Non-blocking I/O HTTP and WebSocket user agent
 ===============================================================
 ::
 
+    from Pyjo.UserAgent import UserAgent
+
+    # Fine grained response handling (raises on connection errors)
+    ua = UserAgent()
+    res = ua.get('docs.mojolicious.org').result
+    if res.is_success:
+        print(res.body)
+    elif res.is_error:
+        print(res.message)
+    elif res.code == 301:
+        print(res.headers.location)
+    else:
+        print('Whatever...')
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.IOLoop
     import Pyjo.Promise
     import Pyjo.URL
@@ -1205,3 +1221,4 @@ def _url(tx: Pyjo.Transaction.object) -> str:
 
 new = Pyjo_UserAgent.new
 object = Pyjo_UserAgent
+UserAgent = Pyjo_UserAgent

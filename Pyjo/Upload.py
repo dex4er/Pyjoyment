@@ -3,6 +3,14 @@ Pyjo.Upload - Upload
 ====================
 ::
 
+    from Pyjo.Upload import Upload
+
+    upload = Upload()
+    print(upload.filename)
+    upload.move_to('/home/sri/foo.txt')
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Upload
 
     upload = Pyjo.Upload.new()
@@ -128,3 +136,4 @@ class Pyjo_Upload(Pyjo.Base.object):
 
 new = Pyjo_Upload.new
 object = Pyjo_Upload
+Upload = Pyjo_Upload

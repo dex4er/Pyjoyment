@@ -3,6 +3,20 @@ Pyjo.Message.Response - HTTP response
 =====================================
 ::
 
+    from Pyjo.Message.Response import Response
+
+    # Parse
+    res = Response()
+    res.parse(b'HTTP/1.0 200 OK\x0d\x0a')
+    res.parse(b'Content-Length: 12\x0d\x0a')
+    res.parse(b'Content-Type: text/plain\x0d\x0a\x0d\x0a')
+    res.parse(b'Hello World!')
+    print(res.code)
+    print(res.headers.content_type)
+    print(res.body)
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Message.Response
 
     # Parse
@@ -459,3 +473,4 @@ class _Socket:
 
 new = Pyjo_Message_Response.new
 object = Pyjo_Message_Response
+Response = Pyjo_Message_Response

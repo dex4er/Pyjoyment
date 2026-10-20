@@ -5,6 +5,14 @@ from Pyjo.Test import *
 
 
 with subtest('Synopsis'):
+    from Pyjoyment.Plugins import Plugins
+
+    plugins = Plugins()
+    plugins.namespaces.append('MyApp.Plugin')
+    is_deeply_ok(plugins.namespaces, ['Pyjoyment.Plugin', 'MyApp.Plugin'], 'namespaces')
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjoyment.Plugins
 
     plugins = Pyjoyment.Plugins.new()

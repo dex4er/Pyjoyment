@@ -16,7 +16,24 @@ def output(cb):
 
 with subtest('Synopsis'):
 
+    def client_python():
+        from Pyjo.Transaction.HTTP import HTTP
+
+        # Client
+        tx = HTTP()
+        tx.req.method = 'GET'
+        tx.req.url.parse('http://example.com')
+        tx.req.headers.accept = 'application/json'
+        print(tx.res.code)
+        print(tx.res.headers.content_type)
+        print(tx.res.body)
+        print(tx.remote_address)
+
+    is_ok(output(client_python), "None\nNone\nb''\nNone\n", 'client')
+
     def client():
+        # Or import the module, as in Google Python Style Guide
+
         import Pyjo.Transaction.HTTP
 
         # Client

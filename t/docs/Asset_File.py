@@ -16,6 +16,20 @@ def documented(path):
 
 
 with subtest('Synopsis'):
+    from Pyjo.Asset.File import File
+
+    output = io.StringIO()
+    with contextlib.redirect_stdout(output):
+        # Temporary file
+        file = File()
+        file.add_chunk(b'foo bar baz')
+        if file.contains(b'bar') >= 0:
+            print('File contains "bar"')
+        print(file.slurp())
+    is_ok(output.getvalue(), 'File contains "bar"\nb\'foo bar baz\'\n', 'output')
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Asset.File
 
     output = io.StringIO()

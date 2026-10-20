@@ -3,6 +3,20 @@ Pyjo.Transaction.HTTP - HTTP transaction
 ========================================
 ::
 
+    from Pyjo.Transaction.HTTP import HTTP
+
+    # Client
+    tx = HTTP()
+    tx.req.method = 'GET'
+    tx.req.url.parse('http://example.com')
+    tx.req.headers.accept = 'application/json'
+    print(tx.res.code)
+    print(tx.res.headers.content_type)
+    print(tx.res.body)
+    print(tx.remote_address)
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Transaction.HTTP
 
     # Client
@@ -356,3 +370,4 @@ class Pyjo_Transaction_HTTP(Pyjo.Transaction.object):
 
 new = Pyjo_Transaction_HTTP.new
 object = Pyjo_Transaction_HTTP
+HTTP = Pyjo_Transaction_HTTP

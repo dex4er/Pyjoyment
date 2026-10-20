@@ -3,6 +3,30 @@ Pyjo.Server.Prefork - Pre-forking non-blocking I/O HTTP and WebSocket server
 ============================================================================
 ::
 
+    from Pyjo.Server.Prefork import Prefork
+
+    prefork = Prefork(listen=['http://*:8080'])
+
+
+    @prefork.unsubscribe('request').on('request')
+    def request(prefork, tx):
+        # Request
+        method = tx.req.method
+        path = tx.req.url.path
+
+        # Response
+        tx.res.code = 200
+        tx.res.headers.content_type = 'text/plain'
+        tx.res.body = f'{method} request for {path}!'.encode()
+
+        # Resume transaction
+        tx.resume()
+
+
+    prefork.run()
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Server.Prefork
 
     prefork = Pyjo.Server.Prefork.new(listen=['http://*:8080'])
@@ -827,3 +851,4 @@ def _number(value: float) -> str:
 
 new = Pyjo_Server_Prefork.new
 object = Pyjo_Server_Prefork
+Prefork = Pyjo_Server_Prefork

@@ -3,6 +3,15 @@ Pyjo.DOM.HTML - HTML/XML engine
 ===============================
 ::
 
+    from Pyjo.DOM.HTML import HTML
+
+    # Turn HTML into DOM tree
+    html = HTML()
+    html.parse('<div><p id="a">Test</p><p id="b">123</p></div>')
+    tree = html.tree
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.DOM.HTML
 
     # Turn HTML into DOM tree
@@ -490,3 +499,4 @@ def _tag(name: str, content: str | Callable[[], str] | None, attrs: dict[str, An
 
 new = Pyjo_DOM_HTML.new
 object = Pyjo_DOM_HTML
+HTML = Pyjo_DOM_HTML

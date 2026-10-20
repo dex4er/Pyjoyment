@@ -6,6 +6,15 @@ from unittest.mock import patch
 
 
 with subtest('Synopsis'):
+    from Pyjo.UserAgent.Proxy import Proxy
+
+    with patch.dict(os.environ, {'HTTP_PROXY': 'http://127.0.0.1:8080'}):
+        proxy = Proxy()
+        proxy.detect()
+        is_ok(proxy.http, 'http://127.0.0.1:8080', 'print(proxy.http)')
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.UserAgent.Proxy
 
     with patch.dict(os.environ, {'HTTP_PROXY': 'http://127.0.0.1:8080'}):

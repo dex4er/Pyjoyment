@@ -4,6 +4,21 @@ Pyjoyment.Controller - Controller base class
 ::
 
     # Controller
+    from Pyjoyment.Controller import Controller
+
+    class MyApp_Controller_Foo(Controller):
+
+        # Action
+        def bar(self):
+            name = self.param('name')
+            self.res.headers.cache_control = 'max-age=1, no-cache'
+            self.render(json={'hello': name})
+
+    object = MyApp_Controller_Foo
+
+    # Or import the module, as in Google Python Style Guide
+
+    # Controller
     import Pyjoyment.Controller
 
     class MyApp_Controller_Foo(Pyjoyment.Controller.object):
@@ -1168,3 +1183,4 @@ def _hmac(data: str, secret: str) -> str:
 
 new = Pyjoyment_Controller.new
 object = Pyjoyment_Controller
+Controller = Pyjoyment_Controller

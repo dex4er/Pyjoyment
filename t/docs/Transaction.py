@@ -18,6 +18,18 @@ def output(cb):
 
 
 with subtest('Synopsis'):
+    from Pyjo.Transaction import Transaction
+
+    class MyTransaction(Transaction):
+        def client_read(self, chunk): ...
+        def client_write(self): ...
+        def server_read(self, chunk): ...
+        def server_write(self): ...
+
+    isa_ok(MyTransaction(), Transaction, 'subclass')
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Transaction
 
     class MyTransaction(Pyjo.Transaction.object):

@@ -2,6 +2,13 @@ from Pyjo.Test import *
 
 
 with subtest('Synopsis'):
+    from Pyjo.HelloWorld import HelloWorld
+
+    hello = HelloWorld()
+    is_ok(hello.start(), hello, 'hello.start()')
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.HelloWorld
 
     hello = Pyjo.HelloWorld.new()

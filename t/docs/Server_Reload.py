@@ -77,6 +77,20 @@ def stop(process):
 
 with subtest('Synopsis'):
     code = f"""
+from Pyjo.Server.Reload import Reload
+
+reload = Reload()
+reload.daemon.listen = ['http://127.0.0.1:{{port}}']
+reload.run({myapp.to_str()!r})
+"""
+    port, process = server('-c', code)
+    status, output = stop(process)
+    is_ok(status, 0, 'stopped')
+    like_ok(output, rf'Web application available at http://127.0.0.1:{port}', 'listening')
+
+    # Or import the module, as in Google Python Style Guide
+
+    code = f"""
 import Pyjo.Server.Reload
 
 reload = Pyjo.Server.Reload.new()

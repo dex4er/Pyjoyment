@@ -175,3 +175,4 @@ def _load(module: Any) -> Callable[[str], Any] | None:
 
 new = Pyjoyment_Plugin_YAMLConfig.new
 object = Pyjoyment_Plugin_YAMLConfig
+YAMLConfig = Pyjoyment_Plugin_YAMLConfig

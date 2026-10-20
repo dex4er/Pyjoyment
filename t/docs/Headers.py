@@ -4,6 +4,17 @@ import re
 
 
 with subtest('Synopsis'):
+    from Pyjo.Headers import Headers
+
+    # Parse
+    headers = Headers()
+    headers.parse('Content-Length: 42\x0d\x0a')
+    headers.parse('Content-Type: text/html\x0d\x0a\x0d\x0a')
+    is_ok(headers.content_length, '42', 'headers.content_length')
+    is_ok(headers.content_type, 'text/html', 'headers.content_type')
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Headers
 
     # Parse

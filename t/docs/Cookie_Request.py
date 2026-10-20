@@ -2,6 +2,15 @@ from Pyjo.Test import *
 
 
 with subtest('Synopsis'):
+    from Pyjo.Cookie.Request import Request
+
+    cookie = Request()
+    cookie.name = 'foo'
+    cookie.value = 'bar'
+    is_ok(str(cookie), 'foo=bar', 'print(cookie)')
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Cookie.Request
 
     from http.cookies import SimpleCookie

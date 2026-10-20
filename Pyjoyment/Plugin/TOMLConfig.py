@@ -138,3 +138,4 @@ class Pyjoyment_Plugin_TOMLConfig(Pyjoyment.Plugin.JSONConfig.object):
 
 new = Pyjoyment_Plugin_TOMLConfig.new
 object = Pyjoyment_Plugin_TOMLConfig
+TOMLConfig = Pyjoyment_Plugin_TOMLConfig

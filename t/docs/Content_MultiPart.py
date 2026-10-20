@@ -8,6 +8,18 @@ import re
 
 
 with subtest('Synopsis'):
+    from Pyjo.Content.MultiPart import MultiPart
+
+    multi = MultiPart()
+    multi.parse(b'Content-Type: multipart/mixed; boundary=---foobar')
+    # The parts of the documentation, once the rest of the content has been parsed
+    body = b''.join(b'-----foobar\x0d\x0a\x0d\x0a%d\x0d\x0a' % i for i in range(5)) + b'-----foobar--'
+    multi.parse(b'\x0d\x0aContent-Length: %d\x0d\x0a\x0d\x0a' % len(body) + body)
+    single = multi.parts[4]
+    is_ok(single.asset.slurp(), b'4', 'fifth part')
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Content.MultiPart
 
     multi = Pyjo.Content.MultiPart.new()

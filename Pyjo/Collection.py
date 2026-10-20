@@ -3,6 +3,15 @@ Pyjo.Collection - Collection
 ============================
 ::
 
+    from Pyjo.Collection import Collection
+
+    # Manipulate collection
+    collection = Collection(['just', 'works'])
+    collection.insert(0, 'it')
+    print(collection.join("\n"))
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Collection
 
     # Manipulate collection
@@ -291,7 +300,12 @@ class Pyjo_Collection[T](list[T]):
 
             collection = Pyjo.Collection.new(1, 2, 3)
 
-        Construct a new :mod:`Pyjo.Collection` object.
+        Construct a new :mod:`Pyjo.Collection` object. The constructor of the
+        class takes an iterable, as the one of :class:`list`, so that a single
+        element that is iterable stays one element of :meth:`new`. ::
+
+            collection = Collection([1, 2, 3])
+            collection = Collection(n for n in range(3))
         """
         return cls(elements)
 
@@ -553,3 +567,4 @@ def _str(element: Anything) -> str:
 # Any: the type of the elements is not known before they are given
 new = Pyjo_Collection[Any].new
 object = Pyjo_Collection
+Collection = Pyjo_Collection

@@ -3,6 +3,14 @@ Pyjoyment.Types - MIME types
 ============================
 ::
 
+    from Pyjoyment.Types import Types
+
+    types = Types()
+    types.type('foo', 'text/foo')
+    print(types.type('foo'))
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjoyment.Types
 
     types = Pyjoyment.Types.new()
@@ -227,3 +235,4 @@ class Pyjoyment_Types(Pyjo.Base.object):
 
 new = Pyjoyment_Types.new
 object = Pyjoyment_Types
+Types = Pyjoyment_Types

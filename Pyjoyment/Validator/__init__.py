@@ -3,6 +3,16 @@ Pyjoyment.Validator - Validate values
 =====================================
 ::
 
+    from Pyjoyment.Validator import Validator
+
+    validator = Validator()
+    v = validator.validation()
+    v.input = {'foo': 'bar'}
+    v.required('foo').like(re.compile(r'ar$'))
+    print(v.param('foo'))
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjoyment.Validator
 
     validator = Pyjoyment.Validator.new()
@@ -291,3 +301,4 @@ def _upload(v: Anything, name: str, value: Anything) -> bool:
 
 new = Pyjoyment_Validator.new
 object = Pyjoyment_Validator
+Validator = Pyjoyment_Validator

@@ -3,6 +3,18 @@ Pyjo.File - File system paths
 =============================
 ::
 
+    from Pyjo.File import File
+
+    # Portably deal with file system paths
+    path = File('/home/sri/.vimrc')
+    print(path.slurp())
+    print(path.dirname())
+    print(path.basename())
+    print(path.extname)
+    print(path.sibling('.bashrc'))
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.File
 
     # Portably deal with file system paths
@@ -944,3 +956,4 @@ def _str(value: Anything) -> str:
 
 new = Pyjo_File.new
 object = Pyjo_File
+File = Pyjo_File

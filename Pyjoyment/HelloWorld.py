@@ -3,6 +3,13 @@ Pyjoyment.HelloWorld - Hello World!
 ===================================
 ::
 
+    from Pyjoyment.HelloWorld import HelloWorld
+
+    hello = HelloWorld()
+    hello.start()
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjoyment.HelloWorld
 
     hello = Pyjoyment.HelloWorld.new()
@@ -46,3 +53,4 @@ class Pyjoyment_HelloWorld(Pyjoyment.object):
 
 new = Pyjoyment_HelloWorld.new
 object = Pyjoyment_HelloWorld
+HelloWorld = Pyjoyment_HelloWorld

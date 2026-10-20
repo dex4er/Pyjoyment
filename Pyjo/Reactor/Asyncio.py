@@ -3,6 +3,16 @@ Pyjo.Reactor.Asyncio - Low-level event reactor on asyncio
 =========================================================
 ::
 
+    from Pyjo.Reactor.Asyncio import Asyncio
+
+    # Watch if handle becomes readable or writable
+    reactor = Asyncio()
+    reactor.io(first, lambda reactor, writable: print(
+        'First handle is writable' if writable else 'First handle is readable'
+    ))
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Reactor.Asyncio
 
     # Watch if handle becomes readable or writable
@@ -729,3 +739,4 @@ def _close_own() -> None:
 
 new = Pyjo_Reactor_Asyncio.new
 object = Pyjo_Reactor_Asyncio
+Asyncio = Pyjo_Reactor_Asyncio

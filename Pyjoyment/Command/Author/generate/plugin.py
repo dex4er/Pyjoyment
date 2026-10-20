@@ -91,7 +91,13 @@ class Pyjoyment_Command_Author_generate_plugin(Pyjoyment.Command.object):
         self.render_to_rel_file(
             'class',
             f'{dir}/{app}',
-            {'class_': class_, 'identifier': class_.replace('.', '_'), 'name': name, 'title': title},
+            {
+                'alias': class_.rsplit('.', 1)[-1],
+                'class_': class_,
+                'identifier': class_.replace('.', '_'),
+                'name': name,
+                'title': title,
+            },
         )
 
         # Test
@@ -154,6 +160,9 @@ class <%= identifier %>(Pyjoyment.Plugin.object):
 
 
 object = <%= identifier %>
+% if alias != identifier:
+<%= alias %> = <%= identifier %>
+% end
 
 @@ test
 from Pyjo.Test import *

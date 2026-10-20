@@ -54,6 +54,45 @@ with subtest('Synopsis'):
     port, process = server(
         lambda port: (
             f"""
+from Pyjo.Server.Prethread import Prethread
+
+prethread = Prethread(listen=['http://*:{port}'])
+prethread.pid_file = {str(pid_file)!r}
+prethread.workers = 2
+
+
+@prethread.unsubscribe('request').on('request')
+def request(prethread, tx):
+    # Request
+    method = tx.req.method
+    path = tx.req.url.path
+
+    # Response
+    tx.res.code = 200
+    tx.res.headers.content_type = 'text/plain'
+    tx.res.body = f'{{method}} request for {{path}}!'.encode()
+
+    # Resume transaction
+    tx.resume()
+
+
+prethread.run()
+"""
+        )
+    )
+    is_ok(get(port, '/foo'), b'GET request for /foo!', 'served by a worker')
+    # TERM of Windows terminates the process, and Ctrl-Break stops the server, immediately
+    process.send_signal(signal.CTRL_BREAK_EVENT if sys.platform == 'win32' else signal.SIGTERM)
+    is_ok(process.wait(30), 0, 'stopped gracefully')
+    like_ok(process.stdout.read(), rf'Web application available at http://127.0.0.1:{port}', 'listening')
+    process.stdout.close()
+
+    # Or import the module, as in Google Python Style Guide
+
+    pid_file = tempdir().child('prethread.pid')
+    port, process = server(
+        lambda port: (
+            f"""
 import Pyjo.Server.Prethread
 
 prethread = Pyjo.Server.Prethread.new(listen=['http://*:{port}'])

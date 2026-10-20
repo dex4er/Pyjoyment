@@ -41,6 +41,13 @@ with subtest('Synopsis'):
         'pyjo generate app My.TestApp',
     )
 
+    # Not in Mojolicious: the class under the name of its module, unless it has it already
+    module = tmp.child('my_test_app', 'My', 'TestApp', '__init__.py').slurp('UTF-8')
+    like_ok(module, r'\nTestApp = My_TestApp\n', 'application class under the name of its module')
+    unlike_ok(tmp.child('my_app', 'MyApp', '__init__.py').slurp('UTF-8'), r'\nMyApp = ', 'named after its module')
+    controller = tmp.child('my_app', 'MyApp', 'Controller', 'Example.py').slurp('UTF-8')
+    like_ok(controller, r'\nExample = MyApp_Controller_Example\n', 'controller class under the name of its module')
+
 with subtest('Description'):
     application = Pyjoyment.new()
     app = Pyjoyment.Command.Author.generate.app.new(app=application)

@@ -3,6 +3,13 @@ Pyjo.Server.Hot - Production web server with hot deployment
 ============================================================
 ::
 
+    from Pyjo.Server.Hot import Hot
+
+    hot = Hot()
+    hot.run('/home/sri/myapp.py')
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Server.Hot
 
     hot = Pyjo.Server.Hot.new()
@@ -674,3 +681,4 @@ def _number(value: float) -> str:
 
 new = Pyjo_Server_Hot.new
 object = Pyjo_Server_Hot
+Hot = Pyjo_Server_Hot

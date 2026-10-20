@@ -3,6 +3,30 @@ Pyjo.Server.Lambda - AWS Lambda server
 ======================================
 ::
 
+    from Pyjo.Server.Lambda import Lambda
+
+    server = Lambda()
+
+
+    @server.unsubscribe('request').on('request')
+    def request(server, tx):
+        # Request
+        method = tx.req.method
+        path = tx.req.url.path
+
+        # Response
+        tx.res.code = 200
+        tx.res.headers.content_type = 'text/plain'
+        tx.res.body = f'{method} request for {path}!'.encode()
+
+        # Resume transaction
+        tx.resume()
+
+
+    handler = server.to_lambda_app()
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Server.Lambda
 
     server = Pyjo.Server.Lambda.new()
@@ -327,3 +351,4 @@ def _unchunk(body: bytes) -> bytes:
 
 new = Pyjo_Server_Lambda.new
 object = Pyjo_Server_Lambda
+Lambda = Pyjo_Server_Lambda

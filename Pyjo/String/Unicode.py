@@ -3,6 +3,14 @@ Pyjo.String.Unicode - String of characters
 ==========================================
 ::
 
+    from Pyjo.String.Unicode import Unicode
+
+    # Manipulate string
+    string = Unicode('foo_bar_baz')
+    print(string.camelize())
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.String.Unicode
 
     # Manipulate string
@@ -542,3 +550,4 @@ def _str(part: Anything) -> str:
 
 new = Pyjo_String_Unicode.new
 object = Pyjo_String_Unicode
+Unicode = Pyjo_String_Unicode

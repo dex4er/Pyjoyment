@@ -491,3 +491,4 @@ if TYPE_CHECKING:
 
 new = Pyjoyment_Lite.new
 object = Pyjoyment_Lite
+Lite = Pyjoyment_Lite

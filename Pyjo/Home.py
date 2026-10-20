@@ -3,6 +3,16 @@ Pyjo.Home - Home sweet home
 ===========================
 ::
 
+    from Pyjo.Home import Home
+
+    # Find and manage the project root directory
+    home = Home()
+    home.detect()
+    print(home.child('templates', 'layouts', 'default.html.ep'))
+    print(f'{home}')
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Home
 
     # Find and manage the project root directory
@@ -96,3 +106,4 @@ def _module(cls: type | ModuleType | str) -> ModuleType | None:
 
 new = Pyjo_Home.new
 object = Pyjo_Home
+Home = Pyjo_Home

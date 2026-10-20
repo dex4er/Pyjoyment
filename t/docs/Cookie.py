@@ -2,6 +2,18 @@ from Pyjo.Test import *
 
 
 with subtest('Synopsis'):
+    from Pyjo.Cookie import Cookie
+
+    class MyCookie(Cookie):
+        @classmethod
+        def parse(cls, string=None): ...
+
+        def to_str(self): ...
+
+    isa_ok(MyCookie(), Cookie, 'MyCookie()')
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Cookie
 
     class MyCookie(Pyjo.Cookie.object):

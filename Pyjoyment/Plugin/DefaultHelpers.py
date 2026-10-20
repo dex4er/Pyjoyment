@@ -1099,3 +1099,4 @@ def _validation(c: 'Controller') -> 'Pyjoyment.Validator.Validation.object':
 
 new = Pyjoyment_Plugin_DefaultHelpers.new
 object = Pyjoyment_Plugin_DefaultHelpers
+DefaultHelpers = Pyjoyment_Plugin_DefaultHelpers

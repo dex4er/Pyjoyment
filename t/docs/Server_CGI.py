@@ -12,12 +12,40 @@ env = {'PATH_INFO': '/foo', 'REQUEST_METHOD': 'GET', 'SCRIPT_NAME': '/', 'HTTP_H
 with subtest('Synopsis'):
     stdout = io.BytesIO()
     with patch.dict(os.environ, env), patch.object(sys, 'stdout', io.TextIOWrapper(stdout, write_through=True)):
+        from Pyjo.Server.CGI import CGI
+
+        cgi = CGI()
+
+        @cgi.unsubscribe('request').on('request')
+        def request(cgi, tx):
+            # Request
+            method = tx.req.method
+            path = tx.req.url.path
+
+            # Response
+            tx.res.code = 200
+            tx.res.headers.content_type = 'text/plain'
+            tx.res.body = f'{method} request for {path}!'.encode()
+
+            # Resume transaction
+            tx.resume()
+
+        cgi.run()
+        output = stdout.getvalue()
+    like_ok(output, rb'^Content-Length: 20\r\nContent-Type: text/plain\r\n', 'headers')
+    like_ok(output, rb'\r\n\r\nGET request for foo!$', 'content')
+
+    stdout = io.BytesIO()
+    with patch.dict(os.environ, env), patch.object(sys, 'stdout', io.TextIOWrapper(stdout, write_through=True)):
+        # Or import the module, as in Google Python Style Guide
+
         import Pyjo.Server.CGI
 
         cgi = Pyjo.Server.CGI.new()
 
+        # F811 "Redefinition of unused `request`": the synopsis defines it in both forms
         @cgi.unsubscribe('request').on('request')
-        def request(cgi, tx):
+        def request(cgi, tx):  # noqa: F811
             # Request
             method = tx.req.method
             path = tx.req.url.path

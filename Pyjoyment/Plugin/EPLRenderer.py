@@ -131,3 +131,4 @@ def _render(
 
 new = Pyjoyment_Plugin_EPLRenderer.new
 object = Pyjoyment_Plugin_EPLRenderer
+EPLRenderer = Pyjoyment_Plugin_EPLRenderer

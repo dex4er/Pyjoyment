@@ -3,6 +3,13 @@ Pyjoyment.Routes.Pattern - Route pattern
 ========================================
 ::
 
+    from Pyjoyment.Routes.Pattern import Pattern
+
+    # Create pattern
+    pattern = Pattern('/test/:name')
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjoyment.Routes.Pattern
 
     # Create pattern
@@ -430,3 +437,4 @@ def _regex_source(regex: re.Pattern[str]) -> str:
 
 new = Pyjoyment_Routes_Pattern.new
 object = Pyjoyment_Routes_Pattern
+Pattern = Pyjoyment_Routes_Pattern

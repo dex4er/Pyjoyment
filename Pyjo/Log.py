@@ -3,6 +3,13 @@ Pyjo.Log - Simple logger
 ========================
 ::
 
+    from Pyjo.Log import Log
+
+    # Log to STDERR
+    log = Log()
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Log
 
     # Log to STDERR
@@ -713,3 +720,4 @@ def _short(time: float, level: str, *lines: Any) -> str:
 
 new = Pyjo_Log.new
 object = Pyjo_Log
+Log = Pyjo_Log

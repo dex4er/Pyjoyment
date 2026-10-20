@@ -3,6 +3,20 @@ Pyjo.GetOpt - Command line options
 ==================================
 ::
 
+    from Pyjo.GetOpt import GetOpt
+
+    getopt = GetOpt()
+
+    # The value goes to the result
+    getopt.option('m|mode=s')
+
+    opts = getopt.parse(['-m', 'production', 'myapp.py'])
+    if not opts:
+        raise SystemExit('Usage: ...')
+    print(opts.mode)
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.GetOpt
 
     getopt = Pyjo.GetOpt.new()
@@ -579,3 +593,4 @@ def format_usage(usage: str, width: int = WIDTH) -> str:
 
 new = Pyjo_GetOpt.new
 object = Pyjo_GetOpt
+GetOpt = Pyjo_GetOpt

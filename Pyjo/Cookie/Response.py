@@ -3,6 +3,15 @@ Pyjo.Cookie.Response - HTTP response cookie
 ===========================================
 ::
 
+    from Pyjo.Cookie.Response import Response
+
+    cookie = Response()
+    cookie.name = 'foo'
+    cookie.value = 'bar'
+    print(cookie)
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Cookie.Response
 
     cookie = Pyjo.Cookie.Response.new()
@@ -282,3 +291,4 @@ class Pyjo_Cookie_Response(Pyjo.Cookie.object):
 parse = Pyjo_Cookie_Response.parse
 new = Pyjo_Cookie_Response.new
 object = Pyjo_Cookie_Response
+Response = Pyjo_Cookie_Response

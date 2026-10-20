@@ -13,6 +13,20 @@ with subtest('Synopsis'):
     os.chdir(dir)
     output = io.StringIO()
     with contextlib.redirect_stdout(output):
+        from Pyjo.Server.Reload.Backend.Poll import Poll
+
+        backend = Poll()
+        backend.watch_timeout = 0
+        backend.modified_files()
+        # The clock of a file system can be behind time.time() by some milliseconds, so the file is written a second
+        # after the start
+        time.sleep(1)
+        file = dir.child('lib').make_path().child('MyApp.py').spew(b'pass\n')
+        if files := backend.modified_files():
+            print('Files have been changed')
+
+        # Or import the module, as in Google Python Style Guide
+
         import Pyjo.Server.Reload.Backend.Poll
 
         backend = Pyjo.Server.Reload.Backend.Poll.new()
@@ -24,7 +38,7 @@ with subtest('Synopsis'):
         file = dir.child('lib').make_path().child('MyApp.py').spew(b'pass\n')
         if files := backend.modified_files():
             print('Files have been changed')
-    is_ok(output.getvalue(), 'Files have been changed\n', 'changed')
+    is_ok(output.getvalue(), 'Files have been changed\n' * 2, 'changed')
     os.chdir('/')
 
 with subtest('new'):

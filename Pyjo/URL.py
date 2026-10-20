@@ -3,6 +3,20 @@ Pyjo.URL - Uniform Resource Locator
 ===================================
 ::
 
+    from Pyjo.URL import URL
+
+    # Parse
+    url = URL('http://sri:foo@example.com:3000/foo?foo=bar#23')
+    print(url.scheme)
+    print(url.userinfo)
+    print(url.host)
+    print(url.port)
+    print(url.path)
+    print(url.query)
+    print(url.fragment)
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.URL
 
     # Parse
@@ -634,3 +648,4 @@ def _encode(string: str, pattern: bytes) -> str:
 
 new = Pyjo_URL.new
 object = Pyjo_URL
+URL = Pyjo_URL

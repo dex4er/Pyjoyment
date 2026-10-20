@@ -13,6 +13,23 @@ with subtest('Synopsis'):
 
     output = io.StringIO()
     with contextlib.redirect_stdout(output):
+        from Pyjo.Reactor.Poll import Poll
+
+        # Watch if handle becomes readable or writable
+        reactor = Poll()
+        reactor.io(
+            first,
+            lambda reactor, writable: print('First handle is writable' if writable else 'First handle is readable'),
+        )
+
+        reactor.one_tick()
+        reactor.remove(first)
+    ok('First handle is writable' in output.getvalue().splitlines(), 'first handle')
+
+    output = io.StringIO()
+    with contextlib.redirect_stdout(output):
+        # Or import the module, as in Google Python Style Guide
+
         import Pyjo.Reactor.Poll
 
         # Watch if handle becomes readable or writable

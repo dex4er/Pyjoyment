@@ -5,6 +5,24 @@ Pyjoyment.Routes.Match - Find routes
 
     import Pyjoyment.Controller
     import Pyjoyment.Routes
+
+    from Pyjoyment.Routes.Match import Match
+
+    # Routes
+    r = Pyjoyment.Routes.new()
+    r.get('/user/:id')
+    r.put('/user/:id')
+
+    # Match
+    c = Pyjoyment.Controller.new()
+    match = Match(root=r)
+    match.find(c, method='PUT', path='/user/23')
+    print(match.stack[0]['id'])
+
+    # Or import the module, as in Google Python Style Guide
+
+    import Pyjoyment.Controller
+    import Pyjoyment.Routes
     import Pyjoyment.Routes.Match
 
     # Routes
@@ -230,3 +248,4 @@ class Pyjoyment_Routes_Match(Pyjo.Base.object):
 
 new = Pyjoyment_Routes_Match.new
 object = Pyjoyment_Routes_Match
+Match = Pyjoyment_Routes_Match

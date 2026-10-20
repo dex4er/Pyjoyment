@@ -3,6 +3,30 @@ Pyjo.IOLoop.Subprocess - Subprocesses
 =====================================
 ::
 
+    from Pyjo.IOLoop.Subprocess import Subprocess
+
+    import time
+
+    # Operation that would block the event loop for 5 seconds
+    subprocess = Subprocess()
+
+
+    def blocking(subprocess):
+        time.sleep(5)
+        return '♥', 'Pyjoyment'
+
+
+    def done(subprocess, err, *results):
+        if err:
+            print(f'Subprocess error: {err}')
+            return
+        print(f'I {results[0]} {results[1]}!')
+
+
+    subprocess.run(blocking, done)
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.IOLoop.Subprocess
 
     import time
@@ -392,3 +416,4 @@ def _results(value: Any) -> list[Any]:
 
 new = Pyjo_IOLoop_Subprocess.new
 object = Pyjo_IOLoop_Subprocess
+Subprocess = Pyjo_IOLoop_Subprocess

@@ -3,6 +3,14 @@ Pyjo.Asset.Memory - In-memory storage for HTTP content
 ======================================================
 ::
 
+    from Pyjo.Asset.Memory import Memory
+
+    mem = Memory()
+    mem.add_chunk(b'foo bar baz')
+    print(mem.slurp())
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Asset.Memory
 
     mem = Pyjo.Asset.Memory.new()
@@ -224,3 +232,4 @@ class Pyjo_Asset_Memory(Pyjo.Asset.object):
 
 new = Pyjo_Asset_Memory.new
 object = Pyjo_Asset_Memory
+Memory = Pyjo_Asset_Memory

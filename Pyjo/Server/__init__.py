@@ -3,6 +3,18 @@ Pyjo.Server - HTTP/WebSocket server base class
 ==============================================
 ::
 
+    from Pyjo.Server import Server
+
+    class Pyjo_Server_MyServer(Server):
+        def run(self):
+            # Get a transaction
+            tx = self.build_tx()
+
+            # Emit "request" event
+            self.emit('request', tx)
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Server
 
     class Pyjo_Server_MyServer(Pyjo.Server.object):
@@ -371,3 +383,4 @@ def _croak(e: OSError, message: str) -> NoReturn:
 
 new = Pyjo_Server.new
 object = Pyjo_Server
+Server = Pyjo_Server

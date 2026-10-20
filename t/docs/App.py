@@ -8,6 +8,29 @@ from Pyjo.Test import *
 
 
 with subtest('Synopsis'):
+    from Pyjo.App import App
+
+    class MyApp(App):
+        # All the complexities of CGI, WSGI, ASGI, HTTP and WebSockets get
+        # reduced to a single method call!
+        def handler(self, tx):
+            # Resume transaction at the end of the block
+            with tx:
+                # Request
+                method = tx.req.method
+                path = tx.req.url.path
+
+                # Response
+                tx.res.code = 200
+                tx.res.headers.content_type = 'text/plain'
+                tx.res.body = f'{method} request for {path}!'.encode()
+
+    ua = Pyjo.UserAgent.new()
+    ua.server.app = MyApp()
+    is_ok(ua.get('/foo').res.text, 'GET request for /foo!', 'handler')
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.App
 
     class MyApp(Pyjo.App.object):

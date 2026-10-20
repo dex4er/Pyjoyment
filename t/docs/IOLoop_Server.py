@@ -12,6 +12,27 @@ import tempfile
 os.environ.pop('PYJO_REACTOR', None)
 
 with subtest('Synopsis'):
+    from Pyjo.IOLoop.Server import Server
+
+    accepted = []
+
+    # Create listen socket
+    server = Server()
+    server.on('accept', lambda server, handle: ...)
+    server.on('accept', lambda server, handle: accepted.append(handle) or server.reactor.stop())
+    server.listen(port=Server.generate_port(), address='127.0.0.1')
+
+    server.start()
+    client = socket.create_connection(('127.0.0.1', server.port))
+    if not server.reactor.is_running:
+        server.reactor.start()
+    isa_ok(accepted[0], socket.socket, 'accepted')
+    accepted[0].close()
+    client.close()
+    server.close()
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.IOLoop.Server
 
     accepted = []

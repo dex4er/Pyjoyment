@@ -3,6 +3,14 @@ Pyjo.DOM.CSS - CSS selector engine
 ==================================
 ::
 
+    from Pyjo.DOM.CSS import CSS
+
+    # Select elements from DOM tree
+    css = CSS(tree=tree)
+    elements = css.select('h1, h2, h3')
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.DOM.CSS
 
     # Select elements from DOM tree
@@ -989,3 +997,4 @@ def _value(op: str, value: str | None, insensitive: str | None = None) -> re.Pat
 
 new = Pyjo_DOM_CSS.new
 object = Pyjo_DOM_CSS
+CSS = Pyjo_DOM_CSS

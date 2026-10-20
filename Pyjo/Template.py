@@ -3,6 +3,20 @@ Pyjo.Template - Python-ish templates
 ====================================
 ::
 
+    from Pyjo.Template import Template
+
+    # Use Python modules
+    mt = Template()
+    print(mt.render('''
+    % import time
+    <div>
+      % now = time.gmtime(0)
+      Time: <%= time.strftime('%H:%M:%S', now) %>
+    </div>
+    '''))
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Template
 
     # Use Python modules
@@ -1273,3 +1287,4 @@ def _trim(tree: list[list[str]]) -> None:
 
 new = Pyjo_Template.new
 object = Pyjo_Template
+Template = Pyjo_Template

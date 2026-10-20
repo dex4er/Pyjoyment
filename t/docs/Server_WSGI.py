@@ -13,12 +13,42 @@ def environ(path='/foo'):
 
 
 with subtest('Synopsis'):
+    from Pyjo.Server.WSGI import WSGI
+
+    wsgi = WSGI()
+
+    @wsgi.unsubscribe('request').on('request')
+    def request(wsgi, tx):
+        # Request
+        method = tx.req.method
+        path = tx.req.url.path
+
+        # Response
+        tx.res.code = 200
+        tx.res.headers.content_type = 'text/plain'
+        tx.res.body = f'{method} request for {path}!'.encode()
+
+        # Resume transaction
+        tx.resume()
+
+    app = wsgi.to_wsgi_app()
+
+    got = []
+    body = app(environ(), lambda status, headers, exc_info=None: got.extend([status, headers]))
+    is_ok(got[0], '200 OK', 'status')
+    is_ok(dict(got[1])['Content-Type'], 'text/plain', 'header')
+    is_ok(b''.join(body), b'GET request for /foo!', 'content')
+    body.close()
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Server.WSGI
 
     wsgi = Pyjo.Server.WSGI.new()
 
+    # F811 "Redefinition of unused `request`": the synopsis defines it in both forms
     @wsgi.unsubscribe('request').on('request')
-    def request(wsgi, tx):
+    def request(wsgi, tx):  # noqa: F811
         # Request
         method = tx.req.method
         path = tx.req.url.path

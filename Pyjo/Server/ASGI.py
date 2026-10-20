@@ -3,6 +3,29 @@ Pyjo.Server.ASGI - ASGI server
 ==============================
 ::
 
+    from Pyjo.Server.ASGI import ASGI
+
+    asgi = ASGI()
+    asgi.unsubscribe('request')
+
+    @asgi.on('request')
+    def request(asgi, tx):
+        # Request
+        method = tx.req.method
+        path = tx.req.url.path
+
+        # Response
+        tx.res.code = 200
+        tx.res.headers.content_type = 'text/plain'
+        tx.res.body = f'{method} request for {path}!'.encode()
+
+        # Resume transaction
+        tx.resume()
+
+    app = asgi.to_asgi_app()
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Server.ASGI
 
     asgi = Pyjo.Server.ASGI.new()
@@ -416,3 +439,4 @@ def _environ(scope: Scope) -> dict[str, str]:
 
 new = Pyjo_Server_ASGI.new
 object = Pyjo_Server_ASGI
+ASGI = Pyjo_Server_ASGI

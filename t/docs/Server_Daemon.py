@@ -9,12 +9,53 @@ from contextlib import redirect_stdout
 
 with subtest('Synopsis'):
     import Pyjo.IOLoop
+
+    from Pyjo.Server.Daemon import Daemon
+
+    daemon = Daemon(listen=['http://127.0.0.1'], silent=True)
+
+    @daemon.unsubscribe('request').on('request')
+    def request(daemon, tx):
+        # Request
+        method = tx.req.method
+        path = tx.req.url.path
+
+        # Response
+        tx.res.code = 200
+        tx.res.headers.content_type = 'text/plain'
+        tx.res.body = f'{method} request for {path}!'.encode()
+
+        # Resume transaction
+        tx.resume()
+
+    port = daemon.start().ports()[0]
+    results = []
+
+    def client():
+        conn = http.client.HTTPConnection('127.0.0.1', port, timeout=10)
+        conn.request('GET', '/foo')
+        results.append(conn.getresponse().read())
+        conn.close()
+
+    # The client in a thread of its own, and the event loop stops when it is done
+    worker = threading.Thread(target=client)
+    worker.start()
+    timer = Pyjo.IOLoop.recurring(0.05, lambda loop: worker.is_alive() or loop.stop())
+    daemon.run()
+    worker.join()
+    Pyjo.IOLoop.remove(timer)
+    is_deeply_ok(results, [b'GET request for /foo!'], 'daemon.run()')
+    daemon.close()
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Server.Daemon
 
     daemon = Pyjo.Server.Daemon.new(listen=['http://127.0.0.1'], silent=True)
 
+    # F811 "Redefinition of unused `request`": the synopsis defines it in both forms
     @daemon.unsubscribe('request').on('request')
-    def request(daemon, tx):
+    def request(daemon, tx):  # noqa: F811
         # Request
         method = tx.req.method
         path = tx.req.url.path

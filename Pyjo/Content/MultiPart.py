@@ -3,6 +3,14 @@ Pyjo.Content.MultiPart - HTTP multipart content
 ===============================================
 ::
 
+    from Pyjo.Content.MultiPart import MultiPart
+
+    multi = MultiPart()
+    multi.parse(b'Content-Type: multipart/mixed; boundary=---foobar')
+    single = multi.parts[4]
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Content.MultiPart
 
     multi = Pyjo.Content.MultiPart.new()
@@ -312,3 +320,4 @@ class Pyjo_Content_MultiPart(Pyjo.Content.object):
 
 new = Pyjo_Content_MultiPart.new
 object = Pyjo_Content_MultiPart
+MultiPart = Pyjo_Content_MultiPart

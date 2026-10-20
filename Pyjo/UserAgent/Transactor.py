@@ -3,6 +3,14 @@ Pyjo.UserAgent.Transactor - User agent transactor
 =================================================
 ::
 
+    from Pyjo.UserAgent.Transactor import Transactor
+
+    # GET request with Accept header
+    t = Transactor()
+    print(t.tx('GET', 'http://example.com', {'Accept': '*/*'}).req.to_bytes())
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.UserAgent.Transactor
 
     # GET request with Accept header
@@ -755,3 +763,4 @@ def _type(headers: Pyjo.Headers.object, content_type: str) -> None:
 
 new = Pyjo_UserAgent_Transactor.new
 object = Pyjo_UserAgent_Transactor
+Transactor = Pyjo_UserAgent_Transactor

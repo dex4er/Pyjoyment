@@ -3,6 +3,16 @@ Pyjo.Cookie - HTTP cookie base class
 ====================================
 ::
 
+    from Pyjo.Cookie import Cookie
+
+    class MyCookie(Cookie):
+        @classmethod
+        def parse(cls, string=None): ...
+
+        def to_str(self): ...
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Cookie
 
     class MyCookie(Pyjo.Cookie.object):
@@ -130,3 +140,4 @@ class Pyjo_Cookie(Pyjo.Base.object, Pyjo.String.Mixin.object):
 
 new = Pyjo_Cookie.new
 object = Pyjo_Cookie
+Cookie = Pyjo_Cookie

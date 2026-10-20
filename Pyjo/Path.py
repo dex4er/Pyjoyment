@@ -3,6 +3,14 @@ Pyjo.Path - Path
 ================
 ::
 
+    from Pyjo.Path import Path
+
+    # Parse
+    path = Path('/foo%2Fbar%3B/baz.html')
+    print(path[0])
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Path
 
     # Parse
@@ -408,3 +416,4 @@ class Pyjo_Path(Pyjo.Base.object, Pyjo.String.Mixin.object):
 
 new = Pyjo_Path.new
 object = Pyjo_Path
+Path = Pyjo_Path

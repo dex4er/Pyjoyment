@@ -39,6 +39,23 @@ port = server.server_address[1]
 with subtest('Synopsis'):
 
     def parse():
+        from Pyjo.Message.Response import Response
+
+        # Parse
+        res = Response()
+        res.parse(b'HTTP/1.0 200 OK\x0d\x0a')
+        res.parse(b'Content-Length: 12\x0d\x0a')
+        res.parse(b'Content-Type: text/plain\x0d\x0a\x0d\x0a')
+        res.parse(b'Hello World!')
+        print(res.code)
+        print(res.headers.content_type)
+        print(res.body)
+
+    is_ok(output(parse), "200\ntext/plain\nb'Hello World!'\n", 'parse')
+
+    def parse():
+        # Or import the module, as in Google Python Style Guide
+
         import Pyjo.Message.Response
 
         # Parse

@@ -3,6 +3,17 @@ Pyjo.Message - HTTP message base class
 ======================================
 ::
 
+    from Pyjo.Message import Message
+
+    class MyMessage(Message):
+        def cookies(self, *cookies): ...
+        def extract_start_line(self, buffer): ...
+        def get_start_line_chunk(self, offset): ...
+        @property
+        def start_line_size(self): ...
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Message
 
     class MyMessage(Pyjo.Message.object):
@@ -806,3 +817,4 @@ def _single(content: Pyjo.Content.object) -> Pyjo.Content.Single.object:
 
 new = Pyjo_Message.new
 object = Pyjo_Message
+Message = Pyjo_Message

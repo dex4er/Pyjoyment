@@ -3,6 +3,12 @@ Pyjoyment.Routes.Route - Route
 ==============================
 ::
 
+    from Pyjoyment.Routes.Route import Route
+
+    r = Route()
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjoyment.Routes.Route
 
     r = Pyjoyment.Routes.Route.new()
@@ -758,3 +764,4 @@ class Pyjoyment_Routes_Route(Pyjo.Base.object):
 
 new = Pyjoyment_Routes_Route.new
 object = Pyjoyment_Routes_Route
+Route = Pyjoyment_Routes_Route

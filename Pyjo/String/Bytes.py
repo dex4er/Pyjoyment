@@ -3,6 +3,14 @@ Pyjo.String.Bytes - String of bytes
 ===================================
 ::
 
+    from Pyjo.String.Bytes import Bytes
+
+    # Manipulate bytes
+    data = Bytes(b'foo bar baz')
+    print(data.md5_sum())
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.String.Bytes
 
     # Manipulate bytes
@@ -521,3 +529,4 @@ def _decode(data: bytes) -> tuple[str, str]:
 
 new = Pyjo_String_Bytes.new
 object = Pyjo_String_Bytes
+Bytes = Pyjo_String_Bytes

@@ -4,6 +4,18 @@ Pyjoyment.Validator.Validation - Perform validations
 ::
 
     import Pyjoyment.Validator
+
+    from Pyjoyment.Validator.Validation import Validation
+
+    validator = Pyjoyment.Validator.new()
+    v = Validation(validator=validator)
+    v.input = {'foo': 'bar'}
+    v.required('foo').one_of('bar', 'baz')
+    print(v.param('foo'))
+
+    # Or import the module, as in Google Python Style Guide
+
+    import Pyjoyment.Validator
     import Pyjoyment.Validator.Validation
 
     validator = Pyjoyment.Validator.new()
@@ -380,3 +392,4 @@ def _values(result: Any) -> tuple[Any, ...]:
 
 new = Pyjoyment_Validator_Validation.new
 object = Pyjoyment_Validator_Validation
+Validation = Pyjoyment_Validator_Validation

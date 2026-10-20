@@ -3,6 +3,22 @@ Pyjo.Asset - HTTP content storage base class
 ============================================
 ::
 
+    from Pyjo.Asset import Asset
+
+    class MyAsset(Asset):
+        def add_chunk(self, chunk): ...
+        def contains(self, string): ...
+        def get_chunk(self, offset, max=None): ...
+        def move_to(self, to): ...
+        @property
+        def mtime(self): ...
+        @property
+        def size(self): ...
+        def slurp(self): ...
+        def to_file(self): ...
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Asset
 
     class MyAsset(Pyjo.Asset.object):
@@ -181,3 +197,4 @@ class Pyjo_Asset(Pyjo.EventEmitter.object):
 
 new = Pyjo_Asset.new
 object = Pyjo_Asset
+Asset = Pyjo_Asset

@@ -3,6 +3,16 @@ Pyjo.Transaction - Transaction base class
 =========================================
 ::
 
+    from Pyjo.Transaction import Transaction
+
+    class MyTransaction(Transaction):
+        def client_read(self, chunk): ...
+        def client_write(self): ...
+        def server_read(self, chunk): ...
+        def server_write(self): ...
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Transaction
 
     class MyTransaction(Pyjo.Transaction.object):
@@ -406,3 +416,4 @@ class Pyjo_Transaction(Pyjo.EventEmitter.object):
 
 new = Pyjo_Transaction.new
 object = Pyjo_Transaction
+Transaction = Pyjo_Transaction

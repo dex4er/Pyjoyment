@@ -4,6 +4,28 @@ Pyjoyment.Command - Command base class
 ::
 
     # Lowercase command name, in the module Pyjoyment.Command.mycommand
+    from Pyjoyment.Command import Command
+
+    from Pyjo.Util import extract_usage
+
+
+    class Pyjoyment_Command_mycommand(Command):
+        # Short description
+        description = 'My first Pyjoyment command'
+
+        # Usage message from the synopsis of the docstring of the module
+        usage = extract_usage()
+
+        def run(self, *args):
+            # Magic here! :)
+            ...
+
+
+    object = Pyjoyment_Command_mycommand
+
+    # Or import the module, as in Google Python Style Guide
+
+    # Lowercase command name, in the module Pyjoyment.Command.mycommand
     import Pyjoyment.Command
 
     from Pyjo.Util import extract_usage
@@ -307,3 +329,4 @@ __path__ = extend_path(__path__, __name__)
 
 new = Pyjoyment_Command.new
 object = Pyjoyment_Command
+Command = Pyjoyment_Command

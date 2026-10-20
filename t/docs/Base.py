@@ -7,6 +7,20 @@ import io
 with subtest('Synopsis'):
     output = io.StringIO()
     with contextlib.redirect_stdout(output):
+        from Pyjo.Base import Base
+
+        from dataclasses import dataclass
+
+        @dataclass
+        class Cat(Base):
+            name: str = 'Nyan'
+            age: int = 4
+
+        mew = Cat(name='Longcat')
+        print(mew.age)
+
+        # Or import the module, as in Google Python Style Guide
+
         import Pyjo.Base
 
         from dataclasses import dataclass, field
@@ -28,7 +42,7 @@ with subtest('Synopsis'):
 
         rawr = Tiger.new(stripes=38, weight=250)
         print(rawr.tap(lambda rawr: rawr.friend.set(name='Tacgnol')).weight)
-    is_ok(output.getvalue(), '4\n3\n250\n', 'output')
+    is_ok(output.getvalue(), '4\n4\n3\n250\n', 'output')
     is_ok(rawr.friend.name, 'Tacgnol', 'friend')
 
 with subtest('Description'):
@@ -43,6 +57,19 @@ with subtest('Description'):
     lion = Lion.new()
     is_ok(len(lion.pride), 2, 'built')
     ok(lion.pride is lion.pride, 'built once')
+
+with subtest('Constructors'):
+    import Pyjo.Path
+
+    path = Pyjo.Path.new('/foo/bar')
+    is_ok(str(path), '/foo/bar', 'new')
+
+    # Or import the class
+
+    from Pyjo.Path import Path
+
+    path = Path('/foo/bar')
+    is_ok(str(path), '/foo/bar', 'constructor')
 
 with subtest('Fluent interfaces'):
 

@@ -3,6 +3,13 @@ Pyjo.Server.Reload - Auto-restarting development server
 ========================================================
 ::
 
+    from Pyjo.Server.Reload import Reload
+
+    reload = Reload()
+    reload.run('/home/sri/myapp.py')
+
+    # Or import the module, as in Google Python Style Guide
+
     import Pyjo.Server.Reload
 
     reload = Pyjo.Server.Reload.new()
@@ -357,3 +364,4 @@ def _kill(sig: int, pid: int) -> bool:
 
 new = Pyjo_Server_Reload.new
 object = Pyjo_Server_Reload
+Reload = Pyjo_Server_Reload
