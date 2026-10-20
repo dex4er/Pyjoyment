@@ -667,11 +667,15 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
     def _watching(self) -> bool:
         return bool(len(self._timers) or len(self._io) or len(self._tasks))
 
+    # The handle is removed from the loop that watches it, without the move to a loop that runs, which leaves out the
+    # handles that are not watched anymore, so the loop of before would keep it, and select of Windows fails once the
+    # handle is closed
     def _unwatch(self, fd: int, io: _IO) -> None:
-        if io['read']:
-            self.loop.remove_reader(fd)
-        if io['write']:
-            self.loop.remove_writer(fd)
+        if (loop := self._loop) is not None and not loop.is_closed():
+            if io['read']:
+                loop.remove_reader(fd)
+            if io['write']:
+                loop.remove_writer(fd)
         io['read'] = io['write'] = False
 
 
