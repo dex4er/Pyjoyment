@@ -105,7 +105,7 @@ class Pyjo_IOLoop_TLS(Pyjo.EventEmitter.object):
     def __exit__(
         self, type: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None
     ) -> None:
-        self._release()
+        self.close()
 
     def _release(self) -> None:
         self._cleanup()
@@ -142,6 +142,18 @@ class Pyjo_IOLoop_TLS(Pyjo.EventEmitter.object):
         environment variable is set.
         """
         return TLS
+
+    # Not in Mojolicious: the release of the connection of the handshake, which Perl does in DESTROY, also at the end of
+    # a with block
+    def close(self) -> None:
+        """::
+
+            tls.close()
+
+        Close the connection of the handshake, as the end of a ``with`` block
+        does.
+        """
+        self._release()
 
     def negotiate(self, **options: Any) -> None:
         """::

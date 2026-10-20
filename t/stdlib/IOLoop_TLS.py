@@ -110,4 +110,10 @@ with subtest('Context manager'):
     is_ok(a.fileno(), -1, 'connection of the handshake closed at the end of the block')
     b.close()
 
+with subtest('close'):
+    a, b = socket.socketpair()
+    Pyjo.IOLoop.TLS.new(a).close()
+    is_ok(a.fileno(), -1, 'connection of the handshake closed')
+    b.close()
+
 done_testing()

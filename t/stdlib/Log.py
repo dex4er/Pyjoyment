@@ -128,4 +128,17 @@ with subtest('Context manager'):
     log.handle.close()
     like_ok(path.slurp().decode(), (r'First.*Second', 's'), 'messages')
 
+with subtest('close'):
+    tmp = tempdir()
+    path = tmp.child('test.log')
+    log = Pyjo.Log.new(path=path)
+    log.error('First')
+    handle = log.handle
+    log.close()
+    ok(handle.closed, 'file closed')
+    log.error('Second')
+    ok(not log.handle.closed, 'opened again when the log is used again')
+    log.close()
+    like_ok(path.slurp().decode(), (r'First.*Second', 's'), 'messages')
+
 done_testing()

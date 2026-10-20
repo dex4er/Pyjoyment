@@ -94,8 +94,7 @@ class Pyjo_App(Pyjo.Base.object):
     def __exit__(
         self, type: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None
     ) -> None:
-        if self._ua is not None:
-            self._ua.__exit__(type, value, traceback)
+        self.close()
 
     @property
     def home(self) -> Pyjo.Home.object:
@@ -190,6 +189,18 @@ class Pyjo_App(Pyjo.Base.object):
         :mod:`Pyjo.Transaction.HTTP` object.
         """
         return Pyjo.Transaction.HTTP.new()
+
+    # Not in Mojolicious: the release of the user agent, which Perl does in DESTROY, also at the end of a with block
+    def close(self) -> None:
+        """::
+
+            app.close()
+
+        Close the connections and the servers of :attr:`ua`, as the end of a
+        ``with`` block does.
+        """
+        if self._ua is not None:
+            self._ua.close()
 
     # config(**values) with no values is config(), which the first overload types
     @overload

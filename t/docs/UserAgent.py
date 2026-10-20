@@ -190,6 +190,16 @@ with subtest('prepare'):
 
     is_ok(ua.get('mojolicious.org').res.body, b'mock', 'mocked')
 
+with subtest('close'):
+    import Pyjo.UserAgent
+
+    ua = Pyjo.UserAgent.new()
+    before = ua.server.url().port
+    ua.close()
+    isnt_ok(ua.server.url().port, before, 'a new server when it is used again')
+    ua.close()
+
+
 with subtest('start'):
     ua = local(Pyjo.UserAgent.new())
     ua.on('start', lambda ua, tx: ...)

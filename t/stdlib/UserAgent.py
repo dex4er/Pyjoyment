@@ -223,4 +223,11 @@ with subtest('Context manager'):
         socket.create_connection(('127.0.0.1', port)).close()
     throws_ok(lambda: socket.create_connection(('127.0.0.1', port)), ConnectionRefusedError, 'server closed at the end')
 
+with subtest('close'):
+    ua = Pyjo.UserAgent.new()
+    port = ua.server.url().port
+    socket.create_connection(('127.0.0.1', port)).close()
+    ua.close()
+    throws_ok(lambda: socket.create_connection(('127.0.0.1', port)), ConnectionRefusedError, 'server closed')
+
 done_testing()

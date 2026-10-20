@@ -51,6 +51,16 @@ with subtest('can_tls'):
     boolean = Pyjo.IOLoop.TLS.object.can_tls()
     ok(boolean, 'TLS support')
 
+with subtest('close'):
+    import Pyjo.IOLoop.TLS
+
+    a, b = socket.socketpair()
+    tls = Pyjo.IOLoop.TLS.new(a)
+    tls.close()
+    is_ok(a.fileno(), -1, 'connection of the handshake closed')
+    b.close()
+
+
 with subtest('negotiate'):
     errors = []
     pair = socket.socketpair()

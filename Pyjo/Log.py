@@ -220,7 +220,7 @@ class Pyjo_Log(Pyjo.EventEmitter.object):
     def __exit__(
         self, type: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None
     ) -> None:
-        self._release()
+        self.close()
 
     @property
     def color(self) -> bool:
@@ -398,6 +398,17 @@ class Pyjo_Log(Pyjo.EventEmitter.object):
         self.on('message', message)
 
         return capture
+
+    # Not in Mojolicious: the release of the file of path, which Perl does in DESTROY, also at the end of a with block
+    def close(self) -> None:
+        """::
+
+            log.close()
+
+        Close the file that the log opened for :attr:`path`, as the end of a
+        ``with`` block does, which it opens again when it is used again.
+        """
+        self._release()
 
     def context(self, *context: Any) -> Self:
         """::

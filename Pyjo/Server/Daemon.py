@@ -435,6 +435,18 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
     def __exit__(
         self, exc_type: type[BaseException] | None, exc: BaseException | None, tb: TracebackType | None
     ) -> None:
+        self.close()
+
+    # Not in Mojolicious: the release of the listen sockets and the connections, which Perl does in DESTROY, also at the
+    # end of a with block
+    def close(self) -> None:
+        """::
+
+            daemon.close()
+
+        Close the listen sockets and the connections of the server, as the end
+        of a ``with`` block does.
+        """
         self._cleanup()
 
     def ports(self) -> list[int]:
@@ -593,6 +605,7 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
         loop = self.ioloop
         for id in [*self._connections, *self.acceptors]:
             loop.remove(id)
+        self.acceptors = []
         # Not in Mojolicious: the listen sockets of a stopped daemon, which Perl closes as it frees them
         for server in self._servers.values():
             server.close()

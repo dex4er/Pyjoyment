@@ -235,8 +235,7 @@ class Pyjo_Test_Pyjo(Pyjo.Base.object):
     def __exit__(
         self, type: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None
     ) -> None:
-        if self._ua is not None:
-            self._ua.__exit__(type, value, traceback)
+        self.close()
 
     @property
     def ua(self) -> Pyjo.UserAgent.object:
@@ -359,6 +358,18 @@ class Pyjo_Test_Pyjo(Pyjo.Base.object):
         """
         desc = _desc(desc, f'no similar match for attribute "{attr}" at selector "{selector}"')
         return self.test('unlike', self._attr(selector, attr), regex, desc)
+
+    # Not in Mojolicious: the release of the user agent, which Perl does in DESTROY, also at the end of a with block
+    def close(self) -> None:
+        """::
+
+            t.close()
+
+        Close the connections and the servers of :attr:`ua`, as the end of a
+        ``with`` block does.
+        """
+        if self._ua is not None:
+            self._ua.close()
 
     def content_is(self, value: Any, desc: str | None = None) -> Self:
         """::

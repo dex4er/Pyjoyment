@@ -563,7 +563,7 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
     def __exit__(
         self, type: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None
     ) -> None:
-        self._release()
+        self.close()
 
     def _release(self) -> None:
         self._cleanup()
@@ -685,6 +685,18 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
                 Pyjo.IOLoop.start()
         """
         return self.transactor.websocket(*args)
+
+    # Not in Mojolicious: the release of the connections, which Perl does in DESTROY, also at the end of a with block
+    def close(self) -> None:
+        """::
+
+            ua.close()
+
+        Close the connections of the user agent, and the server that it made
+        for relative URLs, as the end of a ``with`` block does. The user agent
+        makes new ones when it is used again.
+        """
+        self._release()
 
     @overload
     def start(self, tx: Pyjo.Transaction.HTTP.object) -> Any: ...

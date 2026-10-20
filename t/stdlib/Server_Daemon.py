@@ -198,4 +198,25 @@ with subtest('TLS of ssl'):
     is_deeply_ok(run(client), ('TLSv1.2', b'GET /secure 1.1 0'), 'verified certificate, version of the location')
     tls.stop()
 
+with subtest('Context manager'):
+    with (
+        Pyjo.IOLoop.new() as loop,
+        Pyjo.Server.Daemon.new(ioloop=loop, listen=['http://127.0.0.1'], silent=True) as daemon,
+    ):
+        port = daemon.start().ports()[0]
+        socket.create_connection(('127.0.0.1', port)).close()
+    throws_ok(
+        lambda: socket.create_connection(('127.0.0.1', port)),
+        ConnectionRefusedError,
+        'listen socket closed at the end of the block',
+    )
+
+with subtest('close'):
+    with Pyjo.IOLoop.new() as loop:
+        daemon = Pyjo.Server.Daemon.new(ioloop=loop, listen=['http://127.0.0.1'], silent=True)
+        port = daemon.start().ports()[0]
+        socket.create_connection(('127.0.0.1', port)).close()
+        daemon.close()
+        throws_ok(lambda: socket.create_connection(('127.0.0.1', port)), ConnectionRefusedError, 'listen socket closed')
+
 done_testing()

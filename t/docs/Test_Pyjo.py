@@ -328,6 +328,14 @@ with subtest('attr_unlike'):
         t = t.attr_unlike('img.cat', 'alt', re.compile(r'Calm'), 'different alt text')
         is_deeply_ok([c[0] for c in calls], ['unlike', 'unlike'], 'calls')
 
+with subtest('close'):
+    t = Pyjo.Test.Pyjo.new(Pyjoyment.new())
+    before = t.ua.server.url().port
+    t.close()
+    isnt_ok(t.ua.server.url().port, before, 'a new server when it is used again')
+    t.close()
+
+
 with subtest('content_is'):
     with tester('/foo') as t:
         t = t.content_is('working!')

@@ -29,6 +29,16 @@ with subtest('app'):
     server.app = Pyjo.HelloWorld.new()
     ok(isinstance(server.app, Pyjo.HelloWorld.object), 'server.app')
 
+with subtest('close'):
+    import Pyjo.UserAgent.Server
+
+    server = Pyjo.UserAgent.Server.new()
+    before = server.url().port
+    server.close()
+    isnt_ok(server.url().port, before, 'started again on a new port')
+    server.close()
+
+
 with subtest('nb_url'):
     url = server.nb_url()
     is_ok(url.protocol, 'http', 'url')

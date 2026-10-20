@@ -166,6 +166,16 @@ with subtest('capture'):
     like_ok(str(messages), r'Something very bad happened', 'logs contain fatal message')
     like_ok(messages[-1], r'Just some debug information', 'trace message was last')
 
+with subtest('close'):
+    import Pyjo.Log
+
+    log = Pyjo.Log.new(path=tempdir().child('test.log'))
+    log.info('First')
+    handle = log.handle
+    log.close()
+    ok(handle.closed, 'file closed')
+
+
 with subtest('context'):
     log = Pyjo.Log.new(handle=None)
     new = log.context('[extra]', '[information]')

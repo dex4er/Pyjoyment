@@ -75,6 +75,16 @@ with subtest('build_tx'):
     tx = MyApp.new().build_tx()
     isa_ok(tx, Pyjo.Transaction.HTTP.object, 'transaction')
 
+with subtest('close'):
+    import Pyjo.App
+
+    app = Pyjo.App.new()
+    before = app.ua.server.url().port
+    app.close()
+    isnt_ok(app.ua.server.url().port, before, 'a new server when it is used again')
+    app.close()
+
+
 with subtest('config'):
     app = MyApp.new()
     hash = app.config()
