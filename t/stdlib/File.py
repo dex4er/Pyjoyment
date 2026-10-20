@@ -9,6 +9,8 @@ import shutil
 import tempfile
 import warnings
 
+from unittest.mock import patch
+
 
 # The temporary objects of the standard library that Pyjo.File keeps warn when they are removed with it, as tempdir()
 # and tempfile() do not
@@ -30,7 +32,7 @@ with subtest('An os.PathLike'):
 with subtest('pathlib'):
     p = pathlib.Path('/home/sri/.vimrc')
     file = Pyjo.File.new(p)
-    is_ok(file, '/home/sri/.vimrc', 'from pathlib.Path')
+    is_ok(file, str(p), 'from pathlib.Path')
     is_ok(pathlib.Path(file), p, 'pathlib.Path() of it')
     is_ok(file.to_path(), p, 'to_path()')
     isa_ok(file.to_path(), pathlib.Path, 'to_path()')
@@ -38,7 +40,7 @@ with subtest('pathlib'):
 
 with subtest('Kept as given'):
     is_ok(path('foo/bar/'), 'foo/bar/', 'unlike pathlib.Path')
-    is_ok(str(pathlib.Path('foo/bar/')), 'foo/bar', 'pathlib.Path normalizes')
+    is_ok(str(pathlib.Path('foo/bar/')), os.path.join('foo', 'bar'), 'pathlib.Path normalizes')
 
 with subtest('Temporary files of the standard library'):
     tmp = tempfile.TemporaryDirectory()
@@ -78,6 +80,27 @@ with subtest('stat'):
     file = tempdir().child('test.txt').spew('1234')
     isa_ok(file.stat(), os.stat_result, 'os.stat_result')
     is_ok(file.stat(), os.stat(file), 'as os.stat() gives it')
+
+with subtest('The paths of Windows on any system'):
+    # The rules of File::Spec::Win32 and of File::Basename for MSWin32, as Perl gives them
+    with patch.object(Pyjo.File, '_WIN32', True):
+        is_ok(path('a/b', 'c').to_str(), 'a\\b\\c', 'catfile')
+        is_ok(path('C:', 'a').to_str(), 'C:\\a', 'catfile of a drive')
+        is_ok(
+            path('C:\\Users\\x\\t\\Pyjo\\x.py').sibling('..', 'lib').to_str(),
+            'C:\\Users\\x\\t\\lib',
+            'sibling of a parent',
+        )
+        is_ok(path('C:\\a\\b.txt').dirname().to_str(), 'C:\\a', 'dirname')
+        is_ok(path('C:\\a').dirname().to_str(), 'C:\\', 'dirname of the root of a drive')
+        is_ok(path('C:\\a\\b.txt').basename('.txt'), 'b', 'basename')
+        is_ok(path('C:\\a\\').basename(), 'a', 'basename with a trailing separator')
+        is_deeply_ok(path('C:\\a/b').to_list(), ['C:', 'a', 'b'], 'both separators')
+        is_deeply_ok(path('\\\\host\\share\\a').to_list(), ['', '', 'host', 'share', 'a'], 'UNC path')
+        ok(path('\\a').is_abs, 'from the root')
+        ok(not path('C:a').is_abs, 'drive without the root')
+        ok(path('C:/a').is_abs, 'drive with the root')
+        is_ok(path('C:/a/./b/../c/').to_abs().to_str(), 'C:\\a\\c', 'canonpath')
 
 with subtest('Bytes as they are'):
     dir = tempdir()

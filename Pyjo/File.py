@@ -55,6 +55,7 @@ import random
 import re
 import shutil
 import string
+import sys
 import tempfile as _tempfile
 import weakref
 
@@ -69,6 +70,10 @@ if TYPE_CHECKING:
 
 
 _random = random.SystemRandom()
+
+# File::Spec and File::Basename of Perl follow the system: on Windows a path may have a volume, and both / and \
+# separate its levels
+_WIN32 = sys.platform == 'win32'
 
 # The bytes of a file as they are, as sysread and syswrite of Perl pass them, where the text mode of the C runtime of
 # Windows, the default of os.open there, writes \n as CRLF and reads CRLF as \n
@@ -297,7 +302,7 @@ class Pyjo_File(Pyjo.Base.object, Pyjo.String.Mixin.object):
             # False (on UNIX)
             path('.vimrc').is_abs
         """
-        return os.path.isabs(self._path)
+        return _is_abs(self._path) > 0
 
     def list(self, *, dir: bool = False, hidden: bool = False) -> 'Pyjo.Collection.object[Self]':
         """::
@@ -591,9 +596,20 @@ class Pyjo_File(Pyjo.Base.object, Pyjo.String.Mixin.object):
         Return absolute path as a :mod:`Pyjo.File` object, the path does not
         need to exist on the file system.
         """
-        if os.path.isabs(self._path):
-            return self.new(_canonpath(self._path))
-        return self.new(_catfile(os.getcwd(), self._path))
+        path = self._path
+        if (level := _is_abs(path)) == 2 or (level and not _WIN32):
+            return self.new(_canonpath(path))
+
+        # File::Spec::Win32's rel2abs: a path from the root takes the volume of the working directory, and one with a
+        # drive and no root the working directory of that drive
+        if _WIN32:
+            if level:
+                volume = re.match(r'(?:[a-zA-Z]:|(?:\\\\|//)[^\\/]+[\\/][^\\/]+)?', os.getcwd())
+                assert volume is not None
+                return self.new(_canonpath(volume[0] + path))
+            if drive := re.match(r'[a-zA-Z]:', path):
+                return self.new(_catfile(os.path.abspath(drive[0]), path[2:]))
+        return self.new(_catfile(os.getcwd(), path))
 
     def to_list(self) -> 'builtins.list[str]':
         """::
@@ -605,7 +621,7 @@ class Pyjo_File(Pyjo.Base.object, Pyjo.String.Mixin.object):
             # "home:sri:.vimrc" (on UNIX)
             ':'.join(path('/home/sri/.vimrc').to_list())
         """
-        return self._path.split(os.sep)
+        return _splitdir(self._path)
 
     # Not in Mojolicious: the conversion to pathlib
     def to_path(self) -> pathlib.Path:
@@ -784,7 +800,7 @@ def _unlink(name: str) -> None:
 
 # File::Basename's basename
 def _basename(path: str, *suffixes: str) -> str:
-    path = re.sub(r'(.)/*\Z', r'\1', path, flags=re.S)
+    path = _strip_trailing_sep(path)
     basename, dirname = _fileparse(path)
     tail = ''
     for suffix in suffixes:
@@ -797,6 +813,8 @@ def _basename(path: str, *suffixes: str) -> str:
 
 # File::Spec's canonpath
 def _canonpath(path: str) -> str:
+    if _WIN32:
+        return _canon_cat(path) if len(path) else path
     path = re.sub(r'/{2,}', '/', path)
     path = re.sub(r'(?:/\.)+(?:/|\Z)', '/', path)
     if path != './':
@@ -810,7 +828,44 @@ def _canonpath(path: str) -> str:
 
 # File::Spec's catfile
 def _catfile(*parts: str) -> str:
+    if _WIN32:
+        if not len(parts) or parts[0] == '':
+            return _canon_cat('/', *parts[1:])
+        if re.match(r'[a-zA-Z]:\Z', parts[0]):
+            return _canon_cat(parts[0] + '\\', *parts[1:])
+        return _canon_cat(*parts)
     return _canonpath('/'.join(parts))
+
+
+# File::Spec::Win32's _canon_cat
+def _canon_cat(first: str, *rest: str) -> str:
+    volume = ''
+    if m := re.match(r'([A-Za-z]:)([\\/]?)', first):
+        volume = m[1].upper() + ('\\' if m[2] else '')
+    elif m := re.match(r'(?:\\\\|//)([^\\/]+)(?:[\\/]([^\\/]+))?[\\/]?', first, re.S):
+        volume = f'\\\\{m[1]}' + (f'\\{m[2]}' if m[2] is not None else '') + '\\'
+    elif m := re.match(r'[\\/]', first):
+        volume = '\\'
+    if m:
+        first = first[m.end() :]
+    path = '\\'.join((first, *rest))
+
+    path = re.sub(r'[\\/]+', r'\\', path)
+    path = re.sub(r'(?:(?:\A|\\)\.(?:\\\.)*(?:\\|\Z))+', r'\\', path)
+    while True:
+        path, n = re.subn(
+            r'(?:(?:\A|\\)[^\\]+\\\.\.(?<!\A\.\.\\\.\.)(?<!\\\.\.\\\.\.)(?:\\|\Z))+', r'\\', path, count=1, flags=re.S
+        )
+        if not n:
+            break
+    path = re.sub(r'\A\\', '', path)
+    path = re.sub(r'\\\Z', '', path)
+
+    if volume.endswith('\\'):
+        path = re.sub(r'\A\.\.(?:\\\.\.)*(?:\\|\Z)', '', path)
+        if path == '' and (m := re.match(r'(\\\\.*)\\\Z', volume, re.S)):
+            return m[1]
+    return volume + path if len(path) or len(volume) else '.'
 
 
 def _download_error(tx: 'Pyjo.Transaction.HTTP.object') -> 'Pyjo.Transaction.HTTP.object | None':
@@ -832,22 +887,51 @@ def _croak(e: OSError, message: str) -> NoReturn:
 # File::Basename's dirname
 def _dirname(path: str) -> str:
     basename, dirname = _fileparse(path)
-    dirname = re.sub(r'(.)/*\Z', r'\1', dirname, flags=re.S)
+    dirname = _strip_trailing_sep(dirname)
     if not len(basename):
         basename, dirname = _fileparse(dirname)
-        dirname = re.sub(r'(.)/*\Z', r'\1', dirname, flags=re.S)
+        dirname = _strip_trailing_sep(dirname)
     return dirname
 
 
 # File::Basename's fileparse
 def _fileparse(path: str) -> tuple[str, str]:
+    if _WIN32:
+        m = re.match(r'((?:.*[:\\/])?)(.*)', path, re.S)
+        assert m is not None
+        return m[2], m[1] if re.search(r'[\\/]\Z', m[1]) else m[1] + '.\\'
     m = re.match(r'^(.*/)?(.*)$', path, re.S)
     assert m is not None
     return m[2], m[1] or './'
 
 
+# File::Spec's file_name_is_absolute, 2 for a path with a volume on Windows
+def _is_abs(path: str) -> int:
+    if not _WIN32:
+        return 1 if path.startswith('/') else 0
+    if m := re.match(r'[a-zA-Z]:|(?:\\\\|//)[^\\/]+[\\/][^\\/]+', path):
+        return 2 if m[0][1] != ':' or re.match(r'[a-zA-Z]:[\\/]', path) else 0
+    return 1 if re.match(r'[\\/]', path) else 0
+
+
 def _is_temp(value: Anything) -> bool:
     return isinstance(value, (_Temp, _tempfile.TemporaryDirectory)) or type(value).__name__ == '_TemporaryFileWrapper'
+
+
+# File::Spec's splitdir
+def _splitdir(path: str) -> 'builtins.list[str]':
+    if not _WIN32:
+        return path.split('/')
+    if not re.search(r'[\\/]\Z', path):
+        return re.split(r'[\\/]', path) if len(path) else []
+    return [*re.split(r'[\\/]', path)[:-1], '']
+
+
+# File::Basename's _strip_trailing_sep
+def _strip_trailing_sep(path: str) -> str:
+    if _WIN32:
+        return re.sub(r'([^:])[\\/]*\Z', r'\1', path)
+    return re.sub(r'(.)/*\Z', r'\1', path, flags=re.S)
 
 
 def _str(value: Anything) -> str:
