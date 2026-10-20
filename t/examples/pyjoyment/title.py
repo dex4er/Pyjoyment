@@ -5,7 +5,7 @@ from Pyjo.Test import *
 
 
 # The application of examples/title.py, which the test loads without starting a server
-t = Pyjo.Test.Pyjo.new(curfile().dirname().dirname().sibling('examples', 'title.py'))
+t = Pyjo.Test.Pyjo.new(curfile().dirname().dirname().dirname().sibling('examples', 'pyjoyment', 'title.py'))
 
 # A page with a title, in the place of the website of the example, as a test does not request remote hosts
 t.app.routes.get('/page', lambda c: c.render(data='<html><head><title>I ♥ Pyjoyment!</title></head></html>'))

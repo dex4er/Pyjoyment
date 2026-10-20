@@ -13,7 +13,7 @@ are ported from Mojolicious and the rules they follow.
 | `Pyjoyment/` | tests of the framework, ported from `t/mojolicious/*.t`, as `*_lite_app.py`       |
 | `docs/`      | the examples of the module documentation, with assertions                         |
 | `stdlib/`    | the interaction with the Python standard library                                  |
-| `examples/`  | the code of the scripts in `examples/`                                            |
+| `examples/`  | the code of the scripts in `examples/`, in the same groups                        |
 | `servers/`   | Pyjoyment on real ASGI, WSGI and CGI servers, with the dependency group `servers` |
 | `lib/`       | helpers shared by the tests, skipped when run on their own                        |
 | `certs/`     | the certificates and keys of the TLS tests                                        |

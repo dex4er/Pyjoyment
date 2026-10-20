@@ -12,7 +12,7 @@ import tempfile
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
 ServerProcess = importlib.import_module('ServerProcess')
 
-EXAMPLES = os.path.join(os.path.dirname(__file__), '..', '..', 'examples')
+EXAMPLES = os.path.join(os.path.dirname(__file__), '..', '..', 'examples', 'servers')
 VARIANTS = [
     ('natively', 'hello_world.py', None),
     ('uvicorn', 'hello_world_uvicorn.py', 'uvicorn'),

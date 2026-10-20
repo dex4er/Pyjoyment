@@ -9,8 +9,8 @@ import sys
 
 # The example itself, in a process of its own, as the workflow Build runs it with the wheel: its server listens on a port
 # that the system picks, so it needs no free port of the tests
-ROOT = Pyjo.File.curfile().dirname().dirname().dirname().to_str()
-script = Pyjo.File.path(ROOT, 'examples', 'loopback.py').to_str()
+ROOT = Pyjo.File.curfile().dirname().dirname().dirname().dirname().to_str()
+script = Pyjo.File.path(ROOT, 'examples', 'ua', 'loopback.py').to_str()
 result = subprocess.run(
     [sys.executable, script], env={**os.environ, 'PYTHONPATH': ROOT}, capture_output=True, text=True, timeout=60
 )

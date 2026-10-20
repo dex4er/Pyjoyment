@@ -6,7 +6,9 @@ import runpy
 
 
 # The example itself, as it needs no network and no library of its own
-script = Pyjo.File.curfile().dirname().dirname().sibling('examples', 'hello_world_lambda.py').to_str()
+script = (
+    Pyjo.File.curfile().dirname().dirname().dirname().sibling('examples', 'servers', 'hello_world_lambda.py').to_str()
+)
 handler = runpy.run_path(script)['handler']
 
 with subtest('Function URL'):
