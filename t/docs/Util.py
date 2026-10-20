@@ -17,6 +17,9 @@ with subtest('Synopsis'):
 with subtest('Description'):
     from Pyjo.Util import die, getenv
 
+    # Not in Mojolicious: Windows has USERPROFILE, and HOME only in a shell that sets it, as Git Bash
+    os.environ.setdefault('HOME', os.path.expanduser('~'))
+
     home = getenv('HOME') or die('HOME is not defined')
     is_ok(home, os.environ['HOME'], 'defined')
     throws_ok(lambda: getenv('PYJO_DOCS_UNDEFINED') or die('HOME is not defined'), SystemExit, 'not defined')
