@@ -117,16 +117,19 @@ with local(PYJO_ASGI='production'):
 with local(AWS_LAMBDA_RUNTIME_API='127.0.0.1:9001'):
     is_ok(commands.detect(), 'lambda', 'right environment')
 # Not in Mojolicious: FastCGI, whose web server gives the application its listen socket as the file descriptor 0
-with socket.socket() as listener:
-    listener.bind(('127.0.0.1', 0))
-    listener.listen()
-    stdin = os.dup(0)
-    try:
-        os.dup2(listener.fileno(), 0)
-        is_ok(commands.detect(), 'fastcgi', 'right environment')
-    finally:
-        os.dup2(stdin, 0)
-        os.close(stdin)
+if sys.platform == 'win32':
+    skip('a socket of Windows is not a file descriptor', 1)
+else:
+    with socket.socket() as listener:
+        listener.bind(('127.0.0.1', 0))
+        listener.listen()
+        stdin = os.dup(0)
+        try:
+            os.dup2(listener.fileno(), 0)
+            is_ok(commands.detect(), 'fastcgi', 'right environment')
+        finally:
+            os.dup2(stdin, 0)
+            os.close(stdin)
 with local(PATH_INFO='/test'):
     is_ok(commands.detect(), 'cgi', 'right environment')
 with local(GATEWAY_INTERFACE='CGI/1.1'):
@@ -370,8 +373,10 @@ ok(os.path.exists(app.rel_file('my_app/templates/example/welcome.html.ep').to_st
 # value of a missing key for undef
 code = "import Pyjo.Test.Pyjo; Pyjo.Test.Pyjo.new('MyApp', {'enable_weather': 1}).get_ok('/').status_is(200)"
 env = {**os.environ, 'PYTHONPATH': os.pathsep.join([cwd.to_str(), app.rel_file('my_app').to_str()])}
-result = subprocess.run([sys.executable, '-c', code], cwd=app.rel_file('my_app').to_str(), env=env, capture_output=True)
-ok(re.search(r'^ok 2 - 200 OK$', result.stdout.decode(), re.M), 'configuration of a test')
+result = subprocess.run(
+    [sys.executable, '-c', code], cwd=app.rel_file('my_app').to_str(), env=env, capture_output=True, encoding='UTF-8'
+)
+ok(re.search(r'^ok 2 - 200 OK$', result.stdout, re.M), 'configuration of a test')
 os.chdir(cwd)
 
 with subtest('generate dockerfile'):
