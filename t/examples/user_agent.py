@@ -25,12 +25,14 @@ with tempfile.TemporaryDirectory() as dir:
         port = ServerStart.port()
         script = os.path.join(dir, 'user_agent.py')
         Pyjo.File.path(script).spew(SOURCE.replace('3000', str(port)), 'UTF-8')
+        # A group of its own on Windows, which Ctrl-Break reaches
         with open(log, 'w') as output:
             process = subprocess.Popen(
                 [sys.executable, '-u', script],
                 env={**os.environ, 'PYTHONPATH': ROOT},
                 stdout=output,
                 stderr=subprocess.STDOUT,
+                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == 'win32' else 0,
             )
         if ServerStart.listening(port, process):
             return process
@@ -45,7 +47,8 @@ with tempfile.TemporaryDirectory() as dir:
     try:
         ServerStart.wait_for(lambda: responses() >= 2 or process.poll() is not None, 'two responses')
     finally:
-        process.send_signal(signal.SIGINT)
+        # Windows sends no INT to one process, and Ctrl-Break stops the server, immediately
+        process.send_signal(signal.CTRL_BREAK_EVENT if sys.platform == 'win32' else signal.SIGINT)
         try:
             process.wait(10)
         except subprocess.TimeoutExpired:
