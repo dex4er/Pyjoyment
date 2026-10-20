@@ -1,7 +1,9 @@
 import http.client
 import os
+import signal
 import socket
 import subprocess
+import sys
 import time
 
 import ServerStart
@@ -30,7 +32,14 @@ class Server:
             'PYTHONPATH': os.pathsep.join([dir, ROOT])
         }
         self.log = open(os.path.join(dir, 'server.log'), 'w+')
-        self.process = subprocess.Popen(args, cwd=dir, env=env, stdout=self.log, stderr=subprocess.STDOUT)
+        self.process = subprocess.Popen(
+            args,
+            cwd=dir,
+            env=env,
+            stdout=self.log,
+            stderr=subprocess.STDOUT,
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == 'win32' else 0,
+        )
         deadline = time.monotonic() + 20
         while time.monotonic() < deadline:
             try:
@@ -43,7 +52,9 @@ class Server:
         raise RuntimeError(f'the server did not start: {output}')
 
     def close(self):
-        self.process.terminate()
+        # Windows terminates only the launcher of a virtual environment, whose interpreter ends after it, with the log
+        # still open, and Ctrl-Break stops every process of the group of the server, the interpreter before the launcher
+        self.process.send_signal(signal.CTRL_BREAK_EVENT if sys.platform == 'win32' else signal.SIGTERM)
         try:
             self.process.wait(10)
         except subprocess.TimeoutExpired:

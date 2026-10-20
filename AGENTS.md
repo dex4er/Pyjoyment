@@ -259,7 +259,9 @@ that captures output reads it with LF, as Windows writes CRLF in text mode. A
 test signals its own process with `signal.raise_signal`, as `os.kill` of
 Windows terminates the process, and stops a server of a process of its own
 with `CTRL_BREAK_EVENT` in a process group of its own, as Windows sends no INT
-or TERM to one process. It closes a file before it removes its directory, as
+or TERM to one process, and the `python.exe` of a virtual environment is a
+launcher that starts the interpreter as a process of its own, which outlives
+for a moment a launcher that is terminated, with its files still open. It closes a file before it removes its directory, as
 Windows removes no file that is open.
 
 CI runs the tests in `t/servers` on Python 3.12 and 3.15, the oldest and the
