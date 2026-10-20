@@ -117,7 +117,10 @@ with subtest('Running tests'):
         like_ok(out, r'(?m)^t/Pyjo/URL\.py \.+ ok$', 'python -m Pyjo.Prove -I . -r t')
         is_ok(code, 0, 'right exit status')
 
-        if shutil.which('prove'):
+        # A variable before the command is of a shell of POSIX, which the cmd.exe of Windows is not
+        if sys.platform == 'win32':
+            skip('no shell of POSIX on Windows', 2)
+        elif shutil.which('prove'):
             out, code = shell('PYTHONPATH=. prove --ext=py --exec=python -r t', tmp)
             like_ok(out, r'(?m)^t/Pyjo/URL\.py \.+ ok$', 'PYTHONPATH=. prove --ext=py --exec=python -r t')
             is_ok(code, 0, 'right exit status')

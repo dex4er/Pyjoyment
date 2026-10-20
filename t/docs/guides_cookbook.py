@@ -269,7 +269,8 @@ app.start()
             os.chdir(cwd)
 
         # Access fully initialized application
-        is_ok(app.static.paths[0], os.path.join(os.path.realpath(tmp), 'public'), 'static paths')
+        # Both real, as a temporary directory of Windows may have the short names of 8.3, as C:\Users\RUNNER~1
+        is_ok(os.path.realpath(app.static.paths[0]), os.path.join(os.path.realpath(tmp), 'public'), 'static paths')
         is_ok(app.config('secret_identity'), 'Pyjo', 'config')
         is_ok(app.dumper({'just': 'a helper test'}), "{'just': 'a helper test'}\n", 'helper')
         is_ok(app.build_controller().render_to_string(template='foo'), 'Hello Pyjo!\n', 'template')
