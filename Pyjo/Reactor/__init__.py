@@ -244,9 +244,14 @@ class Pyjo_Reactor(Pyjo.EventEmitter.object):
         # Left out from Mojolicious: Mojo::Reactor::EV, as asyncio is the event loop
         default = 'Pyjo.Reactor.Asyncio'
         tried = os.environ.get('PYJO_REACTOR') or default
+        # Not in Mojolicious: the error of the default reactor, which may not load, as asyncio without SYSTEMROOT on
+        # Windows, where Mojo::Reactor::Poll always does; the first one, as a module that failed is not imported again
         if tried not in _DETECTED:
-            _DETECTED[tried] = default if load_class(tried) else tried
-        load_class(_DETECTED[tried])
+            _DETECTED[tried] = default if (e := load_class(tried)) else tried
+            if tried == default and isinstance(e, Exception):
+                raise e
+        if isinstance(e := load_class(_DETECTED[tried]), Exception):
+            raise e
         return _DETECTED[tried]
 
     # Not in Mojolicious: a future that a promise turns into

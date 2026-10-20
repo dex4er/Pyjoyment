@@ -9,25 +9,30 @@ import gc
 import os
 import socket
 import ssl
+import sys
 
 
 with subtest('A pipe'):
-    r, w = os.pipe()
-    reader = Pyjo.IOLoop.Stream.new(os.fdopen(r, 'rb', buffering=0))
-    writer = Pyjo.IOLoop.Stream.new(os.fdopen(w, 'wb', buffering=0))
-    got = []
+    # select of Windows, which the reactors use there, watches sockets only
+    if sys.platform == 'win32':
+        skip('no pipes in the event loop on Windows', 1)
+    else:
+        r, w = os.pipe()
+        reader = Pyjo.IOLoop.Stream.new(os.fdopen(r, 'rb', buffering=0))
+        writer = Pyjo.IOLoop.Stream.new(os.fdopen(w, 'wb', buffering=0))
+        got = []
 
-    def read(stream, chunk):
-        got.append(chunk)
-        writer.close()
+        def read(stream, chunk):
+            got.append(chunk)
+            writer.close()
 
-    reader.on('read', read)
-    reader.on('close', lambda stream: Pyjo.IOLoop.stop())
-    reader.start()
-    writer.start()
-    writer.write(b'through a pipe')
-    Pyjo.IOLoop.start()
-    is_deeply_ok(got, [b'through a pipe'], 'os.read and os.write')
+        reader.on('read', read)
+        reader.on('close', lambda stream: Pyjo.IOLoop.stop())
+        reader.start()
+        writer.start()
+        writer.write(b'through a pipe')
+        Pyjo.IOLoop.start()
+        is_deeply_ok(got, [b'through a pipe'], 'os.read and os.write')
 
 with subtest('A closed peer'):
     a, b = socket.socketpair()
