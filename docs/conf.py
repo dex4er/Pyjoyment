@@ -54,4 +54,7 @@ html_theme_options = {
     'github_user': 'dex4er',
     'github_repo': 'Pyjoyment',
     'show_powered_by': False,
+    # The sans-serif font of the system, where Alabaster has Georgia
+    'font_family': "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+    'head_font_family': "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
 }
