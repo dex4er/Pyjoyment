@@ -1188,7 +1188,11 @@ actionlint, and shellcheck and shfmt for the shell scripts. shellcheck runs
 with all its checks but the ones that `.shellcheckrc` disables, and shfmt
 formats as `.editorconfig` says, with the branches of `case` indented: the
 definition of shfmt in `.trunk/trunk.yaml` runs it without the flags that
-would make it ignore `.editorconfig`. The `trunk` launcher is not pinned in
+would make it ignore `.editorconfig`. actionlint is the one of the
+maintained fork kjanat/actionlint, whose releases continue those of
+rhysd/actionlint after 1.7.12: `downloads` in `.trunk/trunk.yaml` replaces the
+URLs of the plugin with those of the fork, whose files have the same names.
+The `trunk` launcher is not pinned in
 `mise.toml` (mise only has it as an npm package); install it with
 `mise use -g trunk` or the installer from the Trunk documentation. The
 launcher downloads the CLI version named in `trunk.yaml`.
