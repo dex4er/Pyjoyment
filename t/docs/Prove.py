@@ -187,6 +187,13 @@ with tempfile.TemporaryDirectory() as tmp:
             is_ok(names['result'].passed, True, 'result.passed with the progress')
             is_ok(out.count("Result(path='t/test.py'"), 2, 'progress at the start and after the test')
 
+            shutil.copytree('t', os.path.join('project', 't'))
+            names, _ = run("""
+                result = await run_script('t/test.py', [sys.executable], dict(os.environ), cwd='project')
+            """)
+            is_ok(names['result'].passed, True, 'result.passed in the directory')
+            is_ok(names['result'].path, 't/test.py', 'result.path relative to the directory')
+
         with subtest('find_scripts'):
             names, _ = run("""
                 scripts = find_scripts(['t'], '.py', recurse=True)

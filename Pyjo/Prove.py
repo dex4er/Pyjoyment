@@ -279,6 +279,7 @@ async def run_script(
     stderr_lines: int | None = None,
     color: bool = False,
     progress: Callable[[Result], object] | None = None,
+    cwd: str | None = None,
 ) -> Result:
     """::
 
@@ -287,6 +288,7 @@ async def run_script(
         result = await run_script('t/test.py', [sys.executable], dict(os.environ), capture_stderr=True)
         result = await run_script('t/test.py', [sys.executable], dict(os.environ), capture_stderr=True, stderr_lines=100)
         result = await run_script('t/test.py', [sys.executable], dict(os.environ), progress=print)
+        result = await run_script('t/test.py', [sys.executable], dict(os.environ), cwd='project')
 
     Run a test script and parse its TAP output. The standard error of the
     script goes to the standard error of this process, or with
@@ -299,10 +301,12 @@ async def run_script(
     longer than ``timeout`` seconds is killed, with the processes it started.
     A script whose ``requires-python`` the Python of the command does not
     satisfy is skipped without running.
+    The script runs in the directory ``cwd``, the current one by default, which
+    its path is relative to.
     """
     result = Result(path)
     try:
-        requires = _requires_python(path)
+        requires = _requires_python(os.path.join(cwd, path) if cwd is not None else path)
         if requires is not None and (version := await _python(command)) is not None:
             if not _satisfies(version, requires):
                 result.planned = 0
@@ -321,6 +325,7 @@ async def run_script(
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE if capture_stderr else None,
             env=env,
+            cwd=cwd,
             process_group=0 if hasattr(os, 'killpg') else None,
         )
     except OSError as e:
