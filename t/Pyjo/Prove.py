@@ -346,9 +346,16 @@ with subtest('Scripts that require a version of Python'):
     like_ok(out, r'(?m)^this\.py \.+ ok$', 'this version of the command')
     is_ok(code, 0, 'right exit status')
 
+    # A command that runs the script, but not the question of its version, which runs the script instead
     scripts = {'unknown.py': requires('>=99')}
-    out, code = prove('--exec', 'sh', *scripts, scripts=scripts)
-    like_ok(out, r'(?m)^unknown\.py \.+ Dubious$', 'run when the version of the command is unknown')
+    command = f'{sys.executable} -c "import runpy, sys; runpy.run_path(sys.argv[1])"'
+    out, code = prove('--exec', command, *scripts, scripts=scripts)
+    like_ok(out, r'(?m)^unknown\.py \.+ ok$', 'run when the version of the command is unknown')
+
+    out, code = prove('--exec', 'pyjo-does-not-exist', 'pass.py')
+    like_ok(out, r'(?m)^pass\.py \.+ Dubious$', 'a command that cannot run')
+    like_ok(out, r"(?m)^  Can't run pyjo-does-not-exist: ", 'reason in the summary')
+    is_ok(code, 1, 'right exit status')
 
 with subtest('Run failing scripts'):
     out, code = prove('fail.py', 'noplan.py', 'badplan.py', 'die.py')
