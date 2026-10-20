@@ -45,7 +45,12 @@ Options
     Run the test scripts in subdirectories too.
 
 ``-j N``, ``--jobs N``
-    Run up to N test scripts at the same time.
+    Run up to N test scripts at the same time, or with ``0`` as many as the
+    processors that the harness may use. ::
+
+        $ python -m Pyjo.Prove -j 0 -r t
+
+    ``prove`` has no such value.
 
 ``-v``, ``--verbose``
     Print the TAP output of each test script, and set the environment
@@ -412,14 +417,17 @@ async def run(
     """::
 
         results = asyncio.run(run(['t/a.py', 't/b.py'], jobs=2))
+        results = asyncio.run(run(['t/a.py', 't/b.py'], jobs=0))
         results = asyncio.run(run(['t/a.py', 't/b.py'], timeout=60, trap=True))
         results = asyncio.run(run(['t/a.py', 't/b.py'], jobs=2, capture_stderr=True))
         results = asyncio.run(run(['t/a.py', 't/b.py'], jobs=2, capture_stderr=True, stderr_lines=1000))
         results = asyncio.run(run(['t/a.py', 't/b.py'], color=False))
         results = asyncio.run(run(['t/a.py', 't/b.py'], count=False))
 
-    Run the test scripts, print a line for each of them and a summary, and
-    return the results in the order of the scripts. With ``trap``, a run that
+    Run the test scripts, up to ``jobs`` of them at the same time, or with
+    ``0`` as many as the processors that the process may use, print a line
+    for each of them and a summary, and return the results in the order of
+    the scripts. With ``trap``, a run that
     Ctrl-C interrupts prints the summary and returns the results of the test
     scripts that have finished. The output is colored with ``color``, and the
     tests of the test scripts are counted while they run with ``count``, both
@@ -428,6 +436,9 @@ async def run(
     """
     command = list(command or [sys.executable])
     env = dict(os.environ if env is None else env)
+    # Not in prove: no number of jobs, which is as many as the processors that the process may use
+    if jobs == 0:
+        jobs = _cpu_count()
     # Not in prove: PYJO_HARNESS_ACTIVE and PYJO_HARNESS_IS_VERBOSE, where prove sets HARNESS_ACTIVE and
     # HARNESS_IS_VERBOSE
     env['PYJO_HARNESS_ACTIVE'] = '1'
@@ -627,6 +638,17 @@ async def _python(command: Sequence[str]) -> tuple[int, ...] | None:
             except (OSError, ValueError):
                 pass
     return _PYTHONS[key]
+
+
+def _cpu_count() -> int:
+    # The processors that the process may use, as its affinity limits them, which Python 3.12 reports on Linux only
+    if sys.version_info >= (3, 13):
+        count = os.process_cpu_count()
+    elif sys.platform == 'linux':
+        count = len(os.sched_getaffinity(0))
+    else:
+        count = os.cpu_count()
+    return count or 1
 
 
 # The requires-python of the inline metadata of PEP 723, as its reference implementation reads it

@@ -85,6 +85,13 @@ with subtest('Synopsis'):
         else:
             skip('pyjo-prove is not installed', 2)
 
+with subtest('Options'):
+    with tempfile.TemporaryDirectory() as tmp:
+        scripts(tmp)
+        out, code = shell('python -m Pyjo.Prove -j 0 -r t', tmp)
+        like_ok(out, r'(?m)^Files=5, Tests=5, ', 'python -m Pyjo.Prove -j 0 -r t')
+        is_ok(code, 0, 'right exit status')
+
 with subtest('Environment'):
     # A variable before the command is of a shell of POSIX, which the cmd.exe of Windows is not
     if sys.platform == 'win32':
@@ -211,6 +218,12 @@ with tempfile.TemporaryDirectory() as tmp:
             is_ok([r.path for r in names['results']], ['t/a.py', 't/b.py'], 'results')
             like_ok(out, r'(?m)^t/a\.py \.+ ok$', 'line for t/a.py')
             like_ok(out, r'(?m)^Result: PASS$', 'summary')
+
+            names, out = run("""
+                results = asyncio.run(run(['t/a.py', 't/b.py'], jobs=0))
+            """)
+            is_ok([r.path for r in names['results']], ['t/a.py', 't/b.py'], 'results with the jobs of the processors')
+            like_ok(out, r'(?m)^Result: PASS$', 'summary with the jobs of the processors')
 
             names, out = run("""
                 results = asyncio.run(run(['t/a.py', 't/b.py'], timeout=60, trap=True))
