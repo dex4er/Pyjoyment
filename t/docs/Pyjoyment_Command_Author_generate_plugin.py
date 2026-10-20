@@ -66,6 +66,8 @@ with subtest('Description'):
         ['Pyjoyment/Plugin/MyPlugin.py'],
         'only the module',
     )
+    is_deeply_ok(pyproject['tool']['pytest']['ini_options']['testpaths'], ['t'], 'testpaths of pytest')
+    is_deeply_ok(pyproject['tool']['pytest']['ini_options']['pythonpath'], ['.'], 'pythonpath of pytest')
     for name in ('Pyjoyment-Plugin-MyPlugin', 'MyApp-Ext-Test'):
         result = subprocess.run(
             [sys.executable, '-m', 'Pyjo.Prove', '-l', '-r', 't'],

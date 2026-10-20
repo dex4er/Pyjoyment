@@ -15,7 +15,10 @@ Pyjoyment.Command.Author.generate.pyproject - pyproject.toml generator command
 ``pyproject.toml`` files for applications, with their dependencies and no
 build system, as ``uv init --app`` does, so that ``uv sync`` installs the
 dependencies without the application. The name of the project is the one of
-the current directory.
+the current directory, and where it has a directory ``t``, ``testpaths`` of
+pytest names it and ``pythonpath`` the current directory, so that ``pytest``
+runs its test scripts with :mod:`Pyjo.Test.pytest_plugin`, and its tests find
+the application.
 
 This is a core command, that means it is always enabled and its code a good
 example for learning to build new commands, you're welcome to fork it.
@@ -45,6 +48,7 @@ import Pyjoyment.Command
 from Pyjo.Util import extract_usage
 from Pyjoyment.Command.version import _version  # pyright: ignore[reportPrivateUsage]
 
+import os
 import re
 
 
@@ -82,7 +86,11 @@ class Pyjoyment_Command_Author_generate_pyproject(Pyjoyment.Command.object):
         """
         # Not in Mojolicious: the name of the project, which Makefile.PL of Mojo leaves out
         name = re.sub(r'[^A-Za-z0-9._-]+', '-', Pyjo.File.path().to_abs().basename()).strip('-._') or 'myapp'
-        self.render_to_rel_file('pyproject', 'pyproject.toml', {'name': name, 'requirement': _requirement()})
+        # Not in Mojolicious: testpaths of pytest for the test scripts in t
+        tests = os.path.isdir('t')
+        self.render_to_rel_file(
+            'pyproject', 'pyproject.toml', {'name': name, 'requirement': _requirement(), 'tests': tests}
+        )
 
 
 # Not in Mojolicious: the requirement of the dependency on Pyjoyment, with the version that generates the files
@@ -101,4 +109,10 @@ name = "<%= name %>"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = ["<%= requirement %>"]
+% if tests:
+
+[tool.pytest.ini_options]
+testpaths = ["t"]
+pythonpath = ["."]
+% end
 """

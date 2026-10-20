@@ -17,7 +17,8 @@ structures for fully functional :mod:`Pyjoyment` applications: the package of
 the application in the directory of the project, which is its home, with
 ``pyproject.toml`` for its dependencies, so that
 ``uv run python -m MyApp daemon`` starts it and
-``uv run python -m Pyjo.Prove -l -r t`` tests it.
+``uv run python -m Pyjo.Prove -l -r t`` tests it, as does ``pytest``, whose
+``testpaths`` names ``t``.
 
 This is a core command, that means it is always enabled and its code a good
 example for learning to build new commands, you're welcome to fork it.
@@ -109,7 +110,7 @@ class Pyjoyment_Command_Author_generate_app(Pyjoyment.Command.object):
         # Not in Mojolicious: pyproject.toml, with the dependencies, as Mojo leaves Makefile.PL to generate makefile
         pyproject = Pyjoyment.Command.Author.generate.pyproject.new(app=self.app, quiet=self.quiet)
         pyproject.render_to_rel_file(
-            'pyproject', f'{name}/pyproject.toml', {'name': name, 'requirement': _requirement()}
+            'pyproject', f'{name}/pyproject.toml', {'name': name, 'requirement': _requirement(), 'tests': True}
         )
 
         # Static file

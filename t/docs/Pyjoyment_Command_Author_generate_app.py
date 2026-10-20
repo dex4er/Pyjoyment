@@ -9,6 +9,7 @@ import io
 import os
 import subprocess
 import sys
+import tomllib
 
 
 # The modules of the checkout for the generated application, which runs in a process of its own
@@ -60,6 +61,9 @@ with subtest('Description'):
         os.chdir(cwd)
     dir = tmp.child('my_app').to_str()
     like_ok(tmp.child('my_app', 'pyproject.toml').slurp().decode(), r'dependencies = \["Pyjoyment', 'dependencies')
+    project = tomllib.loads(tmp.child('my_app', 'pyproject.toml').slurp().decode())
+    is_deeply_ok(project['tool']['pytest']['ini_options']['testpaths'], ['t'], 'testpaths of pytest')
+    is_deeply_ok(project['tool']['pytest']['ini_options']['pythonpath'], ['.'], 'pythonpath of pytest')
     result = python('-m', 'MyApp', 'get', '/', dir=dir)
     like_ok(result.stdout, r'<h2>Welcome to the Pyjoyment real-time web framework!</h2>', 'python -m MyApp')
     result = python('-m', 'MyApp', 'eval', '-v', 'app.home', dir=dir)
