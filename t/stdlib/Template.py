@@ -12,7 +12,7 @@ import traceback
 with subtest('A path of pathlib'):
     with tempfile.TemporaryDirectory() as tmp:
         path = pathlib.Path(tmp) / 'test.ep'
-        path.write_text('<%= args[0] %>\n', encoding='UTF-8')
+        path.write_text('<%= args[0] %>\n', encoding='UTF-8', newline='\n')
         mt = Pyjo.Template.new()
         is_ok(mt.render_file(path, 'works'), 'works\n', 'rendered')
         is_ok(mt.name, str(path), 'name')

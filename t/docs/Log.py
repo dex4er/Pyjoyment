@@ -30,7 +30,8 @@ with subtest('Synopsis'):
     log.warn('This might be a problem')
     log.error('Garden variety error')
     log.fatal('Boom')
-    content = dir.child('pyjo.log').slurp().decode()
+    # Universal newlines, as the log is a file of text, which Windows writes with CRLF
+    content = dir.child('pyjo.log').to_path().read_text(encoding='UTF-8')
     unlike_ok(content, r'Doing stuff|Not sure|FYI', 'below the level')
     like_ok(
         content, r'\[warn\] This might be a problem\n.*\[error\] Garden variety error\n.*\[fatal\] Boom\n', 'logged'
