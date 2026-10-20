@@ -4,6 +4,7 @@ from Pyjo.File import tempdir
 from Pyjo.Loader import data_section, file_is_binary, find_modules, load_class, load_classes
 from Pyjo.Test import *
 
+import os
 import sys
 
 
@@ -59,6 +60,18 @@ with subtest('Packages'):
     )
     is_ok(load_class('stdlib_pkg.sub'), None, 'package loaded')
     ok(hasattr(sys.modules['stdlib_pkg.sub'], 'new'), 'with new')
+
+with subtest('A module written after the finders of importlib looked'):
+    # The finder keeps the files of the directory until its time of modification changes, which it may not do as soon
+    # as a file is written, so the time is set back
+    dir = lib.child('stdlib_late')
+    dir.make_path()
+    dir.child('__init__.py').spew('')
+    is_ok(load_class('stdlib_late.mod'), True, 'not found yet')
+    stat = os.stat(dir)
+    dir.child('mod.py').spew('')
+    os.utime(dir, ns=(stat.st_atime_ns, stat.st_mtime_ns))
+    is_ok(load_class('stdlib_late.mod'), None, 'found, as require of Perl finds it')
 
 with subtest('Not found'):
     is_ok(load_class('stdlib_ns'), True, 'namespace package')

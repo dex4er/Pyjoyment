@@ -72,6 +72,7 @@ import re
 import sys
 import traceback
 
+from importlib.machinery import ModuleSpec
 from types import ModuleType
 
 
@@ -191,7 +192,7 @@ def load_class(cls: str) -> 'Pyjo.Exception.object | bool | None':
     # Load if not already loaded
     module = sys.modules.get(cls)
     try:
-        spec = module.__spec__ if module is not None else importlib.util.find_spec(cls)
+        spec = module.__spec__ if module is not None else _find_spec(cls)
     except ModuleNotFoundError as e:
         # Does not exist
         if e.name is not None and (cls == e.name or cls.startswith(f'{e.name}.')):
@@ -290,6 +291,19 @@ def _exception(e: Exception, origin: str | None) -> Pyjo.Exception.object:
 
 
 # The module of a class, or the longest prefix of a dotted name that is loaded
+# Not in Mojolicious: the finders of importlib keep the files of a directory until its time of modification changes,
+# which may not show a module written right after they looked, where require of Perl looks at the files each time, so a
+# module that is not found is looked for again without them
+def _find_spec(cls: str) -> ModuleSpec | None:
+    try:
+        if (spec := importlib.util.find_spec(cls)) is not None:
+            return spec
+    except ModuleNotFoundError:
+        pass
+    importlib.invalidate_caches()
+    return importlib.util.find_spec(cls)
+
+
 def _module(cls: Class) -> ModuleType | None:
     if isinstance(cls, ModuleType):
         return cls
