@@ -52,6 +52,7 @@ import Pyjo.IOLoop
 import Pyjo.IOLoop.TLS
 import Pyjo.Reactor
 
+import errno
 import os
 import re
 import socket
@@ -226,7 +227,7 @@ class Pyjo_IOLoop_Server(Pyjo.EventEmitter.object):
                 reuse=True
 
             Allow multiple servers to use the same port with the
-            ``SO_REUSEPORT`` socket option.
+            ``SO_REUSEPORT`` socket option, which Windows does not have.
 
         single_accept
             ::
@@ -300,6 +301,9 @@ class Pyjo_IOLoop_Server(Pyjo.EventEmitter.object):
             try:
                 # UNIX domain socket
                 if path:
+                    # Not in Mojolicious: Python has no UNIX domain sockets on Windows
+                    if sys.platform == 'win32':
+                        raise OSError(errno.EAFNOSUPPORT, 'UNIX domain sockets are not supported')
                     if os.path.exists(path) and stat.S_ISSOCK(os.stat(path).st_mode):
                         os.remove(path)
                     handle = created = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -314,8 +318,14 @@ class Pyjo_IOLoop_Server(Pyjo.EventEmitter.object):
                         host, port or 0, type=socket.SOCK_STREAM, flags=socket.AI_PASSIVE
                     )[0]
                     handle = created = socket.socket(family, socket.SOCK_STREAM)
-                    handle.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                    # Unlike Mojolicious: no SO_REUSEADDR on Windows, where it lets a second socket listen on a port
+                    # that is taken, as socket.create_server leaves it out there, and SO_REUSEPORT is not there at all,
+                    # where Perl dies of the missing constant
+                    if sys.platform != 'win32':
+                        handle.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                     if options.get('reuse'):
+                        if sys.platform == 'win32':
+                            raise OSError(errno.ENOPROTOOPT, 'SO_REUSEPORT is not supported')
                         handle.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
                     handle.bind(sockaddr)
                     handle.listen(backlog)

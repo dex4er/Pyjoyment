@@ -537,6 +537,9 @@ class Pyjo_IOLoop_Client(Pyjo.EventEmitter.object):
             try:
                 # UNIX domain socket
                 if path:
+                    # Not in Mojolicious: Python has no UNIX domain sockets on Windows
+                    if sys.platform == 'win32':
+                        raise OSError(errno.EAFNOSUPPORT, 'UNIX domain sockets are not supported')
                     handle = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
                     handle.setblocking(False)
                     _connect_ex(handle, path)
