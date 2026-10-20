@@ -12,7 +12,7 @@ import re
 @contextlib.contextmanager
 def stdout():
     buffer = io.BytesIO()
-    wrapper = io.TextIOWrapper(buffer, write_through=True)
+    wrapper = io.TextIOWrapper(buffer, write_through=True, newline='\n')
     try:
         with contextlib.redirect_stdout(wrapper):
             yield buffer

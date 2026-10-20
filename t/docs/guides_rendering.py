@@ -252,7 +252,11 @@ with subtest('Static files'):
         t.get_ok('/').status_is(200).text_is('title', 'Static')
         t.get_ok('/some_download').status_is(200).content_type_is('image/png')
         t.header_is('Content-Disposition', 'attachment; filename=bar.png;')
-        t.get_ok('/leak').status_is(200).content_is(Pyjo.File.path('/etc/passwd').slurp().decode())
+        # The example serves /etc/passwd, which Windows does not have
+        if sys.platform == 'win32':
+            skip('no /etc/passwd on Windows', 3)
+        else:
+            t.get_ok('/leak').status_is(200).content_is(Pyjo.File.path('/etc/passwd').slurp().decode())
 
     app = Pyjoyment.new()
     app.static.paths = [EXAMPLES.child('public').to_str()]
@@ -452,12 +456,16 @@ with subtest('Template inheritance'):
         t.get_ok('/third').status_is(200).content_like(r'New header\s+<div>Hello World!</div>\s+New footer')
 
 with subtest('Custom responses'):
-    passwd = Pyjo.File.path('/etc/passwd').slurp().decode()
-    with rendering('leak_asset') as t:
-        t.get_ok('/leak').status_is(200).content_type_is('text/plain').content_is(passwd)
-        t.get_ok('/leak', {'Range': 'bytes=0-3'}).status_is(206).content_is(passwd[:4])
-    with rendering('leak_rendered') as t:
-        t.get_ok('/leak').status_is(200).content_type_is('text/plain').content_is(passwd)
+    # The examples serve /etc/passwd, which Windows does not have
+    if sys.platform == 'win32':
+        skip('no /etc/passwd on Windows', 11)
+    else:
+        passwd = Pyjo.File.path('/etc/passwd').slurp().decode()
+        with rendering('leak_asset') as t:
+            t.get_ok('/leak').status_is(200).content_type_is('text/plain').content_is(passwd)
+            t.get_ok('/leak', {'Range': 'bytes=0-3'}).status_is(206).content_is(passwd[:4])
+        with rendering('leak_rendered') as t:
+            t.get_ok('/leak').status_is(200).content_type_is('text/plain').content_is(passwd)
 
 with subtest('Helper plugins'):
     result = command('debug_plugin', 'get', '/', plugins='debug_helper_plugin')

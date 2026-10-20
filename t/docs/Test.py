@@ -124,9 +124,13 @@ with subtest('Running tests'):
         else:
             skip('Perl prove is not installed', 2)
 
-        out, code = shell('PYTHONPATH=. python t/Pyjo/URL.py', tmp)
-        is_ok(out, 'ok 1 - works\n1..1\n', 'PYTHONPATH=. python t/Pyjo/URL.py')
-        is_ok(code, 0, 'right exit status')
+        # A variable before the command is of a shell of POSIX, which the cmd.exe of Windows is not
+        if sys.platform == 'win32':
+            skip('no shell of POSIX on Windows', 2)
+        else:
+            out, code = shell('PYTHONPATH=. python t/Pyjo/URL.py', tmp)
+            is_ok(out, 'ok 1 - works\n1..1\n', 'PYTHONPATH=. python t/Pyjo/URL.py')
+            is_ok(code, 0, 'right exit status')
 
 with subtest('Plans'):
     out, err, code = run(

@@ -93,9 +93,13 @@ with subtest('Methods'):
         command.write_rel_file('foo/bar.txt', 'Hello World!')
         is_ok(tmp.child('foo', 'bar.txt').slurp(), b'Hello World!', 'write_rel_file')
         command.chmod_file(tmp.child('foo.txt'), 0o644)
-        is_ok(os.stat(tmp.child('foo.txt').to_str()).st_mode & 0o777, 0o644, 'chmod_file')
         command.chmod_rel_file('foo/bar.txt', 0o644)
-        is_ok(os.stat(tmp.child('foo', 'bar.txt').to_str()).st_mode & 0o777, 0o644, 'chmod_rel_file')
+        # Windows keeps the bit of read-only of a mode only
+        if sys.platform == 'win32':
+            skip('no mode of files on Windows', 2)
+        else:
+            is_ok(os.stat(tmp.child('foo.txt').to_str()).st_mode & 0o777, 0o644, 'chmod_file')
+            is_ok(os.stat(tmp.child('foo', 'bar.txt').to_str()).st_mode & 0o777, 0o644, 'chmod_rel_file')
         is_ok(
             os.path.realpath(command.rel_file('foo/bar.txt').to_str()),
             os.path.realpath(tmp.child('foo', 'bar.txt').to_str()),

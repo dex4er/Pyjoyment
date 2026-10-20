@@ -32,10 +32,11 @@ with subtest('detect'):
     module = type(sys)('My.App')
     module.__file__ = os.path.join(os.sep, 'srv', 'myapp', 'lib', 'My', 'App.py')
     sys.modules['My.App'] = module
+    # The absolute path, which has the drive of the working directory on Windows
     home = home.detect(MyApp)
-    is_ok(str(home), os.path.join(os.sep, 'srv', 'myapp'), 'class')
+    is_ok(str(home), os.path.abspath(os.path.join(os.sep, 'srv', 'myapp')), 'class')
     home = Pyjo.Home.new().detect('My.App')
-    is_ok(str(home), os.path.join(os.sep, 'srv', 'myapp'), 'name')
+    is_ok(str(home), os.path.abspath(os.path.join(os.sep, 'srv', 'myapp')), 'name')
     del sys.modules['My.App']
 
 with subtest('rel_file'):

@@ -86,11 +86,15 @@ with subtest('Synopsis'):
             skip('pyjo-prove is not installed', 2)
 
 with subtest('Environment'):
-    with tempfile.TemporaryDirectory() as tmp:
-        scripts(tmp)
-        out, code = shell("PYJO_PROVE_OPTS='-l -j 4' python -m Pyjo.Prove -r t", tmp)
-        like_ok(out, r'(?m)^Files=5, Tests=5, ', "PYJO_PROVE_OPTS='-l -j 4' python -m Pyjo.Prove -r t")
-        is_ok(code, 0, 'right exit status')
+    # A variable before the command is of a shell of POSIX, which the cmd.exe of Windows is not
+    if sys.platform == 'win32':
+        skip('no shell of POSIX on Windows', 2)
+    else:
+        with tempfile.TemporaryDirectory() as tmp:
+            scripts(tmp)
+            out, code = shell("PYJO_PROVE_OPTS='-l -j 4' python -m Pyjo.Prove -r t", tmp)
+            like_ok(out, r'(?m)^Files=5, Tests=5, ', "PYJO_PROVE_OPTS='-l -j 4' python -m Pyjo.Prove -r t")
+            is_ok(code, 0, 'right exit status')
 
 with subtest('Description'):
     with tempfile.TemporaryDirectory() as tmp:
