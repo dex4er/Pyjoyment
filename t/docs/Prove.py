@@ -189,7 +189,7 @@ with tempfile.TemporaryDirectory() as tmp:
             """)
             is_ok(
                 names['scripts'],
-                [os.path.join('t', *p.split('/')) for p in ('Pyjo/URL.py', 'a.py', 'b.py', 'docs/URL.py', 'test.py')],
+                ['t/Pyjo/URL.py', 't/a.py', 't/b.py', 't/docs/URL.py', 't/test.py'],
                 'scripts',
             )
 

@@ -129,8 +129,9 @@ def prove_stderr(*args, scripts=SCRIPTS, env=None):
         # Not the options of a harness that runs this test
         env = {k: v for k, v in os.environ.items() if k != 'PYJO_PROVE_OPTS'} | {'PYTHONPATH': ROOT} | (env or {})
         p = subprocess.run([sys.executable, '-m', 'Pyjo.Prove', *args], cwd=tmp, env=env, capture_output=True)
-    # Bytes, as the universal newlines of text would turn the carriage returns of the count into newlines
-    return p.stdout.decode(), p.stderr.decode(), p.returncode
+    # Bytes, as the universal newlines of text would turn the carriage returns of the count into newlines; only the CRLF
+    # of the text mode of Windows is a newline
+    return p.stdout.decode().replace('\r\n', '\n'), p.stderr.decode().replace('\r\n', '\n'), p.returncode
 
 
 def prove_tty(*args, env=None, scripts=SCRIPTS):
@@ -392,19 +393,23 @@ with subtest('Timeout'):
     is_ok(code, 0, 'right exit status')
 
 with subtest('Ctrl-C'):
-    out, err, code, alive = interrupt()
-    is_ok(code, -signal.SIGINT, 'dies of the signal')
-    unlike_ok(out, r'Result:', 'no summary')
-    unlike_ok(err, r'Traceback', 'no traceback')
-    ok(not alive, 'the running script is killed')
+    # Ctrl-C of a console of Windows reaches all its processes, and a signal cannot be sent to one of them
+    if sys.platform == 'win32':
+        skip('no SIGINT for a process on Windows', 10)
+    else:
+        out, err, code, alive = interrupt()
+        is_ok(code, -signal.SIGINT, 'dies of the signal')
+        unlike_ok(out, r'Result:', 'no summary')
+        unlike_ok(err, r'Traceback', 'no traceback')
+        ok(not alive, 'the running script is killed')
 
-    out, err, code, alive = interrupt('--trap')
-    like_ok(out, r'(?m)^pass\.py \.+ ok$', 'finished script')
-    like_ok(err, r'(?m)^Test run interrupted!$', 'interrupted')
-    like_ok(out, r'(?m)^Files=1, Tests=2, ', 'summary of the finished scripts')
-    like_ok(out, r'(?m)^Result: FAIL$', 'result')
-    is_ok(code, 1, 'right exit status')
-    ok(not alive, 'the running script is killed')
+        out, err, code, alive = interrupt('--trap')
+        like_ok(out, r'(?m)^pass\.py \.+ ok$', 'finished script')
+        like_ok(err, r'(?m)^Test run interrupted!$', 'interrupted')
+        like_ok(out, r'(?m)^Files=1, Tests=2, ', 'summary of the finished scripts')
+        like_ok(out, r'(?m)^Result: FAIL$', 'result')
+        is_ok(code, 1, 'right exit status')
+        ok(not alive, 'the running script is killed')
 
 with subtest('Capture the standard error'):
     out, err, code = prove_stderr('stderr.py', 'pass.py')

@@ -119,8 +119,10 @@ Environment
 
 ``PYJO_PROVE_OPTS``
     Options that go before the ones of the command line, which override them,
-    split as a shell splits words. The test scripts do not get it, so that a
-    test script that runs :mod:`Pyjo.Prove` itself runs it without them. ::
+    split as a shell splits words, as the command of ``--exec`` is, where a
+    backslash is kept on Windows, as in its paths. The test scripts do not
+    get it, so that a test script that runs :mod:`Pyjo.Prove` itself runs it
+    without them. ::
 
         $ PYJO_PROVE_OPTS='-l -j 4' python -m Pyjo.Prove -r t
 
@@ -318,6 +320,7 @@ async def run_script(
         env=env,
         process_group=0 if hasattr(os, 'killpg') else None,
     )
+    job = _job(process.pid)
     assert process.stdout is not None
     if progress is not None:
         progress(result)
@@ -337,14 +340,15 @@ async def run_script(
             result.exit_status = await process.wait()
     except TimeoutError:
         result.timed_out = timeout
-        _kill(process)
+        _kill(process, job)
         result.exit_status = await process.wait()
     finally:
         # Ctrl-C reaches the foreground process group only, not the one of the script, which the harness waits for,
         # so that it does not outlive the harness
         if process.returncode is None:
-            _kill(process)
+            _kill(process, job)
             await process.wait()
+        _close_job(job)
         # A process that the script started may keep the standard error open after the script exits
         if stderr is not None:
             try:
@@ -360,7 +364,9 @@ def find_scripts(paths: Sequence[str], ext: str, recurse: bool) -> list[str]:
 
         scripts = find_scripts(['t'], '.py', recurse=True)
 
-    Expand directories into the test scripts in them, sorted by name.
+    Expand directories into the test scripts in them, sorted by name. The
+    names of the scripts found in a directory have ``/`` between their
+    levels on every system, as ``prove`` gives them.
     """
     scripts: list[str] = []
     for path in paths:
@@ -370,7 +376,8 @@ def find_scripts(paths: Sequence[str], ext: str, recurse: bool) -> list[str]:
         found: list[str] = []
         for root, dirs, files in os.walk(path):
             dirs.sort()
-            found.extend(os.path.join(root, f) for f in files if f.endswith(ext))
+            # The names with /, as prove gives them on every system
+            found.extend(os.path.join(root, f).replace(os.sep, '/') for f in files if f.endswith(ext))
             if not recurse:
                 break
         scripts.extend(sorted(found))
@@ -533,7 +540,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument('paths', nargs='*', default=['t'], help='test scripts and directories, t by default')
     # Not in prove: PYJO_PROVE_OPTS, where prove reads .proverc
     try:
-        opts = shlex.split(os.environ.get('PYJO_PROVE_OPTS', ''))
+        opts = _split(os.environ.get('PYJO_PROVE_OPTS', ''))
     except ValueError as e:
         parser.error(f'PYJO_PROVE_OPTS: {e}')
     args = parser.parse_args([*opts, *(sys.argv[1:] if argv is None else argv)])
@@ -549,7 +556,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.include:
         env['PYTHONPATH'] = os.pathsep.join([*args.include, *filter(None, [env.get('PYTHONPATH')])])
 
-    command = shlex.split(args.command) if args.command else [sys.executable]
+    command = _split(args.command) if args.command else [sys.executable]
     try:
         results = asyncio.run(
             run(
@@ -798,15 +805,64 @@ def _head(limit: int) -> int:
     return (limit + 1) // 2
 
 
+# Not in prove: the words of a command line of Windows, whose paths have backslashes, which a shell of POSIX takes for
+# escapes, so they are split as there, and the quotes around a word are removed
+def _split(line: str) -> list[str]:
+    if sys.platform != 'win32':
+        return shlex.split(line)
+    return [re.sub(r'\A(["\'])(.*)\1\Z', r'\2', word, flags=re.S) for word in shlex.split(line, posix=False)]
+
+
 def _lines(value: str) -> int:
     if (lines := int(value)) < 0:
         raise argparse.ArgumentTypeError(f'invalid number of lines: {value}')
     return lines
 
 
-def _kill(process: asyncio.subprocess.Process) -> None:
+# Not in prove: Windows has no process group that a signal kills, and a job, which the processes that the script starts
+# join, kills them with the script, also when the script has ended before them, as a process group does elsewhere
+if sys.platform == 'win32':
+    import ctypes
+
+    from ctypes import wintypes
+
+    _kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
+    _kernel32.CreateJobObjectW.argtypes = (wintypes.LPVOID, wintypes.LPCWSTR)
+    _kernel32.CreateJobObjectW.restype = wintypes.HANDLE
+    _kernel32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+    _kernel32.OpenProcess.restype = wintypes.HANDLE
+    _kernel32.AssignProcessToJobObject.argtypes = (wintypes.HANDLE, wintypes.HANDLE)
+    _kernel32.TerminateJobObject.argtypes = (wintypes.HANDLE, wintypes.UINT)
+    _kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+
+    # PROCESS_SET_QUOTA and PROCESS_TERMINATE, which AssignProcessToJobObject needs
+    _ASSIGN = 0x0100 | 0x0001
+
+
+def _job(pid: int) -> int | None:
+    if sys.platform != 'win32' or not (job := _kernel32.CreateJobObjectW(None, None)):
+        return None
+    process = _kernel32.OpenProcess(_ASSIGN, False, pid)
+    assigned = bool(process) and bool(_kernel32.AssignProcessToJobObject(job, process))
+    if process:
+        _kernel32.CloseHandle(process)
+    if not assigned:
+        _kernel32.CloseHandle(job)
+        return None
+    return job
+
+
+def _close_job(job: int | None) -> None:
+    if sys.platform == 'win32' and job is not None:
+        _kernel32.CloseHandle(job)
+
+
+def _kill(process: asyncio.subprocess.Process, job: int | None) -> None:
     try:
-        if hasattr(os, 'killpg'):
+        if sys.platform == 'win32':
+            if job is None or not _kernel32.TerminateJobObject(job, 1):
+                process.kill()
+        elif hasattr(os, 'killpg'):
             os.killpg(process.pid, signal.SIGKILL)
         else:
             process.kill()
