@@ -8,6 +8,7 @@ import os
 import subprocess
 import sys
 import textwrap
+import tomllib
 
 
 if importlib.util.find_spec('pytest') is None:
@@ -60,6 +61,9 @@ project = tmp.child('my_app')
 with subtest('Synopsis'):
     out, code = pytest(project)
     like_ok(out, r'(?m)^testpaths: t$', 'testpaths of generate app')
+    generated = tomllib.loads(project.child('pyproject.toml').slurp().decode())
+    is_deeply_ok(generated['dependency-groups']['dev'], ['pytest>=9', 'pytest-xdist>=3'], 'pytest in the group dev')
+    is_deeply_ok(generated['tool']['pytest']['ini_options'], {'testpaths': ['t'], 'pythonpath': ['.']}, 'ini options')
     like_ok(out, r'(?m)^t/basic\.py \.$', 'pytest')
     is_ok(code, 0, 'right exit status')
 

@@ -17,8 +17,8 @@ structures for fully functional :mod:`Pyjoyment` applications: the package of
 the application in the directory of the project, which is its home, with
 ``pyproject.toml`` for its dependencies, so that
 ``uv run python -m MyApp daemon`` starts it and
-``uv run python -m Pyjo.Prove -l -r t`` tests it, as does ``pytest``, whose
-``testpaths`` names ``t``.
+``uv run python -m Pyjo.Prove -l -r t`` tests it, as does ``uv run pytest``,
+with pytest of the dependency group ``dev``.
 
 This is a core command, that means it is always enabled and its code a good
 example for learning to build new commands, you're welcome to fork it.

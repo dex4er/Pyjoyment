@@ -64,6 +64,7 @@ with subtest('Description'):
     project = tomllib.loads(tmp.child('my_app', 'pyproject.toml').slurp().decode())
     is_deeply_ok(project['tool']['pytest']['ini_options']['testpaths'], ['t'], 'testpaths of pytest')
     is_deeply_ok(project['tool']['pytest']['ini_options']['pythonpath'], ['.'], 'pythonpath of pytest')
+    is_deeply_ok(project['dependency-groups']['dev'], ['pytest>=9', 'pytest-xdist>=3'], 'pytest in the group dev')
     result = python('-m', 'MyApp', 'get', '/', dir=dir)
     like_ok(result.stdout, r'<h2>Welcome to the Pyjoyment real-time web framework!</h2>', 'python -m MyApp')
     result = python('-m', 'MyApp', 'eval', '-v', 'app.home', dir=dir)

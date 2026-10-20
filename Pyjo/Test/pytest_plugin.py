@@ -62,7 +62,11 @@ The scripts get the environment that pytest started with, as
 ``pytest`` without arguments runs the directories of ``testpaths``, so a
 project whose tests are test scripts names their directory there, in
 ``pyproject.toml``, as the projects of ``generate app`` and
-``generate plugin`` do: ::
+``generate plugin`` do, with pytest in the dependency group ``dev``, which
+``uv run pytest`` installs: ::
+
+    [dependency-groups]
+    dev = ["pytest>=9", "pytest-xdist>=3"]
 
     [tool.pytest.ini_options]
     testpaths = ["t"]

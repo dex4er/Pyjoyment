@@ -449,12 +449,13 @@ pytest runs the test scripts too, where it is installed, through the plugin
 :mod:`Pyjo.Test.pytest_plugin`, as a test explorer of an IDE or a coding
 agent runs them. Each script is a test of pytest, whose failure shows the
 failed tests of the script with their diagnostic messages. The
-``pyproject.toml`` of ``pyjo generate app`` names ``t`` in ``testpaths``, so
-``pytest`` runs it:
+``pyproject.toml`` of ``pyjo generate app`` has pytest and pytest-xdist in the
+dependency group ``dev``, which ``uv`` installs, and names ``t`` in
+``testpaths``, so ``uv run pytest`` runs it:
 
 .. code-block:: console
 
-    $ pytest
+    $ uv run pytest
     ...
     t/basic.py .                                                       [100%]
 
@@ -463,7 +464,7 @@ time, as ``-j`` of ``pyjo-prove`` does:
 
 .. code-block:: console
 
-    $ pytest -n auto
+    $ uv run pytest -n auto
 
 A test of pytest uses :mod:`Pyjo.Test.Pyjo` through the fixture ``t``, made
 of the application of the fixture ``app``, and its first failed test raises
@@ -489,7 +490,7 @@ runs every script of ``t``:
 
 .. code-block:: console
 
-    $ pytest tests
+    $ uv run pytest tests
     ...
     tests/test_basic.py .                                              [100%]
 

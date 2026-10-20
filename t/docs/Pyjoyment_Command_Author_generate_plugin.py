@@ -68,6 +68,7 @@ with subtest('Description'):
     )
     is_deeply_ok(pyproject['tool']['pytest']['ini_options']['testpaths'], ['t'], 'testpaths of pytest')
     is_deeply_ok(pyproject['tool']['pytest']['ini_options']['pythonpath'], ['.'], 'pythonpath of pytest')
+    is_deeply_ok(pyproject['dependency-groups']['dev'], ['pytest>=9', 'pytest-xdist>=3'], 'pytest in the group dev')
     for name in ('Pyjoyment-Plugin-MyPlugin', 'MyApp-Ext-Test'):
         result = subprocess.run(
             [sys.executable, '-m', 'Pyjo.Prove', '-l', '-r', 't'],

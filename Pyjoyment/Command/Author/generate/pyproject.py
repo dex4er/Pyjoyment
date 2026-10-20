@@ -15,10 +15,12 @@ Pyjoyment.Command.Author.generate.pyproject - pyproject.toml generator command
 ``pyproject.toml`` files for applications, with their dependencies and no
 build system, as ``uv init --app`` does, so that ``uv sync`` installs the
 dependencies without the application. The name of the project is the one of
-the current directory, and where it has a directory ``t``, ``testpaths`` of
-pytest names it and ``pythonpath`` the current directory, so that ``pytest``
-runs its test scripts with :mod:`Pyjo.Test.pytest_plugin`, and its tests find
-the application.
+the current directory, and where it has a directory ``t``, the dependency
+group ``dev`` has pytest and pytest-xdist, which ``uv sync`` installs and
+``generate dockerfile`` leaves out, ``testpaths`` of pytest names ``t`` and
+``pythonpath`` the current directory, so that ``uv run pytest`` runs its test
+scripts with :mod:`Pyjo.Test.pytest_plugin`, and its tests find the
+application.
 
 This is a core command, that means it is always enabled and its code a good
 example for learning to build new commands, you're welcome to fork it.
@@ -110,6 +112,9 @@ version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = ["<%= requirement %>"]
 % if tests:
+
+[dependency-groups]
+dev = ["pytest>=9", "pytest-xdist>=3"]
 
 [tool.pytest.ini_options]
 testpaths = ["t"]
