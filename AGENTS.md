@@ -191,7 +191,8 @@ port 0 instead, which `ports()` gives.
 - `t/stdlib/` checks the interaction with the Python standard library,
   written for Pyjoyment, as Mojolicious has no counterpart.
 - `t/examples/` checks the code of some scripts of `examples/` with assertions,
-  in versions of its own. The scripts themselves are not run by the tests, as
+  in versions of its own, in the directories of the groups of `examples/`,
+  which `examples/README.md` lists. The scripts themselves are not run by the tests, as
   some need the network or libraries the project does not install; they are
   reviewed by hand, the Perl ones, the Mojolicious counterparts of the Python
   ones, against the target Mojolicious.
