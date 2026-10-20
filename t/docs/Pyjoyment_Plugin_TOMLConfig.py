@@ -28,7 +28,7 @@ foo = "bar"
 baz = ["♥"]
 
 %# You have full access to the application
-music_dir = "<%= app.home.child('music') %>"
+music_dir = '<%= app.home.child('music') %>'
 
 [db]
 host = "localhost"

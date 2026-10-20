@@ -11,7 +11,7 @@ Pyjoyment.Plugin.TOMLConfig - TOML configuration plugin
     baz = ["♥"]
 
     %# You have full access to the application
-    music_dir = "<%= app.home.child('music') %>"
+    music_dir = '<%= app.home.child('music') %>'
 
     [db]
     host = "localhost"
@@ -43,6 +43,10 @@ filename in the application home directory will be generated from the value
 of :attr:`Pyjoyment.Pyjoyment_App.moniker` (``$moniker.toml``). You can extend
 the normal configuration file ``$moniker.toml`` with ``mode`` specific ones
 like ``$moniker.$mode.toml``, which will be detected automatically.
+
+A path goes into a literal string of TOML, in single quotes, which keeps
+the backslashes of a path of Windows, where a basic string in double quotes
+takes them for escapes.
 
 These configuration values are currently reserved:
 
