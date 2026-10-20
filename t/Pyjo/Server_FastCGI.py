@@ -387,34 +387,42 @@ with subtest('Long names and values'):
     like_ok(body, re.compile(rb'"agent":"x{300}"'), 'four bytes of length')
 
 with subtest('UNIX domain socket'):
-    with tempfile.TemporaryDirectory(dir='/tmp') as tmp:
-        path = os.path.join(tmp, 'fcgi.sock')
-        with Pyjo.Server.Daemon.new(app=app, listen=[f'fcgi+unix://{url_escape(path)}'], silent=True) as unix:
-            unix.start()
-            client = Client(path=path)
-            client.send(request(path='/hello', params={'REMOTE_ADDR': None, 'REMOTE_PORT': None}))
-            headers, body, end = client.response()
-            is_ok(headers['Status'], '200 OK', 'status')
-            like_ok(body, re.compile(rb'"remote":\[null,null\]'), 'no remote address')
+    if not hasattr(socket, 'AF_UNIX'):
+        skip('no UNIX domain sockets', 2)
+    else:
+        with tempfile.TemporaryDirectory(dir='/tmp') as tmp:
+            path = os.path.join(tmp, 'fcgi.sock')
+            with Pyjo.Server.Daemon.new(app=app, listen=[f'fcgi+unix://{url_escape(path)}'], silent=True) as unix:
+                unix.start()
+                client = Client(path=path)
+                client.send(request(path='/hello', params={'REMOTE_ADDR': None, 'REMOTE_PORT': None}))
+                headers, body, end = client.response()
+                is_ok(headers['Status'], '200 OK', 'status')
+                like_ok(body, re.compile(rb'"remote":\[null,null\]'), 'no remote address')
 
 with subtest('Started by the web server'):
     # The listen socket as the file descriptor 0 of the script, as Apache with mod_fcgid and lighttpd start it
     script = "from Pyjoyment.Lite import *\n\nget('/', {'text': 'Started'})\n\napp.start()\n"
-    with tempfile.TemporaryDirectory() as tmp, socket.socket() as listener:
-        Pyjo.File.path(tmp, 'myapp.py').spew(script)
-        listener.bind(('127.0.0.1', 0))
-        listener.listen()
-        env = {**os.environ, 'PYTHONPATH': os.getcwd(), 'PYJO_LOG_LEVEL': 'fatal'}
-        env.pop('PYJO_HOME', None)
-        process = subprocess.Popen([sys.executable, os.path.join(tmp, 'myapp.py')], stdin=listener.fileno(), env=env)
-        atexit.register(lambda: process.poll() is None and process.kill())
-        client = Client(address='127.0.0.1', port=listener.getsockname()[1])
-        client.send(request(path='/'))
-        headers, body, end = client.response()
-        is_ok(headers['Status'], '200 OK', 'status')
-        is_ok(body, b'Started', 'detected')
-        process.send_signal(signal.SIGTERM)
-        is_ok(process.wait(30), 0, 'stopped gracefully')
+    if sys.platform == 'win32':
+        skip('a socket of Windows is not a file descriptor', 3)
+    else:
+        with tempfile.TemporaryDirectory() as tmp, socket.socket() as listener:
+            Pyjo.File.path(tmp, 'myapp.py').spew(script)
+            listener.bind(('127.0.0.1', 0))
+            listener.listen()
+            env = {**os.environ, 'PYTHONPATH': os.getcwd(), 'PYJO_LOG_LEVEL': 'fatal'}
+            env.pop('PYJO_HOME', None)
+            process = subprocess.Popen(
+                [sys.executable, os.path.join(tmp, 'myapp.py')], stdin=listener.fileno(), env=env
+            )
+            atexit.register(lambda: process.poll() is None and process.kill())
+            client = Client(address='127.0.0.1', port=listener.getsockname()[1])
+            client.send(request(path='/'))
+            headers, body, end = client.response()
+            is_ok(headers['Status'], '200 OK', 'status')
+            is_ok(body, b'Started', 'detected')
+            process.send_signal(signal.SIGTERM)
+            is_ok(process.wait(30), 0, 'stopped gracefully')
 
 with subtest('Invalid location'):
     throws_ok(
