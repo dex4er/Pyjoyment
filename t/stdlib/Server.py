@@ -25,7 +25,7 @@ with subtest('A script of load_app runs with runpy in a namespace of its own'):
     argv = sys.argv[0]
     app = Pyjo.Server.new().load_app(script)
     like_ok(app.moniker, r'^Pyjo\.Server\.Sandbox\.[0-9a-f]{32} ', 'sandbox')
-    like_ok(app.moniker, rf' {script.to_str()} 1$', 'sys.argv[0] is the script, PYJO_APP_LOADER is set')
+    like_ok(app.moniker, rf' {re.escape(script.to_str())} 1$', 'sys.argv[0] is the script, PYJO_APP_LOADER is set')
     is_ok(sys.argv[0], argv, 'sys.argv[0] restored')
     is_ok(os.environ.get('PYJO_APP_LOADER'), None, 'PYJO_APP_LOADER restored')
     is_ok(Pyjo.Server.loaded_app, None, 'loaded_app restored')

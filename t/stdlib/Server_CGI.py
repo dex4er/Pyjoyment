@@ -39,6 +39,8 @@ script = tempdir().child('app.py').spew(SCRIPT)
 def cgi(env, content=b''):
     env = {
         'PATH': os.environ.get('PATH', ''),
+        # Windows, which a CGI server gives its programs, as Python cannot start its sockets without it
+        **({'SYSTEMROOT': os.environ['SYSTEMROOT']} if sys.platform == 'win32' else {}),
         'PYTHONPATH': ROOT,
         'GATEWAY_INTERFACE': 'CGI/1.1',
         'SERVER_PROTOCOL': 'HTTP/1.1',
