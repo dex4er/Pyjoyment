@@ -458,17 +458,24 @@ with subtest('Signals'):
     import sys
     import time
 
-    def run(*signals, connect=False):
+    restored = []
+
+    def run(*signals, connect=False, poll=False):
         # An event loop of its own, which the connections of the other subtests do not keep from stopping gracefully
         finished, connections = [], []
         with (
             Pyjo.IOLoop.new() as loop,
             Pyjo.Server.Daemon.new(ioloop=loop, listen=['http://127.0.0.1'], silent=True) as daemon,
+            Pyjo.UserAgent.new(ioloop=loop) as ua,
         ):
             daemon.start()
             loop.once('finish', lambda loop: finished.append(True))
             if connect:
                 connections.append(socket.create_connection(('127.0.0.1', daemon.ports()[0])))
+            # A client that requests every 0.1 seconds, on a connection that it keeps alive
+            if poll:
+                url = f'http://127.0.0.1:{daemon.ports()[0]}/'
+                loop.recurring(0.1, lambda loop: ua.get(url, lambda ua, tx: None))
             for i, signum in enumerate(signals):
                 loop.timer(0.2 * (i + 1), lambda loop, signum=signum: os.kill(os.getpid(), signum))
             loop.timer(5, lambda loop: loop.stop())
@@ -476,10 +483,11 @@ with subtest('Signals'):
             daemon.run()
             for connection in connections:
                 connection.close()
+            restored.append(daemon.max_requests)
         return bool(finished)
 
     if sys.platform == 'win32':
-        skip('no signals of POSIX', 8)
+        skip('no signals of POSIX', 11)
     else:
         ok(run(signal.SIGTERM), 'TERM stops gracefully')
         ok(run(signal.SIGINT), 'INT stops gracefully')
@@ -494,5 +502,9 @@ with subtest('Signals'):
         started = time.monotonic()
         ok(run(signal.SIGTERM, signal.SIGTERM, connect=True), 'graceful stop before the second TERM')
         ok(time.monotonic() - started > 4, 'second TERM does nothing')
+        started = time.monotonic()
+        ok(run(signal.SIGTERM, poll=True), 'TERM stops gracefully, with a client that keeps requesting')
+        ok(time.monotonic() - started < 2, 'a connection kept alive closes after its next response')
+        is_ok(restored[-1], 100, 'max_requests is set back')
 
 done_testing()

@@ -43,6 +43,15 @@ As an event function of `AWS Lambda <https://aws.amazon.com/lambda/>`_:
        :code: python
 
 
+Requests on a timer
+-------------------
+
+The user agent requests the server every second, in the same event loop, without
+blocking it:
+
+    .. include:: ../examples/user_agent.py
+       :code: python
+
 Web scraping
 ------------
 
