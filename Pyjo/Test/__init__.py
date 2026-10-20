@@ -52,6 +52,9 @@ or with Perl's ``prove``, as they print standard TAP: ::
 
     $ PYTHONPATH=. prove --ext=py --exec=python -r t
 
+pytest runs them too, each script as a test of pytest, through
+:mod:`Pyjo.Test.pytest_plugin`.
+
 A single script runs on its own as well: ::
 
     $ PYTHONPATH=. python t/Pyjo/URL.py
@@ -99,6 +102,38 @@ failed tests (up to 254), ``254`` when tests ran without a plan, and ``255``
 when the number of tests does not match the plan, when the script died with an
 exception, or after :func:`bail_out`.
 
+Exceptions
+----------
+
+After :func:`raise_failures`, the functions do not print TAP, so that they
+work in the tests of another test runner, as pytest or unittest, where
+:mod:`Pyjo.Test.pytest_plugin` calls it. A failed test raises
+:exc:`AssertionError` with the name of the test and the diagnostic message,
+``plan(skip_all=...)`` raises :exc:`unittest.SkipTest`, which both runners
+report as a skipped test, or in a subtest leaves the subtest, and
+:func:`bail_out` raises :exc:`BailOut`. A subtest is a block, the plans are
+not checked, :func:`skip` does nothing, and :func:`diag` and :func:`note`
+print their messages, which the runner captures. ::
+
+    import unittest
+
+    import Pyjo.Test
+    import Pyjo.URL
+
+
+    def setUpModule():
+        Pyjo.Test.raise_failures()
+
+
+    def tearDownModule():
+        Pyjo.Test.raise_failures(False)
+
+
+    class TestURL(unittest.TestCase):
+        def test_host(self):
+            url = Pyjo.URL.new('HtTp://Example.Com')
+            Pyjo.Test.is_ok(url.host, 'Example.Com', 'right host')
+
 Functions
 ---------
 """
@@ -135,6 +170,7 @@ __all__ = [
     'plan',
     'plan_skip_all',
     'plan_tests',
+    'raise_failures',
     'skip',
     'subtest',
     'throws_ok',
@@ -146,6 +182,13 @@ class Error(Exception):
     """
     Exception raised for a misuse of the test functions, for example planning
     twice.
+    """
+
+
+class BailOut(Exception):
+    """
+    Exception raised by :func:`bail_out` after :func:`raise_failures`, with
+    the reason.
     """
 
 
@@ -183,6 +226,12 @@ _stack: list[_State] = [_State()]
 _used = False
 _died = False
 _bailed_out = False
+_raising = False
+
+
+# pytest leaves the frames of this module out of the traceback of a failed test, which ends at the call of the function
+def __tracebackhide__(excinfo: Any) -> bool:
+    return excinfo is not None and isinstance(excinfo.value, AssertionError | BailOut)
 
 
 def bail_out(reason: str = '') -> NoReturn:
@@ -195,6 +244,8 @@ def bail_out(reason: str = '') -> NoReturn:
     reason. The exit status is ``255``.
     """
     global _bailed_out
+    if _raising:
+        raise BailOut(reason)
     _use()
     _bailed_out = True
     _print(f'Bail out!  {reason}', depth=0)
@@ -226,9 +277,7 @@ def cmp_ok(got: Any, operator: str, expected: Any, test_name: str | None = None)
     if operator not in operators:
         raise Error(f'Unknown operator {operator!r}')
     check = operators[operator](got, expected)
-    _ok(check, test_name)
-    if not check:
-        _diag_lines([f'    {got!r}', f'        {operator}', f'    {expected!r}'])
+    _ok(check, test_name, None if check else [f'    {got!r}', f'        {operator}', f'    {expected!r}'])
     return check
 
 
@@ -259,6 +308,8 @@ def done_testing(how_many: int | None = None) -> bool:
     with :func:`plan`. The number of tests is optional; when it is given, it
     has to match the number of tests run.
     """
+    if _raising:
+        return True
     _use()
     state = _current()
 
@@ -298,9 +349,7 @@ def in_ok(got: Any, elem: object, test_name: str | None = None) -> bool:
         check = elem in got
     except TypeError:
         check = False
-    _ok(check, test_name)
-    if not check:
-        _diag_lines([f'         got: {got!r}', f'    expected: to contain {elem!r}'])
+    _ok(check, test_name, None if check else [f'         got: {got!r}', f'    expected: to contain {elem!r}'])
     return check
 
 
@@ -316,14 +365,10 @@ def is_deeply_ok(got: object, expected: object, test_name: str | None = None) ->
     if _is_container(got) and _is_container(expected):
         stack: list[_Step] = []
         check = _deep_check(stack, got, expected)
-        _ok(check, test_name)
-        if not check:
-            _diag_lines(_format_stack(stack))
+        _ok(check, test_name, None if check else _format_stack(stack))
     else:
         check = got == expected
-        _ok(check, test_name)
-        if not check:
-            _diag_lines([f'         got: {got!r}', f'    expected: {expected!r}'])
+        _ok(check, test_name, None if check else [f'         got: {got!r}', f'    expected: {expected!r}'])
     return check
 
 
@@ -335,9 +380,7 @@ def is_ok(got: object, expected: object, test_name: str | None = None) -> bool:
     Compare two values with ``==``.
     """
     check = got == expected
-    _ok(check, test_name)
-    if not check:
-        _diag_lines([f'         got: {got!r}', f'    expected: {expected!r}'])
+    _ok(check, test_name, None if check else [f'         got: {got!r}', f'    expected: {expected!r}'])
     return check
 
 
@@ -353,9 +396,11 @@ def isa_ok(got: object, cls: type | tuple[type, ...], test_name: str | None = No
     if test_name is None:
         test_name = f'An object of class {type(got).__name__!r} isa {_class_names(cls)!r}'
     check = isinstance(got, cls)
-    _ok(check, test_name)
-    if not check:
-        _diag_lines([f'    The object of class {type(got).__name__!r} is not a {_class_names(cls)!r}'])
+    _ok(
+        check,
+        test_name,
+        None if check else [f'    The object of class {type(got).__name__!r} is not a {_class_names(cls)!r}'],
+    )
     return check
 
 
@@ -367,9 +412,7 @@ def isnt_ok(got: object, expected: object, test_name: str | None = None) -> bool
     Compare two values with ``!=``.
     """
     check = got != expected
-    _ok(check, test_name)
-    if not check:
-        _diag_lines([f'         got: {got!r}', '    expected: anything else'])
+    _ok(check, test_name, None if check else [f'         got: {got!r}', '    expected: anything else'])
     return check
 
 
@@ -389,9 +432,7 @@ def like_ok(got: Any, expected: _Pattern, test_name: str | None = None) -> bool:
         check = regex.search(got) is not None
     except TypeError:
         check = False
-    _ok(check, test_name)
-    if not check:
-        _diag_lines([f'                  {got!r}', f"    doesn't match {regex.pattern!r}"])
+    _ok(check, test_name, None if check else [f'                  {got!r}', f"    doesn't match {regex.pattern!r}"])
     return check
 
 
@@ -403,9 +444,7 @@ def none_ok(got: object, test_name: str | None = None) -> bool:
     Check if the value is ``None``.
     """
     check = got is None
-    _ok(check, test_name)
-    if not check:
-        _diag_lines([f'         got: {got!r}', '    expected: None'])
+    _ok(check, test_name, None if check else [f'         got: {got!r}', '    expected: None'])
     return check
 
 
@@ -421,9 +460,7 @@ def not_in_ok(got: Any, elem: object, test_name: str | None = None) -> bool:
         check = elem not in got
     except TypeError:
         check = False
-    _ok(check, test_name)
-    if not check:
-        _diag_lines([f'         got: {got!r}', f'    expected: not to contain {elem!r}'])
+    _ok(check, test_name, None if check else [f'         got: {got!r}', f'    expected: not to contain {elem!r}'])
     return check
 
 
@@ -485,6 +522,14 @@ def plan(tests: int | None = None, skip_all: str | None = None) -> 'Plan':
     :func:`done_testing` at the end of its block, so that the number of tests
     can be left out.
     """
+    if _raising:
+        if skip_all is not None:
+            # The exception of a skipped test that pytest knows too, imported only by the tests that raise it
+            import unittest
+
+            raise SkipAll(skip_all) if _current().depth else unittest.SkipTest(skip_all)
+        return Plan()
+
     _use()
     state = _current()
 
@@ -526,6 +571,19 @@ def plan_tests(how_many: int) -> 'Plan':
     return plan(tests=how_many)
 
 
+def raise_failures(enable: bool = True) -> None:
+    """::
+
+        raise_failures()
+        raise_failures(False)
+
+    Make the functions raise exceptions instead of printing TAP, as the
+    section `Exceptions`_ describes, or print TAP again with ``False``.
+    """
+    global _raising
+    _raising = enable
+
+
 def skip(why: str | None = None, how_many: int = 1) -> bool:
     """::
 
@@ -536,6 +594,8 @@ def skip(why: str | None = None, how_many: int = 1) -> bool:
 
     Skip the given number of tests, which still count for the plan.
     """
+    if _raising:
+        return True
     _use()
     state = _current()
     for _ in range(how_many):
@@ -583,13 +643,20 @@ class Subtest:
 
     def __enter__(self) -> Self:
         _use()
-        _print(f'# Subtest: {self.name}')
+        if not _raising:
+            _print(f'# Subtest: {self.name}')
         _stack.append(_State(self.name, _current().depth + 1))
         return self
 
     def __exit__(
         self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None
     ) -> bool:
+        if _raising:
+            _stack.pop()
+            skipped = exc_type is not None and issubclass(exc_type, SkipAll)
+            self.passed = exc_type is None or skipped
+            return skipped
+
         state = _current()
 
         if exc_type is not None and issubclass(exc_type, SystemExit):
@@ -694,9 +761,11 @@ def throws_ok(
     elif isinstance(expected, re.Pattern):
         expected = f'a message matching {expected.pattern!r}'
 
-    _ok(check, test_name)
-    if not check:
-        _diag_lines([f'         got: {got if got is not None else "no exception"}', f'    expected: {expected}'])
+    _ok(
+        check,
+        test_name,
+        None if check else [f'         got: {got if got is not None else "no exception"}', f'    expected: {expected}'],
+    )
     return check
 
 
@@ -713,9 +782,7 @@ def unlike_ok(got: Any, expected: _Pattern, test_name: str | None = None) -> boo
         check = regex.search(got) is None
     except TypeError:
         check = True
-    _ok(check, test_name)
-    if not check:
-        _diag_lines([f'                  {got!r}', f'          matches {regex.pattern!r}'])
+    _ok(check, test_name, None if check else [f'                  {got!r}', f'          matches {regex.pattern!r}'])
     return check
 
 
@@ -877,11 +944,17 @@ def _is_container(value: object) -> bool:
     return isinstance(value, (list, tuple, set, dict))
 
 
-def _ok(check: object, test_name: str | None = None) -> bool:
+def _ok(check: object, test_name: str | None = None, diagnostics: list[str] | None = None) -> bool:
+    check = bool(check)
+    if _raising:
+        if not check:
+            failed = f"Failed test '{test_name}'" if test_name is not None else 'Failed test'
+            raise AssertionError('\n'.join([failed, *(diagnostics or [])]))
+        return True
+
     _use()
     state = _current()
     state.count += 1
-    check = bool(check)
 
     line = f'ok {state.count}' if check else f'not ok {state.count}'
     if test_name is not None:
@@ -900,6 +973,8 @@ def _ok(check: object, test_name: str | None = None) -> bool:
         where = _caller()
         failed = f"  Failed test '{test_name}'" if test_name is not None else '  Failed test'
         _diag_lines([failed, f'  at {where}.'] if where else [failed])
+        if diagnostics:
+            _diag_lines(diagnostics)
 
     return check
 
@@ -942,7 +1017,8 @@ def _tests(n: int | None) -> str:
 
 def _use() -> None:
     global _used
-    _used = True
+    if not _raising:
+        _used = True
 
 
 _original_except_hook = sys.excepthook

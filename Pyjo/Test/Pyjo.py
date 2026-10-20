@@ -95,6 +95,10 @@ if not os.environ.get('PYJO_LOG_LEVEL'):
     verbose = os.environ.get('PYJO_HARNESS_IS_VERBOSE', os.environ.get('HARNESS_IS_VERBOSE'))
     os.environ['PYJO_LOG_LEVEL'] = 'trace' if verbose else 'fatal'
 
+# Not in Mojolicious: pytest leaves the frames of this module out of the traceback of a failed test, as those of
+# Pyjo.Test
+__tracebackhide__ = Pyjo.Test.__tracebackhide__
+
 
 class Pyjo_Test_Pyjo(Pyjo.Base.object):
     """
