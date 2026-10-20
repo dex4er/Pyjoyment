@@ -245,11 +245,11 @@ jobs:
         run: |-
           uv run --python "${{ matrix.python }}" --group pytest pytest -p no:cacheprovider --color=yes -v -n 4 -o pyjo_prove_timeout=60 --junitxml=pytest-report.xml | grep --line-buffered -Ev '^t[/\\][^ ]* [[:cntrl:]]?$'
 
-      # The JUnit XML of pytest, a test for each test script, as the table of
-      # the tests in the summary of the job and the annotations of the failed
-      # ones, without a check of its own, which GitHub puts under any workflow
-      # of the commit, as a check that the token of a workflow makes belongs to
-      # GitHub Actions, not to the workflow
+      # The JUnit XML of pytest, a test for each test script, as the counts of
+      # the tests and the table of the failed ones in the summary of the job,
+      # and the annotations of the failed ones, without a check of its own,
+      # which GitHub puts under any workflow of the commit, as a check that the
+      # token of a workflow makes belongs to GitHub Actions, not to the workflow
       - name: Publish the report of pytest
         if: ${{ !cancelled() }}
         uses: mikepenz/action-junit-report@v6
@@ -257,4 +257,4 @@ jobs:
           report_paths: pytest-report.xml
           annotate_only: true
           detailed_summary: true
-          include_passed: true
+          include_skipped: false
