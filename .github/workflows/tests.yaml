@@ -205,6 +205,11 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
 
+    # The check of the report of the tests
+    permissions:
+      checks: write
+      contents: read
+
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -243,4 +248,15 @@ jobs:
           PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
           TEST_ONLINE: "1"
         run: |-
-          uv run --python "${{ matrix.python }}" --group pytest pytest -p no:cacheprovider --color=yes -v -n 4 -o pyjo_prove_timeout=60 | grep --line-buffered -Ev '^t[/\\][^ ]* [[:cntrl:]]?$'
+          uv run --python "${{ matrix.python }}" --group pytest pytest -p no:cacheprovider --color=yes -v -n 4 -o pyjo_prove_timeout=60 --junitxml=pytest-report.xml | grep --line-buffered -Ev '^t[/\\][^ ]* [[:cntrl:]]?$'
+
+      # The JUnit XML of pytest, a test for each test script, as a check with
+      # the table of the tests in the summary of the job
+      - name: Publish the report of pytest
+        if: ${{ !cancelled() }}
+        uses: mikepenz/action-junit-report@v6
+        with:
+          report_paths: pytest-report.xml
+          check_name: pytest report (python ${{ matrix.python }}, ${{ matrix.os }})
+          detailed_summary: true
+          include_passed: true
