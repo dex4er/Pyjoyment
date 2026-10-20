@@ -138,6 +138,10 @@ with subtest('map'):
 with subtest('new'):
     collection = Pyjo.Collection.new(1, 2, 3)
     is_deeply_ok(collection, [1, 2, 3], 'collection')
+    collection = Collection([1, 2, 3])
+    is_deeply_ok(collection, [1, 2, 3], 'constructor')
+    collection = Collection(n for n in range(3))
+    is_deeply_ok(collection, [0, 1, 2], 'constructor of a generator')
 
 with subtest('reduce'):
     collection = c(1, 2, 2, 3)
