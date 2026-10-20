@@ -12,6 +12,7 @@ import os
 import re
 import signal
 import socket
+import sys
 import threading
 import time
 
@@ -29,6 +30,10 @@ def message(log_, level, *lines):
 def finish(prethread, graceful_):
     global graceful
     graceful = graceful_
+
+
+# BREAK of Ctrl-Break takes the place of QUIT on Windows
+QUIT = signal.SIGBREAK if sys.platform == 'win32' else signal.SIGQUIT
 
 
 with subtest('Manage and clean up PID file'):
@@ -91,7 +96,7 @@ with subtest('Multiple workers and graceful shutdown'):
             return
         with Pyjo.UserAgent.new() as ua:
             tx = ua.get(f'http://127.0.0.1:{prethread.ports()[0]}')
-        os.kill(os.getpid(), signal.SIGTERM)
+        signal.raise_signal(signal.SIGTERM)
 
     prethread.on('reap', lambda prethread, id: reap.append(id))
     prethread.on('finish', finish)
@@ -160,7 +165,7 @@ with subtest('Multiple workers and graceful shutdown (Pyjo.HelloWorld)'):
             return
         with Pyjo.UserAgent.new() as ua:
             tx = ua.get(f'http://127.0.0.1:{prethread.ports()[0]}')
-        os.kill(os.getpid(), signal.SIGTERM)
+        signal.raise_signal(signal.SIGTERM)
 
     prethread.on('spawn', lambda prethread, id: spawn.append(id))
     prethread.on('reap', lambda prethread, id: reap.append(id))
@@ -196,7 +201,7 @@ with subtest('One worker and immediate shutdown'):
         global tx
         with Pyjo.UserAgent.new() as ua:
             tx = ua.get(f'http://127.0.0.1:{prethread.ports()[0]}')
-        os.kill(os.getpid(), signal.SIGQUIT)
+        signal.raise_signal(QUIT)
 
     prethread.on('reap', lambda prethread, id: reap.append(id))
     prethread.on('finish', finish)
@@ -209,34 +214,37 @@ with subtest('One worker and immediate shutdown'):
     is_ok(tx.res.body, b'works too!', 'right content')
 
 with subtest('UNIX domain socket'):
-    dir = tempdir()
-    sock = dir.child('prethread.sock').to_str()
-    prethread = Pyjo.Server.Prethread.new(
-        listen=[f'http+unix://{sock.replace("/", "%2F")}'], pid_file=dir.child('prethread.pid'), workers=2
-    )
-    prethread.unsubscribe('request')
+    if not hasattr(socket, 'AF_UNIX'):
+        skip('no UNIX domain sockets', 2)
+    else:
+        dir = tempdir()
+        sock = dir.child('prethread.sock').to_str()
+        prethread = Pyjo.Server.Prethread.new(
+            listen=[f'http+unix://{sock.replace("/", "%2F")}'], pid_file=dir.child('prethread.pid'), workers=2
+        )
+        prethread.unsubscribe('request')
 
-    @prethread.on('request')
-    def request(prethread, tx):
-        tx.res.code = 200
-        tx.res.body = b'unix'
-        tx.resume()
+        @prethread.on('request')
+        def request(prethread, tx):
+            tx.res.code = 200
+            tx.res.body = b'unix'
+            tx.resume()
 
-    tx = None
+        tx = None
 
-    @prethread.on('heartbeat')
-    def heartbeat(prethread, id):
-        global tx
-        if prethread.healthy < 2:
-            return
-        with Pyjo.UserAgent.new() as ua:
-            tx = ua.get(f'http+unix://{sock.replace("/", "%2F")}/')
-        os.kill(os.getpid(), signal.SIGTERM)
+        @prethread.on('heartbeat')
+        def heartbeat(prethread, id):
+            global tx
+            if prethread.healthy < 2:
+                return
+            with Pyjo.UserAgent.new() as ua:
+                tx = ua.get(f'http+unix://{sock.replace("/", "%2F")}/')
+            signal.raise_signal(signal.SIGTERM)
 
-    prethread.heartbeat_interval = 0.5
-    prethread.run()
-    is_ok(tx.res.body, b'unix', 'right content')
-    ok(os.path.exists(sock), 'socket is still there')
+        prethread.heartbeat_interval = 0.5
+        prethread.run()
+        is_ok(tx.res.body, b'unix', 'right content')
+        ok(os.path.exists(sock), 'socket is still there')
 
 with subtest('Second INT and TERM'):
 
@@ -259,13 +267,13 @@ with subtest('Second INT and TERM'):
             connections.append(connection := socket.create_connection(('127.0.0.1', prethread.ports()[0])))
             connection.sendall(b'GET / HTTP/1.1\r\nHost: x\r\n\r\n')
             signalled.append(time.monotonic())
-            os.kill(os.getpid(), signal.SIGINT)
+            signal.raise_signal(signal.SIGINT)
 
             # The second signal once the manager has handled the first, as Python handles two of the same signal that
             # come before its handler runs once
             @prethread.once('finish')
             def again(prethread, graceful):
-                os.kill(os.getpid(), second)
+                signal.raise_signal(second)
 
         prethread.graceful_timeout = 2
         prethread.run()
@@ -281,35 +289,38 @@ with subtest('Second INT and TERM'):
     ok(elapsed < 2, 'stopped before the graceful timeout')
 
 with subtest('HUP'):
-    prethread = Pyjo.Server.Prethread.new(
-        heartbeat_interval=0.5, listen=['http://127.0.0.1'], pid_file=tempdir().child('prethread.pid'), workers=1
-    )
-    spawn, reap = [], []
-    prethread.on('spawn', lambda prethread, id: spawn.append(id))
+    if sys.platform == 'win32':
+        skip('no HUP on Windows', 3)
+    else:
+        prethread = Pyjo.Server.Prethread.new(
+            heartbeat_interval=0.5, listen=['http://127.0.0.1'], pid_file=tempdir().child('prethread.pid'), workers=1
+        )
+        spawn, reap = [], []
+        prethread.on('spawn', lambda prethread, id: spawn.append(id))
 
-    @prethread.on('reap')
-    def reaped(prethread, id):
-        reap.append(id)
-        os.kill(os.getpid(), signal.SIGTERM)
+        @prethread.on('reap')
+        def reaped(prethread, id):
+            reap.append(id)
+            signal.raise_signal(signal.SIGTERM)
 
-    prethread.once('heartbeat', lambda prethread, id: os.kill(os.getpid(), signal.SIGHUP))
-    prethread.run()
-    ok(len(spawn) >= 2, 'worker restarted')
-    is_ok(reap[0], spawn[0], 'first worker stopped')
+        prethread.once('heartbeat', lambda prethread, id: signal.raise_signal(signal.SIGHUP))
+        prethread.run()
+        ok(len(spawn) >= 2, 'worker restarted')
+        is_ok(reap[0], spawn[0], 'first worker stopped')
 
-    prethread = Pyjo.Server.Prethread.new(
-        heartbeat_interval=0.5, listen=['http://127.0.0.1'], pid_file=tempdir().child('prethread.pid'), workers=1
-    )
-    reloads = []
+        prethread = Pyjo.Server.Prethread.new(
+            heartbeat_interval=0.5, listen=['http://127.0.0.1'], pid_file=tempdir().child('prethread.pid'), workers=1
+        )
+        reloads = []
 
-    @prethread.on('reload')
-    def reload(prethread):
-        reloads.append(True)
-        os.kill(os.getpid(), signal.SIGTERM)
+        @prethread.on('reload')
+        def reload(prethread):
+            reloads.append(True)
+            signal.raise_signal(signal.SIGTERM)
 
-    prethread.once('heartbeat', lambda prethread, id: os.kill(os.getpid(), signal.SIGHUP))
-    prethread.run()
-    is_deeply_ok(reloads, [True], 'event emitted')
+        prethread.once('heartbeat', lambda prethread, id: signal.raise_signal(signal.SIGHUP))
+        prethread.run()
+        is_deeply_ok(reloads, [True], 'event emitted')
 
 with subtest('A worker that does not stop is left'):
     prethread = Pyjo.Server.Prethread.new(
@@ -337,7 +348,7 @@ with subtest('A worker that does not stop is left'):
     def heartbeat(prethread, id):
         connections.append(connection := socket.create_connection(('127.0.0.1', prethread.ports()[0])))
         connection.sendall(b'GET / HTTP/1.1\r\nHost: x\r\n\r\n')
-        prethread.once('wait', lambda prethread: os.kill(os.getpid(), signal.SIGTERM))
+        prethread.once('wait', lambda prethread: signal.raise_signal(signal.SIGTERM))
 
     # The debug mode of asyncio, which PYTHONDEVMODE turns on, logs the callback that blocks the worker, as it is slow,
     # until the worker that is left ends
@@ -361,18 +372,21 @@ with subtest('A worker that does not stop is left'):
     like_ok(log, r'Worker \d+ does not stop, leaving it', 'right message')
 
 with subtest('The manager leaves the children of the application'):
-    prethread = Pyjo.Server.Prethread.new(
-        heartbeat_interval=0.5, listen=['http://127.0.0.1'], pid_file=tempdir().child('prethread.pid'), workers=1
-    )
-    handler = signal.getsignal(signal.SIGCHLD)
-    handlers = []
+    if sys.platform == 'win32':
+        skip('no CHLD on Windows', 1)
+    else:
+        prethread = Pyjo.Server.Prethread.new(
+            heartbeat_interval=0.5, listen=['http://127.0.0.1'], pid_file=tempdir().child('prethread.pid'), workers=1
+        )
+        handler = signal.getsignal(signal.SIGCHLD)
+        handlers = []
 
-    @prethread.once('heartbeat')
-    def heartbeat(prethread, id):
-        handlers.append(signal.getsignal(signal.SIGCHLD))
-        os.kill(os.getpid(), signal.SIGTERM)
+        @prethread.once('heartbeat')
+        def heartbeat(prethread, id):
+            handlers.append(signal.getsignal(signal.SIGCHLD))
+            signal.raise_signal(signal.SIGTERM)
 
-    prethread.run()
-    is_deeply_ok(handlers, [handler], 'no handler of CHLD')
+        prethread.run()
+        is_deeply_ok(handlers, [handler], 'no handler of CHLD')
 
 done_testing()

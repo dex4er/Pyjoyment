@@ -25,8 +25,13 @@ ServerStart = importlib.import_module('ServerStart')
 def server(code):
     def start():
         port = ServerStart.port()
+        # A group of its own on Windows, which Ctrl-Break reaches
         process = subprocess.Popen(
-            [sys.executable, '-c', code(port)], env=dict(os.environ, PYTHONPATH=ROOT), stdout=subprocess.PIPE, text=True
+            [sys.executable, '-c', code(port)],
+            env=dict(os.environ, PYTHONPATH=ROOT),
+            stdout=subprocess.PIPE,
+            text=True,
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == 'win32' else 0,
         )
         if ServerStart.listening(port, process):
             return port, process
@@ -76,7 +81,8 @@ prethread.run()
         )
     )
     is_ok(get(port, '/foo'), b'GET request for /foo!', 'served by a worker')
-    process.send_signal(signal.SIGTERM)
+    # TERM of Windows terminates the process, and Ctrl-Break stops the server, immediately
+    process.send_signal(signal.CTRL_BREAK_EVENT if sys.platform == 'win32' else signal.SIGTERM)
     is_ok(process.wait(30), 0, 'stopped gracefully')
     like_ok(process.stdout.read(), rf'Web application available at http://127.0.0.1:{port}', 'listening')
     process.stdout.close()
@@ -93,7 +99,7 @@ with subtest('Events'):
 
     @prethread.once('heartbeat')
     def heartbeat(prethread, id):
-        os.kill(os.getpid(), signal.SIGTERM)
+        signal.raise_signal(signal.SIGTERM)
 
     prethread.app.log.level = 'fatal'
     output = io.StringIO()
