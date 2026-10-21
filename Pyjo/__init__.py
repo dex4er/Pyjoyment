@@ -97,8 +97,6 @@ from typing import TYPE_CHECKING, Any
 
 
 if TYPE_CHECKING:
-    import re
-
     import Pyjo.Collection
     import Pyjo.DOM
     import Pyjo.File
@@ -107,6 +105,8 @@ if TYPE_CHECKING:
     import Pyjo.String.Unicode
     import Pyjo.URL
     import Pyjo.UserAgent
+
+    import re
 
 
 # Not in Mojolicious: a namespace package, as Python does not merge a regular package from every directory of sys.path
