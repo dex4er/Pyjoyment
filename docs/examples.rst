@@ -50,6 +50,11 @@ The ASGI application, which also runs on its own, on an ASGI server:
     .. include:: ../examples/pyjoyment/hello_asgi.py
        :code: python
 
+An application of Pyjoyment as the ASGI application, in the same file:
+
+    .. include:: ../examples/pyjoyment/mount_asgi_inception.py
+       :code: python
+
 
 Servers
 -------
