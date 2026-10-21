@@ -726,14 +726,16 @@ with subtest('Mount applications of other frameworks'):
         # The scripts of a directory
         app.plugin('Mount', {'/php': 'fcgi+unix://%2Frun%2Fphp%2Fphp-fpm.sock?document_root=/var/www/php'})
 
-        # The scripts of WordPress, and its index.php for every other path
-        app.plugin('Mount', {'/blog': 'fcgi://127.0.0.1:9000?document_root=/var/www/wordpress&script=index.php'})
+        # WordPress: its scripts, its files, and its index.php for every other path
+        app.plugin(
+            'Mount', {'/blog': 'fcgi://127.0.0.1:9000?document_root=/var/www/wordpress&script=index.php&static=1'}
+        )
 
         mounts = {str(route.pattern.unparsed): route.pattern.defaults['app'] for route in app.routes.children}
         ok(all(isinstance(fcgi, Pyjo.App.FastCGI.object) for fcgi in mounts.values()), 'FastCGI applications')
         like_ok(str(mounts['/app'].url), r'\?script=/srv/app/public/index\.php$', 'one script')
         like_ok(str(mounts['/php'].url), r'^fcgi\+unix://.*\?document_root=/var/www/php$', 'directory')
-        like_ok(str(mounts['/blog'].url), r'document_root=/var/www/wordpress&script=index\.php$', 'both')
+        like_ok(str(mounts['/blog'].url), r'document_root=/var/www/wordpress&script=index\.php&static=1$', 'WordPress')
 
 with subtest('Embed applications'):
     with application('embed_lite'):

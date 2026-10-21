@@ -1157,7 +1157,12 @@ without rules of rewriting:
   them: the path up to its first part that ends with ``.php`` names the
   script, and a path that ends with a slash names ``index.php``;
 * both together send every path that names no script of the directory to the
-  one script, as ``try_files`` of nginx does for WordPress.
+  one script, as ``try_files`` of nginx does for WordPress;
+* ``static`` replies with the files of the directory for the paths that name
+  them, as the stylesheets and the images of WordPress, before the one
+  script, for an application on the same file system as Pyjoyment, and lets
+  the application reply with such a file by the header ``X-Sendfile``, which
+  ``sendfile`` allows for a directory of private files too.
 
 The paths are the ones that php-fpm sees, which may be in another container,
 so Pyjoyment does not look for the files.
@@ -1170,8 +1175,8 @@ so Pyjoyment does not look for the files.
     # The scripts of a directory
     plugin('Mount', {'/php': 'fcgi+unix://%2Frun%2Fphp%2Fphp-fpm.sock?document_root=/var/www/php'})
 
-    # The scripts of WordPress, and its index.php for every other path
-    plugin('Mount', {'/blog': 'fcgi://127.0.0.1:9000?document_root=/var/www/wordpress&script=index.php'})
+    # WordPress: its scripts, its files, and its index.php for every other path
+    plugin('Mount', {'/blog': 'fcgi://127.0.0.1:9000?document_root=/var/www/wordpress&script=index.php&static=1'})
 
 The query also takes ``inactivity_timeout`` and ``connect_timeout``, in
 seconds, for an application that answers slowly, which the client waits for
