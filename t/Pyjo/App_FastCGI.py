@@ -15,6 +15,7 @@ from Pyjo.Util import url_escape
 
 import concurrent.futures
 import http.client
+import os
 import re
 import socket
 import struct
@@ -287,6 +288,98 @@ with subtest('Directory of the scripts'):
         is_ok(env['SCRIPT_FILENAME'], '/srv/app.php', 'script of the parameters')
         is_ok(env['SCRIPT_NAME'], '/php', 'script name of the mount')
         is_ok(env['PATH_INFO'], '/foo/bar', 'path after the mount')
+    Pyjo.IOLoop.remove(id)
+
+with subtest('Static files'):
+    tmp = Pyjo.File.tempdir()
+    root = tmp.child('www').make_path()
+    root.child('style.css').spew(b'body { color: red }')
+    root.child('sub').make_path().child('app.js').spew(b'alert(1)')
+    root.child('index.php').spew(b'<?php')
+    tmp.child('secret.txt').spew(b'secret')
+    links = hasattr(os, 'symlink') and sys.platform != 'win32'
+    if links:
+        os.symlink(tmp.child('secret.txt').to_str(), root.child('link.txt').to_str())
+
+    url, requests, id = responder(stdout(b'Status: 200\r\n\r\nfrom the application') + end())
+    with Pyjo.App.FastCGI.new(url=url, document_root=root.to_str(), script='index.php', static=True) as fcgi:
+        t = Pyjo.Test.Pyjo.new(application(fcgi, '/blog'))
+        count = len(requests)
+        t.get_ok('/blog/style.css').status_is(200).content_type_is('text/css').content_is('body { color: red }')
+        t.get_ok('/blog/sub/app.js').status_is(200).content_is('alert(1)')
+        t.get_ok('/blog/style.css', {'Range': 'bytes=0-3'}).status_is(206).content_is('body')
+        is_ok(len(requests), count, 'no request to the application')
+
+        # The application for the paths of no file, of a script, or of a link out of the directory
+        t.get_ok('/blog/missing.css').status_is(200).content_is('from the application')
+        is_ok(params(requests[-1])['SCRIPT_FILENAME'], f'{root.to_str()}/index.php', 'the one script')
+        t.get_ok('/blog/index.php').status_is(200).content_is('from the application')
+        t.get_ok('/blog/sub/').status_is(200).content_is('from the application')
+        if links:
+            t.get_ok('/blog/link.txt').status_is(200).content_is('from the application')
+        else:
+            skip('no symbolic links', 3)
+
+    # The flag of the query of the location, and no static files without it
+    with Pyjo.App.FastCGI.new(url=f'{url}?static=1', document_root=root.to_str()) as fcgi:
+        t = Pyjo.Test.Pyjo.new(application(fcgi, '/blog'))
+        t.get_ok('/blog/style.css').status_is(200).content_is('body { color: red }')
+    with Pyjo.App.FastCGI.new(url=url, document_root=root.to_str()) as fcgi:
+        t = Pyjo.Test.Pyjo.new(application(fcgi, '/blog'))
+        t.get_ok('/blog/style.css').status_is(200).content_is('from the application')
+    Pyjo.IOLoop.remove(id)
+
+with subtest('X-Sendfile'):
+    tmp = Pyjo.File.tempdir()
+    root = tmp.child('www').make_path()
+    root.child('style.css').spew(b'body { color: red }')
+    private = tmp.child('private').make_path()
+    private.child('file.bin').spew(b'0123456789')
+
+    def sendfile(path):
+        headers = (
+            b'Status: 200\r\nContent-Type: application/octet-stream\r\n'
+            b'Content-Disposition: attachment; filename="file.bin"\r\nX-Sendfile: ' + path.encode() + b'\r\n\r\n'
+        )
+        return responder(stdout(headers) + end())
+
+    # A private file of the directory of sendfile, with the status and the headers of the application
+    url, requests, id = sendfile(private.child('file.bin').to_str())
+    with Pyjo.App.FastCGI.new(url=url, sendfile=private.to_str()) as fcgi:
+        t = Pyjo.Test.Pyjo.new(application(fcgi, '/dl'))
+        t.get_ok('/dl/file').status_is(200).content_is('0123456789')
+        t.content_type_is('application/octet-stream').header_is(
+            'Content-Disposition', 'attachment; filename="file.bin"'
+        )
+        ok(not t.tx.res.headers.header('X-Sendfile'), 'no header X-Sendfile')
+        t.get_ok('/dl/file', {'Range': 'bytes=2-4'}).status_is(206).content_is('234')
+    Pyjo.IOLoop.remove(id)
+
+    # A path relative to the directory of sendfile
+    url, requests, id = sendfile('file.bin')
+    with Pyjo.App.FastCGI.new(url=f'{url}?sendfile={private.to_str()}') as fcgi:
+        t = Pyjo.Test.Pyjo.new(application(fcgi, '/dl'))
+        t.get_ok('/dl/file').status_is(200).content_is('0123456789')
+    Pyjo.IOLoop.remove(id)
+
+    # A file of the document root with static, and not one of another directory
+    url, requests, id = sendfile(root.child('style.css').to_str())
+    with Pyjo.App.FastCGI.new(url=url, document_root=root.to_str(), static=True) as fcgi:
+        t = Pyjo.Test.Pyjo.new(application(fcgi, '/dl'))
+        t.get_ok('/dl/file.php').status_is(200).content_is('body { color: red }')
+    Pyjo.IOLoop.remove(id)
+    url, requests, id = sendfile(private.child('file.bin').to_str())
+    with Pyjo.App.FastCGI.new(url=url, document_root=root.to_str(), static=True) as fcgi:
+        fcgi.log.level = 'fatal'
+        t = Pyjo.Test.Pyjo.new(application(fcgi, '/dl'))
+        with fcgi.log.capture('error') as messages:
+            t.get_ok('/dl/file.php').status_is(404)
+        like_ok(str(messages), r'FastCGI application sent the file ".*file\.bin", which is not in', 'right error')
+
+    # The header as the application sends it without the directories
+    with Pyjo.App.FastCGI.new(url=url) as fcgi:
+        t = Pyjo.Test.Pyjo.new(application(fcgi, '/dl'))
+        t.get_ok('/dl/file').status_is(200).content_is('').header_like('X-Sendfile', r'file\.bin$')
     Pyjo.IOLoop.remove(id)
 
 with subtest('Response'):

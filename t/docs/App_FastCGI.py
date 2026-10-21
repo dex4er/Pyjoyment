@@ -78,6 +78,20 @@ with subtest('script'):
     app.script = 'index.php'
     is_ok(app.script, 'index.php', 'script of the directory')
 
+with subtest('sendfile'):
+    app = Pyjo.App.FastCGI.new()
+    directory = app.sendfile
+    is_ok(directory, None, 'no directory')
+    app.sendfile = '/var/www/private'
+    is_ok(app.sendfile, '/var/www/private', 'directory')
+
+with subtest('static'):
+    app = Pyjo.App.FastCGI.new()
+    boolean = app.static
+    is_ok(boolean, None, 'of the query or false')
+    app.static = True
+    is_ok(app.static, True, 'static files')
+
 with subtest('url'):
     app = Pyjo.App.FastCGI.new()
     url_ = app.url

@@ -110,6 +110,9 @@ STDERR = 7
 # The id of the request, the only one of its connection
 ID = 1
 
+# The headers of a response by X-Sendfile that the file takes the place of
+_SENT = ('content-length', 'x-sendfile')
+
 
 class Pyjo_App_FastCGI(Pyjo.App.object):
     """
@@ -192,6 +195,38 @@ class Pyjo_App_FastCGI(Pyjo.App.object):
         :attr:`document_root`, in which it is then.
         """
 
+        self.sendfile: str | os.PathLike[str] | None = None
+        """::
+
+            directory = app.sendfile
+            app.sendfile = '/var/www/private'
+
+        Directory of the files that the application may reply with by the
+        header ``X-Sendfile``, as Apache and lighttpd take it, with the path of
+        the file, as the private files that are not in :attr:`document_root`,
+        the parameter ``sendfile`` of the query of :attr:`url`, or
+        :attr:`document_root` with :attr:`static`, none otherwise. A route that
+        embeds the application replies then with the file, as the helper
+        ``reply.file`` of :mod:`Pyjoyment` does, with the status and the other
+        headers of the application, and a file that is not in the directory is
+        not found.
+        """
+
+        self.static: bool | None = None
+        """::
+
+            boolean = app.static
+            app.static = True
+
+        Reply with a file of :attr:`document_root` for a path that names it and
+        no script, as ``try_files`` of nginx does, as the helper ``reply.file``
+        of :mod:`Pyjoyment` does, with ranges and conditional requests, the
+        parameter ``static`` of the query of :attr:`url`, false by default.
+        The files are those that :mod:`Pyjoyment` sees, as for an application
+        on the same file system, and a route that embeds the application
+        replies with them, as :mod:`Pyjoyment.Plugin.Mount` makes.
+        """
+
         self.url: str | Pyjo.URL.object | None = None
         """::
 
@@ -203,8 +238,9 @@ class Pyjo_App_FastCGI(Pyjo.App.object):
         or the path of a UNIX domain socket of ``fcgi+unix://``, escaped as the
         listen locations of :mod:`Pyjo.Server.Daemon` are. Its query can give
         :attr:`connect_timeout`, :attr:`document_root`,
-        :attr:`inactivity_timeout` and :attr:`script`, as the listen locations
-        give their options, which the attributes take the place of. ::
+        :attr:`inactivity_timeout`, :attr:`script`, :attr:`sendfile` and
+        :attr:`static`, as the listen locations give their options, which the
+        attributes take the place of. ::
 
             app.url = 'fcgi://127.0.0.1:9000?document_root=%2Fvar%2Fwww&script=index.php'
             app.url = 'fcgi://127.0.0.1:9000?inactivity_timeout=300'
@@ -225,10 +261,14 @@ class Pyjo_App_FastCGI(Pyjo.App.object):
         if (url := self.url) is None:
             raise Pyjo.Exception.new('No FastCGI application')
         options, query = _location(url)
-        root = os.fspath(self.document_root) if self.document_root is not None else query.get('document_root')
-        script = self.script if self.script is not None else query.get('script')
         options['timeout'] = _seconds(self.connect_timeout, query.get('connect_timeout'), 10)
-        inactivity = _seconds(self.inactivity_timeout, query.get('inactivity_timeout'), 60)
+        config = {
+            'inactivity': _seconds(self.inactivity_timeout, query.get('inactivity_timeout'), 60),
+            'root': os.fspath(self.document_root) if self.document_root is not None else query.get('document_root'),
+            'script': self.script if self.script is not None else query.get('script'),
+            'sendfile': os.fspath(self.sendfile) if self.sendfile is not None else query.get('sendfile'),
+            'static': self.static if self.static is not None else _flag(query.get('static')),
+        }
         c = None
         if not isinstance(tx, Pyjo.Transaction.object):
             c = tx
@@ -236,26 +276,19 @@ class Pyjo_App_FastCGI(Pyjo.App.object):
             if not Pyjo.App._within(c):  # pyright: ignore[reportPrivateUsage]
                 return c.helpers.reply.not_found()
             c.render_later()
-        _Call(self, options, root, script, inactivity, tx, c).start()
+        _Call(self, options, config, tx, c).start()
 
 
 # A request to the application, whose response of CGI is written as it comes
 class _Call:
-    def __init__(
-        self,
-        app: Pyjo_App_FastCGI,
-        options: dict[str, Any],
-        root: str | None,
-        script: str | None,
-        inactivity: float,
-        tx: Any,
-        c: Any,
-    ) -> None:
+    def __init__(self, app: Pyjo_App_FastCGI, options: dict[str, Any], config: dict[str, Any], tx: Any, c: Any) -> None:
         self.app = app
         self.options = options
-        self.root = root
-        self.script = script
-        self.inactivity = inactivity
+        self.inactivity: float = config['inactivity']
+        self.root: str | None = config['root']
+        self.script: str | None = config['script']
+        self.sendfile: str | None = config['sendfile']
+        self.static: bool = config['static']
         self.waiting: tuple[str, float] | None = None
         self.c = c
         self.tx = tx
@@ -278,6 +311,12 @@ class _Call:
         # Not the header Proxy, whose HTTP_PROXY an application may take for the proxy of its own requests, as httpoxy
         # (CVE-2016-5385) does, as nginx and Apache leave it out
         params.pop('HTTP_PROXY', None)
+
+        # A file of the directory of the scripts, as try_files of nginx serves it
+        if (c := self.c) is not None and self.static and (root := self.root) is not None:
+            if (file := _file(root, params['PATH_INFO'])) is not None:
+                self.done = True
+                return c.helpers.reply.file(file)
 
         env = self.app.env
 
@@ -393,6 +432,8 @@ class _Call:
         if not self.started:
             self.started = True
             self._waited()
+            if self._sendfile():
+                return
             _status(res, self.headers)
             if ended:
                 self.done = True
@@ -495,6 +536,24 @@ class _Call:
         if len(body):
             self.pending.append(body)
 
+    # The file of the header X-Sendfile of the application, in the directory of the files that it may reply with
+    def _sendfile(self) -> bool:
+        # The directory of sendfile, or the one of the files that static replies with
+        directory = self.sendfile if self.sendfile is not None else self.root if self.static else None
+        if (c := self.c) is None or directory is None or (headers := self.headers) is None:
+            return False
+        if (value := next((value for name, value in headers if name.lower() == 'x-sendfile'), None)) is None:
+            return False
+        self.done = True
+        self._stop()
+        if (file := _inside(directory, value)) is None:
+            self.app.log.error(f'FastCGI application sent the file "{value}", which is not in "{directory}"')
+            c.helpers.reply.not_found()
+            return True
+        _status(self.tx.res, [(name, value) for name, value in headers if name.lower() not in _SENT])
+        c.helpers.reply.file(file)
+        return True
+
     # The inactivity timeout of the connection of the client again, once the response starts
     def _waited(self) -> None:
         if (waiting := self.waiting) is not None:
@@ -534,7 +593,7 @@ def _extra(tx: Any) -> dict[str, str]:
 # The options of the connection to the location of the application, and the parameters of its query
 def _location(url: Any) -> tuple[dict[str, Any], dict[str, str]]:
     url = Pyjo.URL.new(str(url))
-    names = ('connect_timeout', 'document_root', 'inactivity_timeout', 'script')
+    names = ('connect_timeout', 'document_root', 'inactivity_timeout', 'script', 'sendfile', 'static')
     query = {name: value for name in names if (value := url.query.param(name)) is not None}
     if (proto := url.protocol) == 'fcgi+unix':
         return {'path': url.host}, query
@@ -553,6 +612,27 @@ def _seconds(value: float | None, query: str | None, default: float) -> float:
         return float(query)
     except ValueError:
         raise Pyjo.Exception.new(f'Invalid FastCGI timeout "{query}"') from None
+
+
+# A file of the directory for a path that names no script and no directory, as try_files of nginx takes it
+def _file(root: str, path: str) -> str | None:
+    if not path or path.endswith('/') or _names_script(path) or '..' in path.split('/'):
+        return None
+    return _inside(root, os.fsdecode(path.lstrip('/').encode('latin-1')))
+
+
+# A flag of the query of the location, as the listen locations of Pyjo.Server.Daemon have them
+def _flag(value: str | None) -> bool:
+    return value is not None and value not in ('', '0')
+
+
+# A file in a directory, also once its symbolic links are resolved, so that no link leads out of it
+def _inside(directory: str, path: str) -> str | None:
+    base = os.path.realpath(directory)
+    file = os.path.realpath(os.path.join(base, path))
+    if os.path.commonpath([base, file]) != base or not os.path.isfile(file):
+        return None
+    return file
 
 
 # A path that names a script of PHP
