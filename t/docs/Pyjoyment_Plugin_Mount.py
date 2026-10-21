@@ -1,4 +1,6 @@
+import Pyjo.App.FastCGI
 import Pyjo.File
+import Pyjo.Server.Daemon
 import Pyjo.Test.Pyjo
 import Pyjoyment
 import Pyjoyment.Plugin.Mount
@@ -6,6 +8,7 @@ import Pyjoyment.Routes.Route
 
 from Pyjo.Test import *
 
+import re
 import sys
 
 
@@ -118,6 +121,30 @@ with subtest('Synopsis'):
     app = application()
     app.plugin('Mount', {'/starlette': 'mystarlette:app'})
     Pyjo.Test.Pyjo.new(app).get_ok('/starlette').content_is('Hello from mystarlette!')
+
+    # FastCGI application, as PHP on php-fpm, by its location, which the FastCGI server of Pyjo answers here
+    php = application()
+    php.routes.get('/').to(cb=lambda c: c.render(text='Hello from FastCGI!'))
+    daemon = Pyjo.Server.Daemon.new(app=php, listen=['fcgi://127.0.0.1'], silent=True).start()
+    app = application()
+    route = app.plugin('Mount', {'/php': f'fcgi://127.0.0.1:{daemon.ports()[0]}'})
+    ok(isinstance(route.pattern.defaults['app'], Pyjo.App.FastCGI.object), 'FastCGI application')
+    Pyjo.Test.Pyjo.new(app).get_ok('/php').content_is('Hello from FastCGI!')
+    route = app.plugin('Mount', {'/php': 'fcgi+unix://%2Frun%2Fphp%2Ffpm.sock'})
+    is_ok(route.pattern.defaults['app'].url, 'fcgi+unix://%2Frun%2Fphp%2Ffpm.sock', 'location')
+    route = app.plugin('Mount', {'/blog': 'fcgi://127.0.0.1:9000?document_root=%2Fvar%2Fwww&script=index.php'})
+    like_ok(route.pattern.defaults['app'].url, r'\?document_root=%2Fvar%2Fwww&script=index\.php$', 'with its query')
+    daemon.close()
+
+    # A regular expression of the whole path, whose group path is the rest of
+    # the path for the application, and whose other named groups are captures
+    app = application()
+    app.plugin('Mount', {re.compile(r'/php(?P<path>/.*)?'): flask_app})
+    app.plugin('Mount', {re.compile(r'/(?P<user>\w+)/blog(?P<path>/.*)?'): flask_app})
+    t = Pyjo.Test.Pyjo.new(app)
+    t.get_ok('/php/foo').status_is(200).content_is('Hello from flask_app!')
+    t.get_ok('/phpx').status_is(404)
+    t.get_ok('/sri/blog').status_is(200).content_is('Hello from flask_app!')
 
 with subtest('register'):
     app = application()

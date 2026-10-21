@@ -222,6 +222,13 @@ with subtest('p'):
     res = p('http://example.com', {'Accept': '*/*'}, json={'a': 'b'})
     is_ok(res.code, 200, 'JSON')
 
+with subtest('q'):
+    regex = q(r'/phpinfo\.php')
+    ok(regex.fullmatch('/phpinfo.php'), 'regular expression')
+    regex = q(r'/php(?P<path>/.*)?')
+    is_ok(regex.fullmatch('/php/foo')['path'], '/foo', 'group path')
+    is_ok(one_liner('bool(q(r"\\d+").fullmatch("42"))').stdout, 'True\n', 'one-liner')
+
 with subtest('r'):
     python = r({'data': 'structure'})
     is_ok(python, "{'data': 'structure'}\n", 'dumped')

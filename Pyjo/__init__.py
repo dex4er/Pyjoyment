@@ -106,13 +106,15 @@ if TYPE_CHECKING:
     import Pyjo.URL
     import Pyjo.UserAgent
 
+    import re
+
 
 # Not in Mojolicious: a namespace package, as Python does not merge a regular package from every directory of sys.path
 __path__ = extend_path(__path__, __name__)
 
 # The functions of ojo, which the modules they use are imported for when they are called, so that a module of Pyjo
 # does not import them
-__all__ = ['a', 'b', 'c', 'd', 'f', 'g', 'h', 'j', 'l', 'n', 'o', 'p', 'r', 't', 'u', 'w', 'x']
+__all__ = ['a', 'b', 'c', 'd', 'f', 'g', 'h', 'j', 'l', 'n', 'o', 'p', 'q', 'r', 't', 'u', 'w', 'x']
 
 _agent: 'Pyjo.UserAgent.object | None' = None
 
@@ -318,6 +320,24 @@ def p(*args: Any, **kwargs: Any) -> 'Pyjo.Message.Response.object':
     return resulting :mod:`Pyjo.Message.Response` object.
     """
     return _ua().post(*args, **kwargs).result
+
+
+# Not in Mojolicious: a regular expression, as qr// of Perl makes it, which re.compile makes long in a one-liner
+def q(pattern: str, flags: int = 0) -> 're.Pattern[str]':
+    """::
+
+        regex = q(r'/phpinfo\\.php')
+        regex = q(r'/php(?P<path>/.*)?')
+
+    Compile a regular expression with :func:`re.compile`, as ``qr//`` does in
+    Perl, as the whole path that :mod:`Pyjoyment.Plugin.Mount` mounts an
+    application under. ::
+
+        $ python -m Pyjo 'bool(q(r"\\d+").fullmatch("42"))'
+    """
+    import re
+
+    return re.compile(pattern, flags)
 
 
 def r(*values: object) -> str:

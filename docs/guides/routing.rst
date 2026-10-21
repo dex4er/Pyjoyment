@@ -1121,6 +1121,70 @@ pace of the client, as the server-sent events of ``api.py`` do. A reactor
 without :mod:`asyncio`, as :mod:`Pyjo.Reactor.Poll`, runs only an application
 that awaits nothing but ``receive`` and ``send``.
 
+The path of a mount is a pattern of a route, which matches the beginning of
+the path of a request, as in Mojolicious, so that ``/legacy`` matches
+``/legacy.css`` and ``/legacyx`` too, which an application of another
+framework answers with ``404 Not Found``, as its ``SCRIPT_NAME`` or
+``root_path`` can only end with a slash. A regular expression matches the
+whole path instead, as the ones of PromQL do: its group ``path`` is the rest of
+the path for the application, and its other named groups are captures.
+:func:`Pyjo.q` makes one shorter than :func:`re.compile` does.
+
+.. code-block:: python
+
+    from Pyjo import q
+    from Pyjoyment.Lite import *
+
+    # Only /legacy and the paths under it
+    plugin('Mount', {q(r'/legacy(?P<path>/.*)?'): 'legacy:app'})
+
+    # The API of each user, whose name is a capture
+    plugin('Mount', {q(r'/(?P<user>\w+)/api(?P<path>/.*)?'): 'api:app'})
+
+    # Only one path
+    plugin('Mount', {q(r'/status\.json'): 'api:app'})
+
+A ``FastCGI`` application, as PHP on php-fpm, runs in a process of its own,
+which :mod:`Pyjo.App.FastCGI` connects to for each request, through the
+TCP/IP socket of ``fcgi://`` or the UNIX domain socket of ``fcgi+unix://``,
+the location that is mounted. Its query tells which script answers a path,
+without rules of rewriting:
+
+* ``script`` is the one script for every path, as the one entry of an
+  application that takes every path, as mod_rewrite sends them all to
+  ``index.php``;
+* ``document_root`` is the directory of the scripts, as a web server runs
+  them: the path up to its first part that ends with ``.php`` names the
+  script, and a path that ends with a slash names ``index.php``;
+* both together send every path that names no script of the directory to the
+  one script, as ``try_files`` of nginx does for WordPress;
+* ``static`` replies with the files of the directory for the paths that name
+  them, as the stylesheets and the images of WordPress, before the one
+  script, for an application on the same file system as Pyjoyment, and lets
+  the application reply with such a file by the header ``X-Sendfile``, which
+  ``sendfile`` allows for a directory of private files too.
+
+The paths are the ones that php-fpm sees, which may be in another container,
+so Pyjoyment does not look for the files.
+
+.. code-block:: python
+
+    # Every path to the one entry of the application
+    plugin('Mount', {'/app': 'fcgi://127.0.0.1:9000?script=/srv/app/public/index.php'})
+
+    # The scripts of a directory
+    plugin('Mount', {'/php': 'fcgi+unix://%2Frun%2Fphp%2Fphp-fpm.sock?document_root=/var/www/php'})
+
+    # WordPress: its scripts, its files, and its index.php for every other path
+    plugin('Mount', {'/blog': 'fcgi://127.0.0.1:9000?document_root=/var/www/wordpress&script=index.php&static=1'})
+
+The query also takes ``inactivity_timeout`` and ``connect_timeout``, in
+seconds, for an application that answers slowly, which the client waits for
+without the inactivity timeout of the server until the response starts. The
+attributes of :mod:`Pyjo.App.FastCGI` take the same, and more, as parameters
+of its own for the environment of each request. The page of
+:doc:`/examples` has PHP on php-fpm with the pool of php-fpm that runs it.
+
 Embed applications
 ~~~~~~~~~~~~~~~~~~
 

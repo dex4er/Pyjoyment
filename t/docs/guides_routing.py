@@ -16,6 +16,7 @@ EXAMPLES = curfile().dirname().dirname().sibling('docs', 'guides', 'routing')
 PLUGINS = [EXAMPLES.child(name).to_str() for name in ('werewolf', 'app_plugin')]
 sys.path[0:0] = PLUGINS
 
+import Pyjo.App.FastCGI  # noqa: E402
 import Pyjo.IOLoop  # noqa: E402
 import Pyjo.Test.Pyjo  # noqa: E402
 import Pyjoyment  # noqa: E402
@@ -24,6 +25,7 @@ import Pyjoyment.Plugin  # noqa: E402
 import Pyjoyment.Routes.Match  # noqa: E402
 import Pyjoyment.Routes.Pattern  # noqa: E402
 
+from Pyjo import q  # noqa: E402
 from Pyjo.Test import *  # noqa: E402
 
 
@@ -690,6 +692,50 @@ with subtest('Mount applications of other frameworks'):
             t.get_ok('/api/foo').status_is(200).json_is({'root_path': '/api', 'path': '/api/foo'})
             t.get_ok('/api/events').status_is(200).content_type_is('text/event-stream')
             t.content_is('data: 0\n\ndata: 1\n\ndata: 2\n\n')
+
+            # The beginning of the path, which an application of another framework answers with 404
+            t.get_ok('/legacy.css').status_is(404)
+            t.get_ok('/legacyx').status_is(404)
+
+        # A regular expression of the whole path
+        app = Pyjoyment.new()
+        app.log.level = 'fatal'
+
+        # Only /legacy and the paths under it
+        app.plugin('Mount', {q(r'/legacy(?P<path>/.*)?'): 'legacy:app'})
+
+        # The API of each user, whose name is a capture
+        app.plugin('Mount', {q(r'/(?P<user>\w+)/api(?P<path>/.*)?'): 'api:app'})
+
+        # Only one path
+        app.plugin('Mount', {q(r'/status\.json'): 'api:app'})
+
+        with Pyjo.Test.Pyjo.new(app) as t:
+            t.get_ok('/legacy/foo').status_is(200).content_is('Hello from WSGI at /legacy for /foo!')
+            t.get_ok('/legacyx').status_is(404)
+            t.get_ok('/sri/api/foo').status_is(200).json_is({'root_path': '/sri/api', 'path': '/sri/api/foo'})
+            t.get_ok('/status.json').status_is(200).json_is({'root_path': '/status.json', 'path': '/status.json'})
+            t.get_ok('/status.jsonx').status_is(404)
+
+        # FastCGI, as PHP on php-fpm
+        app = Pyjoyment.new()
+
+        # Every path to the one entry of the application
+        app.plugin('Mount', {'/app': 'fcgi://127.0.0.1:9000?script=/srv/app/public/index.php'})
+
+        # The scripts of a directory
+        app.plugin('Mount', {'/php': 'fcgi+unix://%2Frun%2Fphp%2Fphp-fpm.sock?document_root=/var/www/php'})
+
+        # WordPress: its scripts, its files, and its index.php for every other path
+        app.plugin(
+            'Mount', {'/blog': 'fcgi://127.0.0.1:9000?document_root=/var/www/wordpress&script=index.php&static=1'}
+        )
+
+        mounts = {str(route.pattern.unparsed): route.pattern.defaults['app'] for route in app.routes.children}
+        ok(all(isinstance(fcgi, Pyjo.App.FastCGI.object) for fcgi in mounts.values()), 'FastCGI applications')
+        like_ok(str(mounts['/app'].url), r'\?script=/srv/app/public/index\.php$', 'one script')
+        like_ok(str(mounts['/php'].url), r'^fcgi\+unix://.*\?document_root=/var/www/php$', 'directory')
+        like_ok(str(mounts['/blog'].url), r'document_root=/var/www/wordpress&script=index\.php&static=1$', 'WordPress')
 
 with subtest('Embed applications'):
     with application('embed_lite'):

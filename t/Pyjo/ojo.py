@@ -1,4 +1,5 @@
 import os
+import re
 
 
 # Left out from Mojolicious: MOJO_REACTOR, as the tests run on the reactor of Pyjo.Reactor.detect()
@@ -78,6 +79,14 @@ with subtest('Benchmark'):
 
 with subtest('Link'):
     is_ok(l('http://mojolicious.org/').path.to_str(), '/', 'right result')
+
+
+# Not in Mojolicious: q for a regular expression, as qr// of Perl
+with subtest('Regular expression'):
+    ok(q(r'/php(?P<path>/.*)?').fullmatch('/php/foo'), 'match')
+    is_ok(q(r'/php(?P<path>/.*)?').fullmatch('/php/foo')['path'], '/foo', 'right group')
+    ok(not q(r'/php').fullmatch('/phpx'), 'no match')
+    ok(q(r'hello', re.I).fullmatch('HeLLo'), 'flags')
 
 
 # Not in Mojolicious: b for bytes, next to u for characters

@@ -209,6 +209,10 @@ with subtest('Path of a route'):
         is_ok(t.tx.res.json('/PATH_INFO'), '/foo/bar/', 'right path')
         is_ok(t.tx.res.json('/QUERY_STRING'), 'x=1', 'right query')
 
+        # Not after a part of the path that does not end with a slash, which cannot be SCRIPT_NAME
+        t.get_ok('/prefixx').status_is(404)
+        t.get_ok('/prefix.json').status_is(404)
+
         # Escaped, as the bytes of the path
         t.get_ok('/prefix/a%20b/%E2%99%A5/%2F').status_is(200)
         is_ok(t.tx.res.json('/SCRIPT_NAME'), '/prefix', 'right script name')

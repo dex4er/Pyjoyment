@@ -333,6 +333,54 @@ def _mount(tx: Any, c: Any) -> tuple[str, str]:  # pyright: ignore[reportUnusedF
     return script, path
 
 
+# Not in Mojolicious: a route embeds an application of another framework at a part of the path that ends with a slash,
+# or at the whole path, as SCRIPT_NAME of CGI and WSGI and root_path of ASGI can only be, where /php of /phpx is not
+def _within(c: Any) -> bool:  # pyright: ignore[reportUnusedFunction]
+    return c is None or not (rest := c.stash().get('path')) or rest.startswith('/')
+
+
+# The environment of CGI for the request, as an application of another framework gets it: the path that a route embeds
+# the application under is SCRIPT_NAME, and the rest of it is PATH_INFO, as unescaped bytes in the characters 0-255
+def _cgi(tx: Any, c: Any) -> dict[str, str]:  # pyright: ignore[reportUnusedFunction]
+    req = tx.req
+    url = req.url
+    base = url.base
+    script, path = _mount(tx, c)
+
+    https = req.is_secure
+    env = {
+        'REQUEST_METHOD': req.method,
+        'SCRIPT_NAME': _bytes(script),
+        'PATH_INFO': _bytes(path),
+        'QUERY_STRING': url.query.to_str(),
+        'SERVER_NAME': base.host or tx.local_address or 'localhost',
+        'SERVER_PORT': str(base.port or tx.local_port or (443 if https else 80)),
+        'SERVER_PROTOCOL': f'HTTP/{req.version}',
+    }
+    if (address := tx.remote_address) is not None:
+        env['REMOTE_ADDR'] = address
+    if (port := tx.remote_port) is not None:
+        env['REMOTE_PORT'] = str(port)
+
+    # Headers, joined as CGI has them, and the length of the body, which is whole, as it has been read
+    headers = req.headers
+    for name in headers.names():
+        key = name.upper().replace('-', '_')
+        if key == 'CONTENT_TYPE':
+            env[key] = headers.header(name)
+        elif key not in ('CONTENT_LENGTH', 'TRANSFER_ENCODING'):
+            env[f'HTTP_{key}'] = ('; ' if key == 'COOKIE' else ', ').join(headers.every_header(name))
+    if size := req.content.body_size:
+        env['CONTENT_LENGTH'] = str(size)
+
+    return env
+
+
+# A path of CGI: the unescaped bytes as the characters 0-255
+def _bytes(path: str) -> str:
+    return Pyjo.Util.url_unescape(path.encode()).decode('latin-1')
+
+
 new = Pyjo_App.new
 object = Pyjo_App
 App = Pyjo_App

@@ -7,6 +7,12 @@ Pyjoyment is a port of [Mojolicious](https://mojolicious.org) to Python. The
 agent, servers, event loop), and the `Pyjoyment` package is reserved for the
 `Mojolicious::*` framework layer (routes, controllers, renderer, `Lite`).
 
+`Pyjo` does not import `Pyjoyment`. Where a module of `Pyjo`, as an adapter
+of another framework, needs what only the framework has, as the static files
+of `reply.file` or its exception page, it takes it from the controller that a
+route gives it, as `c.helpers.reply.file`, and goes without it when it runs
+on its own.
+
 The code was written against Mojo 6.x. The project is being revived: the
 target is Mojolicious 9 on Python 3.12+, with asyncio as the only I/O core.
 The plan, its order and its progress live in GitHub Issues, starting from the
@@ -227,7 +233,9 @@ port 0 instead, which `ports()` gives.
   other frameworks, as Flask and Starlette, with `Pyjoyment.Plugin.Mount`, and
   an application of Pyjoyment on WSGI or on ASGI in one of `Pyjoyment.Lite`,
   as the examples `mount_wsgi_inception.py` and `mount_asgi_inception.py` do,
-  on the WSGI and the ASGI servers. The servers and
+  on the WSGI and the ASGI servers, and PHP on php-fpm with
+  `Pyjo.App.FastCGI`, which `setup-php` installs in CI, and without which the
+  test is skipped. The servers and
   the frameworks are in the dependency group `servers`, not in
   `dependencies`; without it, the tests are skipped.
 - `t/lib/` holds helpers shared by the tests. Run on their own, they skip with
@@ -508,7 +516,9 @@ one of Mojolicious, which `Pyjoyment.HelloWorld` ports), `Pyjo.App.WSGI` (the
 application of Pyjo that runs a WSGI application, inspired by
 `Mojolicious::Plugin::MountPSGI` of CPAN, the reverse of `Pyjo.Server.WSGI`),
 `Pyjo.App.ASGI` (the application of Pyjo that runs an ASGI application, the
-reverse of `Pyjo.Server.ASGI`),
+reverse of `Pyjo.Server.ASGI`), `Pyjo.App.FastCGI` (the application of Pyjo
+that runs a FastCGI application, as PHP on php-fpm, through a connection to
+it, the reverse of `Pyjo.Server.FastCGI`),
 `Pyjo.Server.Lambda`
 and `Pyjoyment.Command.lambda` (the server and the command of the event
 functions of AWS Lambda, inspired by `Pyjo.Server.WSGI` and its command),
