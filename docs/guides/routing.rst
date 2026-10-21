@@ -1076,6 +1076,51 @@ applications under a domain and/or prefix.
 
     app.start()
 
+Mount applications of other frameworks
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+:mod:`Pyjoyment.Plugin.Mount` mounts the applications of other Python
+frameworks too, so that they run next to the routes of an application of
+:mod:`Pyjoyment`, in the same process and on the same server: a ``WSGI``
+application, as one of Flask, which :mod:`Pyjo.App.WSGI` runs, and an
+``ASGI`` application, as one of Starlette, whose ``__call__`` is a coroutine
+function, which :mod:`Pyjo.App.ASGI` runs. The application is the object
+itself, or the name of its module and its attribute, as the ``WSGI`` and
+``ASGI`` servers take it.
+
+.. literalinclude:: routing/frameworks/myapp.py
+    :language: python
+    :caption: myapp.py
+
+.. literalinclude:: routing/frameworks/legacy.py
+    :language: python
+    :caption: legacy.py
+
+.. literalinclude:: routing/frameworks/api.py
+    :language: python
+    :caption: api.py
+
+The path that an application is mounted under is its ``SCRIPT_NAME`` of
+``WSGI``, or its ``root_path`` of ``ASGI``, with which its ``path`` begins, so
+the URLs that the application builds, as with ``url_for`` of Flask or
+Starlette, have the prefix of the mount.
+
+A ``WSGI`` application blocks, and it runs in the event loop, which waits for
+it as for any other blocking operation. The pre-forking and the pre-threading
+servers run it in their workers at the same time, best with few connections
+for each worker.
+
+.. code-block:: sh
+
+    $ python myapp.py prefork -w 8 -c 1
+
+An ``ASGI`` application runs as a coroutine of the event loop: with
+:mod:`Pyjo.Reactor.Asyncio`, the default reactor, a task of :mod:`asyncio`,
+which can await anything of :mod:`asyncio`, and whose responses stream at the
+pace of the client, as the server-sent events of ``api.py`` do. A reactor
+without :mod:`asyncio`, as :mod:`Pyjo.Reactor.Poll`, runs only an application
+that awaits nothing but ``receive`` and ``send``.
+
 Embed applications
 ~~~~~~~~~~~~~~~~~~
 
