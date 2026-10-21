@@ -361,4 +361,29 @@ with subtest('Response given later'):
     res[2].close()
     os.environ.pop('PYJO_HELLO', None)
 
+    # In the event loop that runs already, empty chunks until the response is there, and start_response before the content
+    started = []
+    chunks = []
+    bodies = []
+
+    def inside(loop):
+        if not bodies:
+            bodies.append(wsgi_app(env, lambda status, headers, exc_info=None: started.append((status, dict(headers)))))
+            chunks.append(len(started))
+        try:
+            chunks.append(next(bodies[0]))
+            loop.timer(0, inside)
+        except StopIteration:
+            bodies[0].close()
+            loop.stop()
+
+    Pyjo.IOLoop.next_tick(inside)
+    Pyjo.IOLoop.start()
+    is_ok(chunks[0], 0, 'no response yet')
+    is_ok(chunks[1], b'', 'empty chunk before the response')
+    is_ok(started[0][0], '200 OK', 'right status')
+    is_ok(started[0][1]['Content-Length'], '12', 'right "Content-Length" value')
+    is_ok(b''.join(chunks[1:]), b'Hello later!', 'right content')
+    os.environ.pop('PYJO_HELLO', None)
+
 done_testing()

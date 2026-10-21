@@ -59,7 +59,11 @@ Pyjo.Server.WSGI - WSGI server
 
 The response can be given later than the ``request`` event, and its content
 later than the response, as the event loop of :mod:`Pyjo.IOLoop` runs while
-the server waits for them, since ``WSGI`` is synchronous. The request is read
+the server waits for them, since ``WSGI`` is synchronous. In the event loop
+that runs already, as in an application of :mod:`Pyjo` that runs the ``WSGI``
+application with :mod:`Pyjo.App.WSGI`, the chunks of the body are empty until
+the response and its content are there, and ``start_response`` is called
+before the first chunk of the content. The request is read
 from the environment of :pep:`3333` with ``read``, a body of unknown length
 when the server sets ``wsgi.input_terminated``, as for a chunked request. The
 response goes without the hop-by-hop headers that :pep:`3333` forbids, so
@@ -98,9 +102,11 @@ Classes
 """
 
 import Pyjo.Content.Single
+import Pyjo.Exception
 import Pyjo.IOLoop
 import Pyjo.Server
 import Pyjo.Transaction
+import Pyjo.Transaction.HTTP
 
 from Pyjo.Util import url_escape
 
@@ -129,6 +135,38 @@ class Pyjo_Server_WSGI(Pyjo.Server.object):
         Run ``WSGI``: the status, the headers and the body of the response,
         whose ``close`` finishes the transaction.
         """
+        tx, resumed = self._request(environ)
+        while not resumed:
+            _one_tick()
+        return self._response(tx)
+
+    # Renamed from Mojolicious: to_psgi_app
+    def to_wsgi_app(self) -> WSGIApplication:
+        """::
+
+            app = wsgi.to_wsgi_app()
+
+        Turn :mod:`Pyjoyment` application into ``WSGI`` application.
+        """
+        # Preload application and wrap it
+        self.app.server(self)
+
+        def application(environ: WSGIEnvironment, start_response: StartResponse) -> Iterable[bytes]:
+            # Not in Mojolicious: in the event loop that runs already, which cannot run for the server, the response is
+            # given when it is there, with empty chunks of the body before it
+            # TODO: the event loop of an ASGI server, which Pyjo.Server.ASGI runs without the reactor, with Pyjo.App.ASGI
+            if Pyjo.IOLoop.is_running():
+                tx, resumed = self._request(environ)
+                return _Later(self, tx, resumed, start_response)
+
+            status, headers, body = self.run(environ)
+            start_response(status, headers)
+            return body
+
+        return application
+
+    # The transaction of the request, whose response has been given once the list is not empty
+    def _request(self, environ: WSGIEnvironment) -> tuple[Pyjo.Transaction.HTTP.object, list[bool]]:
         env = _environ(environ)
         wsgi_input = environ.get('wsgi.input')
 
@@ -162,17 +200,18 @@ class Pyjo_Server_WSGI(Pyjo.Server.object):
 
         # Unlike Mojolicious: a response given later than the request event, as the one of an application that a route
         # embeds, is waited for while the event loop runs, where Mojo takes the response at the end of the event
-        resumed = False
+        resumed: list[bool] = []
 
         def resume(tx: Pyjo.Transaction.object) -> None:
-            nonlocal resumed
-            resumed = True
+            resumed.append(True)
 
         tx.once('resume', resume)
         self.emit('request', tx)
-        while not resumed:
-            Pyjo.IOLoop.one_tick()
+        return tx, resumed
 
+    def _response(
+        self, tx: Pyjo.Transaction.HTTP.object, wait: bool = True
+    ) -> tuple[str, list[tuple[str, str]], '_IO']:
         # Response headers
         res = tx.res.fix_headers()
         # Unlike Mojolicious: without the hop-by-hop headers that PEP 3333 forbids, so chunked content goes without its
@@ -182,32 +221,15 @@ class Pyjo_Server_WSGI(Pyjo.Server.object):
         # WSGI response
         # Unlike Mojolicious: the status of WSGI has its reason phrase
         status = f'{res.code or 404} {res.message or res.default_message()}'
-        return status, headers, _IO(tx, tx.is_empty, res.content.is_chunked)
-
-    # Renamed from Mojolicious: to_psgi_app
-    def to_wsgi_app(self) -> WSGIApplication:
-        """::
-
-            app = wsgi.to_wsgi_app()
-
-        Turn :mod:`Pyjoyment` application into ``WSGI`` application.
-        """
-        # Preload application and wrap it
-        self.app.server(self)
-
-        def application(environ: WSGIEnvironment, start_response: StartResponse) -> Iterable[bytes]:
-            status, headers, body = self.run(environ)
-            start_response(status, headers)
-            return body
-
-        return application
+        return status, headers, _IO(tx, tx.is_empty, res.content.is_chunked, wait)
 
 
 # The body of the response, which the server iterates and closes
 class _IO(Iterator[bytes]):
-    def __init__(self, tx: Pyjo.Transaction.object, empty: bool, chunked: bool) -> None:
+    def __init__(self, tx: Pyjo.Transaction.object, empty: bool, chunked: bool, wait: bool = True) -> None:
         self._tx = tx
         self._empty = empty
+        self._wait = wait
         self._offset = 0
         # Not in Mojolicious: chunked content without its framing
         self._unchunk = _Unchunk() if chunked else None
@@ -223,10 +245,12 @@ class _IO(Iterator[bytes]):
 
         while True:
             # Not in Mojolicious: no content yet, so the event loop runs once before it tries again, where Mojo
-            # returns an empty chunk for the server to try again
+            # returns an empty chunk for the server to try again, as it does in the event loop that runs already
             chunk = self._tx.res.get_body_chunk(self._offset)
             if chunk is None:
-                Pyjo.IOLoop.one_tick()
+                if not self._wait:
+                    return b''
+                _one_tick()
                 continue
 
             # End of content
@@ -242,6 +266,50 @@ class _IO(Iterator[bytes]):
     # Finish transaction
     def close(self) -> None:
         self._tx.closed()
+
+
+# Not in Mojolicious: the body of a response given in the event loop that runs already, whose chunks are empty until the
+# response is there, which start_response gets before the first chunk of its content
+class _Later(Iterator[bytes]):
+    def __init__(
+        self,
+        server: Pyjo_Server_WSGI,
+        tx: Pyjo.Transaction.HTTP.object,
+        resumed: list[bool],
+        start_response: StartResponse,
+    ) -> None:
+        self._body: _IO | None = None
+        self._resumed = resumed
+        self._server = server
+        self._start_response = start_response
+        self._tx = tx
+
+    def __iter__(self) -> Self:
+        return self
+
+    def __next__(self) -> bytes:
+        if (body := self._body) is None:
+            if not self._resumed:
+                return b''
+            status, headers, body = self._server._response(self._tx, wait=False)  # pyright: ignore[reportPrivateUsage]
+            self._start_response(status, headers)
+            self._body = body
+        return next(body)
+
+    def close(self) -> None:
+        if (body := self._body) is not None:
+            body.close()
+        else:
+            self._tx.closed()
+
+
+# Not in Mojolicious: the event loop runs once while the server waits for the response, but not from inside itself, as
+# in an application of Pyjo that runs the WSGI application, where the asyncio reactor would return at once, and another
+# reactor would run the callbacks of other connections in the middle of the call of the application
+def _one_tick() -> None:
+    if Pyjo.IOLoop.is_running():
+        raise Pyjo.Exception.new('Response cannot be waited for while the event loop is running')
+    Pyjo.IOLoop.one_tick()
 
 
 # Chunked content without its framing, as in Pyjo.Server.ASGI
