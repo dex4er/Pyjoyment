@@ -291,7 +291,8 @@ with subtest('spawn'):
 
         # The output of a program, and its exit code
         with contextlib.redirect_stdout(io.StringIO()) as stdout:
-            child = Pyjo.IOLoop.spawn([sys.executable, '-c', 'print("total 0")'])
+            # One write of the whole line, as print writes the end of the line apart when the output is not buffered
+            child = Pyjo.IOLoop.spawn([sys.executable, '-c', 'import sys; sys.stdout.write("total 0\\n")'])
             child.stdout.on('read', lambda stream, chunk: print(chunk))
             child.on('close', lambda child, code, signal: print(f'Exited with {code}'))
             child.on('close', lambda child, code, signal: Pyjo.IOLoop.stop())

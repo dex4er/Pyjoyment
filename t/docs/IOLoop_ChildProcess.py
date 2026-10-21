@@ -13,8 +13,9 @@ from contextlib import redirect_stdout
 if os.name == 'nt':
     plan(skip_all='child processes need pipes that the reactor watches, which Windows does not have')
 
-# The programs of the examples, as Python, which every system of the tests has
-LS = [sys.executable, '-c', 'print("total 0")']
+# The programs of the examples, as Python, which every system of the tests has, with one write of the whole line, as
+# print writes the end of the line apart when the output is not buffered
+LS = [sys.executable, '-c', 'import sys; sys.stdout.write("total 0\\n")']
 SORT = [sys.executable, '-c', 'import sys; sys.stdout.write("".join(sorted(sys.stdin)))']
 
 

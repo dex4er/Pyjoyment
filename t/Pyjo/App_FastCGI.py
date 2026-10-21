@@ -398,12 +398,12 @@ with subtest('X-Sendfile'):
         Pyjo.IOLoop.remove(id)
 
     # A regular expression of the whole path of the file, once its symbolic links are resolved
-    real = os.path.realpath(private.to_str())
+    real = re.escape(os.path.realpath(private.to_str()) + os.sep)
     url, requests, id = sendfile(private.child('file.bin').to_str())
-    with Pyjo.App.FastCGI.new(url=url, sendfile=re.compile(re.escape(real) + r'/[^/]+\.bin')) as fcgi:
+    with Pyjo.App.FastCGI.new(url=url, sendfile=re.compile(real + r'[^/\\]+\.bin')) as fcgi:
         t = Pyjo.Test.Pyjo.new(application(fcgi, '/dl'))
         t.get_ok('/dl/file').status_is(200).content_is('0123456789')
-    with Pyjo.App.FastCGI.new(url=url, sendfile=[root.to_str(), re.compile(re.escape(real) + r'/[^/]+\.txt')]) as fcgi:
+    with Pyjo.App.FastCGI.new(url=url, sendfile=[root.to_str(), re.compile(real + r'[^/\\]+\.txt')]) as fcgi:
         fcgi.log.level = 'fatal'
         t = Pyjo.Test.Pyjo.new(application(fcgi, '/dl'))
         with fcgi.log.capture('error') as messages:
