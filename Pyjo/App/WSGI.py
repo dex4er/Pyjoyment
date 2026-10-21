@@ -35,13 +35,17 @@ The part of the path that a route embeds the application under is
 ``PATH_INFO``. The body of the request is ``wsgi.input``, of the length of
 ``CONTENT_LENGTH``, also when the request was chunked.
 
-A ``WSGI`` application blocks, so it runs in a pool of :attr:`threads`, and the
-event loop goes on meanwhile. A response that the application has given whole
-is written with its ``Content-Length``. Another one is written as the
-application gives it, each chunk once the one before has been written, with the
-chunked transfer encoding when the application does not give its
-``Content-Length``. The threads are stopped before a fork, and the next request
-starts them again.
+A ``WSGI`` application blocks, and it runs in the event loop, which waits for
+it, so that the workers of :mod:`Pyjo.Server.Prefork` and
+:mod:`Pyjo.Server.Prethread` serve it at the same time, as for any blocking
+operation, with
+:attr:`~Pyjo.Server.Daemon.Pyjo_Server_Daemon.max_clients` as low as ``1``. A
+response that the application has given whole is written with its
+``Content-Length``. Another one is written as the application gives it, each
+chunk in a tick of the event loop once the one before has been written, and
+after an empty chunk, which the application gives while it has none yet, in the
+next cycle of the event loop, with the chunked transfer encoding when the
+application does not give its ``Content-Length``.
 
 An exception of the application before its response starts is a response
 ``500``, the exception page of :mod:`Pyjoyment` in a route that embeds it, and
@@ -70,19 +74,14 @@ Classes
 import Pyjo.App
 import Pyjo.Exception
 import Pyjo.IOLoop
-import Pyjo.Promise
 import Pyjo.Transaction
-import Pyjo.Util
 
 from Pyjo.Util import url_unescape
 
-import concurrent.futures
 import io
-import os
 import sys
 import threading
 import traceback
-import weakref
 import wsgiref.util
 
 from collections.abc import Callable, Iterable, Iterator
@@ -100,7 +99,6 @@ class Pyjo_App_WSGI(Pyjo.App.object):
         """::
 
             app = Pyjo.App.WSGI.new(app=application)
-            app = Pyjo.App.WSGI.new(app=application, threads=10)
 
         Construct a new :mod:`Pyjo.App.WSGI` object.
         """
@@ -113,31 +111,7 @@ class Pyjo_App_WSGI(Pyjo.App.object):
         The ``WSGI`` application to run.
         """
 
-        self.threads = 4
-        """::
-
-            threads = app.threads
-            app.threads = 10
-
-        Maximum number of threads that run the application at the same time,
-        defaults to ``4``.
-        """
-
-        self._executor: concurrent.futures.ThreadPoolExecutor | None = None
         super().__init__(attrs, **kwargs)
-        _apps.add(self)
-
-    def close(self) -> None:
-        """::
-
-            app.close()
-
-        Stop the threads, after the calls of the application that they run,
-        and close the connections and the servers of
-        :attr:`~Pyjo.App.Pyjo_App.ua`, as the end of a ``with`` block does.
-        """
-        _shutdown(self)
-        super().close()
 
     def handler(self, tx: Any) -> None:
         """::
@@ -158,43 +132,8 @@ class Pyjo_App_WSGI(Pyjo.App.object):
             c.render_later()
         _Call(self, application, tx, c).start()
 
-    def _pool(self) -> concurrent.futures.ThreadPoolExecutor:
-        with _lock:
-            if (executor := self._executor) is None:
-                executor = self._executor = concurrent.futures.ThreadPoolExecutor(
-                    max_workers=self.threads, thread_name_prefix='Pyjo.App.WSGI'
-                )
-        return executor
 
-    def _submit[T](self, fn: Callable[..., T], *args: Any) -> Pyjo.Promise.object:
-        return Pyjo.Promise.new(self._pool().submit(fn, *args))
-
-
-# The applications whose threads are stopped before a fork, as a process with threads may deadlock in its child, which
-# Python warns about, and the child would have a pool without its threads; the next request starts the pool again
-_apps: 'weakref.WeakSet[Pyjo_App_WSGI]' = weakref.WeakSet()
-_lock = threading.Lock()
-
-
-def _before_fork() -> None:
-    if any([_shutdown(app) for app in list(_apps)]):
-        Pyjo.Util._threads_joined()  # pyright: ignore[reportPrivateUsage]
-
-
-def _shutdown(app: Pyjo_App_WSGI) -> bool:
-    with _lock:
-        executor, app._executor = app._executor, None  # pyright: ignore[reportPrivateUsage]
-    if executor is None:
-        return False
-    executor.shutdown(wait=True)
-    return True
-
-
-if hasattr(os, 'register_at_fork'):
-    os.register_at_fork(before=_before_fork)
-
-
-# A call of the application, whose response is written on the event loop, while the application runs in a thread
+# A call of the application, whose response is written as the application gives it
 class _Call:
     def __init__(self, app: Pyjo_App_WSGI, application: WSGIApplication, tx: Any, c: Any) -> None:
         self.app = app
@@ -209,15 +148,17 @@ class _Call:
 
     def start(self) -> None:
         self.tx.on('finish', self._finish)
-        self._submit(self.response.start, self.application, _environ(self.tx, self.c)).then(self._headers).catch(
-            self._error
-        )
+        try:
+            self._step(self.response.start(self.application, _environ(self.tx, self.c)))
+        except Exception as e:
+            self._error(e)
 
-    # The body is closed in a thread, without the event loop, which may not run again, as at the end of the program, so
-    # the thread logs what fails
     def _close(self) -> None:
         self.done = True
-        self.app._pool().submit(self.response.close).add_done_callback(self._failed)  # pyright: ignore[reportPrivateUsage]
+        try:
+            self.response.close()
+        except Exception as e:
+            self.app.log.error(f'WSGI application failed to close: {_message(e)}')
 
     # End of the response
     def _end(self) -> None:
@@ -251,17 +192,13 @@ class _Call:
         res.body = b'Internal Server Error'
         self.tx.resume()
 
-    def _failed(self, future: concurrent.futures.Future[None]) -> None:
-        if (e := future.exception()) is not None:
-            self.app.log.error(f'WSGI application failed to close: {_message(e)}')
-
     # The end of the transaction, also when the connection is gone before the end of the response
     def _finish(self, *args: Any) -> None:
         self.closed = True
         if not self.busy and not self.done:
             self._close()
 
-    def _headers(self, chunks: list[bytes] | None = None) -> None:
+    def _headers(self, chunks: list[bytes] | None) -> None:
         response = self.response
         if response.status is None:
             raise Pyjo.Exception.new('WSGI application did not call start_response')
@@ -286,23 +223,18 @@ class _Call:
         if self.tx.is_empty:
             self._close()
             return self._end()
-        self._write(chunks or [])
+        self._step(chunks)
 
-    def _more(self, chunks: list[bytes] | None = None) -> None:
-        self.busy = False
-        if self.closed:
-            return self._close()
-        if chunks is not None:
-            return self._write(chunks)
-
-        self.done = True
-        self._end()
-
-    def _next(self, *args: Any) -> None:
-        if self.closed:
-            return self._close()
+    # A body without a chunk yet tries again after the events of the next cycle of the event loop
+    def _later(self) -> None:
         self.busy = True
-        self._submit(self.response.next).then(self._more).catch(self._error)
+        Pyjo.IOLoop.timer(0, self._tick)
+
+    # The next chunks of the body once the chunk before has been written, in the next tick of the event loop, so that the
+    # application is not called in the middle of what the server does
+    def _next(self, *args: Any) -> None:
+        self.busy = True
+        Pyjo.IOLoop.next_tick(self._tick)
 
     def _rendered(self) -> None:
         if (c := self.c) is not None:
@@ -310,8 +242,31 @@ class _Call:
         else:
             self.tx.resume()
 
-    def _submit(self, fn: Callable[..., Any], *args: Any) -> Pyjo.Promise.object:
-        return self.app._submit(fn, *args)  # pyright: ignore[reportPrivateUsage]
+    # What the application has given: the chunks of the body, none yet, or the end of the body
+    def _step(self, chunks: list[bytes] | None) -> None:
+        response = self.response
+        if not response.started:
+            if response.status is None and response.iterator is not None and chunks is not None and not len(chunks):
+                return self._later()
+            return self._headers(chunks)
+
+        if chunks is None:
+            self.done = True
+            return self._end()
+        if not len(chunks):
+            return self._later()
+        self._write(chunks)
+
+    def _tick(self, *args: Any) -> None:
+        self.busy = False
+        if self.closed:
+            if not self.done:
+                self._close()
+            return
+        try:
+            self._step(self.response.next())
+        except Exception as e:
+            self._error(e)
 
     def _write(self, chunks: list[bytes]) -> None:
         content = self.tx.res.content
@@ -319,7 +274,7 @@ class _Call:
         self._rendered()
 
 
-# What the application gives in its thread: the status and the headers of start_response, the chunks of the body, and
+# What the application gives: the status and the headers of start_response, the chunks of the body, and
 # the iterator of the rest of the body
 class _Response:
     def __init__(self) -> None:
@@ -334,15 +289,14 @@ class _Response:
         if callable(close := getattr(self.result, 'close', None)):
             close()
 
-    # The chunks of the body up to its first one that is not empty, as the application may call start_response when its
-    # body is iterated, or none at the end of the body
+    # The chunks of the next chunk of the body, with what the write of start_response has written, none yet for an empty
+    # one, as the application may call start_response when its body is iterated, or none at the end of the body
     def next(self) -> list[bytes] | None:
         if (iterator := self.iterator) is None:
             return None
         try:
-            while not len(chunk := next(iterator)):
-                pass
-            chunks = self.written + [bytes(chunk)]
+            chunk = next(iterator)
+            chunks = self.written + ([bytes(chunk)] if len(chunk) else [])
         except StopIteration:
             self.iterator = None
             self.close()
@@ -353,7 +307,7 @@ class _Response:
         self.written = []
         return chunks if len(chunks) or self.iterator is not None else None
 
-    def start(self, application: WSGIApplication, environ: WSGIEnvironment) -> list[bytes]:
+    def start(self, application: WSGIApplication, environ: WSGIEnvironment) -> list[bytes] | None:
         result = self.result = application(environ, self.start_response)
 
         # A body in a list is whole
@@ -368,7 +322,7 @@ class _Response:
         except BaseException:
             self.close()
             raise
-        return self.next() or []
+        return self.next()
 
     def start_response(
         self, status: str, headers: list[tuple[str, str]], exc_info: Any = None
@@ -388,7 +342,7 @@ class _Response:
         self.written.append(bytes(data))
 
 
-# The body of the request, read in the thread of the application
+# The body of the request, which the application reads
 class _Input(io.RawIOBase):
     def __init__(self, content: Any) -> None:
         self._content = content
@@ -445,7 +399,8 @@ def _environ(tx: Any, c: Any) -> WSGIEnvironment:
         'wsgi.url_scheme': 'https' if https else 'http',
         'wsgi.input': io.BufferedReader(_Input(req.content)),
         'wsgi.errors': sys.stderr,
-        'wsgi.multithread': True,
+        # The workers of Pyjo.Server.Prethread, which share the application, are the threads other than the main one
+        'wsgi.multithread': threading.current_thread() is not threading.main_thread(),
         'wsgi.multiprocess': False,
         'wsgi.run_once': False,
         'wsgi.input_terminated': True,

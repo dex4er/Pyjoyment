@@ -16,7 +16,6 @@ import re
 import sys
 import threading
 import time
-import warnings
 import wsgiref.util
 
 from wsgiref.validate import validator
@@ -213,6 +212,35 @@ with subtest('Under a WSGI server'):
         is_ok(env['QUERY_STRING'], 'x=1', 'right query')
 
 
+with subtest('Pyjoyment on WSGI'):
+    # An application of Pyjoyment as the WSGI application, whose response and content come in later ticks of the event
+    # loop, which runs already
+    inner = Pyjoyment.new()
+    inner.log.level = 'fatal'
+
+    @inner.routes.get('/later')
+    def later(c):
+        c.render_later()
+        Pyjo.IOLoop.timer(0.01, lambda loop: c.render(text='Hello later!'))
+
+    @inner.routes.get('/chunks')
+    def chunks(c):
+        def write(n):
+            if n < 3:
+                Pyjo.IOLoop.timer(0.01, lambda loop: c.write_chunk(f'{n}'.encode(), lambda c: write(n + 1)))
+            else:
+                c.finish()
+
+        write(0)
+
+    with Pyjo.App.WSGI.new(app=Pyjo.Server.WSGI.new(app=inner).to_wsgi_app()) as wsgi:
+        t = Pyjo.Test.Pyjo.new(application(wsgi))
+        t.get_ok('/prefix/later').status_is(200).content_is('Hello later!')
+        is_ok(t.tx.res.headers.content_length, '12', 'right "Content-Length" value')
+        t.get_ok('/prefix/chunks').status_is(200).content_is('012')
+        t.get_ok('/prefix/missing').status_is(404)
+
+
 # A list, without the validator, whose iterator would hide it
 def whole(environ, start_response):
     start_response('201 Created', [('Content-Type', 'text/plain'), ('X-Foo', 'a'), ('X-Foo', 'b')])
@@ -397,35 +425,5 @@ with subtest('Closed body'):
         t = Pyjo.Test.Pyjo.new(app)
         t.get_ok('/').status_is(200).content_is('Hello!')
         ok(wait(closed), 'body closed')
-
-with subtest('Threads'):
-    barrier = threading.Barrier(2, timeout=5)
-
-    def together(environ, start_response):
-        barrier.wait()
-        start_response('200 OK', [('Content-Type', 'text/plain')])
-        return [environ['PATH_INFO'].encode()]
-
-    with Pyjo.App.WSGI.new(app=together, threads=2) as app:
-        is_ok(app.threads, 2, 'right number of threads')
-        t = Pyjo.Test.Pyjo.new(app)
-        results = result(Pyjo.Promise.all(t.ua.get_p('/a'), t.ua.get_p('/b')))
-        is_deeply_ok([tx[0].res.body for tx in results], [b'/a', b'/b'], 'both requests at the same time')
-
-with subtest('Fork'):
-    if not hasattr(os, 'fork'):
-        skip('fork not supported', 1)
-    else:
-        with Pyjo.App.WSGI.new(app=whole) as app:
-            t = Pyjo.Test.Pyjo.new(app)
-            t.get_ok('/').status_is(201)
-
-            # The threads are stopped before the fork, and the next request starts them again
-            with warnings.catch_warnings(record=True) as caught:
-                warnings.simplefilter('always')
-                forked = result(Pyjo.IOLoop.subprocess().run_p(lambda subprocess: 'forked'))
-            is_ok(forked, 'forked', 'right result')
-            is_deeply_ok([str(w.message) for w in caught if 'fork' in str(w.message)], [], 'no warning of a fork')
-            t.get_ok('/').status_is(201).content_is('Hello World!')
 
 done_testing()

@@ -51,7 +51,7 @@ embedded = route.pattern.defaults['app']
 plugin('Mount', {'/module': 'wsgi_hello:app'})
 plugin('Mount', {'/attribute': 'wsgi_hello:handlers.app'})
 plugin('Mount', {'example.com/host': hello})
-plugin('Mount', {'/wrapped': Pyjo.App.WSGI.new(app=hello, threads=1)})
+plugin('Mount', {'/wrapped': Pyjo.App.WSGI.new(app=hello)})
 plugin('Mount', {'/myapp': MyApp.new()})
 
 t = Pyjo.Test.Pyjo.new()

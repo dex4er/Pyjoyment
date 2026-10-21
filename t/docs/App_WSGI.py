@@ -38,26 +38,10 @@ with subtest('app'):
     app.app = hello
     ok(app.app is hello, 'application')
 
-with subtest('threads'):
-    app = Pyjo.App.WSGI.new()
-    threads = app.threads
-    is_ok(threads, 4, 'default')
-    app.threads = 10
-    is_ok(app.threads, 10, 'threads')
-
 with subtest('new'):
     application = hello
     app = Pyjo.App.WSGI.new(app=application)
     ok(app.app is hello, 'application')
-    app = Pyjo.App.WSGI.new(app=application, threads=10)
-    is_ok(app.threads, 10, 'threads')
-
-with subtest('close'):
-    app = Pyjo.App.WSGI.new(app=hello)
-    Pyjo.Test.Pyjo.new(app).get_ok('/').status_is(200)
-    app.close()
-    Pyjo.Test.Pyjo.new(app).get_ok('/').status_is(200).content_is('Hello World!')
-    app.close()
 
 with subtest('handler'):
     app = Pyjo.App.WSGI.new(app=hello)
