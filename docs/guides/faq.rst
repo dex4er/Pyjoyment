@@ -78,7 +78,8 @@ How well is Windows supported by Pyjoyment?
 Windows is not officially supported by :mod:`Pyjoyment`, even though we try
 to keep the distribution installable. There may be serious security and/or
 reliability issues. Some of the more advanced features, such as
-:meth:`subprocesses <Pyjo.IOLoop.Pyjo_IOLoop.subprocess>` and the
+:meth:`subprocesses <Pyjo.IOLoop.Pyjo_IOLoop.subprocess>`,
+:meth:`child processes <Pyjo.IOLoop.Pyjo_IOLoop.spawn>` and the
 :mod:`Hot <Pyjo.Server.Hot>` web server, will also require the use of the
 `Windows Subsystem for Linux <https://learn.microsoft.com/windows/wsl/>`_.
 The port to Windows is followed in `its issue
