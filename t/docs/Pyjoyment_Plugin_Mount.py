@@ -6,6 +6,8 @@ import Pyjoyment.Routes.Route
 
 from Pyjo.Test import *
 
+import sys
+
 
 # The applications of the examples are scripts in a temporary directory, as a test writes nothing into t
 tmp = Pyjo.File.tempdir()
@@ -16,6 +18,24 @@ get('/', lambda c: c.render(text=c.stash('message') or 'Hello from myapp!'))
 
 app.start()
 """)
+
+# The module of the WSGI application, in the temporary directory, which sys.path has
+tmp.child('myflask.py').spew(b"""\
+def app(environ, start_response):
+    start_response('200 OK', [('Content-Type', 'text/plain')])
+    return [b'Hello from myflask!']
+""")
+sys.path.insert(0, tmp.to_str())
+
+
+def flask_app(environ, start_response):
+    start_response('200 OK', [('Content-Type', 'text/plain')])
+    return [b'Hello from flask_app!']
+
+
+class MyApp(Pyjoyment.object):
+    def startup(self):
+        self.routes.get('/').to(cb=lambda c: c.render(text='Hello from MyApp!'))
 
 
 def application():
@@ -64,10 +84,27 @@ with subtest('Synopsis'):
     t.get_ok('/myapp', {'Host': 'example.com'}).status_is(200).content_is('Hello from myapp!')
     t.get_ok('/myapp', {'Host': 'example.org'}).status_is(404)
 
+    # Application object
+    app = application()
+    app.plugin('Mount', {'/prefix': MyApp.new()})
+    Pyjo.Test.Pyjo.new(app).get_ok('/prefix').content_is('Hello from MyApp!')
+
+    # WSGI application, as an object or as the name of its module and its
+    # attribute
+    app = application()
+    app.plugin('Mount', {'/flask': flask_app})
+    Pyjo.Test.Pyjo.new(app).get_ok('/flask').content_is('Hello from flask_app!')
+    app = application()
+    app.plugin('Mount', {'/flask': 'myflask:app'})
+    Pyjo.Test.Pyjo.new(app).get_ok('/flask').content_is('Hello from myflask!')
+
 with subtest('register'):
     app = application()
     route = Pyjoyment.Plugin.Mount.new().register(app, {'/foo': myapp.to_str()})
     ok(isinstance(route, Pyjoyment.Routes.Route.object), 'route')
     Pyjo.Test.Pyjo.new(app).get_ok('/foo').content_is('Hello from myapp!')
+    app = application()
+    route = Pyjoyment.Plugin.Mount.new().register(app, {'/foo': 'myflask:app'})
+    Pyjo.Test.Pyjo.new(app).get_ok('/foo').content_is('Hello from myflask!')
 
 done_testing()

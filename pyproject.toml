@@ -68,6 +68,7 @@ Issues = "https://github.com/dex4er/Pyjoyment/issues"
 [dependency-groups]
 servers = [
   "daphne>=4.2.3",
+  "flask>=3.1.3",
   "granian>=2.8.4",
   "gunicorn>=26.2.0; sys_platform != 'win32'",
   "hypercorn>=0.18.0",
@@ -231,7 +232,8 @@ typeCheckingMode = "off"
 strict = [
   "Pyjo/__init__.py",
   "Pyjo/__main__.py",
-  "Pyjo/App.py",
+  "Pyjo/App/__init__.py",
+  "Pyjo/App/WSGI.py",
   "Pyjo/Asset/__init__.py",
   "Pyjo/Asset/File.py",
   "Pyjo/Asset/Memory.py",

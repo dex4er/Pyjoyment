@@ -19,6 +19,27 @@ A WebSocket service used by the template to extract the title from a website:
        :code: python
 
 
+Applications of other frameworks
+--------------------------------
+
+A WSGI application, in a file of its own, under a path of an application of
+``Pyjoyment.Lite``:
+
+    .. include:: ../examples/pyjoyment/mount_wsgi.py
+       :code: python
+
+The WSGI application, which also runs on its own, on the WSGI server of the
+standard library:
+
+    .. include:: ../examples/pyjoyment/hello_wsgi.py
+       :code: python
+
+An application of Pyjoyment as the WSGI application, in the same file:
+
+    .. include:: ../examples/pyjoyment/mount_wsgi_inception.py
+       :code: python
+
+
 Servers
 -------
 

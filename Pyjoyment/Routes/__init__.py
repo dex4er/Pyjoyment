@@ -46,6 +46,7 @@ Ported from `Mojolicious::Routes <https://github.com/mojolicious/mojo/blob/v9.49
 of Mojolicious 9.49.
 """
 
+import Pyjo.App
 import Pyjo.Cache
 import Pyjo.Exception
 import Pyjo.Loader
@@ -335,8 +336,6 @@ class Pyjoyment_Routes(Pyjoyment_Routes_Route):
         return False
 
     def _controller(self, old: 'Pyjoyment.Controller.object', field: dict[str, Any], last: bool) -> bool:
-        import Pyjoyment
-
         # Load and instantiate controller/application
         new: Any = self._class(old, field)
         if not new:
@@ -346,7 +345,9 @@ class Pyjoyment_Routes(Pyjoyment_Routes_Route):
         controller = cast(type[Any], type(new))
         cls = f'{controller.__module__}.{controller.__qualname__}'
         log = old.helpers.log()
-        if isinstance(new, Pyjoyment.object):
+        # Unlike Mojolicious: any application of Pyjo, where Mojolicious embeds its own only, as Mojolicious 6 embedded
+        # any Mojo, so that a route embeds an application of another framework, which Pyjo.App.WSGI runs
+        if isinstance(new, Pyjo.App.object):
             log.trace(f'Routing to application "{cls}"')
 
             # Try to connect routes

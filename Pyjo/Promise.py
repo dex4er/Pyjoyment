@@ -157,6 +157,7 @@ import Pyjo.Reactor
 
 from Pyjo.Util import warn
 
+import atexit
 import builtins
 import concurrent.futures
 import functools
@@ -802,9 +803,11 @@ def _wait_future(promise: Pyjo_Promise, future: concurrent.futures.Future[Any]) 
     reactor = promise.ioloop.reactor
     reader, writer = socket.socketpair()
     reader.setblocking(False)
+    _pairs.update((reader, writer))
 
     def ready(reactor: Any, writable: bool) -> None:
         reactor.remove(reader)
+        _pairs.difference_update((reader, writer))
         reader.close()
         writer.close()
         if future.cancelled():
@@ -818,6 +821,18 @@ def _wait_future(promise: Pyjo_Promise, future: concurrent.futures.Future[Any]) 
 
     reactor.io(reader, ready).watch(reader, True, False)
     future.add_done_callback(lambda future: writer.send(b'\x00'))
+
+
+# The socket pairs of the futures that are not done when the program ends, after the threads of concurrent.futures, whose
+# event loop does not run again to see them done
+_pairs: set[socket.socket] = set()
+
+
+@atexit.register
+def _close_pairs() -> None:
+    for handle in list(_pairs):
+        handle.close()
+    _pairs.clear()
 
 
 # An awaitable in a coroutine, which the reactor runs

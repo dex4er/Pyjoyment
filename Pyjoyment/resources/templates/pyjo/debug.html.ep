@@ -7,7 +7,7 @@
 <html>
   <head>
     % title = 'Server Error' if stash('exception') else 'Page Not Found'
-    <title><%= title %> (<%= app().mode %> mode)</title>
+    <title><%= title %> (<%= c.app.mode %> mode)</title>
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="-1">
     %= favicon()
@@ -252,7 +252,7 @@
                       <th>Name</th>
                     </tr>
                   </thead>
-                  % for child in app().routes.children {
+                  % for child in c.app.routes.children {
                     %= walk(walk, child, 0)
                   % }
                 </table>
@@ -289,14 +289,14 @@
                   % }
                   %# Left out from Mojolicious: the codename, as Pyjoyment has none
                   %= kv('Pyjoyment', version)
-                  %= kv('Home', app().home)
-                  %= kv('Template paths', dumper(app().renderer.paths))
-                  %= kv('Template classes', dumper(app().renderer.classes))
-                  %= kv('Static paths', dumper(app().static.paths))
-                  %= kv('Static classes', dumper(app().static.classes))
+                  %= kv('Home', c.app.home)
+                  %= kv('Template paths', dumper(c.app.renderer.paths))
+                  %= kv('Template classes', dumper(c.app.renderer.classes))
+                  %= kv('Static paths', dumper(c.app.static.paths))
+                  %= kv('Static classes', dumper(c.app.static.classes))
                   %= kv('Include', dumper(sys.path))
-                  %= kv('Config', dumper(app().config()))
-                  %= kv('Moniker', app().moniker)
+                  %= kv('Config', dumper(c.app.config()))
+                  %= kv('Moniker', c.app.moniker)
                   %= kv('Name', sys.argv[0])
                   %= kv('Executable', sys.executable)
                   %= kv('PID', os.getpid())
@@ -307,13 +307,13 @@
             </div>
           </div>
           <div class="row">
-            % if app().log.history {
-                % log = ''.join(app().log.format(*entry) for entry in app().log.history)
+            % if c.app.log.history {
+                % log = ''.join(c.app.log.format(*entry) for entry in c.app.log.history)
                 <pre class="mojo-terminal"><code class="nohighlight"><%= log %></code></pre>
             % }
             % else {
               <div class="alert alert-warning wide" role="alert">
-                The application log appears to be empty, perhaps the log level <b><%= app().log.level %></b> is too
+                The application log appears to be empty, perhaps the log level <b><%= c.app.log.level %></b> is too
                 high?
               </div>
             % }

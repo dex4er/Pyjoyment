@@ -46,6 +46,17 @@ def request(wsgi, tx):
         Pyjo.IOLoop.timer(0.1, more)
         return tx.resume()
 
+    # Response given later
+    if path == '/delayed':
+
+        def later(loop):
+            tx.res.code = 200
+            tx.res.body = b'Hello later!'
+            tx.resume()
+
+        Pyjo.IOLoop.timer(0.1, later)
+        return
+
     # Dynamic content
     if path == '/dynamic':
         tx.res.code = 200
@@ -124,6 +135,9 @@ with tempfile.TemporaryDirectory() as dir:
 
                 status, headers, body = server.request('GET', '/later')
                 is_ok(body, b'Hello World!', 'content given later')
+
+                status, headers, body = server.request('GET', '/delayed')
+                is_ok(body, b'Hello later!', 'response given later')
 
                 status, headers, body = server.request('GET', '/dynamic')
                 is_ok(body, b'Hello World!', 'dynamic content')

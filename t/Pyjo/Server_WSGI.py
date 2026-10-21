@@ -1,3 +1,4 @@
+import Pyjo.IOLoop
 import Pyjo.Server.WSGI
 import Pyjoyment.Command.wsgi
 
@@ -50,6 +51,13 @@ def params(c):
 def proxy(c):
     reverse = ':'.join(part for part in (c.tx.remote_address, c.req.url.to_abs().protocol) if part)
     c.render(text=reverse)
+
+
+# Not in Mojolicious: a response given later than the request event
+@get('/later')
+def later(c):
+    c.render_later()
+    Pyjo.IOLoop.timer(0.1, lambda loop: c.render(text='Hello later!'))
 
 
 with subtest('Reverse proxy'):
@@ -327,5 +335,55 @@ with subtest('Trusted proxies (no REMOTE_ADDR)'):
     is_ok(os.environ.get('PYJO_HELLO'), None, 'finish event has not been emitted')
     res[2].close()
     is_ok(os.environ.pop('PYJO_HELLO', None), 'world', 'finish event has been emitted')
+
+# Not in Mojolicious: a response given later than the request event, which the server waits for
+with subtest('Response given later'):
+    env = {
+        'CONTENT_LENGTH': '0',
+        'PATH_INFO': '/later',
+        'REQUEST_METHOD': 'GET',
+        'SCRIPT_NAME': '/',
+        'HTTP_HOST': 'localhost:8080',
+        'SERVER_PROTOCOL': 'HTTP/1.1',
+        'wsgi.version': (1, 0),
+        'wsgi.url_scheme': 'http',
+        'wsgi.input': stdin,
+        'wsgi.errors': sys.stderr,
+        'wsgi.multithread': False,
+        'wsgi.multiprocess': True,
+        'wsgi.run_once': False,
+    }
+    wsgi_app = Pyjoyment.Command.wsgi.new(app=app).run()
+    res = call(wsgi_app, env)
+    is_ok(res[0], '200 OK', 'right status')
+    is_ok(dict(res[1])['Content-Length'], '12', 'right "Content-Length" value')
+    is_ok(b''.join(res[2]), b'Hello later!', 'right content')
+    res[2].close()
+    os.environ.pop('PYJO_HELLO', None)
+
+    # In the event loop that runs already, empty chunks until the response is there, and start_response before the content
+    started = []
+    chunks = []
+    bodies = []
+
+    def inside(loop):
+        if not bodies:
+            bodies.append(wsgi_app(env, lambda status, headers, exc_info=None: started.append((status, dict(headers)))))
+            chunks.append(len(started))
+        try:
+            chunks.append(next(bodies[0]))
+            loop.timer(0, inside)
+        except StopIteration:
+            bodies[0].close()
+            loop.stop()
+
+    Pyjo.IOLoop.next_tick(inside)
+    Pyjo.IOLoop.start()
+    is_ok(chunks[0], 0, 'no response yet')
+    is_ok(chunks[1], b'', 'empty chunk before the response')
+    is_ok(started[0][0], '200 OK', 'right status')
+    is_ok(started[0][1]['Content-Length'], '12', 'right "Content-Length" value')
+    is_ok(b''.join(chunks[1:]), b'Hello later!', 'right content')
+    os.environ.pop('PYJO_HELLO', None)
 
 done_testing()
