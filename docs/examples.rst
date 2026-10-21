@@ -34,6 +34,11 @@ standard library:
     .. include:: ../examples/pyjoyment/hello_wsgi.py
        :code: python
 
+An application of Pyjoyment as the WSGI application, in the same file:
+
+    .. include:: ../examples/pyjoyment/mount_wsgi_inception.py
+       :code: python
+
 
 Servers
 -------
