@@ -27,8 +27,9 @@ with subtest('new'):
 
     date = Pyjo.Date.new()
     isa_ok(date, Pyjo.Date.object, 'date')
+    before = int(time.time())
     date = Pyjo.Date.new(datetime.now(UTC))
-    ok(date.epoch >= int(time.time()), 'datetime')
+    ok(date.epoch >= before, 'datetime')
     date = Pyjo.Date.new('Sun Nov  6 08:49:37 1994')
     is_ok(date.epoch, 784111777, 'date.epoch')
 
@@ -64,8 +65,9 @@ with subtest('__str__'):
 with subtest('parse'):
     date = date.parse('Sun Nov  6 08:49:37 1994')
     is_ok(date.epoch, 784111777, 'date.epoch')
+    before = int(time.time())
     date = date.parse(datetime.now(UTC))
-    ok(date.epoch >= int(time.time()), 'datetime')
+    ok(date.epoch >= before, 'datetime')
     date = date.parse(datetime(1994, 11, 6, 8, 49, 37, 210000, tzinfo=UTC))
     is_ok(date.epoch, 784111777.21, 'datetime with microseconds')
 
