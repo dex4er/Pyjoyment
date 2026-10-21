@@ -233,6 +233,7 @@ This is the class hierarchy of the :mod:`Pyjoyment` distribution.
       - :mod:`Pyjo.Content.Single`
 
     - :mod:`Pyjo.IOLoop`
+    - :mod:`Pyjo.IOLoop.ChildProcess`
     - :mod:`Pyjo.IOLoop.Client`
     - :mod:`Pyjo.IOLoop.Datagram`
     - :mod:`Pyjo.IOLoop.Server`

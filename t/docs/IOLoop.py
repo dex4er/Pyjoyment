@@ -278,6 +278,26 @@ with subtest('singleton'):
     handle.close()
     peer.close()
 
+with subtest('spawn'):
+    import Pyjo.IOLoop.ChildProcess
+
+    if os.name == 'nt':
+        skip('child processes need pipes that the reactor watches', 3)
+    else:
+        loop = Pyjo.IOLoop.new()
+        child = loop.spawn([sys.executable, '-c', 'pass'], cwd='/')
+        isa_ok(child, Pyjo.IOLoop.ChildProcess.object, 'child process')
+        is_ok(child.reactor, loop.reactor, 'reactor of the loop')
+
+        # The output of a program, and its exit code
+        with contextlib.redirect_stdout(io.StringIO()) as stdout:
+            child = Pyjo.IOLoop.spawn([sys.executable, '-c', 'print("total 0")'])
+            child.stdout.on('read', lambda stream, chunk: print(chunk))
+            child.on('close', lambda child, code, signal: print(f'Exited with {code}'))
+            child.on('close', lambda child, code, signal: Pyjo.IOLoop.stop())
+            Pyjo.IOLoop.start()
+        is_ok(stdout.getvalue(), "b'total 0\\n'\nExited with 0\n", 'output and exit code')
+
 with subtest('start and stop'):
     Pyjo.IOLoop.timer(0.01, lambda loop: Pyjo.IOLoop.stop())
 

@@ -130,6 +130,7 @@ from typing import TYPE_CHECKING, Any, Concatenate, Self, overload
 
 
 if TYPE_CHECKING:
+    import Pyjo.IOLoop.ChildProcess
     import Pyjo.IOLoop.Subprocess
 
     from Pyjo.IOLoop.Subprocess import Child, Parent
@@ -628,6 +629,27 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
             _local.singleton = loop = Pyjo_IOLoop()
             return loop
 
+    def spawn(self, args: Any, **options: Any) -> 'Pyjo.IOLoop.ChildProcess.object':
+        """::
+
+            child = Pyjo.IOLoop.spawn(['ls', '-l'])
+            child = loop.spawn(['php-cgi', 'index.php'], cwd='/var/www')
+
+        Run a program with :mod:`Pyjo.IOLoop.ChildProcess` on the reactor of
+        the event loop, with the options of
+        :meth:`Pyjo.IOLoop.ChildProcess.Pyjo_IOLoop_ChildProcess.spawn`. ::
+
+            # The output of a program, and its exit code
+            child = Pyjo.IOLoop.spawn(['ls', '-l'])
+            child.stdout.on('read', lambda stream, chunk: print(chunk))
+            child.on('close', lambda child, code, signal: print(f'Exited with {code}'))
+        """
+        # Not in Mojolicious: child processes, inspired by child_process of Node.js, imported here, as
+        # Pyjo.IOLoop.ChildProcess uses Pyjo.IOLoop
+        import Pyjo.IOLoop.ChildProcess
+
+        return Pyjo.IOLoop.ChildProcess.new(reactor=self.reactor).spawn(args, **options)
+
     def start(self) -> None:
         """::
 
@@ -914,6 +936,7 @@ recurring = _shortcut(Pyjo_IOLoop.recurring)
 remove = _shortcut(Pyjo_IOLoop.remove)
 reset = _shortcut(Pyjo_IOLoop.reset)
 server = _shortcut(Pyjo_IOLoop.server)
+spawn = _shortcut(Pyjo_IOLoop.spawn)
 start = _shortcut(Pyjo_IOLoop.start)
 stop = _shortcut(Pyjo_IOLoop.stop)
 stop_gracefully = _shortcut(Pyjo_IOLoop.stop_gracefully)
