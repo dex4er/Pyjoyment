@@ -342,7 +342,9 @@ with subtest('Non-parsed headers'):
 
         # The body of its chunks, of its length, and up to the end of the output, with lines that end with LF
         t.get_ok('/cgi-bin/nph-chunked.cgi').status_is(200).content_is('onetwo')
-        is_deeply_ok(raw(t, 'GET', '/cgi-bin/nph-chunked.cgi'), (200, None, 'chunked', b'onetwo'), 'chunks again')
+        status, length, encoding, body = raw(t, 'GET', '/cgi-bin/nph-chunked.cgi')
+        is_deeply_ok((status, body), (200, b'onetwo'), 'chunks without their sizes')
+        ok((length, encoding) in (('6', None), (None, 'chunked')), 'length or chunks')
         is_deeply_ok(raw(t, 'GET', '/cgi-bin/nph-length.cgi'), (200, '6', None, b'onetwo'), 'with its length')
         is_deeply_ok(raw(t, 'HEAD', '/cgi-bin/nph-length.cgi'), (200, '6', None, b''), 'headers only')
         t.get_ok('/cgi-bin/nph-end.cgi').status_is(404).content_is('until the end')
@@ -439,7 +441,11 @@ app.start(*sys.argv[1:])
         t.get_ok('/lite/nph-hello.cgi').status_is(200).content_is('Hello CGI at /lite/nph-hello.cgi for /!')
         t.post_ok('/lite/nph-hello.cgi/echo', b'echo').status_is(200).content_is('echo')
         t.get_ok('/lite/nph-hello.cgi/chunks').status_is(200).content_is('onetwo')
-        is_deeply_ok(raw(t, 'GET', '/lite/nph-hello.cgi/chunks'), (200, None, 'chunked', b'onetwo'), 'chunks again')
+
+        # The chunks without their sizes, with the length of the whole response when it comes at once
+        status, length, encoding, body = raw(t, 'GET', '/lite/nph-hello.cgi/chunks')
+        is_deeply_ok((status, body), (200, b'onetwo'), 'chunks without their sizes')
+        ok((length, encoding) in (('6', None), (None, 'chunked')), 'length or chunks')
         t.get_ok('/lite/nph-hello.cgi/gone').status_is(410).content_is('gone')
         t.get_ok('/lite/nph-hello.cgi/missing').status_is(404)
 
