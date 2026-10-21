@@ -165,6 +165,7 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
 
     def _close_loop(self) -> None:
         if (loop := self._own) is not None:
+            _cancel(loop)
             _close(loop)
 
     # Not in Mojolicious: a loop of its own, which is closed with the reactor by weakref.finalize, which the garbage
@@ -174,6 +175,7 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
         loop = self._own = _new_event_loop()
         _OWN.add(loop)
         self._finalizer = weakref.finalize(self, _close, loop)
+        _register()
         return loop
 
     # Not in Mojolicious: the asyncio event loop
@@ -302,8 +304,10 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
             reactor.close()
 
         Close the event loop that the reactor made for itself, as the end of a
-        ``with`` block does; an event loop that it was given, or that was
-        running, is left to its owner.
+        ``with`` block does, after the tasks that are left in it are cancelled
+        and have ended, as :func:`asyncio.run` does, and as the end of the
+        program does; an event loop that it was given, or that was running, is
+        left to its owner.
         """
         self._close_loop()
 
@@ -731,10 +735,40 @@ def _close(loop: asyncio.AbstractEventLoop) -> None:
         loop.close()
 
 
-@atexit.register
+# Not in Mojolicious: the tasks that are left in a loop of its own, as a coroutine that waits for the next cycle of a loop
+# that has stopped, are cancelled and run to their end before the loop closes, as asyncio.run does, so that none is
+# destroyed while it is pending; not in another loop that runs, which cannot run this one, nor in the garbage collector
+def _cancel(loop: asyncio.AbstractEventLoop) -> None:
+    if loop.is_running() or loop.is_closed():
+        return
+    try:
+        asyncio.get_running_loop()
+        return
+    except RuntimeError:
+        pass
+    if tasks := [task for task in asyncio.all_tasks(loop) if not task.done()]:
+        for task in tasks:
+            task.cancel()
+        loop.run_until_complete(asyncio.gather(*tasks, return_exceptions=True))
+
+
 def _close_own() -> None:
     for loop in list(_OWN):
+        _cancel(loop)
         _close(loop)
+
+
+# Not in Mojolicious: the loops of their own are closed at the end of the program after their tasks, by a handler that is
+# registered after the first finalizer, so that it runs before the exit function of weakref.finalize, as atexit runs
+# the handlers in the reverse order, which would close the loops with their tasks pending
+_registered = False
+
+
+def _register() -> None:
+    global _registered
+    if not _registered:
+        _registered = True
+        atexit.register(_close_own)
 
 
 new = Pyjo_Reactor_Asyncio.new
