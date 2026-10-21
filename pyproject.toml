@@ -64,7 +64,8 @@ Source = "https://github.com/dex4er/Pyjoyment"
 Issues = "https://github.com/dex4er/Pyjoyment/issues"
 
 # Not dependencies of the package: the ASGI, WSGI and CGI servers that the tests in t/servers run Pyjo.Server.ASGI,
-# Pyjo.Server.WSGI, Pyjo.Server.CGI and the examples on, and a client of WebSocket for them
+# Pyjo.Server.WSGI, Pyjo.Server.CGI and the examples on, a client of WebSocket for them, and the frameworks, Flask and
+# Starlette, whose applications Pyjoyment.Plugin.Mount mounts
 [dependency-groups]
 servers = [
   "daphne>=4.2.3",
@@ -78,6 +79,7 @@ servers = [
   "waitress>=3.0.2",
   "websockets>=17.2",
   "werkzeug>=3.1.9",
+  "starlette>=1.9.0",
 ]
 # Not dependencies of the package: pytest, which the tests in t/Pyjo/Test_pytest_plugin.py run the plugin
 # Pyjo.Test.pytest_plugin with, and pytest-xdist, which runs the test scripts at the same time
@@ -233,6 +235,7 @@ strict = [
   "Pyjo/__init__.py",
   "Pyjo/__main__.py",
   "Pyjo/App/__init__.py",
+  "Pyjo/App/ASGI.py",
   "Pyjo/App/WSGI.py",
   "Pyjo/Asset/__init__.py",
   "Pyjo/Asset/File.py",

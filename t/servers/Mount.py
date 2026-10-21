@@ -14,10 +14,13 @@ import tempfile
 
 # The applications of other frameworks, which Pyjoyment.Plugin.Mount mounts, of the dependency group "servers": uv run
 # --only-group servers python -m Pyjo.Prove t/servers
-if missing := [m for m in ('flask', 'waitress') if not importlib.util.find_spec(m)]:
+if missing := [m for m in ('flask', 'starlette', 'waitress') if not importlib.util.find_spec(m)]:
     plan(skip_all=f'needs the dependency group "servers", without {", ".join(missing)}')
 
 import flask  # noqa: E402
+import starlette.applications  # noqa: E402
+import starlette.responses  # noqa: E402
+import starlette.routing  # noqa: E402
 
 
 # The servers in processes of their own
@@ -121,6 +124,57 @@ with subtest('Flask'):
     t.get_ok('/flask/stream').status_is(200).content_type_like(r'^text/plain').content_is('onetwo')
     t.get_ok('/flask/missing').status_is(404).content_like(r'Not Found')
     t.get_ok('/flask/fail').status_is(500).content_like(r'Internal Server Error')
+
+with subtest('Starlette'):
+
+    async def index(request):
+        return starlette.responses.PlainTextResponse(f'Hello from Starlette at {request.url_for("index").path}!')
+
+    async def name(request):
+        name = request.path_params['name']
+        return starlette.responses.JSONResponse({'name': name, 'url': str(request.url_for('name', name=name))})
+
+    async def echo(request):
+        return starlette.responses.PlainTextResponse(
+            f'{(await request.body()).decode()} and {request.query_params["x"]}'
+        )
+
+    async def redirect(request):
+        return starlette.responses.RedirectResponse(request.url_for('index').path)
+
+    async def stream(request):
+        async def body():
+            yield 'one'
+            yield 'two'
+
+        return starlette.responses.StreamingResponse(body(), media_type='text/plain')
+
+    async def fail(request):
+        raise RuntimeError('Something went wrong')
+
+    hello = starlette.applications.Starlette(
+        routes=[
+            starlette.routing.Route('/', index, name='index'),
+            starlette.routing.Route('/hello/{name}', name, name='name'),
+            starlette.routing.Route('/echo', echo, methods=['POST']),
+            starlette.routing.Route('/redirect', redirect),
+            starlette.routing.Route('/stream', stream),
+            starlette.routing.Route('/fail', fail),
+        ]
+    )
+
+    t = Pyjo.Test.Pyjo.new(application('/starlette', hello))
+    t.app.log.level = 'fatal'
+    t.get_ok('/').status_is(200).content_is('Hello from Pyjoyment!')
+    t.get_ok('/starlette/').status_is(200).content_is('Hello from Starlette at /starlette/!')
+    t.get_ok('/starlette/hello/%E2%99%A5').status_is(200).json_is('/name', '♥')
+    # Starlette does not escape a parameter of the path in url_for
+    t.json_like('/url', r'^http://127\.0\.0\.1:\d+/starlette/hello/♥$')
+    t.post_ok('/starlette/echo?x=1', b'Hello!').status_is(200).content_is('Hello! and 1')
+    t.get_ok('/starlette/redirect').status_is(307).header_is('Location', '/starlette/')
+    t.get_ok('/starlette/stream').status_is(200).content_type_like(r'^text/plain').content_is('onetwo')
+    t.get_ok('/starlette/missing').status_is(404).content_like(r'Not Found')
+    t.get_ok('/starlette/fail').status_is(500).content_like(r'Internal Server Error')
 
 with tempfile.TemporaryDirectory() as dir:
     shutil.copy(EXAMPLE, os.path.join(dir, 'inception.py'))
