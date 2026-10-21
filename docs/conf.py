@@ -73,8 +73,15 @@ def skip_alias(app, what, name, obj, skip, options):
     return True if found is obj else None
 
 
+# The attribute `__weakref__` that Python makes for a class without `__slots__`
+# is not an API of the class, but `:special-members:` without a list documents it
+def skip_weakref(app, what, name, obj, skip, options):
+    return True if name == '__weakref__' else None
+
+
 def setup(app):
     app.connect('autodoc-skip-member', skip_alias)
+    app.connect('autodoc-skip-member', skip_weakref)
 
 
 # The table of contents lists the pages, not the classes and functions that
