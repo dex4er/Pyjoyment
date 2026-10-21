@@ -175,7 +175,7 @@ jobs:
         with:
           version: 0.13.0 # datasource=github-releases depName=astral-sh/uv
 
-      # php-fpm, the FastCGI application that t/servers/Mount.py mounts
+      # php-fpm and php-cgi, the FastCGI and the CGI applications that t/servers/Mount.py mounts
       - name: Set up PHP
         uses: shivammathur/setup-php@2.40.0
         with:
@@ -183,12 +183,14 @@ jobs:
           coverage: none
           tools: none
 
-      # The test of PHP is skipped without php-fpm, so its absence fails here, and the log shows the version that runs it
-      - name: Check php-fpm
+      # The tests of PHP are skipped without php-fpm and php-cgi, so their absence fails here, and the log shows the
+      # versions that run them
+      - name: Check php-fpm and php-cgi
         shell: bash
         run: |-
           fpm="$(command -v php-fpm || ls /usr/sbin/php-fpm* | sort -r | head -n 1)"
           "$fpm" -v
+          php-cgi -v
 
       - name: Run tests on ASGI, WSGI, CGI and FastCGI servers
         shell: bash

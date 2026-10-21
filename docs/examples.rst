@@ -71,6 +71,21 @@ php-fpm:
     .. include:: ../examples/pyjoyment/php/php-fpm.conf
        :code: ini
 
+A CGI program of Python in the directory ``cgi-bin``, under a path of an
+application of ``Pyjoyment.Lite``, a process for each request:
+
+    .. include:: ../examples/pyjoyment/mount_cgi.py
+       :code: python
+
+    .. include:: ../examples/pyjoyment/cgi-bin/hello.py
+       :code: python
+
+PHP on php-cgi, with the scripts of the same directory as for php-fpm, a
+process of php-cgi for each request:
+
+    .. include:: ../examples/pyjoyment/mount_cgi_php.py
+       :code: python
+
 
 Servers
 -------
