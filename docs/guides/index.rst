@@ -201,6 +201,7 @@ This is the class hierarchy of the :mod:`Pyjoyment` distribution.
   - :mod:`Pyjo.App`
 
     - :mod:`Pyjo.App.ASGI`
+    - :mod:`Pyjo.App.FastCGI`
     - :mod:`Pyjo.App.WSGI`
     - :mod:`Pyjo.HelloWorld`
     - :mod:`Pyjoyment`

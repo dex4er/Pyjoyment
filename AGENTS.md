@@ -508,7 +508,9 @@ one of Mojolicious, which `Pyjoyment.HelloWorld` ports), `Pyjo.App.WSGI` (the
 application of Pyjo that runs a WSGI application, inspired by
 `Mojolicious::Plugin::MountPSGI` of CPAN, the reverse of `Pyjo.Server.WSGI`),
 `Pyjo.App.ASGI` (the application of Pyjo that runs an ASGI application, the
-reverse of `Pyjo.Server.ASGI`),
+reverse of `Pyjo.Server.ASGI`), `Pyjo.App.FastCGI` (the application of Pyjo
+that runs a FastCGI application, as PHP on php-fpm, through a connection to
+it, the reverse of `Pyjo.Server.FastCGI`),
 `Pyjo.Server.Lambda`
 and `Pyjoyment.Command.lambda` (the server and the command of the event
 functions of AWS Lambda, inspired by `Pyjo.Server.WSGI` and its command),

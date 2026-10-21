@@ -1,4 +1,6 @@
+import Pyjo.App.FastCGI
 import Pyjo.File
+import Pyjo.Server.Daemon
 import Pyjo.Test.Pyjo
 import Pyjoyment
 import Pyjoyment.Plugin.Mount
@@ -118,6 +120,18 @@ with subtest('Synopsis'):
     app = application()
     app.plugin('Mount', {'/starlette': 'mystarlette:app'})
     Pyjo.Test.Pyjo.new(app).get_ok('/starlette').content_is('Hello from mystarlette!')
+
+    # FastCGI application, as PHP on php-fpm, by its location, which the FastCGI server of Pyjo answers here
+    php = application()
+    php.routes.get('/').to(cb=lambda c: c.render(text='Hello from FastCGI!'))
+    daemon = Pyjo.Server.Daemon.new(app=php, listen=['fcgi://127.0.0.1'], silent=True).start()
+    app = application()
+    route = app.plugin('Mount', {'/php': f'fcgi://127.0.0.1:{daemon.ports()[0]}'})
+    ok(isinstance(route.pattern.defaults['app'], Pyjo.App.FastCGI.object), 'FastCGI application')
+    Pyjo.Test.Pyjo.new(app).get_ok('/php').content_is('Hello from FastCGI!')
+    route = app.plugin('Mount', {'/php': 'fcgi+unix://%2Frun%2Fphp%2Ffpm.sock'})
+    is_ok(route.pattern.defaults['app'].url, 'fcgi+unix://%2Frun%2Fphp%2Ffpm.sock', 'location')
+    daemon.close()
 
 with subtest('register'):
     app = application()

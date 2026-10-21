@@ -38,12 +38,18 @@ Pyjoyment.Plugin.Mount - Application mount plugin
     plugin('Mount', {'/starlette': starlette_app})
     plugin('Mount', {'/starlette': 'mystarlette:app'})
 
+    # FastCGI application, as PHP on php-fpm, by its location
+    plugin('Mount', {'/php': 'fcgi://127.0.0.1:9000'})
+    plugin('Mount', {'/php': 'fcgi+unix://%2Frun%2Fphp%2Ffpm.sock'})
+
 :mod:`Pyjoyment.Plugin.Mount` is a plugin that allows you to mount whole
 :mod:`Pyjoyment` applications, other applications of :mod:`Pyjo`, ``WSGI``
 applications, which :mod:`Pyjo.App.WSGI` runs, and ``ASGI`` applications,
 whose ``__call__`` is a coroutine function, which :mod:`Pyjo.App.ASGI` runs,
 as an application of :mod:`Pyjo` from a script, an object, or the name of a
-module and its attribute. An application that is not one of :mod:`Pyjoyment` gets the server
+module and its attribute, and ``FastCGI`` applications, which
+:mod:`Pyjo.App.FastCGI` connects to, by their location ``fcgi://`` or
+``fcgi+unix://``. An application that is not one of :mod:`Pyjoyment` gets the server
 that runs it with :meth:`~Pyjo.App.Pyjo_App.server` before the server starts,
 as the application that mounts it does.
 
@@ -67,6 +73,7 @@ Classes
 
 import Pyjo.App
 import Pyjo.App.ASGI
+import Pyjo.App.FastCGI
 import Pyjo.App.WSGI
 import Pyjo.Exception
 import Pyjo.Server
@@ -130,8 +137,11 @@ class Pyjoyment_Plugin_Mount(Pyjoyment.Plugin.object):
 
 
 # Not in Mojolicious: an application as an object, or as the name of a module and its attribute, as ASGI servers take
-# it, and an ASGI or a WSGI application, which Pyjo.App.ASGI or Pyjo.App.WSGI runs, where Mojolicious loads a script
+# it, an ASGI or a WSGI application, which Pyjo.App.ASGI or Pyjo.App.WSGI runs, and the location of a FastCGI
+# application, which Pyjo.App.FastCGI connects to, where Mojolicious loads a script
 def _load(value: Any) -> Pyjo.Server.Application:
+    if isinstance(value, str) and re.match(r'fcgi(\+unix)?://', value):
+        return Pyjo.App.FastCGI.new(url=value)
     if isinstance(value, str) and re.fullmatch(r'[\w.]+:[\w.]+', value) and not os.path.exists(value):
         module, _, name = value.partition(':')
         try:
