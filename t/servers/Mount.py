@@ -1,16 +1,21 @@
+import Pyjo.App.FastCGI
 import Pyjo.Reactor
 import Pyjo.Test.Pyjo
 import Pyjoyment
 
 from Pyjo.Test import *
+from Pyjo.Util import url_escape
 
+import glob
 import importlib
 import importlib.util
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
+import time
 
 
 # The applications of other frameworks, which Pyjoyment.Plugin.Mount mounts, of the dependency group "servers": uv run
@@ -32,6 +37,18 @@ Server = importlib.import_module('ServerProcess').Server
 # WSGI and the ASGI servers
 EXAMPLE = os.path.join(os.path.dirname(__file__), '..', '..', 'examples', 'pyjoyment', 'mount_wsgi_inception.py')
 EXAMPLE_ASGI = os.path.join(os.path.dirname(__file__), '..', '..', 'examples', 'pyjoyment', 'mount_asgi_inception.py')
+
+# The script of PHP of the example of php-fpm, which a FastCGI application runs, and php-fpm, as it is on PATH, as
+# Debian names it with its version, or as Homebrew installs it
+PHP = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'examples', 'pyjoyment', 'php', 'index.php'))
+PHP_FPM = shutil.which('php-fpm') or next(
+    (
+        path
+        for path in (*sorted(glob.glob('/usr/sbin/php-fpm*'), reverse=True), '/opt/homebrew/opt/php/sbin/php-fpm')
+        if os.access(path, os.X_OK)
+    ),
+    None,
+)
 PYTHON = sys.executable
 UWSGI = shutil.which('uwsgi', path=os.path.dirname(sys.executable))
 GUNICORN = [PYTHON, '-m', 'gunicorn', 'served:application', '--bind', '127.0.0.1:{port}']
@@ -190,6 +207,47 @@ with subtest('Starlette'):
     t.get_ok('/starlette/stream').status_is(200).content_type_like(r'^text/plain').content_is('onetwo')
     t.get_ok('/starlette/missing').status_is(404).content_like(r'Not Found')
     t.get_ok('/starlette/fail').status_is(500).content_like(r'Internal Server Error')
+
+with subtest('PHP on php-fpm'):
+    if PHP_FPM is None or sys.platform == 'win32':
+        skip('needs php-fpm', 1)
+    else:
+        with tempfile.TemporaryDirectory() as dir:
+            # A pool on a UNIX domain socket of the temporary directory, which takes no port
+            sock = os.path.join(dir, 'fpm.sock')
+            conf = os.path.join(dir, 'php-fpm.conf')
+            with open(conf, 'w') as file:
+                file.write(
+                    f'[global]\nerror_log = /dev/stderr\ndaemonize = no\n\n'
+                    f'[www]\nlisten = {sock}\npm = static\npm.max_children = 2\n'
+                )
+            with open(os.path.join(dir, 'php-fpm.log'), 'w+') as log:
+                fpm = subprocess.Popen([PHP_FPM, '-n', '-y', conf, '-F'], stdout=log, stderr=subprocess.STDOUT)
+                try:
+                    deadline = time.monotonic() + 10
+                    while not os.path.exists(sock) and fpm.poll() is None and time.monotonic() < deadline:
+                        time.sleep(0.05)
+
+                    location = f'fcgi+unix://{url_escape(sock, rb"^A-Za-z0-9\-._~")}'
+                    php = Pyjo.App.FastCGI.new(
+                        url=location, env={'SCRIPT_FILENAME': PHP, 'DOCUMENT_ROOT': os.path.dirname(PHP)}
+                    )
+                    t = Pyjo.Test.Pyjo.new(application('/php', php))
+                    t.get_ok('/php/foo/bar?x=1').status_is(200).content_type_like(r'^text/plain')
+                    t.content_is('Hello PHP at /php for /foo/bar (GET /php/foo/bar?x=1)!\n')
+                    t.header_like('X-Powered-By', r'^PHP/')
+                    t.get_ok('/php').status_is(200).content_is('Hello PHP at /php for / (GET /php)!\n')
+                    t.post_ok('/php/form', form={'a': '1'}).status_is(200)
+                    t.content_is('Hello PHP at /php for /form (POST /php/form)!\n')
+                    t.get_ok('/php/events').status_is(200).content_type_like(r'^text/event-stream')
+                    t.content_is('data: 0\n\ndata: 1\n\ndata: 2\n\n')
+                except Exception:
+                    log.seek(0)
+                    diag(log.read())
+                    raise
+                finally:
+                    fpm.terminate()
+                    fpm.wait(10)
 
 with tempfile.TemporaryDirectory() as dir:
     shutil.copy(EXAMPLE, os.path.join(dir, 'inception.py'))

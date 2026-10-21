@@ -227,7 +227,9 @@ port 0 instead, which `ports()` gives.
   other frameworks, as Flask and Starlette, with `Pyjoyment.Plugin.Mount`, and
   an application of Pyjoyment on WSGI or on ASGI in one of `Pyjoyment.Lite`,
   as the examples `mount_wsgi_inception.py` and `mount_asgi_inception.py` do,
-  on the WSGI and the ASGI servers. The servers and
+  on the WSGI and the ASGI servers, and PHP on php-fpm with
+  `Pyjo.App.FastCGI`, which `setup-php` installs in CI, and without which the
+  test is skipped. The servers and
   the frameworks are in the dependency group `servers`, not in
   `dependencies`; without it, the tests are skipped.
 - `t/lib/` holds helpers shared by the tests. Run on their own, they skip with

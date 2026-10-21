@@ -175,7 +175,15 @@ jobs:
         with:
           version: 0.13.0 # datasource=github-releases depName=astral-sh/uv
 
-      - name: Run tests on ASGI, WSGI and CGI servers
+      # php-fpm, the FastCGI application that t/servers/Mount.py mounts
+      - name: Set up PHP
+        uses: shivammathur/setup-php@2.40.0
+        with:
+          php-version: latest
+          coverage: none
+          tools: none
+
+      - name: Run tests on ASGI, WSGI, CGI and FastCGI servers
         shell: bash
         env:
           PYTHONDEVMODE: "1"
