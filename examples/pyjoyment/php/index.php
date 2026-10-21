@@ -1,5 +1,5 @@
 <?php
-// The script that php-fpm runs for every path under the mount, as a front controller does
+// The script of the directory, and of every path under the mount when it is the only one, as a front controller is
 if ($_SERVER['PATH_INFO'] === '/events') {
     header('Content-Type: text/event-stream');
     for ($n = 0; $n < 3; $n++) {

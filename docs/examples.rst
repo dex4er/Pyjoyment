@@ -56,12 +56,16 @@ An application of Pyjoyment as the ASGI application, in the same file:
        :code: python
 
 PHP on php-fpm, a FastCGI application, under a path of an application of
-``Pyjoyment.Lite``, with the script that php-fpm runs and its pool:
+``Pyjoyment.Lite``, with the scripts of its directory and the pool of
+php-fpm:
 
     .. include:: ../examples/pyjoyment/mount_fastcgi_php.py
        :code: python
 
     .. include:: ../examples/pyjoyment/php/index.php
+       :code: php
+
+    .. include:: ../examples/pyjoyment/php/phpinfo.php
        :code: php
 
     .. include:: ../examples/pyjoyment/php/php-fpm.conf

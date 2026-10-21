@@ -241,6 +241,15 @@ with subtest('PHP on php-fpm'):
                     t.content_is('Hello PHP at /php for /form (POST /php/form)!\n')
                     t.get_ok('/php/events').status_is(200).content_type_like(r'^text/event-stream')
                     t.content_is('data: 0\n\ndata: 1\n\ndata: 2\n\n')
+
+                    # The scripts of the directory of the example
+                    php = Pyjo.App.FastCGI.new(url=location, document_root=os.path.dirname(PHP))
+                    t = Pyjo.Test.Pyjo.new(application('/php', php))
+                    t.get_ok('/php/').status_is(200).content_is('Hello PHP at /php/index.php for  (GET /php/)!\n')
+                    t.get_ok('/php/index.php/events').status_is(200).content_type_like(r'^text/event-stream')
+                    t.content_is('data: 0\n\ndata: 1\n\ndata: 2\n\n')
+                    t.get_ok('/php/phpinfo.php').status_is(200).content_like(r'<title>PHP [\d.]+ - phpinfo\(\)</title>')
+                    t.get_ok('/php/missing.php').status_is(404)
                 except Exception:
                     log.seek(0)
                     diag(log.read())
