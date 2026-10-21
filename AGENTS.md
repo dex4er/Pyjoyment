@@ -209,9 +209,10 @@ port 0 instead, which `ports()` gives.
   `Pyjo.Server.CGI` on real ASGI, WSGI and CGI servers, and the examples of
   the quick start in `README.md`, each in a process of its own, as the ASGI server of the tests in `t/lib` and the validator of
   `wsgiref` cannot show how a server differs, and mounts the applications of
-  other frameworks, as Flask, with `Pyjoyment.Plugin.Mount`, and an
-  application of Pyjoyment on WSGI in one of `Pyjoyment.Lite`, as the example
-  `mount_wsgi_inception.py` does, on the WSGI servers. The servers and
+  other frameworks, as Flask and Starlette, with `Pyjoyment.Plugin.Mount`, and
+  an application of Pyjoyment on WSGI or on ASGI in one of `Pyjoyment.Lite`,
+  as the examples `mount_wsgi_inception.py` and `mount_asgi_inception.py` do,
+  on the WSGI and the ASGI servers. The servers and
   the frameworks are in the dependency group `servers`, not in
   `dependencies`; without it, the tests are skipped.
 - `t/lib/` holds helpers shared by the tests. Run on their own, they skip with

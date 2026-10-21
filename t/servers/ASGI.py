@@ -1,3 +1,5 @@
+import Pyjo.Reactor
+
 from Pyjo.Test import *
 
 import importlib.util
@@ -12,6 +14,11 @@ if missing := [
     m for m in ('daphne', 'granian', 'hypercorn', 'uvicorn', 'websockets') if not importlib.util.find_spec(m)
 ]:
     plan(skip_all=f'needs the dependency group "servers", without {", ".join(missing)}')
+
+# Pyjo.Server.ASGI needs a reactor that runs in the loop of the ASGI server, which Pyjo.Reactor.Poll, with a loop of its
+# own, does not
+if Pyjo.Reactor.object.detect() != 'Pyjo.Reactor.Asyncio':
+    plan(skip_all='needs Pyjo.Reactor.Asyncio, which runs in the loop of the ASGI server')
 
 from websockets.exceptions import ConnectionClosed, InvalidStatus  # noqa: E402
 

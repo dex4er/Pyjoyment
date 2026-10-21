@@ -1,3 +1,4 @@
+import Pyjo.Reactor
 import Pyjo.Test.Pyjo
 import Pyjoyment
 
@@ -27,8 +28,10 @@ import starlette.routing  # noqa: E402
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
 Server = importlib.import_module('ServerProcess').Server
 
-# The example of an application of Pyjoyment on WSGI, mounted in an application of Pyjoyment.Lite, on the WSGI servers
+# The examples of an application of Pyjoyment on WSGI and on ASGI, mounted in an application of Pyjoyment.Lite, on the
+# WSGI and the ASGI servers
 EXAMPLE = os.path.join(os.path.dirname(__file__), '..', '..', 'examples', 'pyjoyment', 'mount_wsgi_inception.py')
+EXAMPLE_ASGI = os.path.join(os.path.dirname(__file__), '..', '..', 'examples', 'pyjoyment', 'mount_asgi_inception.py')
 PYTHON = sys.executable
 UWSGI = shutil.which('uwsgi', path=os.path.dirname(sys.executable))
 GUNICORN = [PYTHON, '-m', 'gunicorn', 'served:application', '--bind', '127.0.0.1:{port}']
@@ -70,6 +73,18 @@ SERVERS = [
         ],
         [True, False, False],
     ),
+]
+LOCAL = ['--host', '127.0.0.1', '--port', '{port}']
+ASGI_SERVERS = [
+    ('uvicorn', 'uvicorn', [PYTHON, '-m', 'uvicorn', 'served_asgi:application', '--log-level', 'warning', *LOCAL]),
+    (
+        'uvicorn on uvloop',
+        'uvloop',
+        [PYTHON, '-m', 'uvicorn', 'served_asgi:application', '--loop', 'uvloop', '--log-level', 'warning', *LOCAL],
+    ),
+    ('Hypercorn', 'hypercorn', [PYTHON, '-m', 'hypercorn', 'served_asgi:application', '--bind', '127.0.0.1:{port}']),
+    ('Daphne', 'daphne', [PYTHON, '-m', 'daphne', '-b', '127.0.0.1', '-p', '{port}', 'served_asgi:application']),
+    ('Granian', 'granian', [PYTHON, '-m', 'granian', '--interface', 'asgi', 'served_asgi:application', *LOCAL]),
 ]
 
 
@@ -226,6 +241,76 @@ app.plugin('Mount', {'/flags': flags})
                 status, headers, body = server.request('GET', '/flags')
                 is_ok(status, 200, 'right status')
                 is_deeply_ok(json.loads(body), model, 'flags of the WSGI server')
+            except Exception:
+                diag(server.output())
+                raise
+            finally:
+                server.close()
+
+    shutil.copy(EXAMPLE_ASGI, os.path.join(dir, 'inception_asgi.py'))
+
+    # The example, with routes of the inner application whose response and chunks come from timers of the event loop of
+    # the ASGI server
+    with open(os.path.join(dir, 'served_asgi.py'), 'w') as file:
+        file.write("""\
+import Pyjo.IOLoop
+
+from inception_asgi import application, hello
+
+
+@hello.routes.get('/later')
+def later(c):
+    c.render_later()
+    Pyjo.IOLoop.timer(0.01, lambda loop: c.render(text='Hello later!'))
+
+
+@hello.routes.get('/chunks')
+def chunks(c):
+    def write(n):
+        if n < 3:
+            Pyjo.IOLoop.timer(0.01, lambda loop: c.write_chunk(f'{n}'.encode(), lambda c: write(n + 1)))
+        else:
+            c.finish()
+
+    write(0)
+""")
+
+    for name, module, command in ASGI_SERVERS:
+        if not importlib.util.find_spec(module):
+            continue
+
+        with subtest(f'Pyjoyment on ASGI mounted in Pyjoyment.Lite on {name}'):
+            # Pyjo.Server.ASGI needs a reactor that runs in the loop of the ASGI server, which Pyjo.Reactor.Poll, with a
+            # loop of its own, does not
+            if Pyjo.Reactor.object.detect() != 'Pyjo.Reactor.Asyncio':
+                skip('needs Pyjo.Reactor.Asyncio, which runs in the loop of the ASGI server', 1)
+                continue
+            os.environ['PYJO_ASGI'] = '1'
+            try:
+                server = Server(dir, command)
+            finally:
+                del os.environ['PYJO_ASGI']
+            try:
+                status, headers, body = server.request('GET', '/')
+                is_ok(status, 200, 'right status')
+                is_ok(body, 'I ♥ Pyjoyment!'.encode(), 'right content')
+
+                status, headers, body = server.request('GET', '/asgi')
+                is_ok(status, 200, 'right status')
+                is_ok(body, b'Hello Pyjoyment at /asgi on ASGI!', 'right content')
+
+                status, headers, body = server.request('GET', '/asgi/pyjo/pyjo.css')
+                is_ok(status, 200, 'right status')
+                is_ok(headers['Content-Type'], 'text/css', 'static file')
+
+                status, headers, body = server.request('GET', '/asgi/foo')
+                is_ok(status, 404, 'not found')
+
+                status, headers, body = server.request('GET', '/asgi/later')
+                is_ok(body, b'Hello later!', 'response given later')
+
+                status, headers, body = server.request('GET', '/asgi/chunks')
+                is_ok(body, b'012', 'chunks given later')
             except Exception:
                 diag(server.output())
                 raise
