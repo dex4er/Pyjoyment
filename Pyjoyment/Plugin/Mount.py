@@ -38,9 +38,16 @@ Pyjoyment.Plugin.Mount - Application mount plugin
     plugin('Mount', {'/starlette': starlette_app})
     plugin('Mount', {'/starlette': 'mystarlette:app'})
 
-    # FastCGI application, as PHP on php-fpm, by its location
+    # FastCGI application, as PHP on php-fpm, by its location, with the
+    # directory of its scripts and the one entry of every other path
     plugin('Mount', {'/php': 'fcgi://127.0.0.1:9000'})
     plugin('Mount', {'/php': 'fcgi+unix://%2Frun%2Fphp%2Ffpm.sock'})
+    plugin('Mount', {'/blog': 'fcgi://127.0.0.1:9000?document_root=%2Fvar%2Fwww&script=index.php'})
+
+    # A regular expression of the whole path, whose group path is the rest of
+    # the path for the application, and whose other named groups are captures
+    plugin('Mount', {re.compile(r'/php(?P<path>/.*)?'): flask_app})
+    plugin('Mount', {re.compile(r'/(?P<user>\\w+)/blog(?P<path>/.*)?'): flask_app})
 
 :mod:`Pyjoyment.Plugin.Mount` is a plugin that allows you to mount whole
 :mod:`Pyjoyment` applications, other applications of :mod:`Pyjo`, ``WSGI``
@@ -49,9 +56,16 @@ whose ``__call__`` is a coroutine function, which :mod:`Pyjo.App.ASGI` runs,
 as an application of :mod:`Pyjo` from a script, an object, or the name of a
 module and its attribute, and ``FastCGI`` applications, which
 :mod:`Pyjo.App.FastCGI` connects to, by their location ``fcgi://`` or
-``fcgi+unix://``. An application that is not one of :mod:`Pyjoyment` gets the server
-that runs it with :meth:`~Pyjo.App.Pyjo_App.server` before the server starts,
-as the application that mounts it does.
+``fcgi+unix://``. An application that is not one of :mod:`Pyjoyment` gets the
+server that runs it with :meth:`~Pyjo.App.Pyjo_App.server` before the server
+starts, as the application that mounts it does.
+
+The path is a pattern of a route that matches the beginning of the path of a
+request, as in Mojolicious, so that ``/php`` matches ``/php.css`` too, which
+an application of another framework does not get, as its ``SCRIPT_NAME`` or
+``root_path`` ends at a slash. A regular expression matches the whole path, as
+the ones of PromQL do, with the rest of it for the application in its group
+``path``.
 
 The code of this plugin is a good example for learning to build new plugins,
 you're welcome to fork it.
@@ -78,6 +92,7 @@ import Pyjo.App.WSGI
 import Pyjo.Exception
 import Pyjo.Server
 import Pyjoyment.Plugin
+import Pyjoyment.Routes.Pattern
 
 import importlib
 import inspect
@@ -98,7 +113,7 @@ class Pyjoyment_Plugin_Mount(Pyjoyment.Plugin.object):
     :mod:`Pyjoyment.Plugin` and implements the following new ones.
     """
 
-    def register(self, app: 'Pyjoyment.object', conf: dict[str, Any]) -> 'Pyjoyment.Routes.Route.object':
+    def register(self, app: 'Pyjoyment.object', conf: dict[Any, Any]) -> 'Pyjoyment.Routes.Route.object':
         """::
 
             route = plugin.register(Pyjoyment.new(), {'/foo': '/some/app.py'})
@@ -109,8 +124,8 @@ class Pyjoyment_Plugin_Mount(Pyjoyment.Plugin.object):
         """
         import Pyjoyment
 
-        path: str | None = next(iter(conf))
-        embed: Any = _load(conf[path])
+        key: str | re.Pattern[str] = next(iter(conf))
+        embed: Any = _load(conf[key])
         if isinstance(embed, Pyjoyment.object):
             embed.secrets = app.secrets
 
@@ -124,7 +139,17 @@ class Pyjoyment_Plugin_Mount(Pyjoyment.Plugin.object):
             app.hook('before_server_start', before_server_start)
         embed.log = app.log
 
+        # Not in Mojolicious: a regular expression that matches the whole path, as the ones of PromQL do, whose group
+        # path is the rest of the path for the application, as partial routes have it, and whose other named groups are
+        # captures
+        if isinstance(key, re.Pattern):
+            route = app.routes.any()
+            route.pattern = _Whole(key)
+            route.partial = True
+            return route.to(app=embed)
+
         # Extract host
+        path: str | None = key
         host = None
         if m := re.match(r'^(\*\.)?([^/]+)(/.*)?$', path):
             host = re.compile(rf'^(?:.*\.)?{re.escape(m[2])}$' if m[1] else rf'^{re.escape(m[2])}$', re.I)
@@ -160,6 +185,25 @@ def _load(value: Any) -> Pyjo.Server.Application:
     if not callable(value):
         raise Pyjo.Exception.new(f'"{value!r}" is not an application')
     return Pyjo.App.WSGI.new(app=value)
+
+
+# Not in Mojolicious: the pattern of a regular expression that matches the whole path, whose named groups are captures,
+# and whose group path, from its start to the end of the path, is the rest of the path
+class _Whole(Pyjoyment.Routes.Pattern.object):
+    def __init__(self, whole: re.Pattern[str]) -> None:
+        super().__init__()
+        self.whole = whole
+        # The regular expression and its source, as the pages of exceptions and of not found and the command routes show
+        # them
+        self.regex = whole
+        self.unparsed = whole.pattern
+
+    def match_partial(self, path: str, detect: bool = False) -> tuple[dict[str, Any], str] | None:
+        if (m := self.whole.fullmatch(path)) is None:
+            return None
+        captures = {**self.defaults, **{name: value for name, value in m.groupdict().items() if value is not None}}
+        rest = path[m.start('path') :] if captures.pop('path', None) is not None else ''
+        return captures, rest
 
 
 new = Pyjoyment_Plugin_Mount.new

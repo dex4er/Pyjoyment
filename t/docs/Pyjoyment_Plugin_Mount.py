@@ -8,6 +8,7 @@ import Pyjoyment.Routes.Route
 
 from Pyjo.Test import *
 
+import re
 import sys
 
 
@@ -131,7 +132,19 @@ with subtest('Synopsis'):
     Pyjo.Test.Pyjo.new(app).get_ok('/php').content_is('Hello from FastCGI!')
     route = app.plugin('Mount', {'/php': 'fcgi+unix://%2Frun%2Fphp%2Ffpm.sock'})
     is_ok(route.pattern.defaults['app'].url, 'fcgi+unix://%2Frun%2Fphp%2Ffpm.sock', 'location')
+    route = app.plugin('Mount', {'/blog': 'fcgi://127.0.0.1:9000?document_root=%2Fvar%2Fwww&script=index.php'})
+    like_ok(route.pattern.defaults['app'].url, r'\?document_root=%2Fvar%2Fwww&script=index\.php$', 'with its query')
     daemon.close()
+
+    # A regular expression of the whole path, whose group path is the rest of
+    # the path for the application, and whose other named groups are captures
+    app = application()
+    app.plugin('Mount', {re.compile(r'/php(?P<path>/.*)?'): flask_app})
+    app.plugin('Mount', {re.compile(r'/(?P<user>\w+)/blog(?P<path>/.*)?'): flask_app})
+    t = Pyjo.Test.Pyjo.new(app)
+    t.get_ok('/php/foo').status_is(200).content_is('Hello from flask_app!')
+    t.get_ok('/phpx').status_is(404)
+    t.get_ok('/sri/blog').status_is(200).content_is('Hello from flask_app!')
 
 with subtest('register'):
     app = application()
