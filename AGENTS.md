@@ -135,6 +135,17 @@ Python the project does not use. Run tools through mise:
 mise exec -- python --version
 ```
 
+`mise -C <dir>` (`--cd`) does not only take the tools of the `mise.toml` of
+`<dir>`: it changes the working directory to `<dir>` before it runs the
+command, so that the relative paths of the command, as of a test script, of
+`PYTHONPATH=.` or of a file that the command writes, are taken from there,
+not from the directory it is called in. Run the command from the checkout
+without it, or give it absolute paths:
+
+```sh
+mise -C ../Pyjoyment exec -- python -m Pyjo.Prove -l t/Pyjo/URL.py  # t/ of ../Pyjoyment
+```
+
 `uv.lock` locks the Python dependencies; there are none at run time yet. After
 a change to `pyproject.toml`, run `mise exec -- uv lock`; CI checks that the
 lock matches with `uv lock --check`.
