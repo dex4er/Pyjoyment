@@ -39,5 +39,13 @@ PYTHONPATH=. mise exec -- uv run --no-project --with uvicorn \
   python examples/servers/hello_world_uvicorn.py
 ```
 
+A script that needs a program which Pyjoyment does not run, as php-fpm for
+`mount_fastcgi_php.py`, says how to start it in its comment:
+
+```sh
+(cd examples/pyjoyment && php-fpm -n -y php/php-fpm.conf -F) &
+PYTHONPATH=. mise exec -- python examples/pyjoyment/mount_fastcgi_php.py daemon
+```
+
 The tests in [`t/examples/`](../t/examples), in the same groups, check some of
 the scripts, and the documentation shows them on its page of examples.
