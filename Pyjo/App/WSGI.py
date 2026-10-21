@@ -80,8 +80,6 @@ import Pyjo.Server.Prefork
 import Pyjo.Server.Prethread
 import Pyjo.Transaction
 
-from Pyjo.Util import url_unescape
-
 import io
 import sys
 import traceback
@@ -398,60 +396,26 @@ class _Input(io.RawIOBase):
         return size
 
 
-# The environment of PEP 3333 for the request of the transaction: the path that a route embeds the application under
-# is SCRIPT_NAME, and the rest of it is PATH_INFO
+# The environment of PEP 3333 for the request of the transaction: the one of CGI, with the keys of WSGI
 def _environ(tx: Any, c: Any, model: tuple[bool, bool, bool]) -> WSGIEnvironment:
-    req = tx.req
-    url = req.url
-    base = url.base
-    script, path = Pyjo.App._mount(tx, c)  # pyright: ignore[reportPrivateUsage]
-
-    https = req.is_secure
     multithread, multiprocess, run_once = model
     environ: WSGIEnvironment = {
-        'REQUEST_METHOD': req.method,
-        'SCRIPT_NAME': _bytes(script),
-        'PATH_INFO': _bytes(path),
-        'QUERY_STRING': url.query.to_str(),
-        'SERVER_NAME': base.host or tx.local_address or 'localhost',
-        'SERVER_PORT': str(base.port or tx.local_port or (443 if https else 80)),
-        'SERVER_PROTOCOL': f'HTTP/{req.version}',
+        **Pyjo.App._cgi(tx, c),  # pyright: ignore[reportPrivateUsage]
         'wsgi.version': (1, 0),
-        'wsgi.url_scheme': 'https' if https else 'http',
-        'wsgi.input': io.BufferedReader(_Input(req.content)),
+        'wsgi.url_scheme': 'https' if tx.req.is_secure else 'http',
+        'wsgi.input': io.BufferedReader(_Input(tx.req.content)),
         'wsgi.errors': sys.stderr,
         'wsgi.multithread': multithread,
         'wsgi.multiprocess': multiprocess,
         'wsgi.run_once': run_once,
         'wsgi.input_terminated': True,
     }
-    if (address := tx.remote_address) is not None:
-        environ['REMOTE_ADDR'] = address
-    if (port := tx.remote_port) is not None:
-        environ['REMOTE_PORT'] = str(port)
-
-    # Headers, joined as CGI has them, and the length of the body, which is whole, as it has been read
-    headers = req.headers
-    for name in headers.names():
-        key = name.upper().replace('-', '_')
-        if key == 'CONTENT_TYPE':
-            environ[key] = headers.header(name)
-        elif key not in ('CONTENT_LENGTH', 'TRANSFER_ENCODING'):
-            environ[f'HTTP_{key}'] = ('; ' if key == 'COOKIE' else ', ').join(headers.every_header(name))
-    if size := req.content.body_size:
-        environ['CONTENT_LENGTH'] = str(size)
-
     return environ
 
 
 # An exception with its traceback, for the log
 def _message(e: BaseException) -> str:
     return ''.join(traceback.format_exception(e)).rstrip()
-
-
-# A path of PEP 3333: the unescaped bytes as the characters 0-255
-def _bytes(path: str) -> str:
-    return url_unescape(path.encode()).decode('latin-1')
 
 
 new = Pyjo_App_WSGI.new
