@@ -333,6 +333,12 @@ def _mount(tx: Any, c: Any) -> tuple[str, str]:  # pyright: ignore[reportUnusedF
     return script, path
 
 
+# Not in Mojolicious: a route embeds an application of another framework at a part of the path that ends with a slash,
+# or at the whole path, as SCRIPT_NAME of CGI and WSGI and root_path of ASGI can only be, where /php of /phpx is not
+def _within(c: Any) -> bool:  # pyright: ignore[reportUnusedFunction]
+    return c is None or not (rest := c.stash().get('path')) or rest.startswith('/')
+
+
 # The environment of CGI for the request, as an application of another framework gets it: the path that a route embeds
 # the application under is SCRIPT_NAME, and the rest of it is PATH_INFO, as unescaped bytes in the characters 0-255
 def _cgi(tx: Any, c: Any) -> dict[str, str]:  # pyright: ignore[reportUnusedFunction]

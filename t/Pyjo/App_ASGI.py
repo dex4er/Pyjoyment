@@ -160,6 +160,10 @@ with subtest('Path of a route'):
         is_ok(t.tx.res.json('/path'), '/prefix/foo/bar/', 'right path')
         is_ok(t.tx.res.json('/query_string'), 'x=1', 'right query')
 
+        # Not after a part of the path that does not end with a slash, which cannot be root_path
+        t.get_ok('/prefixx').status_is(404)
+        t.get_ok('/prefix.json').status_is(404)
+
         # Escaped, as UTF-8, and as they are on the wire in the raw path
         t.get_ok('/prefix/a%20b/%E2%99%A5/%2F').status_is(200)
         is_ok(t.tx.res.json('/path'), '/prefix/a b/♥//', 'right path')

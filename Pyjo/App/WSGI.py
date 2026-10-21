@@ -132,6 +132,8 @@ class Pyjo_App_WSGI(Pyjo.App.object):
         if not isinstance(tx, Pyjo.Transaction.object):
             c = tx
             tx = c.tx
+            if not Pyjo.App._within(c):  # pyright: ignore[reportPrivateUsage]
+                return c.helpers.reply.not_found()
             c.render_later()
         _Call(self, application, tx, c).start()
 
