@@ -277,7 +277,8 @@ with subtest('PHP on php-cgi'):
         # The scripts of the directory of the example, a process of php-cgi for each request
         t = Pyjo.Test.Pyjo.new(Pyjo.File.path(EXAMPLE_PHP_CGI).to_abs())
         t.get_ok('/').status_is(200).content_is('I ♥ Pyjoyment!')
-        t.get_ok('/php/').status_is(200).content_type_like(r'^text/plain').header_like('X-Powered-By', r'^PHP/')
+        # Not X-Powered-By, which the php.ini of setup-php leaves out, as php-cgi reads it
+        t.get_ok('/php/').status_is(200).content_type_like(r'^text/plain')
         t.content_is('Hello PHP at /php/index.php for  (GET /php/)!\n')
         t.get_ok('/php/index.php/foo/bar?x=1').status_is(200)
         t.content_is('Hello PHP at /php/index.php for /foo/bar (GET /php/index.php/foo/bar?x=1)!\n')
