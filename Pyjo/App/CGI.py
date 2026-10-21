@@ -84,6 +84,7 @@ import Pyjo.App
 import Pyjo.Exception
 import Pyjo.IOLoop
 import Pyjo.IOLoop.Stream
+import Pyjo.Message.Response
 import Pyjo.Transaction
 
 import atexit
@@ -286,6 +287,7 @@ class _Response:
         self.headers: list[tuple[str, str]] | None = None
         self.nph = False
         self.offset = 0
+        self.parser: Any = None
         self.pending: list[bytes] = []
         self.started = False
         self.stream: Any = None
@@ -477,8 +479,32 @@ class _Response:
         c.helpers.reply.file(file)
         return True
 
+    # The body of a response of non-parsed header mode, without its transfer encoding
+    def _body(self, content: Any, chunk: bytes) -> None:
+        if len(chunk):
+            self.pending.append(chunk)
+
+    # The HTTP response of non-parsed header mode, whose status takes the place of the header Status, and whose body is
+    # the one of its length, of its chunks, or up to the end of the output
+    def _nph(self, chunk: bytes) -> None:
+        if (parser := self.parser) is None:
+            self.parser = parser = Pyjo.Message.Response.new()
+            parser.content.unsubscribe('read').on('read', self._body)
+            if self.tx.is_empty:
+                parser.content.skip_body = True
+        parser.parse(chunk)
+        if (error := parser.error) is not None:
+            return self._failed(f'{self.name} application sent an invalid response: {error["message"]}')
+        if self.headers is None and (parser.content.is_parsing_body or parser.is_finished):
+            headers = parser.headers
+            self.headers = [('Status', f'{parser.code} {parser.message or ""}'.rstrip())] + [
+                (name, value) for name in headers.names() for value in headers.every_header(name)
+            ]
+
     # The headers of the response of CGI, and the start of its body
     def _stdout(self, content: bytes) -> None:
+        if self.nph:
+            return self._nph(content)
         if self.headers is not None:
             if len(content):
                 self.pending.append(content)
@@ -489,12 +515,7 @@ class _Response:
         head, body = bytes(self.head[: m.start()]), bytes(self.head[m.end() :])
         self.head = bytearray()
         lines = re.split(r'\r?\n', head.decode('latin-1'))
-
-        # The start line of non-parsed header mode, whose status takes the place of the header Status
-        status = []
-        if self.nph and lines[0].startswith('HTTP/'):
-            status = [('Status', lines.pop(0).partition(' ')[2])]
-        self.headers = status + [
+        self.headers = [
             (name.strip(), value.strip()) for name, _, value in (line.partition(':') for line in lines) if name.strip()
         ]
         if len(body):
@@ -596,7 +617,8 @@ class _Call(_Response):
         if self.done:
             return
         self._stdout(chunk)
-        self._flush(False)
+        if not self.done:
+            self._flush(False)
 
     def _stop(self) -> None:
         self._stop_input()

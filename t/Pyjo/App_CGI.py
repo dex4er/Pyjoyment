@@ -80,6 +80,35 @@ program(
     'nph-hello.cgi',
     "import sys\nsys.stdout.buffer.write(b'HTTP/1.1 202 Accepted\\r\\nContent-Type: text/plain\\r\\n\\r\\nhello')\n",
 )
+program(
+    root,
+    'nph-chunked.cgi',
+    """\
+import sys, time
+
+out = sys.stdout.buffer
+out.write(b'HTTP/1.1 200 OK\\r\\nTransfer-Encoding: chunked\\r\\n\\r\\n3\\r\\none\\r\\n')
+out.flush()
+time.sleep(0.02)
+out.write(b'3\\r\\ntwo\\r\\n0\\r\\n\\r\\n')
+""",
+)
+program(
+    root,
+    'nph-length.cgi',
+    """\
+import sys, time
+
+out = sys.stdout.buffer
+out.write(b'HTTP/1.1 200 OK\\r\\nContent-Length: 6\\r\\n\\r\\none')
+out.flush()
+time.sleep(0.02)
+out.write(b'two')
+""",
+)
+program(root, 'nph-end.cgi', "import sys\nsys.stdout.buffer.write(b'HTTP/1.0 404 Gone Fishing\\n\\nuntil the end')\n")
+program(root, 'nph-bad.cgi', "import sys\nsys.stdout.buffer.write(b'Content-Type: text/plain\\r\\n\\r\\nx')\n")
+program(root, 'start.cgi', "import sys\nsys.stdout.buffer.write(b'HTTP/1.1 201 Created\\r\\n\\r\\nmade')\n")
 program(root, 'fail.cgi', "import sys\nsys.stderr.write('oops\\n')\nsys.exit(1)\n")
 program(root, 'half.cgi', "import sys\nsys.stdout.buffer.write(b'Content-Type: text/plain\\r\\n')\n")
 
@@ -309,9 +338,28 @@ with subtest('Non-parsed headers'):
     with Pyjo.App.CGI.new(document_root=root.to_str()) as cgi:
         t = Pyjo.Test.Pyjo.new(application(cgi, '/cgi-bin'))
         t.get_ok('/cgi-bin/nph-hello.cgi').status_is(202).header_is('Content-Type', 'text/plain').content_is('hello')
-    with Pyjo.App.CGI.new(script=env_cgi, nph=True) as cgi:
+        is_ok(t.tx.res.message, 'Accepted', 'right message')
+
+        # The body of its chunks, of its length, and up to the end of the output, with lines that end with LF
+        t.get_ok('/cgi-bin/nph-chunked.cgi').status_is(200).content_is('onetwo')
+        is_deeply_ok(raw(t, 'GET', '/cgi-bin/nph-chunked.cgi'), (200, None, 'chunked', b'onetwo'), 'chunks again')
+        is_deeply_ok(raw(t, 'GET', '/cgi-bin/nph-length.cgi'), (200, '6', None, b'onetwo'), 'with its length')
+        is_deeply_ok(raw(t, 'HEAD', '/cgi-bin/nph-length.cgi'), (200, '6', None, b''), 'headers only')
+        t.get_ok('/cgi-bin/nph-end.cgi').status_is(404).content_is('until the end')
+        is_ok(t.tx.res.message, 'Gone Fishing', 'right message')
+
+        # Not an HTTP response
+        with cgi.log.capture('error') as messages:
+            t.get_ok('/cgi-bin/nph-bad.cgi').status_is(502)
+        like_ok(str(messages), r'CGI application sent an invalid response', 'right error')
+
+    # The attribute, which takes the place of the name of the file
+    with Pyjo.App.CGI.new(script=f'{root}/start.cgi', nph=True) as cgi:
         t = Pyjo.Test.Pyjo.new(application(cgi))
-        t.get_ok('/prefix').status_is(200).json_is('/env/SCRIPT_NAME', '/prefix')
+        t.get_ok('/prefix').status_is(201).content_is('made')
+    with Pyjo.App.CGI.new(script=f'{root}/nph-bad.cgi', nph=False) as cgi:
+        t = Pyjo.Test.Pyjo.new(application(cgi))
+        t.get_ok('/prefix').status_is(200).content_is('x')
 
 with subtest('Errors'):
     with Pyjo.App.CGI.new(document_root=root.to_str()) as cgi:
@@ -376,6 +424,8 @@ from Pyjoyment.Lite import app, get, post
 app.log.level = 'fatal'
 get('/', lambda c: c.render(text=f'Hello CGI at {{c.url_for("/")}} for {{c.req.url.path.to_abs_str()}}!'))
 post('/echo', lambda c: c.render(data=c.req.body))
+get('/chunks', lambda c: c.write_chunk(b'one', lambda c: c.write_chunk(b'two', lambda c: c.finish())))
+get('/gone', lambda c: c.render(text='gone', status=410))
 app.start(*sys.argv[1:])
 """
     program(lite, 'hello.cgi', code)
@@ -387,5 +437,10 @@ app.start(*sys.argv[1:])
         t.post_ok('/lite/hello.cgi/echo', b'echo').status_is(200).content_is('echo')
         t.get_ok('/lite/hello.cgi/missing').status_is(404)
         t.get_ok('/lite/nph-hello.cgi').status_is(200).content_is('Hello CGI at /lite/nph-hello.cgi for /!')
+        t.post_ok('/lite/nph-hello.cgi/echo', b'echo').status_is(200).content_is('echo')
+        t.get_ok('/lite/nph-hello.cgi/chunks').status_is(200).content_is('onetwo')
+        is_deeply_ok(raw(t, 'GET', '/lite/nph-hello.cgi/chunks'), (200, None, 'chunked', b'onetwo'), 'chunks again')
+        t.get_ok('/lite/nph-hello.cgi/gone').status_is(410).content_is('gone')
+        t.get_ok('/lite/nph-hello.cgi/missing').status_is(404)
 
 done_testing()
