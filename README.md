@@ -1,15 +1,19 @@
+[![Home](https://img.shields.io/badge/%F0%9F%8F%A0-Pyjoyment-02a7a0)](https://github.com/dex4er/Pyjoyment)
+[![GitHub](https://img.shields.io/github/stars/dex4er/Pyjoyment?style=flat&label=GitHub%20%E2%AD%90&logo=github)](https://github.com/dex4er/Pyjoyment)
+[![Documentation](https://img.shields.io/badge/docs-Read_the_Docs-blue?logo=readthedocs&logoColor=white)](https://pyjoyment.readthedocs.io/en/latest/)
+[![DeepWiki](https://img.shields.io/badge/Ask-DeepWiki-blue)](https://deepwiki.com/dex4er/Pyjoyment)
+[![License](https://img.shields.io/github/license/dex4er/Pyjoyment.svg)](https://github.com/dex4er/Pyjoyment/blob/master/LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/Pyjoyment?logo=pypi&logoColor=white)](https://pypi.org/project/Pyjoyment/)
 [![Tests](https://github.com/dex4er/Pyjoyment/actions/workflows/tests.yaml/badge.svg?branch=master)](https://github.com/dex4er/Pyjoyment/actions/workflows/tests.yaml)
-[![Documentation](https://img.shields.io/badge/docs-Read_the_Docs-8CA1AF?logo=readthedocs&logoColor=white)](https://pyjoyment.readthedocs.io/en/latest/)
+[![Trunk Check](https://github.com/dex4er/Pyjoyment/actions/workflows/trunk-check.yaml/badge.svg?branch=master)](https://github.com/dex4er/Pyjoyment/actions/workflows/trunk-check.yaml)
 
 # Pyjoyment
 
 <p align="center">
-<a href="https://pyjoyment.readthedocs.io/">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/dex4er/Pyjoyment/master/Pyjoyment/resources/public/pyjo/logo-white-4x.png">
     <img src="https://raw.githubusercontent.com/dex4er/Pyjoyment/master/Pyjoyment/resources/public/pyjo/logo-black-4x.png" alt="Pyjoyment" width="322">
   </picture>
-</a>
 </p>
 
 A real-time web framework for the Python programming language, ported from
