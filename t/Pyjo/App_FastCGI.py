@@ -7,7 +7,7 @@ import Pyjo.Test.Pyjo
 import Pyjo.Transaction.HTTP
 import Pyjoyment
 
-from Pyjo.Server.FastCGI import END_REQUEST, STDIN, STDOUT, _record  # pyright: ignore[reportPrivateUsage]
+from Pyjo.Server.FastCGI import END_REQUEST, HEADER, PARAMS, STDIN, STDOUT, _pairs, _record  # pyright: ignore[reportPrivateUsage]
 from Pyjo.Test import *
 from Pyjo.Util import url_escape
 
@@ -131,6 +131,17 @@ def end():
     return _record(END_REQUEST, 1, struct.pack('>IB3x', 0, 0))
 
 
+# The parameters of a request that a responder got
+def params(request):
+    data, offset = b'', 0
+    while offset + HEADER.size <= len(request):
+        version, type, id, length, padding = HEADER.unpack_from(request, offset)
+        if type == PARAMS:
+            data += request[offset + HEADER.size : offset + HEADER.size + length]
+        offset += HEADER.size + length + padding
+    return _pairs(data)
+
+
 with subtest('Parameters'):
     with Pyjo.App.FastCGI.new(url=URL) as app:
         t = Pyjo.Test.Pyjo.new(app)
@@ -197,6 +208,42 @@ with subtest('Path of a route'):
         t.get_ok('/prefix/env/a%20b/%E2%99%A5').status_is(200)
         # The bytes of the path in the parameter, which the server of Pyjo escapes beyond ASCII
         is_ok(t.tx.res.json('/env/PATH_INFO'), '/env/a b/%E2%99%A5', 'right path')
+
+with subtest('Directory of the scripts'):
+    url, requests, id = responder(stdout(b'Status: 200\r\n\r\nOK') + end())
+    with Pyjo.App.FastCGI.new(url=url, document_root='/var/www/') as fcgi:
+        t = Pyjo.Test.Pyjo.new(application(fcgi, '/php'))
+        for path, script, name, info in (
+            ('/php', '/var/www/index.php', '/php/index.php', ''),
+            ('/php/', '/var/www/index.php', '/php/index.php', ''),
+            ('/php/phpinfo.php', '/var/www/phpinfo.php', '/php/phpinfo.php', ''),
+            ('/php/index.php/foo/bar?x=1', '/var/www/index.php', '/php/index.php', '/foo/bar'),
+            ('/php/index.php/', '/var/www/index.php', '/php/index.php', '/'),
+            ('/php/dir/', '/var/www/dir/index.php', '/php/dir/index.php', ''),
+            ('/php/foo', '/var/www/foo', '/php/foo', ''),
+        ):
+            t.get_ok(path).status_is(200).content_is('OK')
+            env = params(requests[-1])
+            is_ok(env['SCRIPT_FILENAME'], script, f'right script file of {path}')
+            is_ok(env['SCRIPT_NAME'], name, f'right script name of {path}')
+            is_ok(env['PATH_INFO'], info, f'right path of {path}')
+            is_ok(env['DOCUMENT_ROOT'], '/var/www/', f'right document root of {path}')
+        is_ok(params(requests[-4])['REQUEST_URI'], '/php/index.php/foo/bar?x=1', 'right request URI')
+
+        # Not above the directory
+        count = len(requests)
+        t.get_ok('/php/%2E%2E/etc/passwd').status_is(404)
+        is_ok(len(requests), count, 'no request to the application')
+
+    # The script of the parameters of the application takes its place
+    with Pyjo.App.FastCGI.new(url=url, document_root='/var/www', env={'SCRIPT_FILENAME': '/srv/app.php'}) as fcgi:
+        t = Pyjo.Test.Pyjo.new(application(fcgi, '/php'))
+        t.get_ok('/php/foo/bar').status_is(200)
+        env = params(requests[-1])
+        is_ok(env['SCRIPT_FILENAME'], '/srv/app.php', 'script of the parameters')
+        is_ok(env['SCRIPT_NAME'], '/php', 'script name of the mount')
+        is_ok(env['PATH_INFO'], '/foo/bar', 'path after the mount')
+    Pyjo.IOLoop.remove(id)
 
 with subtest('Response'):
     with Pyjo.App.FastCGI.new(url=URL) as fcgi:

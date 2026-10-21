@@ -41,6 +41,13 @@ with subtest('Synopsis'):
     pyjoyment.plugin('Mount', {'/fcgi': url})
     Pyjo.Test.Pyjo.new(pyjoyment).get_ok('/fcgi').status_is(200).content_is('Hello FastCGI!')
 
+with subtest('document_root'):
+    app = Pyjo.App.FastCGI.new()
+    root = app.document_root
+    is_ok(root, None, 'no directory')
+    app.document_root = '/var/www'
+    is_ok(app.document_root, '/var/www', 'directory')
+
 with subtest('env'):
     app = Pyjo.App.FastCGI.new()
     env = app.env

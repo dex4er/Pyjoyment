@@ -40,8 +40,9 @@ base path of the request, the rest of the path is ``PATH_INFO``, ``/`` for
 the path of the mount itself, as an empty one is the whole path in
 ``SCRIPT_NAME`` for a server of ``FastCGI``, ``REQUEST_URI`` is the path with
 the query, and :attr:`env` adds to them, as ``SCRIPT_FILENAME`` for
-php-fpm. The body of the
-request goes in records ``STDIN``, each once the one before has been written.
+php-fpm, which :attr:`document_root` gives for each request otherwise. The
+body of the request goes in records ``STDIN``, each once the one before has
+been written.
 
 The connection is one for each request, through the event loop. A response of
 ``CGI`` that comes whole, with the end of the request, is written with its
@@ -93,6 +94,7 @@ from Pyjo.Server.FastCGI import (
     _record,  # pyright: ignore[reportPrivateUsage]
 )
 
+import os
 import re
 import struct
 import wsgiref.util
@@ -120,6 +122,22 @@ class Pyjo_App_FastCGI(Pyjo.App.object):
 
         Construct a new :mod:`Pyjo.App.FastCGI` object.
         """
+        self.document_root: str | os.PathLike[str] | None = None
+        """::
+
+            root = app.document_root
+            app.document_root = '/var/www'
+
+        Directory of the scripts of the application, as of PHP, as the
+        application sees it, which takes the script of each request from its
+        path, as a web server does: the path after the mount, up to its first
+        part that ends with ``.php``, names the script, whose file in the
+        directory is ``SCRIPT_FILENAME`` and whose path after the mount is
+        ``SCRIPT_NAME``, the rest of the path is ``PATH_INFO``, and a path that
+        ends with a slash names ``index.php`` in it. A path with ``..`` is not
+        found. ``SCRIPT_FILENAME`` of :attr:`env` takes its place.
+        """
+
         self.env: dict[str, str] = {}
         """::
 
@@ -198,9 +216,14 @@ class _Call:
         self.tx.on('finish', self._finish)
         params = {**Pyjo.App._cgi(self.tx, self.c), **_extra(self.tx)}  # pyright: ignore[reportPrivateUsage]
 
+        # The script of the path in the directory of the scripts
+        if (root := self.app.document_root) is not None and 'SCRIPT_FILENAME' not in self.app.env:
+            if not _script(params, os.fspath(root)):
+                return self._not_found()
+
         # The path of the mount itself, as a server of FastCGI takes an empty PATH_INFO for the whole path in
         # SCRIPT_NAME, as nginx and Caddy send it
-        if not params['PATH_INFO'] and params['SCRIPT_NAME']:
+        elif not params['PATH_INFO'] and params['SCRIPT_NAME']:
             params['PATH_INFO'] = '/'
         params.update(self.app.env)
         self.params = _encode_pairs(params)
@@ -345,6 +368,16 @@ class _Call:
                 break
         self._flush(ended)
 
+    def _not_found(self) -> None:
+        self.done = True
+        if (c := self.c) is not None:
+            return c.helpers.reply.not_found()
+        res = self.tx.res
+        res.code = 404
+        res.headers.content_type = 'text/plain'
+        res.body = b'Not Found'
+        self.tx.resume()
+
     def _rendered(self) -> None:
         if (c := self.c) is not None:
             c.rendered()
@@ -417,6 +450,23 @@ def _options(url: Any) -> dict[str, Any]:
     if proto == 'fcgi' and url.host and url.port:
         return {'address': url.host, 'port': url.port}
     raise Pyjo.Exception.new(f'Invalid FastCGI location "{url}"')
+
+
+# The script of the path in the directory of the scripts, as nginx has it with fastcgi_split_path_info and
+# $document_root$fastcgi_script_name, unless the path has ..
+def _script(params: dict[str, str], root: str) -> bool:
+    parts = (params['PATH_INFO'] or '/').split('/')
+    if '..' in parts:
+        return False
+    end = next((i + 1 for i, part in enumerate(parts) if part.endswith('.php')), len(parts))
+    script, rest = '/'.join(parts[:end]), '/'.join(parts[end:])
+    if end == len(parts) and script.endswith('/'):
+        script += 'index.php'
+    params['SCRIPT_FILENAME'] = root.rstrip('/') + script
+    params['SCRIPT_NAME'] += script
+    params['PATH_INFO'] = f'/{rest}' if end < len(parts) else ''
+    params['DOCUMENT_ROOT'] = root
+    return True
 
 
 # The status of a response of CGI from its header Status, or a redirect for a header Location, and its other headers
