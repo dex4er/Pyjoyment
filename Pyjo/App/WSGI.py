@@ -158,13 +158,16 @@ class Pyjo_App_WSGI(Pyjo.App.object):
             c.render_later()
         _Call(self, application, tx, c).start()
 
-    def _submit[T](self, fn: Callable[..., T], *args: Any) -> Pyjo.Promise.object:
+    def _pool(self) -> concurrent.futures.ThreadPoolExecutor:
         with _lock:
             if (executor := self._executor) is None:
                 executor = self._executor = concurrent.futures.ThreadPoolExecutor(
                     max_workers=self.threads, thread_name_prefix='Pyjo.App.WSGI'
                 )
-        return Pyjo.Promise.new(executor.submit(fn, *args))
+        return executor
+
+    def _submit[T](self, fn: Callable[..., T], *args: Any) -> Pyjo.Promise.object:
+        return Pyjo.Promise.new(self._pool().submit(fn, *args))
 
 
 # The applications whose threads are stopped before a fork, as a process with threads may deadlock in its child, which
@@ -210,9 +213,11 @@ class _Call:
             self._error
         )
 
+    # The body is closed in a thread, without the event loop, which may not run again, as at the end of the program, so
+    # the thread logs what fails
     def _close(self) -> None:
         self.done = True
-        self._submit(self.response.close).catch(self._failed)
+        self.app._pool().submit(self.response.close).add_done_callback(self._failed)  # pyright: ignore[reportPrivateUsage]
 
     # End of the response
     def _end(self) -> None:
@@ -246,8 +251,9 @@ class _Call:
         res.body = b'Internal Server Error'
         self.tx.resume()
 
-    def _failed(self, e: BaseException) -> None:
-        self.app.log.error(f'WSGI application failed to close: {_message(e)}')
+    def _failed(self, future: concurrent.futures.Future[None]) -> None:
+        if (e := future.exception()) is not None:
+            self.app.log.error(f'WSGI application failed to close: {_message(e)}')
 
     # The end of the transaction, also when the connection is gone before the end of the response
     def _finish(self, *args: Any) -> None:
