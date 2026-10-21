@@ -39,6 +39,22 @@ An application of Pyjoyment as the WSGI application, in the same file:
     .. include:: ../examples/pyjoyment/mount_wsgi_inception.py
        :code: python
 
+An ASGI application, in a file of its own, under a path of an application of
+``Pyjoyment.Lite``, whose events stream at the pace of the client:
+
+    .. include:: ../examples/pyjoyment/mount_asgi.py
+       :code: python
+
+The ASGI application, which also runs on its own, on an ASGI server:
+
+    .. include:: ../examples/pyjoyment/hello_asgi.py
+       :code: python
+
+An application of Pyjoyment as the ASGI application, in the same file:
+
+    .. include:: ../examples/pyjoyment/mount_asgi_inception.py
+       :code: python
+
 
 Servers
 -------

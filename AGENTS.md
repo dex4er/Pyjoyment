@@ -78,6 +78,21 @@ of them is a regression.
   awaiting it, the counterpart of Mojo's `AWAIT_*` methods, is `__await__`,
   which asks the reactor for what to wait on, so that it works with the event
   loop of any reactor.
+- **Concurrency lives in the reactor and the servers.** The reactor runs the
+  I/O, the timers and the coroutines, and the workers of
+  `Pyjo.Server.Prefork` and `Pyjo.Server.Prethread` run what blocks, with
+  `max_clients` as low as 1. Nothing else brings a concurrency of its own: an
+  adapter of another framework, as `Pyjo.App.WSGI`, has no pool of threads
+  and forks nothing, so a blocking WSGI application blocks the event loop, as
+  any blocking operation does, and `Pyjo.App.ASGI` runs its application with
+  `run_coroutine` of the reactor. A package that needs the next cycle of the
+  event loop asks the reactor for it, and guards itself against being called
+  again from inside the event loop. What only a server knows, as how it runs
+  an application, which the flags `wsgi.multithread`, `wsgi.multiprocess`
+  and `wsgi.run_once` say, comes from the server, through `server` of the
+  application and the hook `before_server_start`, or from the environment of
+  an outer WSGI server, best-effort, not from an environment variable, which
+  every server of the process and its children would share.
 - **Python 3.12 is the minimum, template strings come with 3.14.** t-strings
   (PEP 750) keep interpolations separate from the literal text, which gives
   templates auto-escaping without a template language. The `t"..."` syntax is
@@ -209,9 +224,10 @@ port 0 instead, which `ports()` gives.
   `Pyjo.Server.CGI` on real ASGI, WSGI and CGI servers, and the examples of
   the quick start in `README.md`, each in a process of its own, as the ASGI server of the tests in `t/lib` and the validator of
   `wsgiref` cannot show how a server differs, and mounts the applications of
-  other frameworks, as Flask, with `Pyjoyment.Plugin.Mount`, and an
-  application of Pyjoyment on WSGI in one of `Pyjoyment.Lite`, as the example
-  `mount_wsgi_inception.py` does, on the WSGI servers. The servers and
+  other frameworks, as Flask and Starlette, with `Pyjoyment.Plugin.Mount`, and
+  an application of Pyjoyment on WSGI or on ASGI in one of `Pyjoyment.Lite`,
+  as the examples `mount_wsgi_inception.py` and `mount_asgi_inception.py` do,
+  on the WSGI and the ASGI servers. The servers and
   the frameworks are in the dependency group `servers`, not in
   `dependencies`; without it, the tests are skipped.
 - `t/lib/` holds helpers shared by the tests. Run on their own, they skip with
@@ -491,6 +507,8 @@ targets of the options), `Pyjo.IOLoop.Datagram` (inspired by `dgram` of Node.js)
 one of Mojolicious, which `Pyjoyment.HelloWorld` ports), `Pyjo.App.WSGI` (the
 application of Pyjo that runs a WSGI application, inspired by
 `Mojolicious::Plugin::MountPSGI` of CPAN, the reverse of `Pyjo.Server.WSGI`),
+`Pyjo.App.ASGI` (the application of Pyjo that runs an ASGI application, the
+reverse of `Pyjo.Server.ASGI`),
 `Pyjo.Server.Lambda`
 and `Pyjoyment.Command.lambda` (the server and the command of the event
 functions of AWS Lambda, inspired by `Pyjo.Server.WSGI` and its command),
@@ -903,7 +921,14 @@ sub {...}` is `get('/foo', cb)` or the decorator `@get('/foo')`, as a route
   then, as `Pyjo.IOLoop`, `Pyjo.Server.Daemon` and `Pyjo.Asset.File`, keeps
   them in a `weakref.WeakSet` and closes them in an `atexit` handler of its
   module, which `Pyjo.IOLoop` follows with `gc.collect()`, so that the
-  objects in cycles are freed while `__del__` still works.
+  objects in cycles are freed while `__del__` still works. `weakref.finalize`
+  calls the finalizers of the objects that are left in an exit function of
+  its own, after which it calls none, also for the objects that the garbage
+  collector frees then, so a handler that has to come before it, as the one
+  of `Pyjo.Reactor.Asyncio`, which cancels the tasks that are left in a loop
+  of its own and runs them to their end, as `asyncio.run` does, before it
+  closes the loop, is registered after the first finalizer, as `atexit` runs
+  the handlers in the reverse order.
 - A method that Mojo calls on the class or on an object, like
   `Mojo::DOM->new_tag` and `$dom->new_tag`, is a descriptor that passes either
   of them.
@@ -1062,6 +1087,10 @@ pattern.match_partial(path)`.
   same tick as the I/O before it, so before the next I/O; asyncio runs a
   `call_later(0)` after the I/O of its next iteration, and a `call_soon`
   before it, so the asyncio reactor schedules such a timer with `call_soon`.
+  The callbacks of `next_tick` run until none is left, as in Mojo, also the
+  ones that they add, so code that tries again until something is there, as
+  a body without a chunk yet, tries with a timer of no time, which lets the
+  I/O and the timers of the next cycle run first.
 - A callback that an asyncio loop keeps, as a timer or an I/O watcher,
   refers to the reactor weakly, so that the reactor and the loop it owns do
   not make a cycle: in a cycle the garbage collector may close the sockets of
@@ -1070,6 +1099,18 @@ pattern.match_partial(path)`.
   callback raises instead of passing it on. Where Mojo runs the reactor from
   a callback, the port returns at once, and an exception that Mojo lets die
   out of `start` is kept by the reactor and raised after the loop stops.
+  So code that the event loop calls never runs the event loop to wait: the
+  `one_tick` of the asyncio reactor returns at once in a loop that runs, so a
+  wait on it spins for ever, and `Pyjo.Reactor.Poll` would run the callbacks
+  of other connections in the middle of the code that waits. A server that
+  waits for a response, as `Pyjo.Server.WSGI`, waits only where the event
+  loop does not run, and gives empty chunks of the body until it is there in
+  the one that runs, and `Pyjo.App.WSGI` takes each chunk of the body of its
+  application in a tick of its own, once the one before has been written,
+  not in the middle of what the server writes. An application mounted in
+  another one in the same process, as in the examples
+  `mount_wsgi_inception.py` and `mount_asgi_inception.py`, is what catches
+  such reentry in the tests, which a test in two processes would hide.
 - A module that is not ported yet but uses a ported one follows its API: the
   lines that use it are taken from the target Mojolicious, and so is the
   expectation of a test of them that the target changed.
@@ -1443,5 +1484,9 @@ and the pull request.
   changes in separate commits.
 - A pull request description lists the changes and a validation checklist;
   check an item only once it has been verified.
+- A pull request fixes what it finds at the cause, also in another module than
+  the one it is about, as the reactor of a change of an adapter, in a commit
+  of its own, rather than working around it in a test: Pyjoyment is a
+  framework, and a defect that one module shows is often in the one below it.
 - A change of `AGENTS.md` alone, as what a distribution of its own teaches, is
   committed on `main` directly, without a pull request.

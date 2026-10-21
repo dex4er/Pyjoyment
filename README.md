@@ -46,6 +46,11 @@ renderer, plugins, `Pyjoyment.Lite` and the command line interface. It
 renders JSON, YAML and TOML, and reads its configuration from Python, JSON,
 YAML and TOML files.
 
+It mounts the applications of other Python frameworks under a path or a
+host, next to its own routes, in the same process and on the same server:
+WSGI applications, as those of Flask, and ASGI applications, as those of
+Starlette, whose responses stream at the pace of the client.
+
 Both are cloud native: `generate dockerfile` writes the image of an
 application, whose server stops gracefully on the `TERM` of its container
 and listens on the port of `PORT`, as Knative, Cloud Run, Render, Koyeb and

@@ -398,30 +398,13 @@ class _Input(io.RawIOBase):
         return size
 
 
-# The environment of PEP 3333 for the request of the transaction: the path that a route embeds the application under,
-# after the base path, is SCRIPT_NAME, and the rest of it, which the route left in the stash, is PATH_INFO
+# The environment of PEP 3333 for the request of the transaction: the path that a route embeds the application under
+# is SCRIPT_NAME, and the rest of it is PATH_INFO
 def _environ(tx: Any, c: Any, model: tuple[bool, bool, bool]) -> WSGIEnvironment:
     req = tx.req
     url = req.url
     base = url.base
-    path = url.path.to_abs_str()
-    script = base.path.to_str().rstrip('/')
-
-    if c is not None and (rest := c.stash().get('path')) is not None:
-        route = url.path.to_route()
-        if not route.endswith(rest):
-            path = rest
-        else:
-            # The rest begins at the slash after the ones of the path above it
-            end = len(path)
-            if len(rest):
-                end = -1
-                for _ in range(route[: len(route) - len(rest)].count('/') + 1):
-                    if (end := path.find('/', end + 1)) < 0:
-                        end = len(path)
-                        break
-            script += path[:end]
-            path = path[end:]
+    script, path = Pyjo.App._mount(tx, c)  # pyright: ignore[reportPrivateUsage]
 
     https = req.is_secure
     multithread, multiprocess, run_once = model

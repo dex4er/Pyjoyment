@@ -682,6 +682,15 @@ with subtest('Mount applications'):
         t.get_ok('/prefix').status_is(200).content_is('Hello World!')
         t.get_ok('/', {'Host': 'test.example.com'}).status_is(200).content_is('Hello World!')
 
+with subtest('Mount applications of other frameworks'):
+    with application('frameworks'):
+        with Pyjo.Test.Pyjo.new(EXAMPLES.child('frameworks', 'myapp.py')) as t:
+            t.get_ok('/').status_is(200).content_is('Hello from Pyjoyment!')
+            t.get_ok('/legacy/foo').status_is(200).content_is('Hello from WSGI at /legacy for /foo!')
+            t.get_ok('/api/foo').status_is(200).json_is({'root_path': '/api', 'path': '/api/foo'})
+            t.get_ok('/api/events').status_is(200).content_type_is('text/event-stream')
+            t.content_is('data: 0\n\ndata: 1\n\ndata: 2\n\n')
+
 with subtest('Embed applications'):
     with application('embed_lite'):
         app = Pyjoyment.new()

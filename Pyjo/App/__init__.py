@@ -306,6 +306,33 @@ def _package(cls: type) -> str:
     return cls.__qualname__ if module == '__main__' else f'{module}.{cls.__qualname__}'
 
 
+# The path of the request for an application of another framework, as escaped strings: the path that a route embeds the
+# application under, after the base path, as SCRIPT_NAME of WSGI and root_path of ASGI, and the rest of it, which the
+# route left in the stash
+def _mount(tx: Any, c: Any) -> tuple[str, str]:  # pyright: ignore[reportUnusedFunction]
+    url = tx.req.url
+    path = url.path.to_abs_str()
+    script = url.base.path.to_str().rstrip('/')
+
+    if c is not None and (rest := c.stash().get('path')) is not None:
+        route = url.path.to_route()
+        if not route.endswith(rest):
+            path = rest
+        else:
+            # The rest begins at the slash after the ones of the path above it
+            end = len(path)
+            if len(rest):
+                end = -1
+                for _ in range(route[: len(route) - len(rest)].count('/') + 1):
+                    if (end := path.find('/', end + 1)) < 0:
+                        end = len(path)
+                        break
+            script += path[:end]
+            path = path[end:]
+
+    return script, path
+
+
 new = Pyjo_App.new
 object = Pyjo_App
 App = Pyjo_App

@@ -1,3 +1,4 @@
+import Pyjo.Reactor
 import Pyjo.Test.Pyjo
 import Pyjoyment
 
@@ -14,18 +15,23 @@ import tempfile
 
 # The applications of other frameworks, which Pyjoyment.Plugin.Mount mounts, of the dependency group "servers": uv run
 # --only-group servers python -m Pyjo.Prove t/servers
-if missing := [m for m in ('flask', 'waitress') if not importlib.util.find_spec(m)]:
+if missing := [m for m in ('flask', 'starlette', 'waitress') if not importlib.util.find_spec(m)]:
     plan(skip_all=f'needs the dependency group "servers", without {", ".join(missing)}')
 
 import flask  # noqa: E402
+import starlette.applications  # noqa: E402
+import starlette.responses  # noqa: E402
+import starlette.routing  # noqa: E402
 
 
 # The servers in processes of their own
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
 Server = importlib.import_module('ServerProcess').Server
 
-# The example of an application of Pyjoyment on WSGI, mounted in an application of Pyjoyment.Lite, on the WSGI servers
+# The examples of an application of Pyjoyment on WSGI and on ASGI, mounted in an application of Pyjoyment.Lite, on the
+# WSGI and the ASGI servers
 EXAMPLE = os.path.join(os.path.dirname(__file__), '..', '..', 'examples', 'pyjoyment', 'mount_wsgi_inception.py')
+EXAMPLE_ASGI = os.path.join(os.path.dirname(__file__), '..', '..', 'examples', 'pyjoyment', 'mount_asgi_inception.py')
 PYTHON = sys.executable
 UWSGI = shutil.which('uwsgi', path=os.path.dirname(sys.executable))
 GUNICORN = [PYTHON, '-m', 'gunicorn', 'served:application', '--bind', '127.0.0.1:{port}']
@@ -67,6 +73,18 @@ SERVERS = [
         ],
         [True, False, False],
     ),
+]
+LOCAL = ['--host', '127.0.0.1', '--port', '{port}']
+ASGI_SERVERS = [
+    ('uvicorn', 'uvicorn', [PYTHON, '-m', 'uvicorn', 'served_asgi:application', '--log-level', 'warning', *LOCAL]),
+    (
+        'uvicorn on uvloop',
+        'uvloop',
+        [PYTHON, '-m', 'uvicorn', 'served_asgi:application', '--loop', 'uvloop', '--log-level', 'warning', *LOCAL],
+    ),
+    ('Hypercorn', 'hypercorn', [PYTHON, '-m', 'hypercorn', 'served_asgi:application', '--bind', '127.0.0.1:{port}']),
+    ('Daphne', 'daphne', [PYTHON, '-m', 'daphne', '-b', '127.0.0.1', '-p', '{port}', 'served_asgi:application']),
+    ('Granian', 'granian', [PYTHON, '-m', 'granian', '--interface', 'asgi', 'served_asgi:application', *LOCAL]),
 ]
 
 
@@ -122,6 +140,57 @@ with subtest('Flask'):
     t.get_ok('/flask/missing').status_is(404).content_like(r'Not Found')
     t.get_ok('/flask/fail').status_is(500).content_like(r'Internal Server Error')
 
+with subtest('Starlette'):
+
+    async def index(request):
+        return starlette.responses.PlainTextResponse(f'Hello from Starlette at {request.url_for("index").path}!')
+
+    async def name(request):
+        name = request.path_params['name']
+        return starlette.responses.JSONResponse({'name': name, 'url': str(request.url_for('name', name=name))})
+
+    async def echo(request):
+        return starlette.responses.PlainTextResponse(
+            f'{(await request.body()).decode()} and {request.query_params["x"]}'
+        )
+
+    async def redirect(request):
+        return starlette.responses.RedirectResponse(request.url_for('index').path)
+
+    async def stream(request):
+        async def body():
+            yield 'one'
+            yield 'two'
+
+        return starlette.responses.StreamingResponse(body(), media_type='text/plain')
+
+    async def fail(request):
+        raise RuntimeError('Something went wrong')
+
+    hello = starlette.applications.Starlette(
+        routes=[
+            starlette.routing.Route('/', index, name='index'),
+            starlette.routing.Route('/hello/{name}', name, name='name'),
+            starlette.routing.Route('/echo', echo, methods=['POST']),
+            starlette.routing.Route('/redirect', redirect),
+            starlette.routing.Route('/stream', stream),
+            starlette.routing.Route('/fail', fail),
+        ]
+    )
+
+    t = Pyjo.Test.Pyjo.new(application('/starlette', hello))
+    t.app.log.level = 'fatal'
+    t.get_ok('/').status_is(200).content_is('Hello from Pyjoyment!')
+    t.get_ok('/starlette/').status_is(200).content_is('Hello from Starlette at /starlette/!')
+    t.get_ok('/starlette/hello/%E2%99%A5').status_is(200).json_is('/name', '♥')
+    # Starlette does not escape a parameter of the path in url_for
+    t.json_like('/url', r'^http://127\.0\.0\.1:\d+/starlette/hello/♥$')
+    t.post_ok('/starlette/echo?x=1', b'Hello!').status_is(200).content_is('Hello! and 1')
+    t.get_ok('/starlette/redirect').status_is(307).header_is('Location', '/starlette/')
+    t.get_ok('/starlette/stream').status_is(200).content_type_like(r'^text/plain').content_is('onetwo')
+    t.get_ok('/starlette/missing').status_is(404).content_like(r'Not Found')
+    t.get_ok('/starlette/fail').status_is(500).content_like(r'Internal Server Error')
+
 with tempfile.TemporaryDirectory() as dir:
     shutil.copy(EXAMPLE, os.path.join(dir, 'inception.py'))
 
@@ -172,6 +241,76 @@ app.plugin('Mount', {'/flags': flags})
                 status, headers, body = server.request('GET', '/flags')
                 is_ok(status, 200, 'right status')
                 is_deeply_ok(json.loads(body), model, 'flags of the WSGI server')
+            except Exception:
+                diag(server.output())
+                raise
+            finally:
+                server.close()
+
+    shutil.copy(EXAMPLE_ASGI, os.path.join(dir, 'inception_asgi.py'))
+
+    # The example, with routes of the inner application whose response and chunks come from timers of the event loop of
+    # the ASGI server
+    with open(os.path.join(dir, 'served_asgi.py'), 'w') as file:
+        file.write("""\
+import Pyjo.IOLoop
+
+from inception_asgi import application, hello
+
+
+@hello.routes.get('/later')
+def later(c):
+    c.render_later()
+    Pyjo.IOLoop.timer(0.01, lambda loop: c.render(text='Hello later!'))
+
+
+@hello.routes.get('/chunks')
+def chunks(c):
+    def write(n):
+        if n < 3:
+            Pyjo.IOLoop.timer(0.01, lambda loop: c.write_chunk(f'{n}'.encode(), lambda c: write(n + 1)))
+        else:
+            c.finish()
+
+    write(0)
+""")
+
+    for name, module, command in ASGI_SERVERS:
+        if not importlib.util.find_spec(module):
+            continue
+
+        with subtest(f'Pyjoyment on ASGI mounted in Pyjoyment.Lite on {name}'):
+            # Pyjo.Server.ASGI needs a reactor that runs in the loop of the ASGI server, which Pyjo.Reactor.Poll, with a
+            # loop of its own, does not
+            if Pyjo.Reactor.object.detect() != 'Pyjo.Reactor.Asyncio':
+                skip('needs Pyjo.Reactor.Asyncio, which runs in the loop of the ASGI server', 1)
+                continue
+            os.environ['PYJO_ASGI'] = '1'
+            try:
+                server = Server(dir, command)
+            finally:
+                del os.environ['PYJO_ASGI']
+            try:
+                status, headers, body = server.request('GET', '/')
+                is_ok(status, 200, 'right status')
+                is_ok(body, 'I ♥ Pyjoyment!'.encode(), 'right content')
+
+                status, headers, body = server.request('GET', '/asgi')
+                is_ok(status, 200, 'right status')
+                is_ok(body, b'Hello Pyjoyment at /asgi on ASGI!', 'right content')
+
+                status, headers, body = server.request('GET', '/asgi/pyjo/pyjo.css')
+                is_ok(status, 200, 'right status')
+                is_ok(headers['Content-Type'], 'text/css', 'static file')
+
+                status, headers, body = server.request('GET', '/asgi/foo')
+                is_ok(status, 404, 'not found')
+
+                status, headers, body = server.request('GET', '/asgi/later')
+                is_ok(body, b'Hello later!', 'response given later')
+
+                status, headers, body = server.request('GET', '/asgi/chunks')
+                is_ok(body, b'012', 'chunks given later')
             except Exception:
                 diag(server.output())
                 raise

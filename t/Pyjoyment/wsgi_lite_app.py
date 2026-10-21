@@ -37,10 +37,6 @@ class MyApp(Pyjoyment.object):
         self.routes.get('/').to(cb=lambda c: c.render(text='Hello from MyApp!'))
 
 
-async def asgi(scope, receive, send):
-    pass
-
-
 # Silence
 app.log.level = 'fatal'
 
@@ -91,7 +87,6 @@ with subtest('Errors'):
         re.compile(r'^Can\'t load application "wsgi_hello:missing": .*missing'),
         'missing attribute',
     )
-    throws_ok(lambda: plugin('Mount', {'/asgi': asgi}), re.compile(r'^ASGI application .* is not supported'), 'ASGI')
     throws_ok(lambda: plugin('Mount', {'/number': 42}), re.compile(r'^"42" is not an application'), 'not callable')
 
 done_testing()

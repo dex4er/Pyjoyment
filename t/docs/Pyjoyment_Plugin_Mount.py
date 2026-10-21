@@ -25,12 +25,24 @@ def app(environ, start_response):
     start_response('200 OK', [('Content-Type', 'text/plain')])
     return [b'Hello from myflask!']
 """)
+
+# The module of the ASGI application
+tmp.child('mystarlette.py').spew(b"""\
+async def app(scope, receive, send):
+    await send({'type': 'http.response.start', 'status': 200, 'headers': [(b'content-type', b'text/plain')]})
+    await send({'type': 'http.response.body', 'body': b'Hello from mystarlette!'})
+""")
 sys.path.insert(0, tmp.to_str())
 
 
 def flask_app(environ, start_response):
     start_response('200 OK', [('Content-Type', 'text/plain')])
     return [b'Hello from flask_app!']
+
+
+async def starlette_app(scope, receive, send):
+    await send({'type': 'http.response.start', 'status': 200, 'headers': [(b'content-type', b'text/plain')]})
+    await send({'type': 'http.response.body', 'body': b'Hello from starlette_app!'})
 
 
 class MyApp(Pyjoyment.object):
@@ -97,6 +109,15 @@ with subtest('Synopsis'):
     app = application()
     app.plugin('Mount', {'/flask': 'myflask:app'})
     Pyjo.Test.Pyjo.new(app).get_ok('/flask').content_is('Hello from myflask!')
+
+    # ASGI application, as an object or as the name of its module and its
+    # attribute
+    app = application()
+    app.plugin('Mount', {'/starlette': starlette_app})
+    Pyjo.Test.Pyjo.new(app).get_ok('/starlette').content_is('Hello from starlette_app!')
+    app = application()
+    app.plugin('Mount', {'/starlette': 'mystarlette:app'})
+    Pyjo.Test.Pyjo.new(app).get_ok('/starlette').content_is('Hello from mystarlette!')
 
 with subtest('register'):
     app = application()

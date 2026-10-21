@@ -231,6 +231,27 @@ with subtest('The event loop of a reactor that exists at the exit is closed'):
     is_ok(process.returncode, 0, 'exit status')
     unlike_ok(process.stderr, r'unclosed event loop', 'no ResourceWarning')
 
+with subtest('The tasks that are left at the exit are cancelled before the event loop closes'):
+    script = (
+        'import Pyjo.Reactor.Asyncio\n'
+        'reactor = Pyjo.Reactor.Asyncio.new()\n'
+        'future = reactor.future()\n'
+        'async def wait():\n'
+        '    try:\n'
+        '        await future\n'
+        '    finally:\n'
+        '        print("cancelled")\n'
+        'reactor.run_coroutine(wait(), lambda value: None, lambda e: print(type(e).__name__))\n'
+        'reactor.timer(0, lambda reactor: reactor.stop())\n'
+        'reactor.start()\n'
+    )
+    root = os.path.join(os.path.dirname(__file__), '..', '..')
+    env = {**os.environ, 'PYTHONPATH': root, 'PYTHONWARNINGS': 'always::ResourceWarning'}
+    process = subprocess.run([sys.executable, '-c', script], env=env, capture_output=True, text=True, timeout=30)
+    is_ok(process.returncode, 0, 'exit status')
+    is_ok(process.stdout, 'cancelled\nCancelledError\n', 'task cancelled')
+    is_ok(process.stderr, '', 'no task destroyed while it is pending')
+
 with subtest('A reactor moves to a new loop in the child of a fork'):
     if not hasattr(os, 'fork'):
         skip('no os.fork', 3)
@@ -277,5 +298,14 @@ with subtest('close'):
     ok(not loop.is_closed(), 'event loop')
     reactor.close()
     ok(loop.is_closed(), 'event loop closed')
+
+    # The tasks that are left are cancelled and end before the event loop closes
+    reactor = Pyjo.Reactor.Asyncio.new()
+    loop = reactor.loop
+    rejected = []
+    reactor.run_coroutine(asyncio.sleep(10), lambda value: None, rejected.append)
+    reactor.close()
+    ok(loop.is_closed(), 'event loop closed')
+    ok(len(rejected) and isinstance(rejected[0], asyncio.CancelledError), 'task cancelled')
 
 done_testing()

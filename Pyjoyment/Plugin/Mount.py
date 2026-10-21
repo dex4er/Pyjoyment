@@ -33,11 +33,17 @@ Pyjoyment.Plugin.Mount - Application mount plugin
     plugin('Mount', {'/flask': flask_app})
     plugin('Mount', {'/flask': 'myflask:app'})
 
+    # ASGI application, as an object or as the name of its module and its
+    # attribute
+    plugin('Mount', {'/starlette': starlette_app})
+    plugin('Mount', {'/starlette': 'mystarlette:app'})
+
 :mod:`Pyjoyment.Plugin.Mount` is a plugin that allows you to mount whole
-:mod:`Pyjoyment` applications, other applications of :mod:`Pyjo`, and
-``WSGI`` applications, which :mod:`Pyjo.App.WSGI` runs, as an application of
-:mod:`Pyjo` from a script, an object, or the name of a module and its
-attribute. An application that is not one of :mod:`Pyjoyment` gets the server
+:mod:`Pyjoyment` applications, other applications of :mod:`Pyjo`, ``WSGI``
+applications, which :mod:`Pyjo.App.WSGI` runs, and ``ASGI`` applications,
+whose ``__call__`` is a coroutine function, which :mod:`Pyjo.App.ASGI` runs,
+as an application of :mod:`Pyjo` from a script, an object, or the name of a
+module and its attribute. An application that is not one of :mod:`Pyjoyment` gets the server
 that runs it with :meth:`~Pyjo.App.Pyjo_App.server` before the server starts,
 as the application that mounts it does.
 
@@ -60,6 +66,7 @@ Classes
 """
 
 import Pyjo.App
+import Pyjo.App.ASGI
 import Pyjo.App.WSGI
 import Pyjo.Exception
 import Pyjo.Server
@@ -123,7 +130,7 @@ class Pyjoyment_Plugin_Mount(Pyjoyment.Plugin.object):
 
 
 # Not in Mojolicious: an application as an object, or as the name of a module and its attribute, as ASGI servers take
-# it, and a WSGI application, which Pyjo.App.WSGI runs, where Mojolicious loads a script
+# it, and an ASGI or a WSGI application, which Pyjo.App.ASGI or Pyjo.App.WSGI runs, where Mojolicious loads a script
 def _load(value: Any) -> Pyjo.Server.Application:
     if isinstance(value, str) and re.fullmatch(r'[\w.]+:[\w.]+', value) and not os.path.exists(value):
         module, _, name = value.partition(':')
@@ -139,8 +146,7 @@ def _load(value: Any) -> Pyjo.Server.Application:
     if isinstance(value, Pyjo.App.object):
         return value
     if inspect.iscoroutinefunction(value) or inspect.iscoroutinefunction(type(value).__call__):
-        # TODO: an ASGI application, which Pyjo.App.ASGI will run
-        raise Pyjo.Exception.new(f'ASGI application "{value!r}" is not supported yet')
+        return Pyjo.App.ASGI.new(app=value)
     if not callable(value):
         raise Pyjo.Exception.new(f'"{value!r}" is not an application')
     return Pyjo.App.WSGI.new(app=value)
