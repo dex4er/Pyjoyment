@@ -7,6 +7,12 @@ Pyjoyment is a port of [Mojolicious](https://mojolicious.org) to Python. The
 agent, servers, event loop), and the `Pyjoyment` package is reserved for the
 `Mojolicious::*` framework layer (routes, controllers, renderer, `Lite`).
 
+`Pyjo` does not import `Pyjoyment`. Where a module of `Pyjo`, as an adapter
+of another framework, needs what only the framework has, as the static files
+of `reply.file` or its exception page, it takes it from the controller that a
+route gives it, as `c.helpers.reply.file`, and goes without it when it runs
+on its own.
+
 The code was written against Mojo 6.x. The project is being revived: the
 target is Mojolicious 9 on Python 3.12+, with asyncio as the only I/O core.
 The plan, its order and its progress live in GitHub Issues, starting from the
