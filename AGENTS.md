@@ -90,8 +90,10 @@ of them is a regression.
   `max_clients` as low as 1. Nothing else brings a concurrency of its own: an
   adapter of another framework, as `Pyjo.App.WSGI`, has no pool of threads
   and forks nothing, so a blocking WSGI application blocks the event loop, as
-  any blocking operation does, and `Pyjo.App.ASGI` runs its application with
-  `run_coroutine` of the reactor. A package that needs the next cycle of the
+  any blocking operation does, `Pyjo.App.ASGI` runs its application with
+  `run_coroutine` of the reactor, and `Pyjo.App.CGI` starts the process of
+  each request, which a CGI program is, whose pipes the event loop reads and
+  writes, and which it reaps with a timer, without waiting for it. A package that needs the next cycle of the
   event loop asks the reactor for it, and guards itself against being called
   again from inside the event loop. What only a server knows, as how it runs
   an application, which the flags `wsgi.multithread`, `wsgi.multiprocess`
@@ -234,8 +236,8 @@ port 0 instead, which `ports()` gives.
   an application of Pyjoyment on WSGI or on ASGI in one of `Pyjoyment.Lite`,
   as the examples `mount_wsgi_inception.py` and `mount_asgi_inception.py` do,
   on the WSGI and the ASGI servers, and PHP on php-fpm with
-  `Pyjo.App.FastCGI`, which `setup-php` installs in CI, and without which the
-  test is skipped. The servers and
+  `Pyjo.App.FastCGI` and on php-cgi with `Pyjo.App.CGI`, which `setup-php`
+  installs in CI, and without which the tests are skipped. The servers and
   the frameworks are in the dependency group `servers`, not in
   `dependencies`; without it, the tests are skipped.
 - `t/lib/` holds helpers shared by the tests. Run on their own, they skip with
@@ -518,7 +520,14 @@ application of Pyjo that runs a WSGI application, inspired by
 `Pyjo.App.ASGI` (the application of Pyjo that runs an ASGI application, the
 reverse of `Pyjo.Server.ASGI`), `Pyjo.App.FastCGI` (the application of Pyjo
 that runs a FastCGI application, as PHP on php-fpm, through a connection to
-it, the reverse of `Pyjo.Server.FastCGI`),
+it, the reverse of `Pyjo.Server.FastCGI`), `Pyjo.App.CGI` (the application of
+Pyjo that runs a CGI program in a process of its own for each request, the
+reverse of `Pyjo.Server.CGI`, inspired by `Mojolicious::Plugin::CGI` of CPAN,
+whose base class has the response of CGI that `Pyjo.App.FastCGI` shares; the
+standard input of the program has a watcher of its own, not a
+`Pyjo.IOLoop.Stream`, which handles an error of a write only when it reads, as
+Mojo does, so that a pipe that is only written would be watched for ever after
+the program closes it),
 `Pyjo.Server.Lambda`
 and `Pyjoyment.Command.lambda` (the server and the command of the event
 functions of AWS Lambda, inspired by `Pyjo.Server.WSGI` and its command),
