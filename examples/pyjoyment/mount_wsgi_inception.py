@@ -14,4 +14,5 @@ plugin('Mount', {'/wsgi': wsgi})
 
 get('/', {'text': 'I ♥ Pyjoyment!'})
 
-app.start()
+# The application of a WSGI server too, which PYJO_WSGI tells: PYJO_WSGI=1 gunicorn mount_wsgi_inception:application
+application = app.start()
