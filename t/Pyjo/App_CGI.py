@@ -421,6 +421,8 @@ import sys
 
 sys.path.insert(0, {repo!r})
 
+import Pyjo.IOLoop
+
 from Pyjoyment.Lite import app, get, post
 
 app.log.level = 'fatal'
@@ -428,6 +430,14 @@ get('/', lambda c: c.render(text=f'Hello CGI at {{c.url_for("/")}} for {{c.req.u
 post('/echo', lambda c: c.render(data=c.req.body))
 get('/chunks', lambda c: c.write_chunk(b'one', lambda c: c.write_chunk(b'two', lambda c: c.finish())))
 get('/gone', lambda c: c.render(text='gone', status=410))
+
+
+@get('/later')
+def later(c):
+    c.render_later()
+    Pyjo.IOLoop.timer(0.01, lambda loop: c.render(text='later'))
+
+
 app.start(*sys.argv[1:])
 """
     program(lite, 'hello.cgi', code)
@@ -438,6 +448,8 @@ app.start(*sys.argv[1:])
         t.get_ok('/lite/hello.cgi/').status_is(200).content_is('Hello CGI at /lite/hello.cgi for /!')
         t.post_ok('/lite/hello.cgi/echo', b'echo').status_is(200).content_is('echo')
         t.get_ok('/lite/hello.cgi/missing').status_is(404)
+        t.get_ok('/lite/hello.cgi/chunks').status_is(200).content_is('onetwo')
+        t.get_ok('/lite/hello.cgi/later').status_is(200).content_is('later')
         t.get_ok('/lite/nph-hello.cgi').status_is(200).content_is('Hello CGI at /lite/nph-hello.cgi for /!')
         t.post_ok('/lite/nph-hello.cgi/echo', b'echo').status_is(200).content_is('echo')
         t.get_ok('/lite/nph-hello.cgi/chunks').status_is(200).content_is('onetwo')

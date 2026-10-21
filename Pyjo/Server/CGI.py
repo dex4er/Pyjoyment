@@ -52,8 +52,12 @@ Pyjo.Server.CGI - CGI server
 :mod:`Pyjo.Server.CGI` is a simple and portable implementation of
 :rfc:`3875`.
 
-The content of the response can come later, as the event loop of
-:mod:`Pyjo.IOLoop` runs while the script waits for it. The request body is
+The response can come later, as the event loop of :mod:`Pyjo.IOLoop` runs
+while the script waits for it, and the script writes it once the application
+resumes the transaction. The body of chunks is written without the chunked
+transfer encoding, as a script returns no header that relates to the
+connection of the client, which the web server makes, except in non-parsed
+header mode, whose response goes to the client as it is. The request body is
 read with the length of ``CONTENT_LENGTH``, so a chunked request, which has
 none, reaches the application without its body.
 
@@ -88,6 +92,7 @@ import Pyjo.Message.Response
 import Pyjo.Server
 
 import os
+import re
 import sys
 
 from typing import Any, BinaryIO, cast
@@ -143,7 +148,13 @@ class Pyjo_Server_CGI(Pyjo.Server.object):
             if length <= 0:
                 break
 
+        # Unlike Mojolicious: the response once the application resumes the transaction, as the daemon writes it, as the
+        # event loop runs while the script waits, where Mojo writes the default response of a later one
+        resumed: list[Any] = []
+        tx.on('resume', resumed.append)
         self.emit('request', tx)
+        while not resumed:
+            Pyjo.IOLoop.one_tick()
 
         # Response start-line
         res = tx.res.fix_headers()
@@ -155,11 +166,19 @@ class Pyjo_Server_CGI(Pyjo.Server.object):
         msg = res.message or res.default_message()
         if not self.nph:
             res.headers.status = f'{code} {msg}'
+
+        # Unlike Mojolicious: the body of chunks without the chunked transfer encoding, as a script returns no header
+        # that relates to the connection of the client (RFC 3875 6.3.4), which the web server writes, where Mojo writes
+        # the chunks with their sizes
+        decode = None
+        if not self.nph and res.content.is_chunked:
+            res.headers.remove('Transfer-Encoding')
+            decode = _Chunks()
         if not _write(res, 'get_header_chunk'):
             return None
 
         # Response body
-        if not tx.is_empty and not _write(res, 'get_body_chunk'):
+        if not tx.is_empty and not _write(res, 'get_body_chunk', decode):
             return None
 
         # Finish transaction
@@ -168,7 +187,7 @@ class Pyjo_Server_CGI(Pyjo.Server.object):
         return res.code
 
 
-def _write(res: Pyjo.Message.Response.object, method: str) -> bool:
+def _write(res: Pyjo.Message.Response.object, method: str, decode: '_Chunks | None' = None) -> bool:
     # Text written to sys.stdout before goes first
     sys.stdout.flush()
     stdout = cast(BinaryIO, sys.stdout.buffer)
@@ -189,10 +208,42 @@ def _write(res: Pyjo.Message.Response.object, method: str) -> bool:
         offset += length
         if stdout.closed:
             return False
+        # Not in Mojolicious: the chunks without their sizes
+        if decode is not None and not len(chunk := decode(chunk)):
+            continue
         stdout.write(chunk)
         stdout.flush()
 
     return True
+
+
+# Not in Mojolicious: the body of the chunks of a dynamic response, without the sizes that write_chunk of Pyjo.Content
+# writes before them
+class _Chunks:
+    def __init__(self) -> None:
+        self.buffer = b''
+        self.left = 0
+
+    def __call__(self, chunk: bytes) -> bytes:
+        self.buffer += chunk
+        body = b''
+        while len(self.buffer):
+            if self.left:
+                part = self.buffer[: self.left]
+                body += part
+                self.buffer = self.buffer[len(part) :]
+                self.left -= len(part)
+                continue
+
+            # The size of the next chunk, after the end of the one before, and none at the end
+            if (m := re.match(rb'(?:\r\n)?([0-9a-fA-F]+)\r\n', self.buffer)) is None:
+                break
+            self.buffer = self.buffer[m.end() :]
+            if not (left := int(m[1], 16)):
+                self.buffer = b''
+                break
+            self.left = left
+        return body
 
 
 new = Pyjo_Server_CGI.new
