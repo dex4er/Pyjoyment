@@ -104,6 +104,7 @@ import Pyjo.EventEmitter
 import Pyjo.IOLoop
 import Pyjo.Reactor
 
+import builtins
 import os
 import select
 import ssl
@@ -115,8 +116,10 @@ from types import TracebackType
 from typing import Any, Self
 
 
+type Anything = builtins.object
+
 # A callback of a write gets the stream once all data has been written
-type DrainCallback = Callable[[Any], object]
+type DrainCallback = Callable[[Any], Anything]
 
 
 class Pyjo_IOLoop_Stream(Pyjo.EventEmitter.object):
