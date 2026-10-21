@@ -11,7 +11,7 @@ on:
       - created
   push:
     branches:
-      - master
+      - main
     paths:
       - .trunk/**
   schedule:
@@ -78,7 +78,7 @@ jobs:
           title="Automated trunk upgrade $(cat .github/pr_title.log)"
           if [[ $(gh pr view "${BRANCH}" --json state --jq .state || true) != "OPEN" ]]; then
             gh pr create \
-              --base master \
+              --base main \
               --head "${BRANCH}" \
               --title "${title}" \
               --body-file .github/pr_body.log \

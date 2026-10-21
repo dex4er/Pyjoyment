@@ -1386,7 +1386,7 @@ permanent file with :meth:`Pyjo.Message.Pyjo_Message.save_to`.
 
     # Fetch the latest Pyjoyment tarball
     ua = Pyjo.UserAgent.new(max_redirects=5)
-    tx = ua.get('https://github.com/dex4er/Pyjoyment/tarball/master')
+    tx = ua.get('https://github.com/dex4er/Pyjoyment/tarball/main')
     tx.result.save_to('pyjoyment.tar.gz')
 
 With :meth:`Pyjo.File.Pyjo_File.download` you can also stream file downloads
@@ -1398,7 +1398,7 @@ resumed at a later time.
     import Pyjo.File
 
     # Download the latest Pyjoyment tarball directly into a file
-    Pyjo.File.path('/home/sri/pyjoyment.tar.gz').download('https://github.com/dex4er/Pyjoyment/tarball/master')
+    Pyjo.File.path('/home/sri/pyjoyment.tar.gz').download('https://github.com/dex4er/Pyjoyment/tarball/main')
 
 To protect you from excessively large files there is also a limit of 2GiB by
 default, which you can tweak with the attribute

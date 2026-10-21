@@ -8,7 +8,7 @@ name: Bundle Check
 on:
   pull_request:
     branches:
-      - master
+      - main
     paths:
       - .github/workflows/bundle-check.yaml
       - package-lock.json
@@ -37,7 +37,7 @@ jobs:
 
     steps:
       # A Renovate branch is checked out at its head rather than merged with
-      # master, so that the copied files match the branch they are committed
+      # main, so that the copied files match the branch they are committed
       # to.
       - name: Checkout
         uses: actions/checkout@v7

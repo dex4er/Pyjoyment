@@ -84,7 +84,7 @@ process, which usually ends when the maintainer has reviewed the changes.
 
 All code changes should emulate the style of the surrounding code, include
 tests that fail without them, and update relevant documentation. `AGENTS.md
-<https://github.com/dex4er/Pyjoyment/blob/master/AGENTS.md>`_ in the
+<https://github.com/dex4er/Pyjoyment/blob/main/AGENTS.md>`_ in the
 repository describes how the project works and why, how a module is ported
 from Mojolicious, and how the tests, the linters and the documentation are
 run, for people and coding agents alike.

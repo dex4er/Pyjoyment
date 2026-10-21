@@ -33,7 +33,7 @@ scratch directory and adapt them to what it measures, keeping the rules in
 | Script                                         | What it does                                                                                                                                                                                                                                |
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `bench.sh [SCENARIO...]`                       | Every server, or the scenarios named: keep-alive 3 times, a new connection per request, and `ab -c 1`                                                                                                                                       |
-| `ab.sh [-n PAIRS] [-r REACTOR]... [REF]`       | `Pyjo.Server.Daemon` of a git ref (default `master`) against the working tree, interleaved, with the medians and the gain                                                                                                                   |
+| `ab.sh [-n PAIRS] [-r REACTOR]... [REF]`       | `Pyjo.Server.Daemon` of a git ref (default `main`) against the working tree, interleaved, with the medians and the gain                                                                                                                     |
 | `profile.sh [-n REQUESTS] [-r REACTOR] [ROOT]` | `cProfile` of `Pyjo.Server.Daemon` under keep-alive requests, with the function calls per request and the top of the profile                                                                                                                |
 | `ka.py PORT N`                                 | The client: `GET /` on one connection, reads by `Content-Length`; `RECONNECT=1` opens a connection for every request, `WARMUP` sets the requests before the measurement                                                                     |
 | `workers.sh [PATTERN...]`                      | `Pyjo.Server.Prefork` and `Pyjo.Server.Prethread` on a CPython with the GIL and free-threaded, `Pyjo.Server.Prefork` on PyPy, and the other servers with as many workers, rounds of oha at several numbers of connections, with the medians |
@@ -50,7 +50,7 @@ with a route, which answers `Your Pyjoyment is working!`: `pyjoyment_hello.py`,
 ```sh
 PYTHON=$(mise exec -- which python) PYPY=pypy3 benchmarks/bench.sh
 PYTHON=$(mise exec -- which python) benchmarks/bench.sh pyjo-daemon-asyncio pyjo-daemon-poll
-PYTHON=$(mise exec -- which python) benchmarks/ab.sh -n 8 -r Asyncio master
+PYTHON=$(mise exec -- which python) benchmarks/ab.sh -n 8 -r Asyncio main
 PYTHON=$(mise exec -- which python) benchmarks/profile.sh -r Poll
 ```
 
