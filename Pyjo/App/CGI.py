@@ -29,7 +29,7 @@ Pyjo.App.CGI - CGI application
 
 :mod:`Pyjo.App.CGI` is an application of :mod:`Pyjo` that runs a ``CGI``
 program, as :rfc:`3875` describes it, in a process of its own for each
-request, so that a server of :mod:`Pyjo` serves it, a route of
+request, which :mod:`Pyjo.IOLoop.ChildProcess` runs, so that a server of :mod:`Pyjo` serves it, a route of
 :mod:`Pyjoyment` embeds it, as :mod:`Pyjoyment.Plugin.Mount` does, and
 :mod:`Pyjo.Test.Pyjo` tests it.
 
@@ -58,8 +58,8 @@ the connection of the client, as one that is quiet for longer than
 connection of the client waits for without the inactivity timeout of the
 server. The process of a request whose client is gone is killed.
 
-The event loop watches the pipes of the process, which it can on POSIX
-systems, not on Windows, where the response is ``502``.
+The reactor watches the pipes of the process, which it can on POSIX systems,
+not on Windows, where the response is ``502``.
 
 Attributes
 ----------
@@ -71,7 +71,7 @@ See also
 --------
 
 :mod:`Pyjoyment`, :mod:`Pyjoyment.Plugin.Mount`, :mod:`Pyjo.App.FastCGI`,
-:mod:`Pyjo.Server.CGI`, https://mojolicious.org.
+:mod:`Pyjo.IOLoop.ChildProcess`, :mod:`Pyjo.Server.CGI`, https://mojolicious.org.
 
 It has no counterpart in Mojolicious; it is the reverse of
 :mod:`Pyjo.Server.CGI`, inspired by ``Mojolicious::Plugin::CGI`` of CPAN.
@@ -83,15 +83,13 @@ Classes
 import Pyjo.App
 import Pyjo.Exception
 import Pyjo.IOLoop
-import Pyjo.IOLoop.Stream
+import Pyjo.IOLoop.ChildProcess
 import Pyjo.Message.Response
 import Pyjo.Transaction
 
-import atexit
-import functools
 import os
 import re
-import subprocess
+import signal
 import wsgiref.util
 
 from typing import Any
@@ -99,10 +97,6 @@ from typing import Any
 
 # The headers of a response by X-Sendfile that the file takes the place of
 _SENT = ('content-length', 'x-sendfile')
-
-# The processes that the event loop has not reaped yet, which the end of the interpreter kills and reaps, as Python
-# warns of a process that still runs when it frees its object
-_processes: set[subprocess.Popen[bytes]] = set()
 
 
 class Pyjo_App_CGI(Pyjo.App.object):
@@ -538,10 +532,8 @@ class _Response:
 class _Call(_Response):
     def __init__(self, app: Pyjo_App_CGI, config: dict[str, Any], tx: Any, c: Any) -> None:
         super().__init__(app, config, tx, c)
-        self.buffer = b''
+        self.child: Pyjo.IOLoop.ChildProcess.object | None = None
         self.command = app.command
-        self.input: Any = None
-        self.process: subprocess.Popen[bytes] | None = None
 
     def _closed(self, stream: Any) -> None:
         self.stream = None
@@ -558,60 +550,33 @@ class _Call(_Response):
     def _error(self, stream: Any, err: Any) -> None:
         self._failed(f'CGI application failed: {err}')
 
-    def _ignore(self, stream: Any, err: Any) -> None:
-        pass
-
     # The standard error of the program
     def _log(self, stream: Any, chunk: bytes) -> None:
         if message := chunk.decode('utf-8', 'replace').rstrip():
             self.app.log.warn(f'CGI application: {message}')
 
+    # The program, or the command that runs the script, in the directory of its file
     def _open(self, params: dict[str, str]) -> None:
-        if os.name == 'nt':
-            return self._failed('CGI applications need pipes that the event loop watches, which Windows does not have')
-
-        # The program, or the command that runs the script, in the directory of its file
         file = params['SCRIPT_FILENAME'].encode('latin-1')
         nph = self.app.nph
         self.nph = os.path.basename(file).startswith(b'nph-') if nph is None else nph
         env = {name.encode('latin-1'): value.encode('latin-1') for name, value in params.items()}
-        try:
-            self.process = process = subprocess.Popen(
-                [*(self.command or []), file],
-                bufsize=0,
-                cwd=os.path.dirname(file) or None,
-                env=env,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-            )
-        except OSError as e:
-            return self._failed(f"Can't run CGI application: {e.strerror or e}")
-        _processes.add(process)
-        assert process.stdin is not None and process.stdout is not None and process.stderr is not None
-        for handle in (process.stdin, process.stdout, process.stderr):
-            os.set_blocking(handle.fileno(), False)
+        self.child = child = Pyjo.IOLoop.spawn(
+            [*(self.command or []), file], cwd=os.path.dirname(file) or None, env=env
+        )
+        child.on('error', self._unstarted)
+        if (stream := child.stdout) is None or (errors := child.stderr) is None:
+            return
 
         # The standard output, the response, and the standard error, which is logged until its end
-        self.stream = stream = Pyjo.IOLoop.Stream.new(process.stdout)
-        stream.timeout = 0
-        Pyjo.IOLoop.stream(stream)
+        self.stream = stream
         stream.timeout = self.inactivity
         stream.on('read', self._read)
         stream.on('close', self._closed)
         stream.on('error', self._error)
         stream.on('timeout', self._timeout)
-        errors = Pyjo.IOLoop.Stream.new(process.stderr)
-        errors.timeout = 0
-        Pyjo.IOLoop.stream(errors)
         errors.on('read', self._log)
-        errors.on('error', self._ignore)
-
-        # The standard input, the body of the request, which the event loop writes to without reading
-        self.input = process.stdin
-        reactor = Pyjo.IOLoop.singleton.reactor
-        reactor.io(process.stdin, self._write)
-        reactor.watch(process.stdin, False, True)
+        self._write()
 
     def _read(self, stream: Any, chunk: bytes) -> None:
         if self.done:
@@ -619,26 +584,6 @@ class _Call(_Response):
         self._stdout(chunk)
         if not self.done:
             self._flush(False)
-
-    def _stop(self) -> None:
-        self._stop_input()
-        if (stream := self.stream) is not None:
-            self.stream = None
-            stream.close()
-
-        # The process of a response that has failed, or of a client that is gone, which the end of its output does not
-        # end
-        if (process := self.process) is not None:
-            self.process = None
-            if self.aborted and process.poll() is None:
-                process.kill()
-            _reap(process)
-
-    def _stop_input(self) -> None:
-        if (handle := self.input) is not None:
-            self.input = None
-            Pyjo.IOLoop.singleton.reactor.remove(handle)
-            handle.close()
 
     # The program of the first parts of the path that are a file of the directory, as cgi-bin, or of the path up to its
     # first part with one of the extensions, which is a file of the directory, as the command runs no other file
@@ -659,45 +604,34 @@ class _Call(_Response):
                     return True
         return False
 
+    # The end of the request, with the process of a response that has failed, or of a client that is gone, which the
+    # end of its output does not end
+    def _stop(self) -> None:
+        if (stream := self.stream) is not None:
+            self.stream = None
+            stream.close()
+        if (child := self.child) is not None:
+            self.child = None
+            if (stdin := child.stdin) is not None:
+                stdin.close()
+            if self.aborted:
+                child.kill(signal.SIGKILL)
+
     def _timeout(self, stream: Any) -> None:
         self._failed('CGI application inactive')
 
-    # The body of the request, a chunk once the one before has been written, and the end of the input after it
-    def _write(self, reactor: Any, writable: bool) -> None:
-        if (handle := self.input) is None:
+    def _unstarted(self, child: Any, err: Any) -> None:
+        self._failed(f"Can't run CGI application: {getattr(err, 'strerror', None) or err}")
+
+    # The body of the request on the standard input, a chunk once the one before has been written, and its end
+    def _write(self, *args: Any) -> None:
+        if (child := self.child) is None or (stdin := child.stdin) is None:
             return
-        if not len(self.buffer):
-            chunk = self.tx.req.content.get_body_chunk(self.offset) or b''
-            if not len(chunk):
-                return self._stop_input()
-            self.offset += len(chunk)
-            self.buffer = chunk
-        try:
-            written = os.write(handle.fileno(), self.buffer)
-        except BlockingIOError:
-            return
-
-        # The program does not read its input
-        except OSError:
-            return self._stop_input()
-        self.buffer = self.buffer[written:]
-
-
-@atexit.register
-def _kill() -> None:
-    for process in list(_processes):
-        if process.poll() is None:
-            process.kill()
-        process.wait()
-    _processes.clear()
-
-
-# A process, once it has ended
-def _reap(process: subprocess.Popen[bytes], *args: Any) -> None:
-    if process.poll() is None:
-        Pyjo.IOLoop.timer(0.1, functools.partial(_reap, process))
-    else:
-        _processes.discard(process)
+        chunk = self.tx.req.content.get_body_chunk(self.offset) or b''
+        if not len(chunk):
+            return stdin.close_gracefully()
+        self.offset += len(chunk)
+        stdin.write(chunk, self._write)
 
 
 # Characters of the bytes of a string of the system, as the parameters have them

@@ -91,9 +91,10 @@ of them is a regression.
   adapter of another framework, as `Pyjo.App.WSGI`, has no pool of threads
   and forks nothing, so a blocking WSGI application blocks the event loop, as
   any blocking operation does, `Pyjo.App.ASGI` runs its application with
-  `run_coroutine` of the reactor, and `Pyjo.App.CGI` starts the process of
-  each request, which a CGI program is, whose pipes the event loop reads and
-  writes, and which it reaps with a timer, without waiting for it. A package that needs the next cycle of the
+  `run_coroutine` of the reactor, and `Pyjo.App.CGI` runs the program of
+  each request, which a CGI program is, with `Pyjo.IOLoop.ChildProcess`,
+  whose pipes the reactor reads and writes, and which it reaps with a timer,
+  without waiting for it. A package that needs the next cycle of the
   event loop asks the reactor for it, and guards itself against being called
   again from inside the event loop. What only a server knows, as how it runs
   an application, which the flags `wsgi.multithread`, `wsgi.multiprocess`
@@ -523,11 +524,14 @@ that runs a FastCGI application, as PHP on php-fpm, through a connection to
 it, the reverse of `Pyjo.Server.FastCGI`), `Pyjo.App.CGI` (the application of
 Pyjo that runs a CGI program in a process of its own for each request, the
 reverse of `Pyjo.Server.CGI`, inspired by `Mojolicious::Plugin::CGI` of CPAN,
-whose base class has the response of CGI that `Pyjo.App.FastCGI` shares; the
-standard input of the program has a watcher of its own, not a
-`Pyjo.IOLoop.Stream`, which handles an error of a write only when it reads, as
+whose base class has the response of CGI that `Pyjo.App.FastCGI` shares),
+`Pyjo.IOLoop.ChildProcess` (a program in a process of its own, with its
+standard input, output and error as `Pyjo.IOLoop.Stream` objects, inspired by
+`child_process` of Node.js, whose standard input is a stream that closes when
+a write fails, as a stream handles an error of a write only when it reads, as
 Mojo does, so that a pipe that is only written would be watched for ever after
-the program closes it),
+the program closes it, and a reactor of poll reports its hang-up when it
+watches for nothing),
 `Pyjo.Server.Lambda`
 and `Pyjoyment.Command.lambda` (the server and the command of the event
 functions of AWS Lambda, inspired by `Pyjo.Server.WSGI` and its command),
