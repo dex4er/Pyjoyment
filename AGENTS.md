@@ -1438,4 +1438,4 @@ and the pull request.
 - A pull request description lists the changes and a validation checklist;
   check an item only once it has been verified.
 - A change of `AGENTS.md` alone, as what a distribution of its own teaches, is
-  committed on `master` directly, without a pull request.
+  committed on `main` directly, without a pull request.

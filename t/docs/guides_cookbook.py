@@ -610,15 +610,15 @@ with subtest('Large file downloads and uploads'):
     with tempfile.TemporaryDirectory() as tmp:
         # Fetch the latest Pyjoyment tarball
         with Pyjo.UserAgent.new(max_redirects=5) as ua, remote(ua):
-            tx = ua.get('https://github.com/dex4er/Pyjoyment/tarball/master')
+            tx = ua.get('https://github.com/dex4er/Pyjoyment/tarball/main')
             tx.result.save_to(Pyjo.File.path(tmp, 'pyjoyment.tar.gz').to_str())
-        like_ok(Pyjo.File.path(tmp, 'pyjoyment.tar.gz').slurp(), re.compile(rb'dex4er/Pyjoyment/tarball/master'))
+        like_ok(Pyjo.File.path(tmp, 'pyjoyment.tar.gz').slurp(), re.compile(rb'dex4er/Pyjoyment/tarball/main'))
 
         # Download the latest Pyjoyment tarball directly into a file
         with Pyjo.UserAgent.new(max_redirects=10, max_response_size=0) as ua, remote(ua):
             target = Pyjo.File.path(tmp, 'download.tar.gz')
-            ok(target.download('https://github.com/dex4er/Pyjoyment/tarball/master', ua=ua), 'downloaded')
-        like_ok(target.slurp(), re.compile(rb'dex4er/Pyjoyment/tarball/master'), 'file')
+            ok(target.download('https://github.com/dex4er/Pyjoyment/tarball/main', ua=ua), 'downloaded')
+        like_ok(target.slurp(), re.compile(rb'dex4er/Pyjoyment/tarball/main'), 'file')
 
         # Increase limit to 10GiB
         with Pyjo.UserAgent.new() as ua:

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ab.sh [-n PAIRS] [-r REACTOR]... [REF]: Pyjo.Server.Daemon of REF (default: master) against the working
+# ab.sh [-n PAIRS] [-r REACTOR]... [REF]: Pyjo.Server.Daemon of REF (default: main) against the working
 # tree, keep-alive on one connection, the two interleaved, so that a change of the load of the machine
 # hits both alike
 #
@@ -18,7 +18,7 @@ while getopts n:r: opt; do
   esac
 done
 shift $((OPTIND - 1))
-ref=${1:-master}
+ref=${1:-main}
 [[ ${#reactors[@]} -gt 0 ]] || reactors=(Asyncio Poll)
 
 W=$(mktemp -d)/ref
