@@ -5,6 +5,7 @@ from Pyjo.Test import *
 
 import importlib
 import importlib.util
+import json
 import os
 import shutil
 import sys
@@ -27,21 +28,44 @@ Server = importlib.import_module('ServerProcess').Server
 EXAMPLE = os.path.join(os.path.dirname(__file__), '..', '..', 'examples', 'pyjoyment', 'mount_wsgi_inception.py')
 PYTHON = sys.executable
 UWSGI = shutil.which('uwsgi', path=os.path.dirname(sys.executable))
-GUNICORN = [PYTHON, '-m', 'gunicorn', 'inception:application', '--bind', '127.0.0.1:{port}']
+GUNICORN = [PYTHON, '-m', 'gunicorn', 'served:application', '--bind', '127.0.0.1:{port}']
+# The servers, and wsgi.multithread, wsgi.multiprocess and wsgi.run_once that they set
 SERVERS = [
-    ('Gunicorn', importlib.util.find_spec('gunicorn'), GUNICORN),
-    ('Gunicorn with threads', importlib.util.find_spec('gunicorn'), [*GUNICORN, '--threads', '4']),
-    ('uWSGI', UWSGI, [UWSGI, '--http-socket', '127.0.0.1:{port}', '--module', 'inception:application']),
-    ('Waitress', True, [PYTHON, '-m', 'waitress', '--listen=127.0.0.1:{port}', 'inception:application']),
+    ('Gunicorn', importlib.util.find_spec('gunicorn'), GUNICORN, [False, False, False]),
+    (
+        'Gunicorn with threads',
+        importlib.util.find_spec('gunicorn'),
+        [*GUNICORN, '--threads', '4'],
+        [True, False, False],
+    ),
+    (
+        'Gunicorn with workers',
+        importlib.util.find_spec('gunicorn'),
+        [*GUNICORN, '--workers', '2'],
+        [False, True, False],
+    ),
+    (
+        'uWSGI',
+        UWSGI,
+        [UWSGI, '--http-socket', '127.0.0.1:{port}', '--module', 'served:application'],
+        [False, False, False],
+    ),
+    (
+        'Waitress',
+        True,
+        [PYTHON, '-m', 'waitress', '--listen=127.0.0.1:{port}', 'served:application'],
+        [True, False, False],
+    ),
     (
         'Werkzeug',
         importlib.util.find_spec('werkzeug'),
         [
             PYTHON,
             '-c',
-            'from werkzeug.serving import run_simple; from inception import application; '
+            'from werkzeug.serving import run_simple; from served import application; '
             "run_simple('127.0.0.1', {port}, application, threaded=True)",
         ],
+        [True, False, False],
     ),
 ]
 
@@ -101,7 +125,24 @@ with subtest('Flask'):
 with tempfile.TemporaryDirectory() as dir:
     shutil.copy(EXAMPLE, os.path.join(dir, 'inception.py'))
 
-    for name, available, command in SERVERS:
+    # The example, with a WSGI application that gives the flags of the WSGI server, which the servers run
+    with open(os.path.join(dir, 'served.py'), 'w') as file:
+        file.write("""\
+import json
+
+from inception import app, application
+
+
+def flags(environ, start_response):
+    start_response('200 OK', [('Content-Type', 'application/json')])
+    keys = ('wsgi.multithread', 'wsgi.multiprocess', 'wsgi.run_once')
+    return [json.dumps([bool(environ[key]) for key in keys]).encode()]
+
+
+app.plugin('Mount', {'/flags': flags})
+""")
+
+    for name, available, command, model in SERVERS:
         if not available:
             continue
 
@@ -126,6 +167,11 @@ with tempfile.TemporaryDirectory() as dir:
 
                 status, headers, body = server.request('GET', '/wsgi/foo')
                 is_ok(status, 404, 'not found')
+
+                # The flags of the WSGI server for the WSGI application mounted in the application of Pyjoyment
+                status, headers, body = server.request('GET', '/flags')
+                is_ok(status, 200, 'right status')
+                is_deeply_ok(json.loads(body), model, 'flags of the WSGI server')
             except Exception:
                 diag(server.output())
                 raise

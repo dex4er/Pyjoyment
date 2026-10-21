@@ -148,12 +148,18 @@ class Pyjo_App_WSGI(Pyjo.App.object):
         say how the server runs the application: in the threads of the workers
         of :mod:`Pyjo.Server.Prethread`, in the processes of the workers of
         :mod:`Pyjo.Server.Prefork`, or in a process for each request of
-        :mod:`Pyjo.Server.CGI`.
+        :mod:`Pyjo.Server.CGI`. Under a ``WSGI`` server, as
+        :mod:`Pyjo.Server.WSGI` runs an application of :mod:`Pyjoyment`, they
+        are those of the environment of the request, which the ``WSGI``
+        server sets.
         """
         self._server = weakref.ref(server)
 
-    # wsgi.multithread, wsgi.multiprocess and wsgi.run_once for the server that runs the application
-    def _model(self) -> tuple[bool, bool, bool]:
+    # wsgi.multithread, wsgi.multiprocess and wsgi.run_once for the server that runs the application, or of the WSGI
+    # server, whose environment of the request Pyjo.Server.WSGI keeps
+    def _model(self, tx: Any) -> tuple[bool, bool, bool]:
+        if 'wsgi.multiprocess' in (env := tx.req.env):
+            return bool(env.get('wsgi.multithread')), bool(env['wsgi.multiprocess']), bool(env.get('wsgi.run_once'))
         server = ref() if (ref := self._server) is not None else None
         if isinstance(server, Pyjo.Server.Prethread.object):
             return server.workers > 1, False, False
@@ -161,7 +167,6 @@ class Pyjo_App_WSGI(Pyjo.App.object):
             return False, server.workers > 1, False
         if isinstance(server, Pyjo.Server.CGI.object):
             return False, True, True
-        # TODO: the flags of the environment of a WSGI server, which Pyjo.Server.WSGI has for its request
         return False, False, False
 
 
@@ -181,7 +186,7 @@ class _Call:
     def start(self) -> None:
         self.tx.on('finish', self._finish)
         try:
-            self._step(self.response.start(self.application, _environ(self.tx, self.c, self.app._model())))  # pyright: ignore[reportPrivateUsage]
+            self._step(self.response.start(self.application, _environ(self.tx, self.c, self.app._model(self.tx))))  # pyright: ignore[reportPrivateUsage]
         except Exception as e:
             self._error(e)
 

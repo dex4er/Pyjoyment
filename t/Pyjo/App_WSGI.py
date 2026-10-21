@@ -138,6 +138,16 @@ with subtest('Server'):
         app.server(prefork)
         is_deeply_ok(model(app, '/flags'), [False, True, False], 'prefork of the application that mounts it')
 
+    # The flags of the WSGI server, which Pyjo.Server.WSGI keeps in the environment of the request
+    with Pyjo.App.WSGI.new(app=flags) as wsgi:
+        env = {'PATH_INFO': '/prefix', 'wsgi.multithread': True, 'wsgi.multiprocess': True, 'wsgi.run_once': False}
+        wsgiref.util.setup_testing_defaults(env)
+        body = Pyjo.Server.WSGI.new(app=application(wsgi)).to_wsgi_app()(env, lambda *args: None)
+        try:
+            is_deeply_ok(decode_json(b''.join(body)), [True, True, False], 'flags of the WSGI server')
+        finally:
+            body.close()
+
 with subtest('Headers joined'):
     with Pyjo.App.WSGI.new(app=echo) as app:
         t = Pyjo.Test.Pyjo.new(app)
