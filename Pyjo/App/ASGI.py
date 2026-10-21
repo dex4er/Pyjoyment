@@ -32,7 +32,9 @@ application, as https://asgi.readthedocs.io describes it, so that a server of
 
 The part of the path that a route embeds the application under is
 ``root_path``, after the base path of the request, and ``path`` is the whole
-path, with ``root_path`` in front of it. The body of the request is the
+path, with ``root_path`` in front of it. A route that embeds the application
+at a part of the path that does not end with a slash, as ``/php`` of
+``/phpx``, which ``root_path`` cannot be, does not find it. The body of the request is the
 message ``http.request`` of ``receive``, in chunks with ``more_body``, and
 the next ``receive`` waits for the end of the connection, the message
 ``http.disconnect``.

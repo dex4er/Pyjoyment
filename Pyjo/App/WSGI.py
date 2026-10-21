@@ -32,7 +32,9 @@ serves it, a route of :mod:`Pyjoyment` embeds it, as
 
 The part of the path that a route embeds the application under is
 ``SCRIPT_NAME``, after the base path of the request, and the rest of the path is
-``PATH_INFO``. The body of the request is ``wsgi.input``, of the length of
+``PATH_INFO``. A route that embeds the application at a part of the path that
+does not end with a slash, as ``/php`` of ``/phpx``, which ``SCRIPT_NAME``
+cannot be, does not find it. The body of the request is ``wsgi.input``, of the length of
 ``CONTENT_LENGTH``, also when the request was chunked.
 
 A ``WSGI`` application blocks, and it runs in the event loop, which waits for

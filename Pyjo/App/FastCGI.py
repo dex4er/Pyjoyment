@@ -36,7 +36,9 @@ of a responder, so that a server of :mod:`Pyjo` serves it, a route of
 
 The parameters of the request are its environment of ``CGI``: the part of the
 path that a route embeds the application under is ``SCRIPT_NAME``, after the
-base path of the request, the rest of the path is ``PATH_INFO``, ``/`` for
+base path of the request, which a part of the path that does not end with a
+slash, as ``/php`` of ``/phpx``, cannot be, so that the application is not
+found there, the rest of the path is ``PATH_INFO``, ``/`` for
 the path of the mount itself, as an empty one is the whole path in
 ``SCRIPT_NAME`` for a server of ``FastCGI``, ``REQUEST_URI`` is the path with
 the query, without the header ``Proxy``, whose ``HTTP_PROXY`` an application
