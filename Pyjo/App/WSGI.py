@@ -74,14 +74,18 @@ Classes
 import Pyjo.App
 import Pyjo.Exception
 import Pyjo.IOLoop
+import Pyjo.Server
+import Pyjo.Server.CGI
+import Pyjo.Server.Prefork
+import Pyjo.Server.Prethread
 import Pyjo.Transaction
 
 from Pyjo.Util import url_unescape
 
 import io
 import sys
-import threading
 import traceback
+import weakref
 import wsgiref.util
 
 from collections.abc import Callable, Iterable, Iterator
@@ -111,6 +115,7 @@ class Pyjo_App_WSGI(Pyjo.App.object):
         The ``WSGI`` application to run.
         """
 
+        self._server: weakref.ref[Pyjo.Server.object] | None = None
         super().__init__(attrs, **kwargs)
 
     def handler(self, tx: Any) -> None:
@@ -132,6 +137,33 @@ class Pyjo_App_WSGI(Pyjo.App.object):
             c.render_later()
         _Call(self, application, tx, c).start()
 
+    def server(self, server: Pyjo.Server.object) -> None:
+        """::
+
+            app.server(Pyjo.Server.Prefork.new())
+
+        Called by the server before it starts, and by
+        :mod:`Pyjoyment.Plugin.Mount` for the application that it mounts, so
+        that ``wsgi.multithread``, ``wsgi.multiprocess`` and ``wsgi.run_once``
+        say how the server runs the application: in the threads of the workers
+        of :mod:`Pyjo.Server.Prethread`, in the processes of the workers of
+        :mod:`Pyjo.Server.Prefork`, or in a process for each request of
+        :mod:`Pyjo.Server.CGI`.
+        """
+        self._server = weakref.ref(server)
+
+    # wsgi.multithread, wsgi.multiprocess and wsgi.run_once for the server that runs the application
+    def _model(self) -> tuple[bool, bool, bool]:
+        server = ref() if (ref := self._server) is not None else None
+        if isinstance(server, Pyjo.Server.Prethread.object):
+            return server.workers > 1, False, False
+        if isinstance(server, Pyjo.Server.Prefork.object):
+            return False, server.workers > 1, False
+        if isinstance(server, Pyjo.Server.CGI.object):
+            return False, True, True
+        # TODO: the flags of the environment of a WSGI server, which Pyjo.Server.WSGI has for its request
+        return False, False, False
+
 
 # A call of the application, whose response is written as the application gives it
 class _Call:
@@ -149,7 +181,7 @@ class _Call:
     def start(self) -> None:
         self.tx.on('finish', self._finish)
         try:
-            self._step(self.response.start(self.application, _environ(self.tx, self.c)))
+            self._step(self.response.start(self.application, _environ(self.tx, self.c, self.app._model())))  # pyright: ignore[reportPrivateUsage]
         except Exception as e:
             self._error(e)
 
@@ -363,7 +395,7 @@ class _Input(io.RawIOBase):
 
 # The environment of PEP 3333 for the request of the transaction: the path that a route embeds the application under,
 # after the base path, is SCRIPT_NAME, and the rest of it, which the route left in the stash, is PATH_INFO
-def _environ(tx: Any, c: Any) -> WSGIEnvironment:
+def _environ(tx: Any, c: Any, model: tuple[bool, bool, bool]) -> WSGIEnvironment:
     req = tx.req
     url = req.url
     base = url.base
@@ -387,6 +419,7 @@ def _environ(tx: Any, c: Any) -> WSGIEnvironment:
             path = path[end:]
 
     https = req.is_secure
+    multithread, multiprocess, run_once = model
     environ: WSGIEnvironment = {
         'REQUEST_METHOD': req.method,
         'SCRIPT_NAME': _bytes(script),
@@ -399,10 +432,9 @@ def _environ(tx: Any, c: Any) -> WSGIEnvironment:
         'wsgi.url_scheme': 'https' if https else 'http',
         'wsgi.input': io.BufferedReader(_Input(req.content)),
         'wsgi.errors': sys.stderr,
-        # The workers of Pyjo.Server.Prethread, which share the application, are the threads other than the main one
-        'wsgi.multithread': threading.current_thread() is not threading.main_thread(),
-        'wsgi.multiprocess': False,
-        'wsgi.run_once': False,
+        'wsgi.multithread': multithread,
+        'wsgi.multiprocess': multiprocess,
+        'wsgi.run_once': run_once,
         'wsgi.input_terminated': True,
     }
     if (address := tx.remote_address) is not None:

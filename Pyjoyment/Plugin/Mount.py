@@ -37,7 +37,9 @@ Pyjoyment.Plugin.Mount - Application mount plugin
 :mod:`Pyjoyment` applications, other applications of :mod:`Pyjo`, and
 ``WSGI`` applications, which :mod:`Pyjo.App.WSGI` runs, as an application of
 :mod:`Pyjo` from a script, an object, or the name of a module and its
-attribute.
+attribute. An application that is not one of :mod:`Pyjoyment` gets the server
+that runs it with :meth:`~Pyjo.App.Pyjo_App.server` before the server starts,
+as the application that mounts it does.
 
 The code of this plugin is a good example for learning to build new plugins,
 you're welcome to fork it.
@@ -97,6 +99,15 @@ class Pyjoyment_Plugin_Mount(Pyjoyment.Plugin.object):
         embed: Any = _load(conf[path])
         if isinstance(embed, Pyjoyment.object):
             embed.secrets = app.secrets
+
+        # Not in Mojolicious: another application of Pyjo, as one of Pyjo.App.WSGI, gets the server that runs it before it
+        # starts, as the application that mounts it gets it
+        else:
+
+            def before_server_start(server: Pyjo.Server.object, app: Any) -> None:
+                embed.server(server)
+
+            app.hook('before_server_start', before_server_start)
         embed.log = app.log
 
         # Extract host

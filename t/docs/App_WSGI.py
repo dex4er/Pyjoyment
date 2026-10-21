@@ -43,6 +43,14 @@ with subtest('new'):
     app = Pyjo.App.WSGI.new(app=application)
     ok(app.app is hello, 'application')
 
+with subtest('server'):
+    import Pyjo.Server.Prefork
+
+    app = Pyjo.App.WSGI.new(app=hello)
+    app.server(Pyjo.Server.Prefork.new())
+    Pyjo.Test.Pyjo.new(app).get_ok('/').status_is(200)
+    app.close()
+
 with subtest('handler'):
     app = Pyjo.App.WSGI.new(app=hello)
     tx = Pyjo.Transaction.HTTP.new()

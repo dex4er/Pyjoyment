@@ -1,6 +1,10 @@
 import Pyjo.App.WSGI
 import Pyjo.IOLoop
 import Pyjo.Promise
+import Pyjo.Server.CGI
+import Pyjo.Server.Daemon
+import Pyjo.Server.Prefork
+import Pyjo.Server.Prethread
 import Pyjo.Server.WSGI
 import Pyjo.Test.Pyjo
 import Pyjo.Transaction.HTTP
@@ -91,6 +95,48 @@ with subtest('Environment'):
         is_ok(env['wsgi.url_scheme'], 'http', 'right scheme')
         ok('CONTENT_LENGTH' not in env, 'no content length')
         is_ok(env['body'], '', 'no body')
+
+
+# The flags of WSGI for the server that runs the application
+def flags(environ, start_response):
+    start_response('200 OK', [('Content-Type', 'application/json')])
+    return [encode_json([environ['wsgi.multithread'], environ['wsgi.multiprocess'], environ['wsgi.run_once']])]
+
+
+def model(app, path='/'):
+    tx = Pyjo.Transaction.HTTP.new()
+    tx.req.method = 'GET'
+    tx.req.url.parse(path)
+    app.handler(tx)
+    return tx.res.json()
+
+
+with subtest('Server'):
+    with Pyjo.App.WSGI.new(app=flags) as app:
+        is_deeply_ok(model(app), [False, False, False], 'no server')
+        daemon = Pyjo.Server.Daemon.new()
+        app.server(daemon)
+        is_deeply_ok(model(app), [False, False, False], 'daemon')
+        prefork = Pyjo.Server.Prefork.new(workers=2)
+        app.server(prefork)
+        is_deeply_ok(model(app), [False, True, False], 'prefork')
+        prefork.workers = 1
+        is_deeply_ok(model(app), [False, False, False], 'prefork with one worker')
+        prethread = Pyjo.Server.Prethread.new(workers=2)
+        app.server(prethread)
+        is_deeply_ok(model(app), [True, False, False], 'prethread')
+        cgi = Pyjo.Server.CGI.new()
+        app.server(cgi)
+        is_deeply_ok(model(app), [False, True, True], 'CGI')
+
+    # The server of the application that mounts it
+    with Pyjo.App.WSGI.new(app=flags) as wsgi:
+        app = Pyjoyment.new()
+        app.log.level = 'fatal'
+        app.plugin('Mount', {'/flags': wsgi})
+        prefork = Pyjo.Server.Prefork.new(workers=4)
+        app.server(prefork)
+        is_deeply_ok(model(app, '/flags'), [False, True, False], 'prefork of the application that mounts it')
 
 with subtest('Headers joined'):
     with Pyjo.App.WSGI.new(app=echo) as app:
