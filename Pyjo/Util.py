@@ -44,7 +44,6 @@ import re
 import secrets
 import socket
 import sys
-import threading
 import time
 import unicodedata
 import warnings
@@ -3496,15 +3495,6 @@ def _split(pattern: str, string: str) -> list[str]:
     while fields and fields[-1] == '':
         fields.pop()
     return fields
-
-
-# Linux lists a thread that has been joined for a moment more, which Python 3.15 counts as a thread when it forks, so a
-# fork after a pool of threads has been shut down waits a little for the threads of the system to be those of Python
-def _threads_joined() -> None:  # pyright: ignore[reportUnusedFunction]
-    tasks = '/proc/self/task'
-    deadline = time.monotonic() + 0.1
-    while os.path.isdir(tasks) and len(os.listdir(tasks)) > threading.active_count() and time.monotonic() < deadline:
-        time.sleep(0.001)
 
 
 # Perl's ucfirst

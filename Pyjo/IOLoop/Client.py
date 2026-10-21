@@ -67,13 +67,14 @@ import Pyjo.EventEmitter
 import Pyjo.IOLoop
 import Pyjo.IOLoop.TLS
 import Pyjo.Reactor
-import Pyjo.Util
 
 import concurrent.futures
 import errno
 import os
 import socket
 import sys
+import threading
+import time
 import weakref
 
 from collections.abc import Callable, Generator
@@ -110,7 +111,15 @@ def _before_fork() -> None:
     if (executor := _executor) is not None:
         _executor = None
         executor.shutdown(wait=True)
-        Pyjo.Util._threads_joined()  # pyright: ignore[reportPrivateUsage]
+
+        # Linux lists a thread that has been joined for a moment more, which Python 3.15 counts as a thread when it
+        # forks, so the fork waits a little for the threads of the system to be those of Python
+        tasks = '/proc/self/task'
+        deadline = time.monotonic() + 0.1
+        while (
+            os.path.isdir(tasks) and len(os.listdir(tasks)) > threading.active_count() and time.monotonic() < deadline
+        ):
+            time.sleep(0.001)
 
 
 if hasattr(os, 'register_at_fork'):
