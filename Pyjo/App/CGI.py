@@ -142,8 +142,8 @@ class Pyjo_App_CGI(Pyjo.App.object):
         ``SCRIPT_FILENAME`` and whose path after the mount is ``SCRIPT_NAME``,
         the rest of the path is ``PATH_INFO``, and a path that ends with a
         slash names ``index`` with the first of :attr:`script_extensions` in
-        it, as ``index.php``. A path with ``..``, or that names no file, is not
-        found. With :attr:`script`, a path that names no script of the
+        it, as ``index.php``. A path with ``..``, or that names no file, or no
+        script of :attr:`script_extensions`, is not found. With :attr:`script`, a path that names no script of the
         directory is the one of :attr:`script`, as the one entry of an
         application that takes every path, as with ``try_files`` of nginx.
         ``SCRIPT_FILENAME`` of :attr:`env` takes its place.
@@ -619,10 +619,12 @@ class _Call(_Response):
             handle.close()
 
     # The program of the first parts of the path that are a file of the directory, as cgi-bin, or of the path up to its
-    # first part with one of the extensions, which is a file of the directory
+    # first part with one of the extensions, which is a file of the directory, as the command runs no other file
     def _script(self, params: dict[str, str], root: str) -> bool:
-        if self.extensions is not None:
-            return super()._script(params, root) and _program(params, root)
+        if (extensions := self.extensions) is not None:
+            if not super()._script(params, root):
+                return False
+            return _is_script(params['SCRIPT_FILENAME'], extensions) and _program(params, root)
         for path in (params['PATH_INFO'], f'/{self.script.lstrip("/")}' if self.script is not None else None):
             if path is None:
                 continue

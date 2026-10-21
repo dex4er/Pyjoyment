@@ -278,6 +278,7 @@ with subtest('Scripts of a command'):
         t.json_is('/env/SCRIPT_NAME', '/www/page.py').json_is('/env/PATH_INFO', '/x')
         t.get_ok('/www/style.css').status_is(200).content_is('body { color: red }')
         t.get_ok('/www/missing.py').status_is(404)
+        t.get_ok('/www/private.txt/x').status_is(404)
         t.get_ok('/www/missing.css').status_is(404)
 
     # The one script for every path, with a command
