@@ -41,6 +41,13 @@ with subtest('Synopsis'):
     pyjoyment.plugin('Mount', {'/fcgi': url})
     Pyjo.Test.Pyjo.new(pyjoyment).get_ok('/fcgi').status_is(200).content_is('Hello FastCGI!')
 
+with subtest('connect_timeout'):
+    app = Pyjo.App.FastCGI.new()
+    timeout = app.connect_timeout
+    is_ok(timeout, None, 'of the query or the default')
+    app.connect_timeout = 5
+    is_ok(app.connect_timeout, 5, 'timeout')
+
 with subtest('document_root'):
     app = Pyjo.App.FastCGI.new()
     root = app.document_root
@@ -58,7 +65,7 @@ with subtest('env'):
 with subtest('inactivity_timeout'):
     app = Pyjo.App.FastCGI.new()
     timeout = app.inactivity_timeout
-    is_ok(timeout, 60, 'default')
+    is_ok(timeout, None, 'of the query or the default')
     app.inactivity_timeout = 300
     is_ok(app.inactivity_timeout, 300, 'timeout')
 
@@ -82,6 +89,8 @@ with subtest('url'):
 
     app.url = 'fcgi://127.0.0.1:9000?document_root=%2Fvar%2Fwww&script=index.php'
     is_ok(app.url, 'fcgi://127.0.0.1:9000?document_root=%2Fvar%2Fwww&script=index.php', 'with its query')
+    app.url = 'fcgi://127.0.0.1:9000?inactivity_timeout=300'
+    is_ok(app.url, 'fcgi://127.0.0.1:9000?inactivity_timeout=300', 'with a timeout')
 
 with subtest('new'):
     app = Pyjo.App.FastCGI.new(url='fcgi://127.0.0.1:9000')

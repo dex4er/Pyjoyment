@@ -1173,8 +1173,11 @@ so Pyjoyment does not look for the files.
     # The scripts of WordPress, and its index.php for every other path
     plugin('Mount', {'/blog': 'fcgi://127.0.0.1:9000?document_root=/var/www/wordpress&script=index.php'})
 
-The attributes of :mod:`Pyjo.App.FastCGI` take the same, and more, as
-parameters of its own for the environment of each request. The page of
+The query also takes ``inactivity_timeout`` and ``connect_timeout``, in
+seconds, for an application that answers slowly, which the client waits for
+without the inactivity timeout of the server until the response starts. The
+attributes of :mod:`Pyjo.App.FastCGI` take the same, and more, as parameters
+of its own for the environment of each request. The page of
 :doc:`/examples` has PHP on php-fpm with the pool of php-fpm that runs it.
 
 Embed applications

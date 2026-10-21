@@ -5,6 +5,8 @@ import Pyjo.Promise
 import Pyjo.Server.Daemon
 import Pyjo.Test.Pyjo
 import Pyjo.Transaction.HTTP
+import Pyjo.URL
+import Pyjo.UserAgent
 import Pyjoyment
 
 from Pyjo.Server.FastCGI import END_REQUEST, HEADER, PARAMS, STDIN, STDOUT, _pairs, _record  # pyright: ignore[reportPrivateUsage]
@@ -17,6 +19,7 @@ import re
 import socket
 import struct
 import sys
+import time
 
 
 # An application of Pyjoyment on the FastCGI server of Pyjo, in the event loop of the test, which gives the parameters
@@ -73,7 +76,7 @@ def result(promise):
 
 # The response as it is on the wire, as the user agent removes the chunked transfer encoding
 def raw(t, method, path='/'):
-    url = t.ua.server.url()
+    url = t if isinstance(t, Pyjo.URL.object) else t.ua.server.url()
 
     def request():
         connection = http.client.HTTPConnection(url.host, url.port, timeout=5)
@@ -103,11 +106,14 @@ def application(fcgi, prefix='/prefix'):
 
 # A responder of FastCGI that answers a request, once its body has ended, with the bytes of a reply, and closes the
 # connection after them, unless it is told to keep it, and the requests that it got
-def responder(reply, close=True):
+def responder(reply, close=True, delay=0):
     requests = []
 
     def accept(loop, stream, id):
         buffer = bytearray()
+
+        def answer(*args):
+            stream.write(reply, (lambda stream: stream.close()) if close else None)
 
         def read(stream, chunk):
             buffer.extend(chunk)
@@ -115,7 +121,7 @@ def responder(reply, close=True):
                 requests.append(bytes(buffer))
                 buffer.clear()
                 if reply is not None:
-                    stream.write(reply, (lambda stream: stream.close()) if close else None)
+                    Pyjo.IOLoop.timer(delay, answer) if delay else answer()
 
         stream.on('read', read)
 
@@ -391,6 +397,54 @@ with subtest('Errors'):
         lambda: Pyjo.App.FastCGI.new(url='http://127.0.0.1:9000').handler(Pyjo.Transaction.HTTP.new()),
         re.compile(r'^Invalid FastCGI location "http://127\.0\.0\.1:9000"'),
         'invalid location',
+    )
+
+with subtest('Timeouts'):
+    app = Pyjoyment.new()
+    app.log.level = 'fatal'
+    server = Pyjo.Server.Daemon.new(app=app, listen=['http://127.0.0.1'], silent=True, inactivity_timeout=0.2).start()
+    base = f'http://127.0.0.1:{server.ports()[0]}'
+    ua = Pyjo.UserAgent.new(ioloop=Pyjo.IOLoop.singleton)
+
+    # The connection of the client waits for a response that takes longer than the inactivity timeout of the server
+    url, requests, id = responder(stdout(b'Status: 200\r\n\r\nslow') + end(), delay=0.5)
+    app.plugin('Mount', {'/slow': Pyjo.App.FastCGI.new(url=url, inactivity_timeout=3)})
+    tx = result(ua.get_p(f'{base}/slow'))
+    is_ok(tx.res.code, 200, 'right status')
+    is_ok(tx.res.body, b'slow', 'right content')
+    Pyjo.IOLoop.remove(id)
+
+    # The inactivity timeout of the query of the location gives 502
+    url, requests, id = responder(None)
+    app.plugin('Mount', {'/quiet': f'{url}?inactivity_timeout=0.2'})
+    tx = result(ua.get_p(f'{base}/quiet'))
+    is_ok(tx.res.code, 502, 'inactive application')
+    Pyjo.IOLoop.remove(id)
+
+    # The inactivity timeout of the server again, once the response has started
+    url, requests, id = responder(_record(STDOUT, 1, b'Status: 200\r\n\r\none'), close=False)
+    app.plugin('Mount', {'/stalled': Pyjo.App.FastCGI.new(url=url, inactivity_timeout=3)})
+    start = time.monotonic()
+    is_deeply_ok(raw(Pyjo.URL.new(base), 'GET', '/stalled'), (200, None, 'chunked', None), 'incomplete response')
+    ok(time.monotonic() - start < 2, 'closed by the inactivity timeout of the server')
+    Pyjo.IOLoop.remove(id)
+
+    ua.close()
+    server.close()
+
+    # The attributes, the query of the location, and the defaults
+    options, query = Pyjo.App.FastCGI._location('fcgi://127.0.0.1:9000?connect_timeout=5&inactivity_timeout=300')
+    is_deeply_ok(options, {'address': '127.0.0.1', 'port': 9000}, 'right options')
+    is_deeply_ok(query, {'connect_timeout': '5', 'inactivity_timeout': '300'}, 'right query')
+    is_ok(Pyjo.App.FastCGI._seconds(None, '5', 10), 5.0, 'timeout of the query')
+    is_ok(Pyjo.App.FastCGI._seconds(2, '5', 10), 2, 'timeout of the attribute')
+    is_ok(Pyjo.App.FastCGI._seconds(None, None, 10), 10, 'default timeout')
+    throws_ok(
+        lambda: Pyjo.App.FastCGI.new(url='fcgi://127.0.0.1:9000?connect_timeout=soon').handler(
+            Pyjo.Transaction.HTTP.new()
+        ),
+        re.compile(r'^Invalid FastCGI timeout "soon"'),
+        'invalid timeout',
     )
 
 with subtest('Connection of the client closed'):

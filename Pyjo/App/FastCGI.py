@@ -54,7 +54,8 @@ its standard error is logged.
 A connection that fails or closes before the response is a response ``502``,
 and one that closes after the start of the response closes the connection of
 the client, as one that is quiet for longer than :attr:`inactivity_timeout`
-does.
+does, which, until the response starts, the connection of the client waits
+for without the inactivity timeout of the server.
 
 Attributes
 ----------
@@ -122,6 +123,17 @@ class Pyjo_App_FastCGI(Pyjo.App.object):
 
         Construct a new :mod:`Pyjo.App.FastCGI` object.
         """
+        self.connect_timeout: float | None = None
+        """::
+
+            timeout = app.connect_timeout
+            app.connect_timeout = 5
+
+        Maximum amount of time in seconds establishing a connection to the
+        application may take before getting canceled, the parameter
+        ``connect_timeout`` of the query of :attr:`url` or ``10``.
+        """
+
         self.document_root: str | os.PathLike[str] | None = None
         """::
 
@@ -152,14 +164,18 @@ class Pyjo_App_FastCGI(Pyjo.App.object):
         request, and replace the ones of the same name.
         """
 
-        self.inactivity_timeout: float = 60
+        self.inactivity_timeout: float | None = None
         """::
 
             timeout = app.inactivity_timeout
             app.inactivity_timeout = 300
 
         Maximum amount of time in seconds a connection to the application can
-        be inactive before it gets closed, defaults to ``60``.
+        be inactive before it gets closed, the parameter
+        ``inactivity_timeout`` of the query of :attr:`url` or ``60``. Until the
+        response starts, the connection of the client waits for it without
+        the inactivity timeout of the server, so that this one gives the
+        response ``502`` to an application that takes longer.
         """
 
         self.script: str | None = None
@@ -185,10 +201,12 @@ class Pyjo_App_FastCGI(Pyjo.App.object):
         Location of the application, a TCP/IP address and port of ``fcgi://``
         or the path of a UNIX domain socket of ``fcgi+unix://``, escaped as the
         listen locations of :mod:`Pyjo.Server.Daemon` are. Its query can give
-        :attr:`document_root` and :attr:`script`, as the listen locations give
-        their options, which the attributes take the place of. ::
+        :attr:`connect_timeout`, :attr:`document_root`,
+        :attr:`inactivity_timeout` and :attr:`script`, as the listen locations
+        give their options, which the attributes take the place of. ::
 
             app.url = 'fcgi://127.0.0.1:9000?document_root=%2Fvar%2Fwww&script=index.php'
+            app.url = 'fcgi://127.0.0.1:9000?inactivity_timeout=300'
         """
 
         super().__init__(attrs, **kwargs)
@@ -205,11 +223,11 @@ class Pyjo_App_FastCGI(Pyjo.App.object):
         """
         if (url := self.url) is None:
             raise Pyjo.Exception.new('No FastCGI application')
-        options, root, script = _location(url)
-        if self.document_root is not None:
-            root = os.fspath(self.document_root)
-        if self.script is not None:
-            script = self.script
+        options, query = _location(url)
+        root = os.fspath(self.document_root) if self.document_root is not None else query.get('document_root')
+        script = self.script if self.script is not None else query.get('script')
+        options['timeout'] = _seconds(self.connect_timeout, query.get('connect_timeout'), 10)
+        inactivity = _seconds(self.inactivity_timeout, query.get('inactivity_timeout'), 60)
         c = None
         if not isinstance(tx, Pyjo.Transaction.object):
             c = tx
@@ -217,18 +235,27 @@ class Pyjo_App_FastCGI(Pyjo.App.object):
             if not Pyjo.App._within(c):  # pyright: ignore[reportPrivateUsage]
                 return c.helpers.reply.not_found()
             c.render_later()
-        _Call(self, options, root, script, tx, c).start()
+        _Call(self, options, root, script, inactivity, tx, c).start()
 
 
 # A request to the application, whose response of CGI is written as it comes
 class _Call:
     def __init__(
-        self, app: Pyjo_App_FastCGI, options: dict[str, Any], root: str | None, script: str | None, tx: Any, c: Any
+        self,
+        app: Pyjo_App_FastCGI,
+        options: dict[str, Any],
+        root: str | None,
+        script: str | None,
+        inactivity: float,
+        tx: Any,
+        c: Any,
     ) -> None:
         self.app = app
         self.options = options
         self.root = root
         self.script = script
+        self.inactivity = inactivity
+        self.waiting: tuple[str, float] | None = None
         self.c = c
         self.tx = tx
         self.buffer = bytearray()
@@ -267,6 +294,13 @@ class _Call:
                 params['PATH_INFO'] = '/'
         params.update(env)
         self.params = _encode_pairs(params)
+
+        # The connection of the client waits for the response without its inactivity timeout, which the one of the
+        # connection to the application takes the place of, so that an application that takes longer gives 502
+        if (connection := self.tx.connection) is not None and (stream := Pyjo.IOLoop.stream(connection)) is not None:
+            self.waiting = (connection, stream.timeout)
+            stream.timeout = 0
+
         self.id = Pyjo.IOLoop.client(self._connected, **self.options)
 
     def _close(self) -> None:
@@ -290,7 +324,7 @@ class _Call:
             return self._failed(f'FastCGI connection failed: {err}')
 
         self.stream = stream
-        stream.timeout = self.app.inactivity_timeout
+        stream.timeout = self.inactivity
         stream.on('read', self._read)
         stream.on('close', self._closed)
         stream.on('error', self._error)
@@ -329,6 +363,7 @@ class _Call:
 
         self.done = True
         self._stop()
+        self._waited()
         self.app.log.error(message)
         res = self.tx.res
         res.code = 502
@@ -352,6 +387,7 @@ class _Call:
         res = self.tx.res
         if not self.started:
             self.started = True
+            self._waited()
             _status(res, self.headers)
             if ended:
                 self.done = True
@@ -454,6 +490,14 @@ class _Call:
         if len(body):
             self.pending.append(body)
 
+    # The inactivity timeout of the connection of the client again, once the response starts
+    def _waited(self) -> None:
+        if (waiting := self.waiting) is not None:
+            self.waiting = None
+            connection, timeout = waiting
+            if (stream := Pyjo.IOLoop.stream(connection)) is not None:
+                stream.timeout = timeout
+
     def _timeout(self, stream: Any) -> None:
         self._failed('FastCGI connection inactive')
 
@@ -482,16 +526,28 @@ def _extra(tx: Any) -> dict[str, str]:
     return extra
 
 
-# The options of the connection to the location of the application, and the directory and the script of its query
-def _location(url: Any) -> tuple[dict[str, Any], str | None, str | None]:
+# The options of the connection to the location of the application, and the parameters of its query
+def _location(url: Any) -> tuple[dict[str, Any], dict[str, str]]:
     url = Pyjo.URL.new(str(url))
-    query = url.query
-    root, script = query.param('document_root'), query.param('script')
+    names = ('connect_timeout', 'document_root', 'inactivity_timeout', 'script')
+    query = {name: value for name in names if (value := url.query.param(name)) is not None}
     if (proto := url.protocol) == 'fcgi+unix':
-        return {'path': url.host}, root, script
+        return {'path': url.host}, query
     if proto == 'fcgi' and url.host and url.port:
-        return {'address': url.host, 'port': url.port}, root, script
+        return {'address': url.host, 'port': url.port}, query
     raise Pyjo.Exception.new(f'Invalid FastCGI location "{url}"')
+
+
+# A timeout of the attribute, of the query of the location, or its default
+def _seconds(value: float | None, query: str | None, default: float) -> float:
+    if value is not None:
+        return value
+    if query is None:
+        return default
+    try:
+        return float(query)
+    except ValueError:
+        raise Pyjo.Exception.new(f'Invalid FastCGI timeout "{query}"') from None
 
 
 # A path that names a script of PHP
