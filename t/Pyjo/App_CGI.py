@@ -322,7 +322,18 @@ with subtest('X-Sendfile'):
         t.header_is('X-Test', '1').content_is('private')
         with cgi.log.capture('error') as messages:
             t.get_ok(f'/cgi-bin/sendfile.cgi?{env_cgi}').status_is(404)
-        like_ok(str(messages), r'CGI application sent the file ".*env\.cgi", which is not in', 'right error')
+        like_ok(
+            str(messages), r'CGI application sent the file ".*env\.cgi", which sendfile does not allow', 'right error'
+        )
+
+    # A regular expression of the whole path of the file, once its symbolic links are resolved
+    private = re.escape(os.path.realpath(tmp.child('www', 'private.txt').to_str()))
+    with Pyjo.App.CGI.new(document_root=root.to_str(), sendfile=re.compile(private)) as cgi:
+        t = Pyjo.Test.Pyjo.new(application(cgi, '/cgi-bin'))
+        t.get_ok(f'/cgi-bin/sendfile.cgi?{tmp.child("www", "private.txt").to_str()}').status_is(200).content_is(
+            'private'
+        )
+        t.get_ok(f'/cgi-bin/sendfile.cgi?{env_cgi}').status_is(404)
 
 with subtest('Response'):
     with Pyjo.App.CGI.new(document_root=root.to_str()) as cgi:

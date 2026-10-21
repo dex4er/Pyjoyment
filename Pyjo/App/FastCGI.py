@@ -203,21 +203,24 @@ class Pyjo_App_FastCGI(Pyjo.App.object):
         ``['.php']``.
         """
 
-        self.sendfile: str | os.PathLike[str] | None = None
+        self.sendfile: Pyjo.App.CGI.Sendfile | None = None
         """::
 
-            directory = app.sendfile
+            places = app.sendfile
             app.sendfile = '/var/www/private'
+            app.sendfile = ['/var/www/private', '/var/www/media']
+            app.sendfile = re.compile(r'/var/www/[^/]+/private/.*')
 
-        Directory of the files that the application may reply with by the
+        Directories of the files that the application may reply with by the
         header ``X-Sendfile``, as Apache and lighttpd take it, with the path of
-        the file, as the private files that are not in :attr:`document_root`,
-        the parameter ``sendfile`` of the query of :attr:`url`, or
-        :attr:`document_root` with :attr:`static`, none otherwise. A route that
-        embeds the application replies then with the file, as the helper
-        ``reply.file`` of :mod:`Pyjoyment` does, with the status and the other
-        headers of the application, and a file that is not in the directory is
-        not found.
+        the file, absolute or in one of them, or regular expressions of the
+        whole path of such a file, once its symbolic links are resolved, as the
+        private files that are not in :attr:`document_root`, the parameters
+        ``sendfile`` of the query of :attr:`url`, which are directories, or
+        none, which passes the header on as it is. A route that embeds the
+        application replies then with the file, as the helper ``reply.file`` of
+        :mod:`Pyjoyment` does, with the status and the other headers of the
+        application, and a file that they do not allow is not found.
         """
 
         self.static: bool | None = None
@@ -275,7 +278,7 @@ class Pyjo_App_FastCGI(Pyjo.App.object):
             'root': os.fspath(self.document_root) if self.document_root is not None else query.get('document_root'),
             'script': self.script if self.script is not None else query.get('script'),
             'extensions': _extensions(self.script_extensions, query.get('script_extensions')),
-            'sendfile': os.fspath(self.sendfile) if self.sendfile is not None else query.get('sendfile'),
+            'sendfile': Pyjo.App.CGI._places(self.sendfile if self.sendfile is not None else query.get('sendfile')),  # pyright: ignore[reportPrivateUsage]
             'static': self.static if self.static is not None else _flag(query.get('static')),
         }
         _Call.run(self, config, tx, options)
@@ -394,10 +397,11 @@ def _extensions(value: list[str] | None, query: list[str] | None) -> list[str]:
 # The options of the connection to the location of the application, and the parameters of its query
 def _location(url: Any) -> tuple[dict[str, Any], dict[str, Any]]:
     url = Pyjo.URL.new(str(url))
-    names = ('connect_timeout', 'document_root', 'inactivity_timeout', 'script', 'sendfile', 'static')
+    names = ('connect_timeout', 'document_root', 'inactivity_timeout', 'script', 'static')
     query: dict[str, Any] = {name: value for name in names if (value := url.query.param(name)) is not None}
-    if extensions := url.query.every_param('script_extensions'):
-        query['script_extensions'] = extensions
+    for name in ('script_extensions', 'sendfile'):
+        if values := url.query.every_param(name):
+            query[name] = values
     if (proto := url.protocol) == 'fcgi+unix':
         return {'path': url.host}, query
     if proto == 'fcgi' and url.host and url.port:

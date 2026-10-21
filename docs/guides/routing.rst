@@ -1161,9 +1161,11 @@ without rules of rewriting:
   one script, as ``try_files`` of nginx does for WordPress;
 * ``static`` replies with the files of the directory for the paths that name
   them, as the stylesheets and the images of WordPress, before the one
-  script, for an application on the same file system as Pyjoyment, and lets
-  the application reply with such a file by the header ``X-Sendfile``, which
-  ``sendfile`` allows for a directory of private files too.
+  script, for an application on the same file system as Pyjoyment;
+* ``sendfile`` lets the application reply with a file of its directories by
+  the header ``X-Sendfile``, as private files, also more than one, repeated
+  in the query, and the attribute of :mod:`Pyjo.App.FastCGI` takes regular
+  expressions of the whole path of the file too.
 
 The paths are the ones that php-fpm sees, which may be in another container,
 so Pyjoyment does not look for the files.

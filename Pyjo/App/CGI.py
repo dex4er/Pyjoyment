@@ -92,8 +92,13 @@ import re
 import signal
 import wsgiref.util
 
+from collections.abc import Sequence
 from typing import Any
 
+
+# Directories of the files of X-Sendfile, or regular expressions of their paths
+type Place = str | os.PathLike[str] | re.Pattern[str]
+type Sendfile = Place | Sequence[Place]
 
 # The headers of a response by X-Sendfile that the file takes the place of
 _SENT = ('content-length', 'x-sendfile')
@@ -201,20 +206,23 @@ class Pyjo_App_CGI(Pyjo.App.object):
         file of which is a script without them, as cgi-bin.
         """
 
-        self.sendfile: str | os.PathLike[str] | None = None
+        self.sendfile: Sendfile | None = None
         """::
 
-            directory = app.sendfile
+            places = app.sendfile
             app.sendfile = '/var/www/private'
+            app.sendfile = ['/var/www/private', '/var/www/media']
+            app.sendfile = re.compile(r'/var/www/[^/]+/private/.*')
 
-        Directory of the files that the program may reply with by the header
+        Directories of the files that the program may reply with by the header
         ``X-Sendfile``, as Apache and lighttpd take it, with the path of the
-        file, as the private files that are not in :attr:`document_root`, or
-        :attr:`document_root` with :attr:`static`, none otherwise. A route that
-        embeds the application replies then with the file, as the helper
-        ``reply.file`` of :mod:`Pyjoyment` does, with the status and the other
-        headers of the program, and a file that is not in the directory is not
-        found.
+        file, absolute or in one of them, or regular expressions of the whole
+        path of such a file, once its symbolic links are resolved, as the
+        private files that are not in :attr:`document_root`, none by default,
+        which passes the header on as it is. A route that embeds the
+        application replies then with the file, as the helper ``reply.file`` of
+        :mod:`Pyjoyment` does, with the status and the other headers of the
+        program, and a file that they do not allow is not found.
         """
 
         self.static: bool = False
@@ -249,7 +257,7 @@ class Pyjo_App_CGI(Pyjo.App.object):
             'inactivity': self.inactivity_timeout,
             'root': os.fspath(self.document_root) if self.document_root is not None else None,
             'script': self.script,
-            'sendfile': os.fspath(self.sendfile) if self.sendfile is not None else None,
+            'sendfile': _places(self.sendfile),
             'static': self.static,
         }
         _Call.run(self, config, tx)
@@ -268,7 +276,7 @@ class _Response:
         self.inactivity: float = config['inactivity']
         self.root: str | None = config['root']
         self.script: str | None = config['script']
-        self.sendfile: str | None = config['sendfile']
+        self.sendfile: list[str | re.Pattern[str]] | None = config['sendfile']
         self.static: bool = config['static']
         self.waiting: tuple[str, float] | None = None
         self.c = c
@@ -455,18 +463,16 @@ class _Response:
             params['PATH_INFO'] = f'/{script.lstrip("/")}'
         return _script(params, root, extensions)
 
-    # The file of the header X-Sendfile of the application, in the directory of the files that it may reply with
+    # The file of the header X-Sendfile of the application, which sendfile allows
     def _sendfile(self) -> bool:
-        # The directory of sendfile, or the one of the files that static replies with
-        directory = self.sendfile if self.sendfile is not None else self.root if self.static else None
-        if (c := self.c) is None or directory is None or (headers := self.headers) is None:
+        if (c := self.c) is None or not (places := self.sendfile) or (headers := self.headers) is None:
             return False
         if (value := next((value for name, value in headers if name.lower() == 'x-sendfile'), None)) is None:
             return False
         self.done = True
         self._stop()
-        if (file := _inside(directory, value)) is None:
-            self.app.log.error(f'{self.name} application sent the file "{value}", which is not in "{directory}"')
+        if (file := _allowed(places, value)) is None:
+            self.app.log.error(f'{self.name} application sent the file "{value}", which sendfile does not allow')
             c.helpers.reply.not_found()
             return True
         _status(self.tx.res, [(name, value) for name, value in headers if name.lower() not in _SENT])
@@ -634,6 +640,18 @@ class _Call(_Response):
         stdin.write(chunk, self._write)
 
 
+# A file that one of the directories has, with an absolute path or one in it, or that a regular expression matches,
+# once its symbolic links are resolved
+def _allowed(places: list[str | re.Pattern[str]], path: str) -> str | None:
+    for place in places:
+        if isinstance(place, str):
+            if (file := _inside(place, path)) is not None:
+                return file
+        elif os.path.isabs(path) and os.path.isfile(file := os.path.realpath(path)) and place.fullmatch(file):
+            return file
+    return None
+
+
 # Characters of the bytes of a string of the system, as the parameters have them
 def _chars(value: str) -> str:
     return os.fsencode(value).decode('latin-1')
@@ -659,6 +677,14 @@ def _file(root: str, path: str, extensions: list[str]) -> str | None:
     if not path or path.endswith('/') or _names_script(path, extensions) or '..' in path.split('/'):
         return None
     return _inside(root, os.fsdecode(path.lstrip('/').encode('latin-1')))
+
+
+# Directories or regular expressions, as a list
+def _places(value: Sendfile | None) -> list[str | re.Pattern[str]] | None:
+    if value is None:
+        return None
+    places = [value] if isinstance(value, (str, os.PathLike, re.Pattern)) else list(value)
+    return [place if isinstance(place, re.Pattern) else os.fspath(place) for place in places]
 
 
 # A file in a directory, also once its symbolic links are resolved, so that no link leads out of it

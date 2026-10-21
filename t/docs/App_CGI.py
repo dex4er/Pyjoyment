@@ -101,11 +101,17 @@ with subtest('script_extensions'):
     is_deeply_ok(app.script_extensions, ['.php'], 'extensions')
 
 with subtest('sendfile'):
+    import re
+
     app = Pyjo.App.CGI.new()
-    directory = app.sendfile
-    is_ok(directory, None, 'no directory')
+    places = app.sendfile
+    is_ok(places, None, 'none')
     app.sendfile = '/var/www/private'
     is_ok(app.sendfile, '/var/www/private', 'directory')
+    app.sendfile = ['/var/www/private', '/var/www/media']
+    is_deeply_ok(app.sendfile, ['/var/www/private', '/var/www/media'], 'directories')
+    app.sendfile = re.compile(r'/var/www/[^/]+/private/.*')
+    ok(app.sendfile.fullmatch('/var/www/blog/private/file.pdf'), 'regular expression')
 
 with subtest('static'):
     app = Pyjo.App.CGI.new()
