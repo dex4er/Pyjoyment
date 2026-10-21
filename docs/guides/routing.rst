@@ -1154,8 +1154,9 @@ without rules of rewriting:
   application that takes every path, as mod_rewrite sends them all to
   ``index.php``;
 * ``document_root`` is the directory of the scripts, as a web server runs
-  them: the path up to its first part that ends with ``.php`` names the
-  script, and a path that ends with a slash names ``index.php``;
+  them: the path up to its first part that ends with ``.php``, or with one of
+  the extensions of ``script_extensions``, names the script, and a path that
+  ends with a slash names ``index.php``, ``index`` with the first of them;
 * both together send every path that names no script of the directory to the
   one script, as ``try_files`` of nginx does for WordPress;
 * ``static`` replies with the files of the directory for the paths that name

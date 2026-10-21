@@ -280,6 +280,30 @@ with subtest('Directory of the scripts'):
         t.get_ok('/php/foo').status_is(200)
         is_ok(params(requests[-1])['SCRIPT_FILENAME'], '/srv/www/index.php', 'script of the attribute')
 
+    # Other extensions of the scripts, the first one of the index of a directory
+    with Pyjo.App.FastCGI.new(url=url, document_root='/var/www', script_extensions=['.phtml', '.php']) as fcgi:
+        t = Pyjo.Test.Pyjo.new(application(fcgi, '/php'))
+        for path, script, info in (
+            ('/php/', '/var/www/index.phtml', ''),
+            ('/php/page.phtml/x', '/var/www/page.phtml', '/x'),
+            ('/php/info.php', '/var/www/info.php', ''),
+        ):
+            t.get_ok(path).status_is(200)
+            env = params(requests[-1])
+            is_ok(env['SCRIPT_FILENAME'], script, f'right script file of {path}')
+            is_ok(env['PATH_INFO'], info, f'right path of {path}')
+    with Pyjo.App.FastCGI.new(
+        url=f'{url}?document_root=%2Fvar%2Fwww&script_extensions=.cgi&script_extensions=.fcgi'
+    ) as fcgi:
+        t = Pyjo.Test.Pyjo.new(application(fcgi, '/php'))
+        t.get_ok('/php/app.fcgi/x').status_is(200)
+        is_ok(params(requests[-1])['SCRIPT_FILENAME'], '/var/www/app.fcgi', 'extensions of the query')
+        t.get_ok('/php/').status_is(200)
+        is_ok(params(requests[-1])['SCRIPT_FILENAME'], '/var/www/index.cgi', 'index of the query')
+        fcgi.script_extensions = ['.php']
+        t.get_ok('/php/').status_is(200)
+        is_ok(params(requests[-1])['SCRIPT_FILENAME'], '/var/www/index.php', 'extensions of the attribute')
+
     # The script of the parameters of the application takes its place
     with Pyjo.App.FastCGI.new(url=url, document_root='/var/www', env={'SCRIPT_FILENAME': '/srv/app.php'}) as fcgi:
         t = Pyjo.Test.Pyjo.new(application(fcgi, '/php'))

@@ -78,6 +78,13 @@ with subtest('script'):
     app.script = 'index.php'
     is_ok(app.script, 'index.php', 'script of the directory')
 
+with subtest('script_extensions'):
+    app = Pyjo.App.FastCGI.new()
+    extensions = app.script_extensions
+    is_ok(extensions, None, 'of the query or PHP')
+    app.script_extensions = ['.php', '.phtml']
+    is_deeply_ok(app.script_extensions, ['.php', '.phtml'], 'extensions')
+
 with subtest('sendfile'):
     app = Pyjo.App.FastCGI.new()
     directory = app.sendfile

@@ -149,11 +149,11 @@ class Pyjo_App_FastCGI(Pyjo.App.object):
         Directory of the scripts of the application, as of PHP, as the
         application sees it, which takes the script of each request from its
         path, as a web server does: the path after the mount, up to its first
-        part that ends with ``.php``, names the script, whose file in the
-        directory is ``SCRIPT_FILENAME`` and whose path after the mount is
-        ``SCRIPT_NAME``, the rest of the path is ``PATH_INFO``, and a path that
-        ends with a slash names ``index.php`` in it. A path with ``..`` is not
-        found. With :attr:`script`, a path that names no script of the
+        part that ends with one of :attr:`script_extensions`, names the script,
+        whose file in the directory is ``SCRIPT_FILENAME`` and whose path after
+        the mount is ``SCRIPT_NAME``, the rest of the path is ``PATH_INFO``, and
+        a path that ends with a slash names ``index`` with the first of them in
+        it, as ``index.php``. A path with ``..`` is not found. With :attr:`script`, a path that names no script of the
         directory is the one of :attr:`script`, as the one entry of an
         application that takes every path, as with ``try_files`` of nginx,
         which the path decides, not the files, which the application may see
@@ -195,6 +195,17 @@ class Pyjo_App_FastCGI(Pyjo.App.object):
         application of PHP that takes every path, with the path after the
         mount as ``PATH_INFO``, or for every path that names no script of
         :attr:`document_root`, in which it is then.
+        """
+
+        self.script_extensions: list[str] | None = None
+        """::
+
+            extensions = app.script_extensions
+            app.script_extensions = ['.php', '.phtml']
+
+        Extensions of the names of the scripts of :attr:`document_root`, the
+        parameters ``script_extensions`` of the query of :attr:`url`, or
+        ``['.php']``.
         """
 
         self.sendfile: str | os.PathLike[str] | None = None
@@ -240,8 +251,8 @@ class Pyjo_App_FastCGI(Pyjo.App.object):
         or the path of a UNIX domain socket of ``fcgi+unix://``, escaped as the
         listen locations of :mod:`Pyjo.Server.Daemon` are. Its query can give
         :attr:`connect_timeout`, :attr:`document_root`,
-        :attr:`inactivity_timeout`, :attr:`script`, :attr:`sendfile` and
-        :attr:`static`, as the listen locations give their options, which the
+        :attr:`inactivity_timeout`, :attr:`script`, :attr:`script_extensions`,
+        :attr:`sendfile` and :attr:`static`, as the listen locations give their options, which the
         attributes take the place of. ::
 
             app.url = 'fcgi://127.0.0.1:9000?document_root=%2Fvar%2Fwww&script=index.php'
@@ -268,6 +279,7 @@ class Pyjo_App_FastCGI(Pyjo.App.object):
             'inactivity': _seconds(self.inactivity_timeout, query.get('inactivity_timeout'), 60),
             'root': os.fspath(self.document_root) if self.document_root is not None else query.get('document_root'),
             'script': self.script if self.script is not None else query.get('script'),
+            'extensions': _extensions(self.script_extensions, query.get('script_extensions')),
             'sendfile': os.fspath(self.sendfile) if self.sendfile is not None else query.get('sendfile'),
             'static': self.static if self.static is not None else _flag(query.get('static')),
         }
@@ -289,6 +301,7 @@ class _Call:
         self.inactivity: float = config['inactivity']
         self.root: str | None = config['root']
         self.script: str | None = config['script']
+        self.extensions: list[str] = config['extensions']
         self.sendfile: str | None = config['sendfile']
         self.static: bool = config['static']
         self.waiting: tuple[str, float] | None = None
@@ -316,7 +329,7 @@ class _Call:
 
         # A file of the directory of the scripts, as try_files of nginx serves it
         if (c := self.c) is not None and self.static and (root := self.root) is not None:
-            if (file := _file(root, params['PATH_INFO'])) is not None:
+            if (file := _file(root, params['PATH_INFO'], self.extensions)) is not None:
                 self.done = True
                 return c.helpers.reply.file(file)
 
@@ -324,9 +337,9 @@ class _Call:
 
         # The script of the path in the directory of the scripts, or the one script for a path that names none
         if (root := self.root) is not None and 'SCRIPT_FILENAME' not in env:
-            if (script := self.script) is not None and not _names_script(params['PATH_INFO']):
+            if (script := self.script) is not None and not _names_script(params['PATH_INFO'], self.extensions):
                 params['PATH_INFO'] = f'/{script.lstrip("/")}'
-            if not _script(params, root):
+            if not _script(params, root, self.extensions):
                 return self._not_found()
 
         else:
@@ -592,11 +605,20 @@ def _extra(tx: Any) -> dict[str, str]:
     return extra
 
 
+# The extensions of the scripts of the attribute, of the query of the location, or the one of PHP
+def _extensions(value: list[str] | None, query: list[str] | None) -> list[str]:
+    if value is not None:
+        return value
+    return query if query else ['.php']
+
+
 # The options of the connection to the location of the application, and the parameters of its query
-def _location(url: Any) -> tuple[dict[str, Any], dict[str, str]]:
+def _location(url: Any) -> tuple[dict[str, Any], dict[str, Any]]:
     url = Pyjo.URL.new(str(url))
     names = ('connect_timeout', 'document_root', 'inactivity_timeout', 'script', 'sendfile', 'static')
-    query = {name: value for name in names if (value := url.query.param(name)) is not None}
+    query: dict[str, Any] = {name: value for name in names if (value := url.query.param(name)) is not None}
+    if extensions := url.query.every_param('script_extensions'):
+        query['script_extensions'] = extensions
     if (proto := url.protocol) == 'fcgi+unix':
         return {'path': url.host}, query
     if proto == 'fcgi' and url.host and url.port:
@@ -617,8 +639,8 @@ def _seconds(value: float | None, query: str | None, default: float) -> float:
 
 
 # A file of the directory for a path that names no script and no directory, as try_files of nginx takes it
-def _file(root: str, path: str) -> str | None:
-    if not path or path.endswith('/') or _names_script(path) or '..' in path.split('/'):
+def _file(root: str, path: str, extensions: list[str]) -> str | None:
+    if not path or path.endswith('/') or _names_script(path, extensions) or '..' in path.split('/'):
         return None
     return _inside(root, os.fsdecode(path.lstrip('/').encode('latin-1')))
 
@@ -637,21 +659,25 @@ def _inside(directory: str, path: str) -> str | None:
     return file
 
 
-# A path that names a script of PHP
-def _names_script(path: str) -> bool:
-    return any(part.endswith('.php') for part in path.split('/'))
+# A path that names a script, by the extension of one of its parts
+def _names_script(path: str, extensions: list[str]) -> bool:
+    return any(_is_script(part, extensions) for part in path.split('/'))
+
+
+def _is_script(part: str, extensions: list[str]) -> bool:
+    return any(part.endswith(extension) for extension in extensions)
 
 
 # The script of the path in the directory of the scripts, as nginx has it with fastcgi_split_path_info and
 # $document_root$fastcgi_script_name, unless the path has ..
-def _script(params: dict[str, str], root: str) -> bool:
+def _script(params: dict[str, str], root: str, extensions: list[str]) -> bool:
     parts = (params['PATH_INFO'] or '/').split('/')
     if '..' in parts:
         return False
-    end = next((i + 1 for i, part in enumerate(parts) if part.endswith('.php')), len(parts))
+    end = next((i + 1 for i, part in enumerate(parts) if _is_script(part, extensions)), len(parts))
     script, rest = '/'.join(parts[:end]), '/'.join(parts[end:])
-    if end == len(parts) and script.endswith('/'):
-        script += 'index.php'
+    if end == len(parts) and script.endswith('/') and extensions:
+        script += f'index{extensions[0]}'
     params['SCRIPT_FILENAME'] = root.rstrip('/') + script
     params['SCRIPT_NAME'] += script
     params['PATH_INFO'] = f'/{rest}' if end < len(parts) else ''
