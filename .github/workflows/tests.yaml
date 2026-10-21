@@ -183,6 +183,13 @@ jobs:
           coverage: none
           tools: none
 
+      # The test of PHP is skipped without php-fpm, so its absence fails here, and the log shows the version that runs it
+      - name: Check php-fpm
+        shell: bash
+        run: |-
+          fpm="$(command -v php-fpm || ls /usr/sbin/php-fpm* | sort -r | head -n 1)"
+          "$fpm" -v
+
       - name: Run tests on ASGI, WSGI, CGI and FastCGI servers
         shell: bash
         env:
