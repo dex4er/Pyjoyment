@@ -135,7 +135,11 @@ class Pyjo_App_FastCGI(Pyjo.App.object):
         directory is ``SCRIPT_FILENAME`` and whose path after the mount is
         ``SCRIPT_NAME``, the rest of the path is ``PATH_INFO``, and a path that
         ends with a slash names ``index.php`` in it. A path with ``..`` is not
-        found. ``SCRIPT_FILENAME`` of :attr:`env` takes its place.
+        found. With :attr:`script`, a path that names no script of the
+        directory is the one of :attr:`script`, as the one entry of an
+        application that takes every path, as with ``try_files`` of nginx,
+        which the path decides, not the files, which the application may see
+        elsewhere. ``SCRIPT_FILENAME`` of :attr:`env` takes its place.
         """
 
         self.env: dict[str, str] = {}
@@ -158,6 +162,19 @@ class Pyjo_App_FastCGI(Pyjo.App.object):
         be inactive before it gets closed, defaults to ``60``.
         """
 
+        self.script: str | None = None
+        """::
+
+            script = app.script
+            app.script = '/var/www/index.php'
+            app.script = 'index.php'
+
+        Script of the application for every path, as the one entry of an
+        application of PHP that takes every path, with the path after the
+        mount as ``PATH_INFO``, or for every path that names no script of
+        :attr:`document_root`, in which it is then.
+        """
+
         self.url: str | Pyjo.URL.object | None = None
         """::
 
@@ -167,7 +184,11 @@ class Pyjo_App_FastCGI(Pyjo.App.object):
 
         Location of the application, a TCP/IP address and port of ``fcgi://``
         or the path of a UNIX domain socket of ``fcgi+unix://``, escaped as the
-        listen locations of :mod:`Pyjo.Server.Daemon` are.
+        listen locations of :mod:`Pyjo.Server.Daemon` are. Its query can give
+        :attr:`document_root` and :attr:`script`, as the listen locations give
+        their options, which the attributes take the place of. ::
+
+            app.url = 'fcgi://127.0.0.1:9000?document_root=%2Fvar%2Fwww&script=index.php'
         """
 
         super().__init__(attrs, **kwargs)
@@ -184,20 +205,30 @@ class Pyjo_App_FastCGI(Pyjo.App.object):
         """
         if (url := self.url) is None:
             raise Pyjo.Exception.new('No FastCGI application')
-        options = _options(url)
+        options, root, script = _location(url)
+        if self.document_root is not None:
+            root = os.fspath(self.document_root)
+        if self.script is not None:
+            script = self.script
         c = None
         if not isinstance(tx, Pyjo.Transaction.object):
             c = tx
             tx = c.tx
+            if not Pyjo.App._within(c):  # pyright: ignore[reportPrivateUsage]
+                return c.helpers.reply.not_found()
             c.render_later()
-        _Call(self, options, tx, c).start()
+        _Call(self, options, root, script, tx, c).start()
 
 
 # A request to the application, whose response of CGI is written as it comes
 class _Call:
-    def __init__(self, app: Pyjo_App_FastCGI, options: dict[str, Any], tx: Any, c: Any) -> None:
+    def __init__(
+        self, app: Pyjo_App_FastCGI, options: dict[str, Any], root: str | None, script: str | None, tx: Any, c: Any
+    ) -> None:
         self.app = app
         self.options = options
+        self.root = root
+        self.script = script
         self.c = c
         self.tx = tx
         self.buffer = bytearray()
@@ -216,16 +247,25 @@ class _Call:
         self.tx.on('finish', self._finish)
         params = {**Pyjo.App._cgi(self.tx, self.c), **_extra(self.tx)}  # pyright: ignore[reportPrivateUsage]
 
-        # The script of the path in the directory of the scripts
-        if (root := self.app.document_root) is not None and 'SCRIPT_FILENAME' not in self.app.env:
-            if not _script(params, os.fspath(root)):
+        env = self.app.env
+
+        # The script of the path in the directory of the scripts, or the one script for a path that names none
+        if (root := self.root) is not None and 'SCRIPT_FILENAME' not in env:
+            if (script := self.script) is not None and not _names_script(params['PATH_INFO']):
+                params['PATH_INFO'] = f'/{script.lstrip("/")}'
+            if not _script(params, root):
                 return self._not_found()
 
-        # The path of the mount itself, as a server of FastCGI takes an empty PATH_INFO for the whole path in
-        # SCRIPT_NAME, as nginx and Caddy send it
-        elif not params['PATH_INFO'] and params['SCRIPT_NAME']:
-            params['PATH_INFO'] = '/'
-        params.update(self.app.env)
+        else:
+            # The one script for every path
+            if (script := self.script) is not None and 'SCRIPT_FILENAME' not in env:
+                params['SCRIPT_FILENAME'] = script
+
+            # The path of the mount itself, as a server of FastCGI takes an empty PATH_INFO for the whole path in
+            # SCRIPT_NAME, as nginx and Caddy send it
+            if not params['PATH_INFO'] and params['SCRIPT_NAME']:
+                params['PATH_INFO'] = '/'
+        params.update(env)
         self.params = _encode_pairs(params)
         self.id = Pyjo.IOLoop.client(self._connected, **self.options)
 
@@ -442,14 +482,21 @@ def _extra(tx: Any) -> dict[str, str]:
     return extra
 
 
-# The options of the connection to the location of the application
-def _options(url: Any) -> dict[str, Any]:
+# The options of the connection to the location of the application, and the directory and the script of its query
+def _location(url: Any) -> tuple[dict[str, Any], str | None, str | None]:
     url = Pyjo.URL.new(str(url))
+    query = url.query
+    root, script = query.param('document_root'), query.param('script')
     if (proto := url.protocol) == 'fcgi+unix':
-        return {'path': url.host}
+        return {'path': url.host}, root, script
     if proto == 'fcgi' and url.host and url.port:
-        return {'address': url.host, 'port': url.port}
+        return {'address': url.host, 'port': url.port}, root, script
     raise Pyjo.Exception.new(f'Invalid FastCGI location "{url}"')
+
+
+# A path that names a script of PHP
+def _names_script(path: str) -> bool:
+    return any(part.endswith('.php') for part in path.split('/'))
 
 
 # The script of the path in the directory of the scripts, as nginx has it with fastcgi_split_path_info and

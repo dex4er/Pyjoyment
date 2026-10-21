@@ -250,6 +250,13 @@ with subtest('PHP on php-fpm'):
                     t.content_is('data: 0\n\ndata: 1\n\ndata: 2\n\n')
                     t.get_ok('/php/phpinfo.php').status_is(200).content_like(r'<title>PHP [\d.]+ - phpinfo\(\)</title>')
                     t.get_ok('/php/missing.php').status_is(404)
+
+                    # The scripts of the directory, and its index.php for every other path, as the one entry
+                    php = Pyjo.App.FastCGI.new(url=location, document_root=os.path.dirname(PHP), script='index.php')
+                    t = Pyjo.Test.Pyjo.new(application('/php', php))
+                    t.get_ok('/php/2026/10/hello-world/').status_is(200)
+                    t.content_is('Hello PHP at /php/index.php for  (GET /php/2026/10/hello-world/)!\n')
+                    t.get_ok('/php/phpinfo.php').status_is(200).content_like(r'<title>PHP [\d.]+ - phpinfo\(\)</title>')
                 except Exception:
                     log.seek(0)
                     diag(log.read())

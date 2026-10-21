@@ -62,6 +62,15 @@ with subtest('inactivity_timeout'):
     app.inactivity_timeout = 300
     is_ok(app.inactivity_timeout, 300, 'timeout')
 
+with subtest('script'):
+    app = Pyjo.App.FastCGI.new()
+    script = app.script
+    is_ok(script, None, 'no script')
+    app.script = '/var/www/index.php'
+    is_ok(app.script, '/var/www/index.php', 'script')
+    app.script = 'index.php'
+    is_ok(app.script, 'index.php', 'script of the directory')
+
 with subtest('url'):
     app = Pyjo.App.FastCGI.new()
     url_ = app.url
@@ -70,6 +79,9 @@ with subtest('url'):
     is_ok(app.url, 'fcgi://127.0.0.1:9000', 'TCP/IP')
     app.url = 'fcgi+unix://%2Frun%2Fphp%2Ffpm.sock'
     is_ok(app.url, 'fcgi+unix://%2Frun%2Fphp%2Ffpm.sock', 'UNIX domain socket')
+
+    app.url = 'fcgi://127.0.0.1:9000?document_root=%2Fvar%2Fwww&script=index.php'
+    is_ok(app.url, 'fcgi://127.0.0.1:9000?document_root=%2Fvar%2Fwww&script=index.php', 'with its query')
 
 with subtest('new'):
     app = Pyjo.App.FastCGI.new(url='fcgi://127.0.0.1:9000')

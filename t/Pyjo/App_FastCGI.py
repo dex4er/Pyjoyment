@@ -201,6 +201,9 @@ with subtest('Path of a route'):
         is_ok(t.tx.res.json('/env/PATH_INFO'), '/env/foo/bar', 'right path')
         is_ok(t.tx.res.json('/env/REQUEST_URI'), '/prefix/env/foo/bar?x=1', 'right request URI')
 
+        # Not after a part of the path that does not end with a slash, which cannot be SCRIPT_NAME
+        t.get_ok('/prefixx').status_is(404)
+
         # The path of the mount itself
         t.get_ok('/prefix/later').status_is(200).content_is('Hello later at /prefix!')
 
@@ -234,6 +237,40 @@ with subtest('Directory of the scripts'):
         count = len(requests)
         t.get_ok('/php/%2E%2E/etc/passwd').status_is(404)
         is_ok(len(requests), count, 'no request to the application')
+
+    # The one script for a path that names no script of the directory, as the one entry of an application
+    with Pyjo.App.FastCGI.new(url=url, document_root='/var/www', script='index.php') as fcgi:
+        t = Pyjo.Test.Pyjo.new(application(fcgi, '/php'))
+        for path, script, name, info in (
+            ('/php/', '/var/www/index.php', '/php/index.php', ''),
+            ('/php/2026/10/hello-world/', '/var/www/index.php', '/php/index.php', ''),
+            ('/php/wp-admin/edit.php', '/var/www/wp-admin/edit.php', '/php/wp-admin/edit.php', ''),
+            ('/php/xmlrpc.php/x', '/var/www/xmlrpc.php', '/php/xmlrpc.php', '/x'),
+        ):
+            t.get_ok(path).status_is(200)
+            env = params(requests[-1])
+            is_ok(env['SCRIPT_FILENAME'], script, f'right script file of {path}')
+            is_ok(env['SCRIPT_NAME'], name, f'right script name of {path}')
+            is_ok(env['PATH_INFO'], info, f'right path of {path}')
+        is_ok(params(requests[-3])['REQUEST_URI'], '/php/2026/10/hello-world/', 'right request URI')
+
+    # The one script for every path, without a directory
+    with Pyjo.App.FastCGI.new(url=url, script='/srv/app.php') as fcgi:
+        t = Pyjo.Test.Pyjo.new(application(fcgi, '/php'))
+        t.get_ok('/php/foo/bar').status_is(200)
+        env = params(requests[-1])
+        is_ok(env['SCRIPT_FILENAME'], '/srv/app.php', 'right script file')
+        is_ok(env['SCRIPT_NAME'], '/php', 'right script name')
+        is_ok(env['PATH_INFO'], '/foo/bar', 'right path')
+
+    # The directory and the script of the query of the location, which the attributes take the place of
+    with Pyjo.App.FastCGI.new(url=f'{url}?document_root=%2Fsrv%2Fwww&script=front.php') as fcgi:
+        t = Pyjo.Test.Pyjo.new(application(fcgi, '/php'))
+        t.get_ok('/php/foo').status_is(200)
+        is_ok(params(requests[-1])['SCRIPT_FILENAME'], '/srv/www/front.php', 'script of the query')
+        fcgi.script = 'index.php'
+        t.get_ok('/php/foo').status_is(200)
+        is_ok(params(requests[-1])['SCRIPT_FILENAME'], '/srv/www/index.php', 'script of the attribute')
 
     # The script of the parameters of the application takes its place
     with Pyjo.App.FastCGI.new(url=url, document_root='/var/www', env={'SCRIPT_FILENAME': '/srv/app.php'}) as fcgi:
