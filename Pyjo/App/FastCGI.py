@@ -39,10 +39,11 @@ path that a route embeds the application under is ``SCRIPT_NAME``, after the
 base path of the request, the rest of the path is ``PATH_INFO``, ``/`` for
 the path of the mount itself, as an empty one is the whole path in
 ``SCRIPT_NAME`` for a server of ``FastCGI``, ``REQUEST_URI`` is the path with
-the query, and :attr:`env` adds to them, as ``SCRIPT_FILENAME`` for
-php-fpm, which :attr:`document_root` gives for each request otherwise. The
-body of the request goes in records ``STDIN``, each once the one before has
-been written.
+the query, without the header ``Proxy``, whose ``HTTP_PROXY`` an application
+may take for the proxy of its own requests, as with httpoxy, and :attr:`env`
+adds to them, as ``SCRIPT_FILENAME`` for php-fpm, which :attr:`document_root`
+gives for each request otherwise. The body of the request goes in records
+``STDIN``, each once the one before has been written.
 
 The connection is one for each request, through the event loop. A response of
 ``CGI`` that comes whole, with the end of the request, is written with its
@@ -273,6 +274,10 @@ class _Call:
     def start(self) -> None:
         self.tx.on('finish', self._finish)
         params = {**Pyjo.App._cgi(self.tx, self.c), **_extra(self.tx)}  # pyright: ignore[reportPrivateUsage]
+
+        # Not the header Proxy, whose HTTP_PROXY an application may take for the proxy of its own requests, as httpoxy
+        # (CVE-2016-5385) does, as nginx and Apache leave it out
+        params.pop('HTTP_PROXY', None)
 
         env = self.app.env
 

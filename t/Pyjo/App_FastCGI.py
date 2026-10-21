@@ -151,7 +151,7 @@ def params(request):
 with subtest('Parameters'):
     with Pyjo.App.FastCGI.new(url=URL) as app:
         t = Pyjo.Test.Pyjo.new(app)
-        t.get_ok('/env?a=1&b=%20', {'X-Foo': 'bar'}).status_is(200)
+        t.get_ok('/env?a=1&b=%20', {'X-Foo': 'bar', 'Proxy': 'http://evil.example:8080'}).status_is(200)
         env = t.tx.res.json('/env')
         is_ok(env['REQUEST_METHOD'], 'GET', 'right method')
         is_ok(env['SCRIPT_NAME'], '', 'no script name')
@@ -166,6 +166,7 @@ with subtest('Parameters'):
         is_ok(env['REMOTE_ADDR'], '127.0.0.1', 'right remote address')
         ok(env['REMOTE_PORT'].isdigit(), 'remote port')
         is_ok(env['HTTP_X_FOO'], 'bar', 'right header')
+        ok('HTTP_PROXY' not in env, 'no header Proxy, as with httpoxy')
         ok('HTTPS' not in env, 'not secure')
         ok('CONTENT_LENGTH' not in env, 'no content length')
 
