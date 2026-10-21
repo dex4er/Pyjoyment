@@ -246,14 +246,7 @@ namespace of Pyjoyment, as `Pyjo.Reactor` for a reactor or `Pyjoyment.Plugin`
 for a plugin. They are installed from their Git repositories until they are
 on PyPI.
 
-- [Pyjo-Reactor-Twisted](https://github.com/dex4er/Pyjo-Reactor-Twisted):
-  `Pyjo.Reactor.Twisted`, on the reactor of [Twisted](https://twisted.org),
-  so that an application shares the event loop with the code of Twisted.
-
-```sh
-uv add git+https://github.com/dex4er/Pyjo-Reactor-Twisted
-PYJO_REACTOR=Pyjo.Reactor.Twisted ./myapp.py daemon
-```
+- [Pyjo.Reactor.Twisted - Low-level event reactor with Twisted support](https://pyjoyment.readthedocs.io/projects/pyjo-reactor-twisted/en/latest/)
 
 ## Documentation
 
