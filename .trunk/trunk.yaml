@@ -70,7 +70,8 @@ lint:
     - bandit
     # black: Python formatter; ruff formats the code
     - black
-    # checkov: scanner for infrastructure as code; there is none here
+    # checkov: scanner for infrastructure as code; the only one is the OpenTofu
+    # of an example, a platform of tests, not of production
     - checkov
     # grype: known vulnerabilities in images and dependencies; there are no
     # runtime dependencies, as for osv-scanner and trivy
@@ -101,7 +102,7 @@ lint:
     # validate and tofu fmt, and the rules of AWS are a plugin that it downloads
     - tflint
     # trivy: scanner for containers, infrastructure as code and dependencies;
-    # nothing to scan here
+    # nothing to scan here, as for checkov
     - trivy
     # trufflehog: secret scanner; not needed here, and it would report the
     # default self-signed TLS key in Pyjo/IOLoop/certs, tracked on purpose
