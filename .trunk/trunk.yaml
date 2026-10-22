@@ -97,6 +97,9 @@ lint:
     # svgo: optimizes SVG images; the SVG images are the sources of the
     # artwork, edited by hand
     - svgo
+    # tflint: lints Terraform; the OpenTofu of the examples is checked with tofu
+    # validate and tofu fmt, and the rules of AWS are a plugin that it downloads
+    - tflint
     # trivy: scanner for containers, infrastructure as code and dependencies;
     # nothing to scan here
     - trivy
