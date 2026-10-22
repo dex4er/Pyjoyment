@@ -311,12 +311,17 @@ with subtest('Starlette on Mangum on Lambda'):
     if sys.platform == 'win32':
         skip('Lambda functions need pipes that the event loop watches', 1)
     else:
-        # The event function of the example, which runs an event loop of its own in its process
-        t = Pyjo.Test.Pyjo.new(Pyjo.File.path(EXAMPLE_MANGUM).to_abs())
-        t.get_ok('/').status_is(200).content_is('I ♥ Pyjoyment!')
-        t.get_ok('/mangum/').status_is(200).content_type_like(r'^text/plain')
-        t.content_is('Hello Starlette for / on Mangum!')
-        t.get_ok('/mangum/foo/bar').status_is(200).content_is('Hello Starlette for /foo/bar on Mangum!')
+        # The event function of the example, which runs an event loop of its own in its process, which does not get
+        # PYTHONWARNINGS or PYTHONDEVMODE, as the servers do not, as the warnings of Mangum are not ours
+        saved = {name: os.environ.pop(name) for name in ('PYTHONDEVMODE', 'PYTHONWARNINGS') if name in os.environ}
+        try:
+            t = Pyjo.Test.Pyjo.new(Pyjo.File.path(EXAMPLE_MANGUM).to_abs())
+            t.get_ok('/').status_is(200).content_is('I ♥ Pyjoyment!')
+            t.get_ok('/mangum/').status_is(200).content_type_like(r'^text/plain')
+            t.content_is('Hello Starlette for / on Mangum!')
+            t.get_ok('/mangum/foo/bar').status_is(200).content_is('Hello Starlette for /foo/bar on Mangum!')
+        finally:
+            os.environ.update(saved)
 
 with tempfile.TemporaryDirectory() as dir:
     shutil.copy(EXAMPLE, os.path.join(dir, 'inception.py'))
