@@ -115,6 +115,8 @@ program(root, 'half.cgi', "import sys\nsys.stdout.buffer.write(b'Content-Type: t
 # A program that writes its process id at once, as a shell does, which Python does not before its timeout
 sleep_cgi = root.child('sleep.cgi')
 sleep_cgi.spew(b"""#!/bin/sh
+sleep 10 &
+echo $! > "$PID_FILE.child"
 echo $$ > "$PID_FILE"
 if [ "$QUERY_STRING" = started ]; then
   printf 'Content-Type: text/plain\\r\\n\\r\\nstarted'
@@ -402,6 +404,7 @@ with subtest('Errors'):
             t.get_ok('/prefix').status_is(502)
         like_ok(str(messages), r'CGI application inactive', 'right error')
         ok(gone(pid_file), 'process killed')
+        ok(gone(f'{pid_file}.child'), 'process that it has started killed')
 
     # Inactive after the start of the response, which closes the connection of the client
     pid_file = tmp.child('started.pid').to_str()
@@ -409,6 +412,7 @@ with subtest('Errors'):
         t = Pyjo.Test.Pyjo.new(application(cgi))
         is_deeply_ok(raw(t, 'GET', '/prefix?started'), (200, None, 'chunked', None), 'incomplete response')
         ok(gone(pid_file), 'process killed')
+        ok(gone(f'{pid_file}.child'), 'process that it has started killed')
 
     throws_ok(
         lambda: Pyjo.App.CGI.new().handler(Pyjo.Transaction.HTTP.new()),

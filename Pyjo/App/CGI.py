@@ -56,7 +56,8 @@ A program that does not start or ends before its response is a response
 the connection of the client, as one that is quiet for longer than
 :attr:`inactivity_timeout` does, which, until the response starts, the
 connection of the client waits for without the inactivity timeout of the
-server. The process of a request whose client is gone is killed.
+server. The process of a request whose client is gone is killed, with the
+processes that it has started, as it runs as the leader of a process group.
 
 The reactor watches the pipes of the process, which it can on POSIX systems,
 not on Windows, where the response is ``502``.
@@ -568,7 +569,7 @@ class _Call(_Response):
         self.nph = os.path.basename(file).startswith(b'nph-') if nph is None else nph
         env = {name.encode('latin-1'): value.encode('latin-1') for name, value in params.items()}
         self.child = child = Pyjo.IOLoop.spawn(
-            [*(self.command or []), file], cwd=os.path.dirname(file) or None, env=env
+            [*(self.command or []), file], cwd=os.path.dirname(file) or None, detached=True, env=env
         )
         child.on('error', self._unstarted)
         if (stream := child.stdout) is None or (errors := child.stderr) is None:
