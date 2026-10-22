@@ -361,12 +361,17 @@ class _Writer:
 
     async def _write(self) -> None:
         while not self._stopped:
-            self._buffer += self._ws.server_write()
+            chunk = self._ws.server_write()
+            self._buffer += chunk
             while not self._stopped and isinstance(frame := parse_frame(self._buffer, sys.maxsize), tuple):
                 await self._frame(frame)
             if self.closed or self._ws.is_finished:
                 return
-            await self._resumed.wait()
+
+            # What has been written, after which the next write, of nothing, emits the event drain, as a server does
+            # once the data has been written
+            if not len(chunk):
+                await self._resumed.wait()
 
     async def _frame(self, frame: Frame) -> None:
         fin, _, _, _, op, payload = frame

@@ -304,6 +304,30 @@ with subtest('WebSocket closed by the application'):
     is_deeply_ok(sent[-1], {'type': 'websocket.close', 'code': 4000, 'reason': 'Bye!'}, 'right close message')
     is_deeply_ok(events, [(4000, '')], 'right close code')
 
+with subtest('WebSocket drain callbacks'):
+
+    def drain(tx):
+        @tx.on('message')
+        def message(ws, msg):
+            ws.send('one', lambda ws: ws.send('two', lambda ws: ws.finish(4000)))
+
+        tx.res.code = 101
+        tx.resume()
+
+    app = server(drain)
+    messages = [{'type': 'websocket.receive', 'text': 'go'}, {'type': 'websocket.disconnect', 'code': 4000}]
+    sent = ASGIClient.run(app, *ASGIClient.websocket('/ws', messages))
+    is_deeply_ok(
+        sent,
+        [
+            {'type': 'websocket.accept', 'subprotocol': None},
+            {'type': 'websocket.send', 'text': 'one'},
+            {'type': 'websocket.send', 'text': 'two'},
+            {'type': 'websocket.close', 'code': 4000, 'reason': ''},
+        ],
+        'messages sent as the ones before are written',
+    )
+
 with subtest('WebSocket closed abnormally'):
     events = []
 
