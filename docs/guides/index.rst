@@ -104,6 +104,10 @@ Guides
 :doc:`routing`
     Simple and fun introduction to the :mod:`Pyjoyment` router.
 
+:doc:`mounting`
+    Running the applications of other frameworks, of Python, PHP, CGI and AWS
+    Lambda, next to the routes of a :mod:`Pyjoyment` application.
+
 :doc:`rendering`
     Generating content with the :mod:`Pyjoyment` renderer.
 
@@ -126,6 +130,7 @@ Guides
     tutorial
     growing
     routing
+    mounting
     rendering
     testing
     cookbook

@@ -1,7 +1,6 @@
 from Pyjo.File import curfile
 
 import contextlib
-import importlib
 import io
 import random
 import re
@@ -17,10 +16,6 @@ EXAMPLES = curfile().dirname().dirname().sibling('docs', 'guides', 'routing')
 PLUGINS = [EXAMPLES.child(name).to_str() for name in ('werewolf', 'app_plugin')]
 sys.path[0:0] = PLUGINS
 
-import Pyjo.App.ASGI  # noqa: E402
-import Pyjo.App.CGI  # noqa: E402
-import Pyjo.App.FastCGI  # noqa: E402
-import Pyjo.App.Lambda  # noqa: E402
 import Pyjo.IOLoop  # noqa: E402
 import Pyjo.Test.Pyjo  # noqa: E402
 import Pyjoyment  # noqa: E402
@@ -29,7 +24,6 @@ import Pyjoyment.Plugin  # noqa: E402
 import Pyjoyment.Routes.Match  # noqa: E402
 import Pyjoyment.Routes.Pattern  # noqa: E402
 
-from Pyjo import q  # noqa: E402
 from Pyjo.Test import *  # noqa: E402
 
 
@@ -687,109 +681,6 @@ with subtest('Mount applications'):
         t.get_ok('/').status_is(200).content_is('Hello World!')
         t.get_ok('/prefix').status_is(200).content_is('Hello World!')
         t.get_ok('/', {'Host': 'test.example.com'}).status_is(200).content_is('Hello World!')
-
-with subtest('Mount applications of other frameworks'):
-    with application('frameworks'):
-        with Pyjo.Test.Pyjo.new(EXAMPLES.child('frameworks', 'myapp.py')) as t:
-            t.get_ok('/').status_is(200).content_is('Hello from Pyjoyment!')
-            t.get_ok('/legacy/foo').status_is(200).content_is('Hello from WSGI at /legacy for /foo!')
-            t.get_ok('/api/foo').status_is(200).json_is({'root_path': '/api', 'path': '/api/foo'})
-            t.get_ok('/api/events').status_is(200).content_type_is('text/event-stream')
-            t.content_is('data: 0\n\ndata: 1\n\ndata: 2\n\n')
-            t.websocket_ok('/api/echo').send_ok('hi').message_ok().message_is('echo: hi').finish_ok()
-
-            # The pings of the mounted application and of a WebSocket of Pyjoyment
-            api = importlib.import_module('api')
-
-            # Pings every 60 seconds
-            asgi = Pyjo.App.ASGI.new(app=api.app, ping_interval=60)
-            t.app.plugin('Mount', {'/pinged': asgi})
-            is_ok(asgi.ping_interval, 60, 'interval of the pings')
-
-            # A WebSocket of Pyjoyment pinged every 20 seconds
-
-            @t.app.routes.websocket('/echo')
-            def echo(c):
-                c.tx.heartbeat()
-                c.on('message', lambda c, msg: c.send(f'echo: {msg}'))
-
-            t.websocket_ok('/pinged/echo').send_ok('hi').message_ok().message_is('echo: hi').finish_ok()
-            t.websocket_ok('/echo').send_ok('hi').message_ok().message_is('echo: hi').finish_ok()
-
-            # The beginning of the path, which an application of another framework answers with 404
-            t.get_ok('/legacy.css').status_is(404)
-            t.get_ok('/legacyx').status_is(404)
-
-        # A regular expression of the whole path
-        app = Pyjoyment.new()
-        app.log.level = 'fatal'
-
-        # Only /legacy and the paths under it
-        app.plugin('Mount', {q(r'/legacy(?P<path>/.*)?'): 'legacy:app'})
-
-        # The API of each user, whose name is a capture
-        app.plugin('Mount', {q(r'/(?P<user>\w+)/api(?P<path>/.*)?'): 'api:app'})
-
-        # Only one path
-        app.plugin('Mount', {q(r'/status\.json'): 'api:app'})
-
-        with Pyjo.Test.Pyjo.new(app) as t:
-            t.get_ok('/legacy/foo').status_is(200).content_is('Hello from WSGI at /legacy for /foo!')
-            t.get_ok('/legacyx').status_is(404)
-            t.get_ok('/sri/api/foo').status_is(200).json_is({'root_path': '/sri/api', 'path': '/sri/api/foo'})
-            t.get_ok('/status.json').status_is(200).json_is({'root_path': '/status.json', 'path': '/status.json'})
-            t.get_ok('/status.jsonx').status_is(404)
-
-        # FastCGI, as PHP on php-fpm
-        app = Pyjoyment.new()
-
-        # Every path to the one entry of the application
-        app.plugin('Mount', {'/app': 'fcgi://127.0.0.1:9000?script=/srv/app/public/index.php'})
-
-        # The scripts of a directory
-        app.plugin('Mount', {'/php': 'fcgi+unix://%2Frun%2Fphp%2Fphp-fpm.sock?document_root=/var/www/php'})
-
-        # WordPress: its scripts, its files, and its index.php for every other path
-        app.plugin(
-            'Mount', {'/blog': 'fcgi://127.0.0.1:9000?document_root=/var/www/wordpress&script=index.php&static=1'}
-        )
-
-        mounts = {str(route.pattern.unparsed): route.pattern.defaults['app'] for route in app.routes.children}
-        ok(all(isinstance(fcgi, Pyjo.App.FastCGI.object) for fcgi in mounts.values()), 'FastCGI applications')
-        like_ok(str(mounts['/app'].url), r'\?script=/srv/app/public/index\.php$', 'one script')
-        like_ok(str(mounts['/php'].url), r'^fcgi\+unix://.*\?document_root=/var/www/php$', 'directory')
-        like_ok(str(mounts['/blog'].url), r'document_root=/var/www/wordpress&script=index\.php&static=1$', 'WordPress')
-
-        # CGI
-        app = Pyjoyment.new()
-
-        # The programs of cgi-bin
-        app.plugin('Mount', {'/cgi-bin': Pyjo.App.CGI.new(document_root='/usr/lib/cgi-bin')})
-
-        # PHP on php-cgi, with its files
-        php = Pyjo.App.CGI.new(
-            command=['php-cgi'], document_root='/var/www/php', script_extensions=['.php'], static=True
-        )
-        app.plugin('Mount', {'/php': php})
-
-        mounts = {str(route.pattern.unparsed): route.pattern.defaults['app'] for route in app.routes.children}
-        ok(all(isinstance(cgi, Pyjo.App.CGI.object) for cgi in mounts.values()), 'CGI applications')
-        is_ok(mounts['/cgi-bin'].document_root, '/usr/lib/cgi-bin', 'directory of the programs')
-        is_deeply_ok(mounts['/php'].command, ['php-cgi'], 'command of the scripts')
-
-        # Lambda
-        app = Pyjoyment.new()
-
-        # The handler "handler" of myfunction.py of the directory of the function
-        app.plugin('Mount', {'/function': Pyjo.App.Lambda.new(function='myfunction.handler', task_root='functions')})
-
-        # Another runtime, with the events of a REST API
-        app.plugin('Mount', {'/node': Pyjo.App.Lambda.new(command=['node', 'runtime.js'], payload='1.0')})
-
-        mounts = {str(route.pattern.unparsed): route.pattern.defaults['app'] for route in app.routes.children}
-        ok(all(isinstance(fcn, Pyjo.App.Lambda.object) for fcn in mounts.values()), 'Lambda functions')
-        is_ok(mounts['/function'].function, 'myfunction.handler', 'handler of the function')
-        is_ok(mounts['/node'].payload, '1.0', 'payload format')
 
 with subtest('Embed applications'):
     with application('embed_lite'):
