@@ -157,6 +157,17 @@ def timeout(c):
         c.stash()['finished'] = c.stash().get('finished', 0) + 1
 
 
+# Not in Mojolicious: a handshake whose response waits, as an ASGI application waits for its websocket.accept
+@websocket('/later')
+def later(c):
+    c.render_later().stash()['ws'] = c.tx
+
+    @c.tx.on('finish')
+    def finish(ws, code, reason):
+        c.stash()['finished'] = code
+        Pyjo.IOLoop.stop()
+
+
 ua = app.ua
 
 with subtest('URL for WebSocket'):
@@ -504,5 +515,27 @@ with subtest('Ping/pong'):
     Pyjo.IOLoop.start()
     # Unlike Mojolicious: the payload of a frame is bytes
     is_ok(got['pong'], b'test', 'received pong with payload')
+
+# Not in Mojolicious: the WebSocket of a handshake whose connection is closed before its response, which Mojo drops
+# without its event finish
+with subtest('Connection closed before the response of the handshake'):
+    got = {}
+    app.plugins.once('before_dispatch', lambda c: got.update(stash=c.stash()))
+    port = ua.server.nb_url().port
+
+    @Pyjo.IOLoop.client(address='127.0.0.1', port=port)
+    def handshake(loop, err, stream):
+        stream.on('read', lambda stream, chunk: got.update(read=chunk))
+        stream.write(
+            b'GET /later HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n'
+            b'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n',
+            lambda stream: Pyjo.IOLoop.timer(0.1, lambda loop: stream.close()),
+        )
+
+    timer = Pyjo.IOLoop.timer(5, lambda loop: loop.stop())
+    Pyjo.IOLoop.start()
+    Pyjo.IOLoop.remove(timer)
+    is_ok(got['stash'].get('finished'), 1006, 'finish event has been emitted')
+    ok('read' not in got, 'no response')
 
 done_testing()

@@ -652,6 +652,10 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
             fcgi.closed()
         if (tx := self._connections.get(id, {}).get('tx')) is not None:
             tx.closed()
+        # Not in Mojolicious: the WebSocket of a handshake whose response has not been written, which Mojo drops without
+        # its event finish, so that what the response waits for, as the websocket.accept of an ASGI application, ends
+        if (ws := self._connections.get(id, {}).get('next')) is not None:
+            ws.closed()
         self._connections.pop(id, None)
 
     def _finish(self, id: str) -> None:
