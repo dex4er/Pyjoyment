@@ -18,6 +18,7 @@ sys.path[0:0] = PLUGINS
 
 import Pyjo.App.CGI  # noqa: E402
 import Pyjo.App.FastCGI  # noqa: E402
+import Pyjo.App.Lambda  # noqa: E402
 import Pyjo.IOLoop  # noqa: E402
 import Pyjo.Test.Pyjo  # noqa: E402
 import Pyjoyment  # noqa: E402
@@ -754,6 +755,20 @@ with subtest('Mount applications of other frameworks'):
         ok(all(isinstance(cgi, Pyjo.App.CGI.object) for cgi in mounts.values()), 'CGI applications')
         is_ok(mounts['/cgi-bin'].document_root, '/usr/lib/cgi-bin', 'directory of the programs')
         is_deeply_ok(mounts['/php'].command, ['php-cgi'], 'command of the scripts')
+
+        # Lambda
+        app = Pyjoyment.new()
+
+        # The handler "handler" of myfunction.py of the directory of the function
+        app.plugin('Mount', {'/function': Pyjo.App.Lambda.new(function='myfunction.handler', task_root='functions')})
+
+        # Another runtime, with the events of a REST API
+        app.plugin('Mount', {'/node': Pyjo.App.Lambda.new(command=['node', 'runtime.js'], payload='1.0')})
+
+        mounts = {str(route.pattern.unparsed): route.pattern.defaults['app'] for route in app.routes.children}
+        ok(all(isinstance(fcn, Pyjo.App.Lambda.object) for fcn in mounts.values()), 'Lambda functions')
+        is_ok(mounts['/function'].function, 'myfunction.handler', 'handler of the function')
+        is_ok(mounts['/node'].payload, '1.0', 'payload format')
 
 with subtest('Embed applications'):
     with application('embed_lite'):

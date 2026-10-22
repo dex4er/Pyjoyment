@@ -1,0 +1,77 @@
+# An event function of AWS Lambda
+
+`app.py` is an application of `Pyjoyment.Lite` that runs as an event function
+of AWS Lambda, which the OpenTofu of this directory deploys: the function with
+`app.py` alone, and the framework, `Pyjo` and `Pyjoyment` of the checkout, in
+a layer of its own, with a Function URL, and behind an Application Load
+Balancer on request.
+
+## Running locally
+
+The same script runs as an application of its own:
+
+```sh
+uv run python examples/lambda/app.py daemon
+```
+
+and as an event function, with the events of Lambda, under `Pyjo.App.Lambda`,
+as its test does:
+
+```sh
+uv run python -m Pyjo.Prove -l t/examples/lambda/app.py
+```
+
+## Deploying to AWS
+
+OpenTofu 1.13 deploys it with the credentials and the region of the default
+chain of AWS, as `AWS_PROFILE` and `AWS_REGION`:
+
+```sh
+tofu -chdir=examples/lambda init
+tofu -chdir=examples/lambda apply
+```
+
+The output `url` is the Function URL, which the test takes in
+`TEST_LAMBDA_URL`:
+
+```sh
+TEST_LAMBDA_URL=$(tofu -chdir=examples/lambda output -raw url) \
+  uv run python -m Pyjo.Prove -l t/examples/lambda/app.py
+```
+
+`-var alb=true` puts the function behind an Application Load Balancer in the
+default VPC too, which costs for each hour it runs, where the Function URL
+costs nothing while it waits. Its URL is the output `alb_url`, which the test
+takes in `TEST_LAMBDA_ALB_URL`:
+
+```sh
+tofu -chdir=examples/lambda apply -var alb=true
+TEST_LAMBDA_ALB_URL=$(tofu -chdir=examples/lambda output -raw alb_url) \
+  uv run python -m Pyjo.Prove -l t/examples/lambda/app.py
+```
+
+The resources go away with:
+
+```sh
+tofu -chdir=examples/lambda destroy
+```
+
+## PHP
+
+The function runs what Pyjoyment mounts, also PHP on php-fpm. The layer of PHP
+of [Bref](https://bref.sh) has it, and `app.py` starts it with the execution
+environment and serves `phpinfo.php` under `/php` with `Pyjo.App.FastCGI`. The
+variable `layers` adds the layer, which is in its default, commented out, or
+in a `terraform.tfvars` of this directory, which git ignores:
+
+```hcl
+layers = [
+  "arn:aws:lambda:eu-central-1:873528684822:layer:arm-php-85:21",
+]
+```
+
+Locally, `PHP_FPM` names the php-fpm to start:
+
+```sh
+PHP_FPM=$(command -v php-fpm) uv run python examples/lambda/app.py daemon
+```

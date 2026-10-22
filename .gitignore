@@ -21,6 +21,17 @@ benchmarks/venv/
 # Caches of the tools
 .ruff_cache/
 
+# The working directories of OpenTofu, with the archives of the functions, the locks
+# of the providers, which are not locked, the states and the variables of each one
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfvars
+
+# Logs, as the one of TF_LOG_PATH of OpenTofu
+*.log
+
 # The packages of npm, which npm run bundle copies from
 node_modules/
 npm-debug.log*

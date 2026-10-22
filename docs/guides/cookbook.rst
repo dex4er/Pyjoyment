@@ -711,6 +711,53 @@ the command :mod:`Pyjoyment.Command.wsgi` for it.
     :language: python
     :caption: myapp.py
 
+AWS Lambda
+~~~~~~~~~~
+
+An application runs as an event function of `AWS Lambda
+<https://aws.amazon.com/lambda/>`_, whose handler answers the events of API
+Gateway, Function URLs and Application Load Balancers, with
+:mod:`Pyjo.Server.Lambda`. The script of the application ends with
+``handler = app.start()``, which gives the runtime of Lambda its handler,
+``myapp.handler``, as it detects the ``AWS_LAMBDA_RUNTIME_API`` environment
+variable, which Lambda sets.
+
+.. literalinclude:: cookbook/lambda/myapp.py
+    :language: python
+    :caption: myapp.py
+
+On a custom runtime, as ``provided.al2023``, the ``bootstrap`` of the function
+runs it with the runtime client of :mod:`Pyjo.Server.Lambda`, which needs no
+other library.
+
+.. code-block:: sh
+
+    #!/bin/sh
+    exec python3 -m Pyjo.Server.Lambda
+
+The same function runs locally, mounted in an application with
+:mod:`Pyjo.App.Lambda`, in a process of its own, which gets its invocations
+through the Runtime API of Lambda, as on AWS, and with the path of the mount as
+the stage of API Gateway.
+
+.. literalinclude:: cookbook/lambda/gateway.py
+    :language: python
+    :caption: gateway.py
+
+So it is tried live with the built-in web server, and tested with
+:mod:`Pyjo.Test.Pyjo`, before it goes to AWS.
+
+.. code-block:: console
+
+    $ ./gateway.py daemon
+    $ curl http://127.0.0.1:3000/myapp
+    Hello Lambda at /myapp!
+
+.. code-block:: python
+
+    t = Pyjo.Test.Pyjo.new('gateway.py')
+    t.get_ok('/myapp').status_is(200).content_is('Hello Lambda at /myapp!')
+
 Rewriting
 ~~~~~~~~~
 

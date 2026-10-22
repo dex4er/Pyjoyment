@@ -1,5 +1,6 @@
 import Pyjo.App.CGI
 import Pyjo.App.FastCGI
+import Pyjo.App.Lambda
 import Pyjo.File
 import Pyjo.Server.Daemon
 import Pyjo.Test.Pyjo
@@ -142,6 +143,12 @@ with subtest('Synopsis'):
     route = app.plugin('Mount', {'/cgi-bin': Pyjo.App.CGI.new(document_root='/usr/lib/cgi-bin')})
     ok(isinstance(route.pattern.defaults['app'], Pyjo.App.CGI.object), 'CGI application')
     is_ok(route.pattern.defaults['app'].document_root, '/usr/lib/cgi-bin', 'directory of the programs')
+
+    # Event function of AWS Lambda, as an object, in a process of its own
+    app = application()
+    route = app.plugin('Mount', {'/function': Pyjo.App.Lambda.new(function='myfunction.handler')})
+    ok(isinstance(route.pattern.defaults['app'], Pyjo.App.Lambda.object), 'Lambda function')
+    is_ok(route.pattern.defaults['app'].function, 'myfunction.handler', 'handler of the function')
 
     # A regular expression of the whole path, whose group path is the rest of
     # the path for the application, and whose other named groups are captures

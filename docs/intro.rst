@@ -36,9 +36,10 @@ It mounts the applications of other frameworks under a path or a host, next
 to its own routes: WSGI applications, as those of Flask, and ASGI
 applications, as those of Starlette, in the same process and on the same
 server, whose responses stream at the pace of the client, FastCGI
-applications, as PHP on php-fpm, which it connects to, and CGI programs, which
-it runs, as a web server does, with one script for every path or the scripts
-of a directory.
+applications, as PHP on php-fpm, which it connects to, CGI programs, which it
+runs, as a web server does, with one script for every path or the scripts of a
+directory, and event functions of AWS Lambda, which it runs in a process of
+their own, as Lambda does.
 
 Both are cloud native: ``generate dockerfile`` writes the image of an
 application, whose server stops gracefully on the ``TERM`` of its container

@@ -8,7 +8,7 @@ end_of_line = lf
 insert_final_newline = true
 trim_trailing_whitespace = true
 
-[*.{css,ep,html,js,json,md,toml,yaml,yml}]
+[*.{css,ep,hcl,html,js,json,md,tf,tfvars,tofu,toml,yaml,yml}]
 indent_size = 2
 
 [*.sh]

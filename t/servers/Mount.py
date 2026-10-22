@@ -22,7 +22,7 @@ import time
 
 # The applications of other frameworks, which Pyjoyment.Plugin.Mount mounts, of the dependency group "servers": uv run
 # --only-group servers python -m Pyjo.Prove t/servers
-if missing := [m for m in ('flask', 'starlette', 'waitress') if not importlib.util.find_spec(m)]:
+if missing := [m for m in ('flask', 'mangum', 'starlette', 'waitress') if not importlib.util.find_spec(m)]:
     plan(skip_all=f'needs the dependency group "servers", without {", ".join(missing)}')
 
 import flask  # noqa: E402
@@ -55,6 +55,9 @@ PHP_FPM = shutil.which('php-fpm') or next(
 # The example of php-cgi, which runs php-cgi of PATH
 EXAMPLE_PHP_CGI = os.path.join(os.path.dirname(__file__), '..', '..', 'examples', 'mount', 'mount_cgi_php.py')
 PHP_CGI = shutil.which('php-cgi')
+
+# The example of Starlette on Mangum, an event function of AWS Lambda
+EXAMPLE_MANGUM = os.path.join(os.path.dirname(__file__), '..', '..', 'examples', 'mount', 'mount_lambda_mangum.py')
 PYTHON = sys.executable
 UWSGI = shutil.which('uwsgi', path=os.path.dirname(sys.executable))
 GUNICORN = [PYTHON, '-m', 'gunicorn', 'served:application', '--bind', '127.0.0.1:{port}']
@@ -303,6 +306,22 @@ with subtest('PHP on php-cgi'):
         t.get_ok('/php/phpinfo.php').status_is(200).content_like(r'<title>PHP [\d.]+ - phpinfo\(\)</title>')
         t.get_ok('/php/missing.php').status_is(404)
         t.get_ok('/php/php-fpm.conf').status_is(404)
+
+with subtest('Starlette on Mangum on Lambda'):
+    if sys.platform == 'win32':
+        skip('Lambda functions need pipes that the event loop watches', 1)
+    else:
+        # The event function of the example, which runs an event loop of its own in its process, which does not get
+        # PYTHONWARNINGS or PYTHONDEVMODE, as the servers do not, as the warnings of Mangum are not ours
+        saved = {name: os.environ.pop(name) for name in ('PYTHONDEVMODE', 'PYTHONWARNINGS') if name in os.environ}
+        try:
+            t = Pyjo.Test.Pyjo.new(Pyjo.File.path(EXAMPLE_MANGUM).to_abs())
+            t.get_ok('/').status_is(200).content_is('I ♥ Pyjoyment!')
+            t.get_ok('/mangum/').status_is(200).content_type_like(r'^text/plain')
+            t.content_is('Hello Starlette for / on Mangum!')
+            t.get_ok('/mangum/foo/bar').status_is(200).content_is('Hello Starlette for /foo/bar on Mangum!')
+        finally:
+            os.environ.update(saved)
 
 with tempfile.TemporaryDirectory() as dir:
     shutil.copy(EXAMPLE, os.path.join(dir, 'inception.py'))

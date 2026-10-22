@@ -1217,8 +1217,32 @@ the process, which it can on POSIX systems, not on Windows.
     php = Pyjo.App.CGI.new(command=['php-cgi'], document_root='/var/www/php', script_extensions=['.php'], static=True)
     plugin('Mount', {'/php': php})
 
+An event function of AWS Lambda runs in a process of its own, which
+:mod:`Pyjo.App.Lambda` starts on the first request and keeps for the next
+ones, which it gets one after another through the Runtime API of Lambda, as
+an execution environment of Lambda does, mounted as an object of it. A handler
+of Python, ``module.function`` in the directory of ``task_root``, runs with the
+runtime client of :mod:`Pyjo.Server.Lambda`, also one of another framework
+that runs an event loop of its own, as Mangum, and ``command`` runs a function
+of another runtime. The request is an event of the payload format of
+``payload``, ``2.0`` of Function URLs and HTTP APIs by default, ``1.0`` of
+REST APIs or ``alb``, and the path of the mount is its stage, so that the same
+function runs here, live and in the tests of :mod:`Pyjo.Test.Pyjo`, as on AWS.
+
+.. code-block:: python
+
+    import Pyjo.App.Lambda
+
+    # The handler "handler" of myfunction.py of the directory of the function
+    plugin('Mount', {'/function': Pyjo.App.Lambda.new(function='myfunction.handler', task_root='functions')})
+
+    # Another runtime, with the events of a REST API
+    plugin('Mount', {'/node': Pyjo.App.Lambda.new(command=['node', 'runtime.js'], payload='1.0')})
+
 The page of :doc:`/examples` has PHP on php-fpm with the pool of php-fpm that
-runs it, PHP on php-cgi, and a program of Python in cgi-bin.
+runs it, PHP on php-cgi, a program of Python in cgi-bin, and event functions of
+AWS Lambda, also Starlette on Mangum, and an application of Pyjoyment on
+:mod:`Pyjo.Server.Lambda` in the same file.
 
 Embed applications
 ~~~~~~~~~~~~~~~~~~

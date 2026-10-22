@@ -86,6 +86,33 @@ process of php-cgi for each request:
     .. include:: ../examples/mount/mount_cgi_php.py
        :code: python
 
+An event function of AWS Lambda, in a file of its own, under a path of an
+application of ``Pyjoyment.Lite``, in a process of its own, which gets the
+requests one after another, as Lambda runs it:
+
+    .. include:: ../examples/mount/mount_lambda.py
+       :code: python
+
+The event function, whose stage is the path it is mounted under:
+
+    .. include:: ../examples/mount/hello_lambda.py
+       :code: python
+
+Starlette on Mangum as the event function, which runs an event loop of its own
+in its process:
+
+    .. include:: ../examples/mount/mount_lambda_mangum.py
+       :code: python
+
+    .. include:: ../examples/mount/hello_mangum.py
+       :code: python
+
+An application of Pyjoyment on :mod:`Pyjo.Server.Lambda` as the event function,
+in the same file, which its process imports:
+
+    .. include:: ../examples/mount/mount_lambda_inception.py
+       :code: python
+
 
 Servers
 -------
