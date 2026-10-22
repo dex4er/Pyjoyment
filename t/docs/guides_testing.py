@@ -392,6 +392,11 @@ done_testing()
     is_ok(result.stderr, '', 'no diagnostics')
     is_ok(result.returncode, 0, 'right exit status')
 
+    chain = isa_ok(int('42'), int, 'an integer').cmp('>', 0, 'positive').is_(42, 'the answer')
+    ok(chain, 'the chain passed')
+    chain = that('Hello Pyjo').like(r'^Hello', 'a greeting').unlike(r'Mojo', 'not Mojo')
+    ok(chain, 'the chain of that passed')
+
     with Pyjo.Test.Pyjo.new(app) as t:
         t.get_ok('/frogs')
         if not is_ok(t.tx.res.code, 200, 'right status'):

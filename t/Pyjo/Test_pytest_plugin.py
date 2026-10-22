@@ -109,16 +109,18 @@ with subtest('No test scripts'):
 with subtest('Tests of pytest'):
     out, code = pytest('-rfEs', 'tests')
     like_ok(out, r'(?m)^tests/test_app\.py \.F$', 'tests of the application')
-    like_ok(out, r'(?m)^tests/test_functions\.py \.FFs\.$', 'tests of the functions')
+    like_ok(out, r'(?m)^tests/test_functions\.py \.FFs\.F$', 'tests of the functions')
     like_ok(out, r"(?m)^E       AssertionError: Failed test 'exact match for content'$", 'name of the failed test')
     like_ok(out, r"(?m)^E                got: 'Hello'\nE           expected: 'Bye'$", 'got and expected')
     like_ok(out, r'(?m)^tests/test_app\.py:6: AssertionError$', 'the line of the test')
     unlike_ok(out, r'Pyjo/Test/', 'no frames of Pyjo.Test')
+    like_ok(out, r"(?m)^E       AssertionError: Failed test 'greeting'$", 'name of the failed link of a chain')
+    like_ok(out, r'(?m)^tests/test_functions\.py:32: AssertionError$', 'the line of the chain')
     like_ok(out, r"(?m)^E       AssertionError: Failed test 'deep structure'$", 'name of the deep structure')
     like_ok(out, r"(?m)^E                got\['a'\]\[1\] = 2\nE           expected\['a'\]\[1\] = 3$", 'difference')
     like_ok(out, r'(?m)^-+ Captured stderr call -+\n# a diagnostic message$', 'diagnostic message')
     like_ok(out, r'(?m)^SKIPPED \[1\] tests/test_functions\.py:19: not today$', 'skipped test')
-    like_ok(out, r'(?m)^=+ 3 failed, 3 passed, 1 skipped in ', 'right summary')
+    like_ok(out, r'(?m)^=+ 4 failed, 3 passed, 1 skipped in ', 'right summary')
     is_ok(code, 1, 'right exit status')
 
 with subtest('Passing tests of pytest'):
@@ -136,7 +138,7 @@ with subtest('Bail out of a test of pytest'):
 with subtest('Everything'):
     out, code = pytest()
     like_ok(out, r'(?m)^testpaths: t, tests$', 'testpaths')
-    like_ok(out, r'(?m)^=+ 5 failed, 5 passed, 3 skipped in ', 'right summary')
+    like_ok(out, r'(?m)^=+ 6 failed, 5 passed, 3 skipped in ', 'right summary')
     is_ok(code, 1, 'right exit status')
 
 done_testing()

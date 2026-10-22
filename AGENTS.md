@@ -44,7 +44,10 @@ of them is a regression.
   standard library equivalent.
 - **Every return value chains.** Functions return the framework's own types so
   the next method is available: `slurp` returns a string, `Collection.join`
-  returns `Pyjo.String.Unicode`, DOM queries return `Pyjo.Collection`. A
+  returns `Pyjo.String.Unicode`, DOM queries return `Pyjo.Collection`, and the
+  assertions of `Pyjo.Test` return a `Pyjo.Test.Result`, which is true or
+  false, as the `bool` of `Test::More`, and tests the value again, as the one
+  that `that` makes of a value does. A
   function of the standard library that would wrap the chain from the front
   has a method form that continues it, such as `Collection.zip`, the
   conversions like `to_set()` and `Collection.get`, the expression form of an
@@ -591,9 +594,9 @@ git -C mojo checkout v9.49
 For each module:
 
 1. Port its tests from `t/mojo/*.t` first, keeping Mojo's test names and
-   order, one assertion for one, without folding repeated ones into a loop,
-   so that the diff of a newer Mojolicious applies to them. Mojo's tests are
-   the specification.
+   order, one assertion for one, without folding repeated ones into a loop
+   or chaining the assertions of `Pyjo.Test`, so that the diff of a newer
+   Mojolicious applies to them. Mojo's tests are the specification.
 2. Port the module from `lib/Mojo/*.pm` until the tests pass.
 3. Port its POD into the docstrings: the same sections in the same order
    (synopsis, description, events, attributes, methods, operators, see also)

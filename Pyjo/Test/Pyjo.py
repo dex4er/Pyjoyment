@@ -190,7 +190,7 @@ class Pyjo_Test_Pyjo(Pyjo.Base.object):
             # Build custom tests
             def location_is(t, value, desc=''):
                 desc = desc or f'Location: {value}'
-                t.success = is_ok(t.tx.res.headers.location, value, desc)
+                t.success = bool(is_ok(t.tx.res.headers.location, value, desc))
                 return t
 
             t.get_ok('/').status_is(302)
@@ -1407,8 +1407,8 @@ type _Pattern = str | bytes | re.Pattern[str] | re.Pattern[bytes] | tuple[str | 
 
 # like and unlike of Test::More, which match the string of a value, as a number, and match bytes, the characters
 # 0-255 of Perl, with a pattern of characters
-def _like(function: Callable[..., bool]) -> Callable[..., bool]:
-    def like(got: Any, regex: _Pattern, desc: str | None = None) -> bool:
+def _like(function: Callable[..., Pyjo.Test.Result]) -> Callable[..., Pyjo.Test.Result]:
+    def like(got: Any, regex: _Pattern, desc: str | None = None) -> Pyjo.Test.Result:
         pattern = regex.pattern if isinstance(regex, re.Pattern) else regex[0] if isinstance(regex, tuple) else regex
         if isinstance(got, bytes) and not isinstance(pattern, bytes):
             got = got.decode('latin-1')

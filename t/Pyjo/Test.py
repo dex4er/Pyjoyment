@@ -345,6 +345,87 @@ with subtest('Deep structure differences'):
     )
     is_ok(code, 1, 'right exit status')
 
+with subtest('Chains'):
+    out, err, code = run("""
+        from Pyjo.Test import *
+        result = is_ok('42', '42', 'is').isnt('', 'isnt').like(r'^4', 'like').unlike(r'5', 'unlike')
+        result = result.cmp('<', '5', 'cmp').isa(str, 'isa').ok('ok')
+        print('#', bool(result), result.got)
+        in_ok([1, None], 1, 'in').not_in(2, 'not in').is_deeply([1, None], 'is deeply').in_(None, 'in again')
+        none_ok(None, 'none').none('none again')
+        error = throws_ok(lambda: {}['x'], KeyError, 'throws').isa(LookupError, 'isa lookup')
+        print('#', bool(error), repr(error.got))
+        print('#', bool(ok(1).is_(1)), bool(ok(0, 'zero').is_(0, 'is zero')))
+        result = that([1])
+        print('#', bool(result), result.got)
+        result.isa(list, 'that isa').in_(1, 'that in')
+        done_testing()
+    """)
+    is_ok(
+        out,
+        'ok 1 - is\nok 2 - isnt\nok 3 - like\nok 4 - unlike\nok 5 - cmp\nok 6 - isa\nok 7 - ok\n# True 42\n'
+        'ok 8 - in\nok 9 - not in\nok 10 - is deeply\nok 11 - in again\nok 12 - none\nok 13 - none again\n'
+        "ok 14 - throws\nok 15 - isa lookup\n# True KeyError('x')\nok 16\nok 17\nnot ok 18 - zero\n"
+        'ok 19 - is zero\n# True False\n# True [1]\nok 20 - that isa\nok 21 - that in\n1..21\n',
+        'every link is a test',
+    )
+    is_ok(code, 1, 'one failure')
+
+    out, err, code = run("""
+        from Pyjo.Test import *
+        result = (
+            is_ok(1, 1, 'same')
+            .is_(2, 'different')
+            .is_(1, 'again')
+        )
+        if not result:
+            diag('the chain failed')
+        done_testing()
+    """)
+    is_ok(out, 'ok 1 - same\nnot ok 2 - different\nok 3 - again\n1..3\n', 'the chain goes on after a failure')
+    is_ok(
+        err,
+        "#   Failed test 'different'\n"
+        '#   at SCRIPT line 5.\n'
+        '#          got: 1\n'
+        '#     expected: 2\n'
+        '# the chain failed\n'
+        '# Looks like you failed 1 test of 3.\n',
+        'the line of the link, and false after a failure',
+    )
+    is_ok(code, 1, 'right exit status')
+
+    # The exception of throws_ok keeps no frame of the callback, whose objects, as a socket, are freed at once
+    if sys.implementation.name == 'pypy':
+        skip('PyPy frees objects only when its garbage collector runs', 3)
+    else:
+        out, err, code = run("""
+            import gc
+            import weakref
+            from Pyjo.Test import *
+
+            class Resource:
+                pass
+
+            def main():
+                refs = []
+
+                def fail():
+                    resource = Resource()
+                    refs.append(weakref.ref(resource))
+                    raise ValueError('bad')
+
+                result = throws_ok(fail, ValueError, 'raised').isa(Exception, 'an exception')
+                print('#', refs[0]() is None, type(result.got).__name__)
+
+            gc.disable()
+            main()
+            done_testing()
+        """)
+        is_ok(out, 'ok 1 - raised\nok 2 - an exception\n# True ValueError\n1..2\n', 'freed without the collector')
+        is_ok(err, '', 'no diagnostics')
+        is_ok(code, 0, 'right exit status')
+
 with subtest('Exceptions'):
     out, err, code = run("""
         import Pyjo.Test
@@ -363,6 +444,20 @@ with subtest('Exceptions'):
     is_ok(out, "Failed test 'different'\n         got: 1\n    expected: 2\nFailed test\n", 'raised, no TAP')
     is_ok(err, '', 'no diagnostics')
     is_ok(code, 0, 'no plan needed')
+
+    out, err, code = run("""
+        import Pyjo.Test
+        from Pyjo.Test import *
+        Pyjo.Test.raise_failures()
+        print(bool(is_ok(1, 1, 'same').isnt(2, 'other')))
+        try:
+            is_ok(1, 1, 'same').like(r'2', 'like').is_(2, 'never')
+        except AssertionError as e:
+            print(e)
+    """)
+    is_ok(out, "True\nFailed test 'like'\n                  1\n    doesn't match '2'\n", 'the first failure raises')
+    is_ok(err, '', 'no diagnostics')
+    is_ok(code, 0, 'right exit status')
 
     out, err, code = run("""
         import unittest
