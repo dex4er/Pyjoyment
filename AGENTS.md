@@ -1483,7 +1483,11 @@ not kept 1:1 with Mojo: it adds, moves and rewrites sections for what a Python
 developer needs, as the test scripts, the harness and the assertions of
 `Pyjo.Test` in `testing.rst`, which a Perl developer knows from `Test::More`
 and `prove`, and it has no `Not in Mojolicious:` comments; the ones that are
-left go when the guide is edited. `Mojolicious::Guides` is
+left go when the guide is edited. A subject that outgrows the guide of
+Mojolicious it was added to becomes a guide of its own, without a source to
+name, as `mounting.rst` for the applications of other frameworks that
+`Pyjoyment.Plugin.Mount` mounts, which `routing.rst` links to from the
+section of Mojolicious about mounting. `Mojolicious::Guides` is
 `docs/guides/index.rst`, whose section API is the class hierarchy of the
 modules of `docs/api`, each under the module of the base class of its
 class, which `t/docs/guides_index.py` checks, so that a new module goes into
