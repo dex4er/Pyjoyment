@@ -1,3 +1,4 @@
+import Pyjo.IOLoop
 import Pyjo.Server.Daemon
 import Pyjo.Test.Pyjo
 import Pyjoyment
@@ -69,6 +70,13 @@ with subtest('inactivity_timeout'):
     app.inactivity_timeout = 300
     is_ok(app.inactivity_timeout, 300, 'timeout')
 
+with subtest('max_connections'):
+    app = Pyjo.App.FastCGI.new()
+    max = app.max_connections
+    is_ok(max, None, 'of the query or none')
+    app.max_connections = 4
+    is_ok(app.max_connections, 4, 'connections kept')
+
 with subtest('script'):
     app = Pyjo.App.FastCGI.new()
     script = app.script
@@ -116,12 +124,29 @@ with subtest('url'):
 
     app.url = 'fcgi://127.0.0.1:9000?document_root=%2Fvar%2Fwww&script=index.php'
     is_ok(app.url, 'fcgi://127.0.0.1:9000?document_root=%2Fvar%2Fwww&script=index.php', 'with its query')
-    app.url = 'fcgi://127.0.0.1:9000?inactivity_timeout=300'
-    is_ok(app.url, 'fcgi://127.0.0.1:9000?inactivity_timeout=300', 'with a timeout')
+    app.url = 'fcgi://127.0.0.1:9000?inactivity_timeout=300&max_connections=4'
+    is_ok(app.url, 'fcgi://127.0.0.1:9000?inactivity_timeout=300&max_connections=4', 'with a timeout')
 
 with subtest('new'):
     app = Pyjo.App.FastCGI.new(url='fcgi://127.0.0.1:9000')
     is_ok(app.url, 'fcgi://127.0.0.1:9000', 'location')
+
+with subtest('close'):
+    app = Pyjo.App.FastCGI.new(url=f'{url}?max_connections=1')
+    Pyjo.Test.Pyjo.new(app).get_ok('/').status_is(200)
+
+    # The end of the request, which can come after the response of its length
+    def kept(loop):
+        if len(app._queues[Pyjo.IOLoop.singleton]):
+            loop.stop()
+
+    waiting = [Pyjo.IOLoop.recurring(0.01, kept), Pyjo.IOLoop.timer(5, lambda loop: loop.stop())]
+    Pyjo.IOLoop.start()
+    for id in waiting:
+        Pyjo.IOLoop.remove(id)
+    is_ok(len(app._queues[Pyjo.IOLoop.singleton]), 1, 'connection kept')
+    app.close()
+    is_ok(len(app._queues[Pyjo.IOLoop.singleton]), 0, 'closed')
 
 with subtest('handler'):
     with Pyjo.App.FastCGI.new(url=url) as app:

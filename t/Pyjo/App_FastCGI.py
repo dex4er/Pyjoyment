@@ -106,11 +106,13 @@ def application(fcgi, prefix='/prefix'):
 
 
 # A responder of FastCGI that answers a request, once its body has ended, with the bytes of a reply, and closes the
-# connection after them, unless it is told to keep it, and the requests that it got
-def responder(reply, close=True, delay=0):
+# connection after them, unless it is told to keep it, and the requests that it got, and the connections in a list
+def responder(reply, close=True, delay=0, connections=None):
     requests = []
 
     def accept(loop, stream, id):
+        if connections is not None:
+            connections.append(id)
         buffer = bytearray()
 
         def answer(*args):
@@ -546,6 +548,146 @@ with subtest('Errors'):
         'invalid location',
     )
 
+with subtest('Connections kept'):
+    # Used again, by the requests that ask the application to keep them
+    connections = []
+    url, requests, id = responder(stdout(b'Status: 200\r\n\r\nkept') + end(), close=False, connections=connections)
+    with Pyjo.App.FastCGI.new(url=url, max_connections=1) as app:
+        t = Pyjo.Test.Pyjo.new(app)
+        t.get_ok('/').status_is(200).content_is('kept')
+        t.get_ok('/').status_is(200).content_is('kept')
+        t.get_ok('/').status_is(200).content_is('kept')
+        is_ok(len(requests), 3, 'three requests')
+        is_ok(len(connections), 1, 'one connection')
+        is_ok(requests[0][:16], _record(1, 1, struct.pack('>HB5x', 1, 1)), 'request that keeps the connection')
+
+        # A connection of its own for the child of a fork, which leaves the ones of its parent
+        if not hasattr(os, 'fork'):
+            skip('no fork', 3)
+        else:
+            pid = os.fork()
+            if pid == 0:
+                code = 1
+                try:
+                    Pyjo.IOLoop.remove(id)
+                    tx = t.ua.get('/')
+                    code = 0 if tx.res.code == 200 and tx.res.body == b'kept' else 1
+                finally:
+                    sys.stdout.flush()
+                    os._exit(code)
+            status = []
+
+            def reap(loop):
+                if (waited := os.waitpid(pid, os.WNOHANG))[0]:
+                    status.append(os.waitstatus_to_exitcode(waited[1]))
+                    loop.stop()
+
+            reaper = Pyjo.IOLoop.recurring(0.01, reap)
+            deadline = Pyjo.IOLoop.timer(10, lambda loop: loop.stop())
+            Pyjo.IOLoop.start()
+            Pyjo.IOLoop.remove(reaper)
+            Pyjo.IOLoop.remove(deadline)
+            is_deeply_ok(status, [0], 'response in the child')
+            is_ok(len(connections), 2, 'a connection of the child')
+            t.get_ok('/').status_is(200).content_is('kept')
+            is_ok(len(connections), 2, 'the connection of the parent used again')
+    Pyjo.IOLoop.remove(id)
+
+    # Kept after the end of the request that comes after the whole response, of its length, has been written, unless
+    # more of the response comes
+    head = stdout(b'Status: 200\r\nContent-Length: 4\r\n\r\nlate')[: -len(_record(STDOUT, 1))]
+
+    def late(tail, connections):
+        def accept(loop, stream, id):
+            connections.append(id)
+            buffer = bytearray()
+
+            def read(stream, chunk):
+                buffer.extend(chunk)
+                if _record(STDIN, 1) in buffer:
+                    buffer.clear()
+                    stream.write(head)
+                    Pyjo.IOLoop.timer(0.1, lambda loop: stream.write(tail))
+
+            stream.on('read', read)
+
+        return Pyjo.IOLoop.server(accept, address='127.0.0.1')
+
+    for tail, kept, name in (
+        (_record(STDOUT, 1) + end(), 1, 'kept after the end of the request'),
+        (_record(STDOUT, 1, b'more') + _record(STDOUT, 1) + end(), 0, 'closed after more of the response'),
+    ):
+        connections = []
+        id = late(tail, connections)
+        with Pyjo.App.FastCGI.new(url=f'fcgi://127.0.0.1:{Pyjo.IOLoop.acceptor(id).port}', max_connections=1) as app:
+            t = Pyjo.Test.Pyjo.new(app)
+            t.get_ok('/').status_is(200).content_is('late')
+            Pyjo.IOLoop.timer(0.3, lambda loop: loop.stop())
+            Pyjo.IOLoop.start()
+            is_ok(len(app._queues[Pyjo.IOLoop.singleton]), kept, name)
+            t.get_ok('/').status_is(200).content_is('late')
+            is_ok(len(connections), 2 - kept, 'connections')
+        Pyjo.IOLoop.remove(id)
+
+    # Not kept, by default
+    connections = []
+    url, requests, id = responder(stdout(b'Status: 200\r\n\r\nkept') + end(), close=False, connections=connections)
+    with Pyjo.App.FastCGI.new(url=url) as app:
+        t = Pyjo.Test.Pyjo.new(app)
+        t.get_ok('/').status_is(200).content_is('kept')
+        t.get_ok('/').status_is(200).content_is('kept')
+        is_ok(len(connections), 2, 'a connection for each request')
+        is_ok(requests[0][:16], _record(1, 1, struct.pack('>HB5x', 1, 0)), 'request that closes the connection')
+    Pyjo.IOLoop.remove(id)
+
+    # Closed by the application, which does not keep it, with the query of the location
+    connections = []
+    url, requests, id = responder(stdout(b'Status: 200\r\n\r\nclosed') + end(), connections=connections)
+    with Pyjo.App.FastCGI.new(url=f'{url}?max_connections=4') as app:
+        t = Pyjo.Test.Pyjo.new(app)
+        t.get_ok('/').status_is(200).content_is('closed')
+        t.get_ok('/').status_is(200).content_is('closed')
+        is_ok(len(connections), 2, 'a new connection')
+    Pyjo.IOLoop.remove(id)
+
+    # Closed by its inactivity timeout
+    connections = []
+    url, requests, id = responder(stdout(b'Status: 200\r\n\r\nkept') + end(), close=False, connections=connections)
+    with Pyjo.App.FastCGI.new(url=url, max_connections=1, inactivity_timeout=0.1) as app:
+        t = Pyjo.Test.Pyjo.new(app)
+        t.get_ok('/').status_is(200).content_is('kept')
+        Pyjo.IOLoop.timer(0.3, lambda loop: loop.stop())
+        Pyjo.IOLoop.start()
+        t.get_ok('/').status_is(200).content_is('kept')
+        is_ok(len(connections), 2, 'a new connection')
+    Pyjo.IOLoop.remove(id)
+
+    # Closed by the application when it gets the request again, which goes to a new one
+    connections = []
+    reply = stdout(b'Status: 200\r\n\r\nagain') + end()
+
+    def accept(loop, stream, id):
+        connections.append(id)
+        buffer = bytearray()
+        count = []
+
+        def read(stream, chunk):
+            buffer.extend(chunk)
+            if _record(STDIN, 1) in buffer:
+                buffer.clear()
+                count.append(1)
+                stream.write(reply) if len(count) == 1 else stream.close()
+
+        stream.on('read', read)
+
+    id = Pyjo.IOLoop.server(accept, address='127.0.0.1')
+    with Pyjo.App.FastCGI.new(url=f'fcgi://127.0.0.1:{Pyjo.IOLoop.acceptor(id).port}', max_connections=1) as app:
+        t = Pyjo.Test.Pyjo.new(app)
+        t.get_ok('/').status_is(200).content_is('again')
+        t.get_ok('/').status_is(200).content_is('again')
+        is_ok(len(connections), 2, 'the request again on a new connection')
+    Pyjo.IOLoop.remove(id)
+
 with subtest('Timeouts'):
     app = Pyjoyment.new()
     app.log.level = 'fatal'
@@ -586,6 +728,18 @@ with subtest('Timeouts'):
     is_ok(Pyjo.App.FastCGI._seconds(None, '5', 10), 5.0, 'timeout of the query')
     is_ok(Pyjo.App.FastCGI._seconds(2, '5', 10), 2, 'timeout of the attribute')
     is_ok(Pyjo.App.FastCGI._seconds(None, None, 10), 10, 'default timeout')
+    options, query = Pyjo.App.FastCGI._location('fcgi://127.0.0.1:9000?max_connections=4')
+    is_deeply_ok(query, {'max_connections': '4'}, 'number of the query')
+    is_ok(Pyjo.App.FastCGI._number(None, '4'), 4, 'number of the query')
+    is_ok(Pyjo.App.FastCGI._number(2, '4'), 2, 'number of the attribute')
+    is_ok(Pyjo.App.FastCGI._number(None, None), 0, 'no connections kept')
+    throws_ok(
+        lambda: Pyjo.App.FastCGI.new(url='fcgi://127.0.0.1:9000?max_connections=many').handler(
+            Pyjo.Transaction.HTTP.new()
+        ),
+        re.compile(r'^Invalid FastCGI number "many"'),
+        'invalid number',
+    )
     throws_ok(
         lambda: Pyjo.App.FastCGI.new(url='fcgi://127.0.0.1:9000?connect_timeout=soon').handler(
             Pyjo.Transaction.HTTP.new()

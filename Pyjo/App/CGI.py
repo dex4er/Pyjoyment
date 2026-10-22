@@ -292,6 +292,7 @@ class _Response:
         self.offset = 0
         self.parser: Any = None
         self.pending: list[bytes] = []
+        self.sent = 0
         self.started = False
         self.stream: Any = None
 
@@ -431,6 +432,7 @@ class _Response:
 
             if stream is not None and not ended:
                 stream.stop()
+            self.sent += len(chunk)
             (content.write_chunk if self.chunked else content.write)(chunk, drained)
             self._rendered()
         if ended:
