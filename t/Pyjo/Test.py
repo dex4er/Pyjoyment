@@ -356,6 +356,9 @@ with subtest('Chains'):
         error = throws_ok(lambda: {}['x'], KeyError, 'throws').isa(LookupError, 'isa lookup')
         print('#', bool(error), repr(error.got))
         print('#', bool(ok(1).is_(1)), bool(ok(0, 'zero').is_(0, 'is zero')))
+        result = that([1])
+        print('#', bool(result), result.got)
+        result.isa(list, 'that isa').in_(1, 'that in')
         done_testing()
     """)
     is_ok(
@@ -363,7 +366,7 @@ with subtest('Chains'):
         'ok 1 - is\nok 2 - isnt\nok 3 - like\nok 4 - unlike\nok 5 - cmp\nok 6 - isa\nok 7 - ok\n# True 42\n'
         'ok 8 - in\nok 9 - not in\nok 10 - is deeply\nok 11 - in again\nok 12 - none\nok 13 - none again\n'
         "ok 14 - throws\nok 15 - isa lookup\n# True KeyError('x')\nok 16\nok 17\nnot ok 18 - zero\n"
-        'ok 19 - is zero\n# True False\n1..19\n',
+        'ok 19 - is zero\n# True False\n# True [1]\nok 20 - that isa\nok 21 - that in\n1..21\n',
         'every link is a test',
     )
     is_ok(code, 1, 'one failure')

@@ -46,7 +46,8 @@ of them is a regression.
   the next method is available: `slurp` returns a string, `Collection.join`
   returns `Pyjo.String.Unicode`, DOM queries return `Pyjo.Collection`, and the
   assertions of `Pyjo.Test` return a `Pyjo.Test.Result`, which is true or
-  false, as the `bool` of `Test::More`, and tests the value again. A
+  false, as the `bool` of `Test::More`, and tests the value again, as the one
+  that `that` makes of a value does. A
   function of the standard library that would wrap the chain from the front
   has a method form that continues it, such as `Collection.zip`, the
   conversions like `to_set()` and `Collection.get`, the expression form of an

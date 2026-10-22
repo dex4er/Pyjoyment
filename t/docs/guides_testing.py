@@ -394,6 +394,8 @@ done_testing()
 
     chain = isa_ok(int('42'), int, 'an integer').cmp('>', 0, 'positive').is_(42, 'the answer')
     ok(chain, 'the chain passed')
+    chain = that('Hello Pyjo').like(r'^Hello', 'a greeting').unlike(r'Mojo', 'not Mojo')
+    ok(chain, 'the chain of that passed')
 
     with Pyjo.Test.Pyjo.new(app) as t:
         t.get_ok('/frogs')

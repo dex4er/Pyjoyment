@@ -20,7 +20,7 @@ Pyjo.Test - Writing test scripts
     is_deeply_ok(got_complex_structure, expected_complex_structure, 'test name')
     isa_ok(obj, cls)
     throws_ok(lambda: int('x'), ValueError, 'test name')
-    is_ok(got, expected, 'test name').unlike(r'unexpected', 'test name')
+    that(got).is_(expected, 'test name').unlike(r'unexpected', 'test name')
 
     with subtest('Parse'):
         is_ok(url.host, 'example.com', 'right host')
@@ -106,8 +106,12 @@ so that the tests of a value chain as the assertions of
 
     is_ok(url.host, 'example.com', 'right host').like(r'\.com$', 'top-level domain')
 
+:func:`that` makes one of a value without a test, so that a chain starts
+with the first of its methods: ::
+
     (
-        isa_ok(answer, int)
+        that(answer)
+        .isa(int)
         .cmp('>', 0, 'positive')
         .is_(42, 'meaning of life')
     )
@@ -194,6 +198,7 @@ __all__ = [
     'raise_failures',
     'skip',
     'subtest',
+    'that',
     'throws_ok',
     'unlike_ok',
 ]
@@ -649,8 +654,9 @@ class Plan:
 class Result:
     """
     The result of a test of a value, returned by :func:`ok`, :func:`is_ok`
-    and the other functions which test one. Its methods test the same value
-    again, and it is true when all the tests of the chain passed: ::
+    and the other functions which test one, or of no test, returned by
+    :func:`that`. Its methods test the same value again, and it is true when
+    all the tests of the chain passed: ::
 
         isa_ok(answer, str).is_('42', 'meaning of life') or diag('the answer is lost')
     """
@@ -888,6 +894,17 @@ def subtest(name: str, fn: Callable[[], object] | None = None) -> Subtest | bool
         return test
     test(fn)
     return bool(test.passed)
+
+
+def that(got: object) -> Result:
+    """::
+
+        that(answer).isa(int).is_(42, 'meaning of life')
+
+    Make a :class:`Result` of the value without a test, which is true, so
+    that a chain of tests of the value starts with the first of its methods.
+    """
+    return Result(got, True)
 
 
 def throws_ok(

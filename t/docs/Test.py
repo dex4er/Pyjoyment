@@ -60,7 +60,7 @@ SYNOPSIS = """
     is_deeply_ok(got_complex_structure, expected_complex_structure, 'test name')
     isa_ok(obj, cls)
     throws_ok(lambda: int('x'), ValueError, 'test name')
-    is_ok(got, expected, 'test name').unlike(r'unexpected', 'test name')
+    that(got).is_(expected, 'test name').unlike(r'unexpected', 'test name')
 
     with subtest('Parse'):
         is_ok(url.host, 'example.com', 'right host')
@@ -186,7 +186,8 @@ with subtest('Chains'):
         is_ok(url.host, 'example.com', 'right host').like(r'\.com$', 'top-level domain')
 
         (
-            isa_ok(answer, int)
+            that(answer)
+            .isa(int)
             .cmp('>', 0, 'positive')
             .is_(42, 'meaning of life')
         )
@@ -619,6 +620,10 @@ with subtest('subtest'):
         ''.join(f'# Subtest: Parse\n    ok 1\n    1..1\nok {i} - Parse\n' for i in (1, 2, 3)) + 'ok 4 - passed\n1..4\n',
         'three subtests',
     )
+
+with subtest('that'):
+    out, err, code = run("that(answer).isa(int).is_(42, 'meaning of life')", setup='answer = 42')
+    is_ok(out, "ok 1 - An object of class 'int' isa 'int'\nok 2 - meaning of life\n1..2\n", 'no test of its own')
 
 with subtest('throws_ok'):
     out, err, code = run(
