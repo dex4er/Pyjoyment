@@ -88,4 +88,36 @@ with subtest('ASGI application in its adapter'):
 with subtest('Application object'):
     t.get_ok('/myapp').status_is(200).content_is('Hello from MyApp!')
 
+with subtest('Lifespan of a mounted application'):
+    import Pyjo.Server.Daemon
+
+    events = []
+
+    async def lifespan(scope, receive, send):
+        if scope['type'] == 'lifespan':
+            while True:
+                message = await receive()
+                events.append(message['type'])
+                if message['type'] == 'lifespan.startup':
+                    scope['state']['greeting'] = 'Hello'
+                    await send({'type': 'lifespan.startup.complete'})
+                else:
+                    return await send({'type': 'lifespan.shutdown.complete'})
+        await send({'type': 'http.response.start', 'status': 200, 'headers': [(b'content-type', b'text/plain')]})
+        await send({'type': 'http.response.body', 'body': f'{scope["state"]["greeting"]} with a lifespan!'.encode()})
+
+    mounting = Pyjoyment.new()
+    mounting.log.level = 'fatal'
+    mounting.plugin('Mount', {'/lifespan': lifespan})
+    t2 = Pyjo.Test.Pyjo.new(mounting)
+    t2.get_ok('/lifespan').status_is(200).content_is('Hello with a lifespan!')
+    is_deeply_ok(events, ['lifespan.startup'], 'started by the first request')
+
+    # The end of the server of the application that mounts it
+    promise = mounting.server_stopped(Pyjo.Server.Daemon.new())
+    ok(promise is not None, 'cleanup to wait for')
+    promise.wait()
+    is_deeply_ok(events, ['lifespan.startup', 'lifespan.shutdown'], 'shut down by the end of the server')
+    is_ok(mounting.server_stopped(Pyjo.Server.Daemon.new()), None, 'nothing to wait for')
+
 done_testing()

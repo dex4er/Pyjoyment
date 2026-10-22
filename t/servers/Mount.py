@@ -2,12 +2,14 @@ import Pyjo.App.FastCGI
 import Pyjo.File
 import Pyjo.IOLoop
 import Pyjo.Reactor
+import Pyjo.Server.Daemon
 import Pyjo.Test.Pyjo
 import Pyjoyment
 
 from Pyjo.Test import *
 from Pyjo.Util import url_escape
 
+import contextlib
 import glob
 import importlib
 import importlib.util
@@ -210,7 +212,19 @@ with subtest('Starlette'):
     async def closed(websocket):
         await websocket.close()
 
+    async def pool(request):
+        return starlette.responses.PlainTextResponse(f'Pool {request.state.pool}')
+
+    lifespan_events = []
+
+    @contextlib.asynccontextmanager
+    async def lifespan(app):
+        lifespan_events.append('startup')
+        yield {'pool': 'connected'}
+        lifespan_events.append('shutdown')
+
     hello = starlette.applications.Starlette(
+        lifespan=lifespan,
         routes=[
             starlette.routing.Route('/', index, name='index'),
             starlette.routing.Route('/hello/{name}', name, name='name'),
@@ -221,7 +235,8 @@ with subtest('Starlette'):
             starlette.routing.WebSocketRoute('/ws', chat),
             starlette.routing.WebSocketRoute('/ws/denied', denied),
             starlette.routing.WebSocketRoute('/ws/closed', closed),
-        ]
+            starlette.routing.Route('/pool', pool),
+        ],
     )
 
     t = Pyjo.Test.Pyjo.new(application('/starlette', hello))
@@ -242,6 +257,12 @@ with subtest('Starlette'):
     t.status_is(401).content_is('Denied!')
     t.tx = t.ua.start(t.ua.build_websocket_tx('/starlette/ws/closed'))
     t.status_is(403)
+
+    # The lifespan, which the first request has started, and the end of the server shuts down
+    t.get_ok('/starlette/pool').status_is(200).content_is('Pool connected')
+    is_deeply_ok(lifespan_events, ['startup'], 'started')
+    t.app.server_stopped(Pyjo.Server.Daemon.new()).wait()
+    is_deeply_ok(lifespan_events, ['startup', 'shutdown'], 'shut down')
 
 with subtest('PHP on php-fpm'):
     if PHP_FPM is None or sys.platform == 'win32':
@@ -413,6 +434,8 @@ app.plugin('Mount', {'/flags': flags})
         file.write("""\
 import Pyjo.IOLoop
 
+import inception_asgi
+
 from inception_asgi import application, hello
 
 
@@ -431,6 +454,25 @@ def chunks(c):
             c.finish()
 
     write(0)
+
+
+# An ASGI application with a lifespan, which writes its startup and its shutdown to a file of the directory of the server
+async def lifespan(scope, receive, send):
+    if scope['type'] == 'lifespan':
+        while True:
+            message = await receive()
+            with open('lifespan.log', 'a') as file:
+                file.write(f'{message["type"]}\\n')
+            if message['type'] == 'lifespan.startup':
+                scope['state']['greeting'] = 'Hello'
+                await send({'type': 'lifespan.startup.complete'})
+            else:
+                return await send({'type': 'lifespan.shutdown.complete'})
+    await send({'type': 'http.response.start', 'status': 200, 'headers': [(b'content-type', b'text/plain')]})
+    await send({'type': 'http.response.body', 'body': f'{scope["state"]["greeting"]} with a lifespan!'.encode()})
+
+
+inception_asgi.app.plugin('Mount', {'/lifespan': lifespan})
 
 
 @hello.routes.websocket('/echo')
@@ -452,6 +494,9 @@ def echo(c):
             if Pyjo.Reactor.object.detect() != 'Pyjo.Reactor.Asyncio':
                 skip('needs Pyjo.Reactor.Asyncio, which runs in the loop of the ASGI server', 1)
                 continue
+            log = os.path.join(dir, 'lifespan.log')
+            if os.path.exists(log):
+                os.remove(log)
             os.environ['PYJO_ASGI'] = '1'
             try:
                 server = Server(dir, command)
@@ -461,6 +506,9 @@ def echo(c):
                 status, headers, body = server.request('GET', '/')
                 is_ok(status, 200, 'right status')
                 is_ok(body, 'I ♥ Pyjoyment!'.encode(), 'right content')
+
+                status, headers, body = server.request('GET', '/lifespan')
+                is_ok(body, b'Hello with a lifespan!', 'state of the lifespan')
 
                 status, headers, body = server.request('GET', '/asgi')
                 is_ok(status, 200, 'right status')
@@ -504,5 +552,14 @@ def echo(c):
                 raise
             finally:
                 server.close()
+
+            # The lifespan of the mounted application shuts down with the one of the ASGI server, which Daphne does not
+            # have
+            with open(log) as file:
+                is_deeply_ok(
+                    file.read().split(),
+                    ['lifespan.startup'] if name == 'Daphne' else ['lifespan.startup', 'lifespan.shutdown'],
+                    'startup and shutdown',
+                )
 
 done_testing()
