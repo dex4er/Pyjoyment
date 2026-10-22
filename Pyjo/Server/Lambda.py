@@ -87,6 +87,43 @@ Attributes
 
 :mod:`Pyjo.Server.Lambda` inherits all attributes from :mod:`Pyjo.Server`.
 
+Runtime client
+--------------
+::
+
+    Usage: python -m Pyjo.Server.Lambda [OPTIONS] [HANDLER]
+
+      python -m Pyjo.Server.Lambda myapp.handler
+      AWS_LAMBDA_RUNTIME_API=127.0.0.1:9001 python -m Pyjo.Server.Lambda myapp.handler
+
+    Options:
+      -h, --help   Show this message
+
+The client of the `Runtime API
+<https://docs.aws.amazon.com/lambda/latest/dg/runtimes-api.html>`_ of AWS
+Lambda, which runs the handler of an event function, ``module.function`` or
+the one of ``_HANDLER``, as a custom runtime does: it gets the next
+invocation from the API of ``AWS_LAMBDA_RUNTIME_API``, calls the handler with
+its event and a context, and posts the value that the handler returns as
+JSON, or its exception, one invocation after another. An exception of the
+import of the handler is an error of the initialization, which ends the
+client. The handler can be any handler of an event function, also one of
+another framework, which runs an event loop of its own, as the client runs
+outside of the event loop of :mod:`Pyjo.IOLoop`, and the directory of the
+handler, ``LAMBDA_TASK_ROOT`` or the current one, is the first one of
+:data:`sys.path`. ::
+
+    #!/bin/sh
+    # The bootstrap of a custom runtime, as provided.al2023
+    exec python3 -m Pyjo.Server.Lambda
+
+The context has the attributes and the method of the context of the Python
+runtime of Lambda: ``aws_request_id``, ``invoked_function_arn``,
+``function_name``, ``function_version``, ``memory_limit_in_mb``,
+``log_group_name``, ``log_stream_name``, ``identity``, ``client_context``
+and ``get_remaining_time_in_millis()``, from the headers of the invocation
+and the variables of the environment that Lambda sets.
+
 See also
 --------
 
@@ -103,14 +140,21 @@ import Pyjo.Parameters
 import Pyjo.Server
 import Pyjo.Transaction
 
-from Pyjo.Util import url_escape
+from Pyjo.Util import die, extract_usage, getopt, url_escape
 
 import base64
+import http.client
+import importlib
+import json
+import os
 import re
+import sys
+import time
+import traceback
 import wsgiref.util
 
-from collections.abc import Callable
-from typing import Any, cast
+from collections.abc import Callable, Sequence
+from typing import Any, NoReturn, cast
 
 
 type Event = dict[str, Any]
@@ -319,6 +363,113 @@ class _Request:
         return response
 
 
+def main(argv: Sequence[str] | None = None) -> NoReturn:
+    """::
+
+        main(['myapp.handler'])
+
+    The command line interface of the runtime client: parse the options and
+    run the handler for the invocations of the Runtime API.
+    """
+    args = list(sys.argv[1:] if argv is None else argv)
+    opts = getopt(args, {'h|help': None})
+    name = args[0] if args else os.environ.get('_HANDLER')
+    if not opts or opts.help or not name:
+        # The usage without its last newline, as SystemExit writes the message with one
+        die(extract_usage(__file__, section='Runtime client').rstrip('\n'))
+    if not (api := os.environ.get('AWS_LAMBDA_RUNTIME_API')):
+        die('AWS_LAMBDA_RUNTIME_API is not set')
+    runtime = _Runtime(api)
+    try:
+        runtime.run(name)
+    finally:
+        runtime.connection.close()
+    sys.exit(0)
+
+
+# An invocation of the Runtime API, as the context of the Python runtime of Lambda has it
+class _Context:
+    def __init__(self, headers: http.client.HTTPMessage) -> None:
+        self.aws_request_id = headers.get('Lambda-Runtime-Aws-Request-Id', '')
+        self.invoked_function_arn = headers.get('Lambda-Runtime-Invoked-Function-Arn', '')
+        self.function_name = os.environ.get('AWS_LAMBDA_FUNCTION_NAME')
+        self.function_version = os.environ.get('AWS_LAMBDA_FUNCTION_VERSION')
+        self.memory_limit_in_mb = os.environ.get('AWS_LAMBDA_FUNCTION_MEMORY_SIZE')
+        self.log_group_name = os.environ.get('AWS_LAMBDA_LOG_GROUP_NAME')
+        self.log_stream_name = os.environ.get('AWS_LAMBDA_LOG_STREAM_NAME')
+        self.identity = _json(headers.get('Lambda-Runtime-Cognito-Identity'))
+        self.client_context = _json(headers.get('Lambda-Runtime-Client-Context'))
+        deadline = headers.get('Lambda-Runtime-Deadline-Ms')
+        self.deadline = int(deadline) if deadline and deadline.isdigit() else None
+
+    def get_remaining_time_in_millis(self) -> int:
+        if self.deadline is None:
+            return 0
+        return max(self.deadline - int(time.time() * 1000), 0)
+
+
+# The client of the Runtime API, with a connection of its own, outside of the event loop
+class _Runtime:
+    PREFIX = '/2018-06-01/runtime'
+
+    def __init__(self, api: str) -> None:
+        self.connection = http.client.HTTPConnection(api)
+
+    def run(self, name: str) -> None:
+        try:
+            handler = _handler(name)
+        except Exception as e:
+            self.post(f'{self.PREFIX}/init/error', _error(e, 'Runtime.ImportModuleError'), 'Runtime.ImportModuleError')
+            raise SystemExit(1) from None
+        while True:
+            self.connection.request('GET', f'{self.PREFIX}/invocation/next')
+            res = self.connection.getresponse()
+            event = json.loads(res.read() or b'null')
+            context = _Context(res.headers)
+            if trace := res.headers.get('Lambda-Runtime-Trace-Id'):
+                os.environ['_X_AMZN_TRACE_ID'] = trace
+            else:
+                os.environ.pop('_X_AMZN_TRACE_ID', None)
+            path = f'{self.PREFIX}/invocation/{context.aws_request_id}'
+            try:
+                body = json.dumps(handler(event, context)).encode()
+            except Exception as e:
+                self.post(f'{path}/error', _error(e), 'Unhandled')
+                continue
+            self.post(f'{path}/response', body)
+
+    def post(self, path: str, body: bytes, error: str | None = None) -> None:
+        headers = {'Content-Type': 'application/json'}
+        if error is not None:
+            headers['Lambda-Runtime-Function-Error-Type'] = error
+        self.connection.request('POST', path, body, headers)
+        self.connection.getresponse().read()
+
+
+# The error of an exception, as the Python runtime of Lambda posts it
+def _error(e: Exception, type: str | None = None) -> bytes:
+    stack = traceback.format_list(traceback.extract_tb(e.__traceback__))
+    return json.dumps({'errorMessage': str(e), 'errorType': type or e.__class__.__name__, 'stackTrace': stack}).encode()
+
+
+# The handler of a name "module.function", from the directory of the task first
+def _handler(name: str) -> Callable[[Any, Any], Any]:
+    module, _, function = name.rpartition('.')
+    if not module:
+        raise ValueError(f'Bad handler "{name}": not a module and a function')
+    root = os.environ.get('LAMBDA_TASK_ROOT') or os.getcwd()
+    if root not in sys.path:
+        sys.path.insert(0, root)
+    handler = getattr(importlib.import_module(module), function, None)
+    if not callable(handler):
+        raise AttributeError(f'Handler "{function}" missing on module "{module}"')
+    return handler
+
+
+def _json(value: str | None) -> Any:
+    return json.loads(value) if value else None
+
+
 def _is_utf8(body: bytes) -> bool:
     try:
         body.decode()
@@ -352,3 +503,6 @@ def _unchunk(body: bytes) -> bytes:
 new = Pyjo_Server_Lambda.new
 object = Pyjo_Server_Lambda
 Lambda = Pyjo_Server_Lambda
+
+if __name__ == '__main__':
+    main()

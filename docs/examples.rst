@@ -110,6 +110,12 @@ As an event function of `AWS Lambda <https://aws.amazon.com/lambda/>`_:
     .. include:: ../examples/servers/hello_world_lambda.py
        :code: python
 
+On a custom runtime of AWS Lambda, as ``provided.al2023``, its ``bootstrap``
+runs it with the runtime client of Pyjoyment:
+
+    .. include:: ../examples/servers/bootstrap
+       :code: sh
+
 
 Requests on a timer
 -------------------
