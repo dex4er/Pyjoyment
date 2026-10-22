@@ -26,3 +26,7 @@ def test_skip_subtest():
         plan(skip_all='not in this subtest')
         ok(False, 'never')
     ok(True, 'after the subtest')
+
+
+def test_chain():
+    is_ok('Hello', 'Hello', 'same').like(r'^Bye', 'greeting').is_('Hello', 'never')

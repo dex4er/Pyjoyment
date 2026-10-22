@@ -549,6 +549,15 @@ suffix ``_ok``, as ``is`` is a keyword of Python: ``is_ok`` for ``is`` and
 and the expected values, or for :func:`~Pyjo.Test.is_deeply_ok` the place in
 the structures where they begin to differ.
 
+The ones that test a value return a :class:`~Pyjo.Test.Result`, which is
+true when the test passed, and whose methods test the same value again, with
+the names of ``Test::More``, so that the tests of one value chain, as the
+assertions of :mod:`Pyjo.Test.Pyjo` do:
+
+.. code-block:: python
+
+    isa_ok(int('42'), int, 'an integer').cmp('>', 0, 'positive').is_(42, 'the answer')
+
 :func:`~Pyjo.Test.diag` prints a diagnostic message to the standard error,
 which the harness shows, and :func:`~Pyjo.Test.note` a comment to the standard
 output, which ``pyjo-prove`` shows with ``-v`` only:

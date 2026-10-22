@@ -20,6 +20,7 @@ Pyjo.Test - Writing test scripts
     is_deeply_ok(got_complex_structure, expected_complex_structure, 'test name')
     isa_ok(obj, cls)
     throws_ok(lambda: int('x'), ValueError, 'test name')
+    is_ok(got, expected, 'test name').unlike(r'unexpected', 'test name')
 
     with subtest('Parse'):
         is_ok(url.host, 'example.com', 'right host')
@@ -93,6 +94,26 @@ which runs a callback: ::
 
 A subtest has an implicit :func:`done_testing`. ``plan(skip_all=...)`` skips
 the rest of the subtest, and a subtest that runs no tests fails.
+
+Chains
+------
+
+The functions which test a value return a :class:`Result`, which is true
+when the test passed, so that ``if not is_ok(...):`` works, and whose
+methods test the same value again, with the names of Perl's ``Test::More``,
+so that the tests of a value chain as the assertions of
+:mod:`Pyjo.Test.Pyjo` do: ::
+
+    is_ok(url.host, 'example.com', 'right host').like(r'\.com$', 'top-level domain')
+
+    (
+        isa_ok(answer, int)
+        .cmp('>', 0, 'positive')
+        .is_(42, 'meaning of life')
+    )
+
+Each method is a test of its own, which runs also after a test of the chain
+failed, and a failure shows the line of the method.
 
 Exit status
 -----------
@@ -252,7 +273,7 @@ def bail_out(reason: str = '') -> NoReturn:
     sys.exit(255)
 
 
-def cmp_ok(got: Any, operator: str, expected: Any, test_name: str | None = None) -> bool:
+def cmp_ok(got: Any, operator: str, expected: Any, test_name: str | None = None) -> 'Result':
     """::
 
         # ok(got == expected)
@@ -278,7 +299,7 @@ def cmp_ok(got: Any, operator: str, expected: Any, test_name: str | None = None)
         raise Error(f'Unknown operator {operator!r}')
     check = operators[operator](got, expected)
     _ok(check, test_name, None if check else [f'    {got!r}', f'        {operator}', f'    {expected!r}'])
-    return check
+    return Result(got, check)
 
 
 def diag(*messages: object) -> bool:
@@ -337,7 +358,7 @@ def fail_ok(test_name: str | None = None) -> bool:
     return _ok(False, test_name)
 
 
-def in_ok(got: Any, elem: object, test_name: str | None = None) -> bool:
+def in_ok(got: Any, elem: object, test_name: str | None = None) -> 'Result':
     """::
 
         in_ok(['foo', 'bar'], 'foo', 'foo is in the list')
@@ -350,10 +371,10 @@ def in_ok(got: Any, elem: object, test_name: str | None = None) -> bool:
     except TypeError:
         check = False
     _ok(check, test_name, None if check else [f'         got: {got!r}', f'    expected: to contain {elem!r}'])
-    return check
+    return Result(got, check)
 
 
-def is_deeply_ok(got: object, expected: object, test_name: str | None = None) -> bool:
+def is_deeply_ok(got: object, expected: object, test_name: str | None = None) -> 'Result':
     """::
 
         is_deeply_ok([[1, 2], [3, [4, 5]]], [[1, 2], [3]], 'deep structure')
@@ -369,10 +390,10 @@ def is_deeply_ok(got: object, expected: object, test_name: str | None = None) ->
     else:
         check = got == expected
         _ok(check, test_name, None if check else [f'         got: {got!r}', f'    expected: {expected!r}'])
-    return check
+    return Result(got, check)
 
 
-def is_ok(got: object, expected: object, test_name: str | None = None) -> bool:
+def is_ok(got: object, expected: object, test_name: str | None = None) -> 'Result':
     """::
 
         is_ok(ultimate_answer(), 42, 'meaning of life')
@@ -381,10 +402,10 @@ def is_ok(got: object, expected: object, test_name: str | None = None) -> bool:
     """
     check = got == expected
     _ok(check, test_name, None if check else [f'         got: {got!r}', f'    expected: {expected!r}'])
-    return check
+    return Result(got, check)
 
 
-def isa_ok(got: object, cls: type | tuple[type, ...], test_name: str | None = None) -> bool:
+def isa_ok(got: object, cls: type | tuple[type, ...], test_name: str | None = None) -> 'Result':
     """::
 
         obj = SomeClass()
@@ -401,10 +422,10 @@ def isa_ok(got: object, cls: type | tuple[type, ...], test_name: str | None = No
         test_name,
         None if check else [f'    The object of class {type(got).__name__!r} is not a {_class_names(cls)!r}'],
     )
-    return check
+    return Result(got, check)
 
 
-def isnt_ok(got: object, expected: object, test_name: str | None = None) -> bool:
+def isnt_ok(got: object, expected: object, test_name: str | None = None) -> 'Result':
     """::
 
         isnt_ok(foo, '', 'got some foo')
@@ -413,10 +434,10 @@ def isnt_ok(got: object, expected: object, test_name: str | None = None) -> bool
     """
     check = got != expected
     _ok(check, test_name, None if check else [f'         got: {got!r}', '    expected: anything else'])
-    return check
+    return Result(got, check)
 
 
-def like_ok(got: Any, expected: _Pattern, test_name: str | None = None) -> bool:
+def like_ok(got: Any, expected: _Pattern, test_name: str | None = None) -> 'Result':
     """::
 
         like_ok(got, r'expected', 'test name')
@@ -433,10 +454,10 @@ def like_ok(got: Any, expected: _Pattern, test_name: str | None = None) -> bool:
     except TypeError:
         check = False
     _ok(check, test_name, None if check else [f'                  {got!r}', f"    doesn't match {regex.pattern!r}"])
-    return check
+    return Result(got, check)
 
 
-def none_ok(got: object, test_name: str | None = None) -> bool:
+def none_ok(got: object, test_name: str | None = None) -> 'Result':
     """::
 
         none_ok(req.headers.transfer_encoding, 'no "Transfer-Encoding" value')
@@ -445,10 +466,10 @@ def none_ok(got: object, test_name: str | None = None) -> bool:
     """
     check = got is None
     _ok(check, test_name, None if check else [f'         got: {got!r}', '    expected: None'])
-    return check
+    return Result(got, check)
 
 
-def not_in_ok(got: Any, elem: object, test_name: str | None = None) -> bool:
+def not_in_ok(got: Any, elem: object, test_name: str | None = None) -> 'Result':
     """::
 
         not_in_ok(os.environ, 'DISPLAY', 'DISPLAY is not set')
@@ -461,7 +482,7 @@ def not_in_ok(got: Any, elem: object, test_name: str | None = None) -> bool:
     except TypeError:
         check = False
     _ok(check, test_name, None if check else [f'         got: {got!r}', f'    expected: not to contain {elem!r}'])
-    return check
+    return Result(got, check)
 
 
 def note(*messages: object) -> None:
@@ -477,7 +498,7 @@ def note(*messages: object) -> None:
         _print(f'# {line}' if line else '#')
 
 
-def ok(check: object, test_name: str | None = None) -> bool:
+def ok(check: object, test_name: str | None = None) -> 'Result':
     """::
 
         ok(3**4 == 81, 'simple exponential')
@@ -487,7 +508,7 @@ def ok(check: object, test_name: str | None = None) -> bool:
     The basic test: it passes if the value is true and fails otherwise.
     Returns whether the test passed.
     """
-    return _ok(check, test_name)
+    return Result(check, _ok(check, test_name))
 
 
 def pass_ok(test_name: str | None = None) -> bool:
@@ -625,6 +646,149 @@ class Plan:
             done_testing()
 
 
+class Result:
+    """
+    The result of a test of a value, returned by :func:`ok`, :func:`is_ok`
+    and the other functions which test one. Its methods test the same value
+    again, and it is true when all the tests of the chain passed: ::
+
+        isa_ok(answer, str).is_('42', 'meaning of life') or diag('the answer is lost')
+    """
+
+    def __init__(self, got: object, passed: bool) -> None:
+        self.got: Any = got
+        """::
+
+            got = result.got
+
+        The value that the tests check: the first argument of the function,
+        or the exception that the callback of :func:`throws_ok` raised.
+        """
+
+        self.passed = passed
+        """::
+
+            boolean = result.passed
+
+        True if all the tests of the chain passed.
+        """
+
+    def __bool__(self) -> bool:
+        """::
+
+            boolean = bool(result)
+
+        The value of :attr:`passed`.
+        """
+        return self.passed
+
+    def __repr__(self) -> str:
+        return f'<{type(self).__module__}.{type(self).__qualname__} passed={self.passed}>'
+
+    def cmp(self, operator: str, expected: Any, test_name: str | None = None) -> Self:
+        """::
+
+            ok(count, 'some').cmp('<', 10, 'small enough')
+
+        The same as :func:`cmp_ok`.
+        """
+        return self._chain(cmp_ok(self.got, operator, expected, test_name))
+
+    def in_(self, elem: object, test_name: str | None = None) -> Self:
+        """::
+
+            isa_ok(names, list).in_('foo', "there's a foo")
+
+        The same as :func:`in_ok`.
+        """
+        return self._chain(in_ok(self.got, elem, test_name))
+
+    def is_(self, expected: object, test_name: str | None = None) -> Self:
+        """::
+
+            isa_ok(answer, int).is_(42, 'meaning of life')
+
+        The same as :func:`is_ok`.
+        """
+        return self._chain(is_ok(self.got, expected, test_name))
+
+    def is_deeply(self, expected: object, test_name: str | None = None) -> Self:
+        """::
+
+            isa_ok(got, dict).is_deeply({'a': [1, 2]}, 'deep structure')
+
+        The same as :func:`is_deeply_ok`.
+        """
+        return self._chain(is_deeply_ok(self.got, expected, test_name))
+
+    def isa(self, cls: type | tuple[type, ...], test_name: str | None = None) -> Self:
+        """::
+
+            throws_ok(lambda: {}['x'], KeyError).isa(LookupError)
+
+        The same as :func:`isa_ok`.
+        """
+        return self._chain(isa_ok(self.got, cls, test_name))
+
+    def isnt(self, expected: object, test_name: str | None = None) -> Self:
+        """::
+
+            isa_ok(foo, str).isnt('', 'got some foo')
+
+        The same as :func:`isnt_ok`.
+        """
+        return self._chain(isnt_ok(self.got, expected, test_name))
+
+    def like(self, expected: _Pattern, test_name: str | None = None) -> Self:
+        """::
+
+            isa_ok(got, str).like(r'expected', 'test name')
+
+        The same as :func:`like_ok`.
+        """
+        return self._chain(like_ok(self.got, expected, test_name))
+
+    def none(self, test_name: str | None = None) -> Self:
+        """::
+
+            isnt_ok(req.headers.transfer_encoding, 'chunked').none('no "Transfer-Encoding" value')
+
+        The same as :func:`none_ok`.
+        """
+        return self._chain(none_ok(self.got, test_name))
+
+    def not_in(self, elem: object, test_name: str | None = None) -> Self:
+        """::
+
+            in_ok(names, 'foo').not_in('bar', 'no bar')
+
+        The same as :func:`not_in_ok`.
+        """
+        return self._chain(not_in_ok(self.got, elem, test_name))
+
+    def ok(self, test_name: str | None = None) -> Self:
+        """::
+
+            isa_ok(items, list).ok('not empty')
+
+        The same as :func:`ok` of the value.
+        """
+        return self._chain(ok(self.got, test_name))
+
+    def unlike(self, expected: _Pattern, test_name: str | None = None) -> Self:
+        """::
+
+            like_ok(got, r'expected').unlike(r'unexpected', 'test name')
+
+        The same as :func:`unlike_ok`.
+        """
+        return self._chain(unlike_ok(self.got, expected, test_name))
+
+    def _chain(self, result: 'Result') -> Self:
+        self.passed = self.passed and result.passed
+        return self
+
+
 class Subtest:
     """
     A subtest, returned by :func:`subtest` without a callback. It is a context
@@ -728,7 +892,7 @@ def subtest(name: str, fn: Callable[[], object] | None = None) -> Subtest | bool
 
 def throws_ok(
     cb: Callable[[], object], expected: type[BaseException] | str | re.Pattern[str], test_name: str | None = None
-) -> bool:
+) -> 'Result':
     """::
 
         throws_ok(lambda: [1, 2, 3][3], IndexError, 'no more elements')
@@ -738,6 +902,7 @@ def throws_ok(
     Check if the callback raises an exception: of the given class, with the
     given message, or with a message matching the regular expression.
     """
+    error = None
     got = None
     check = False
 
@@ -746,6 +911,7 @@ def throws_ok(
     try:
         cb()
     except catch as e:
+        error = e
         if isinstance(expected, type):
             got = type(e).__name__
             check = isinstance(e, expected)
@@ -766,10 +932,10 @@ def throws_ok(
         test_name,
         None if check else [f'         got: {got if got is not None else "no exception"}', f'    expected: {expected}'],
     )
-    return check
+    return Result(error, check)
 
 
-def unlike_ok(got: Any, expected: _Pattern, test_name: str | None = None) -> bool:
+def unlike_ok(got: Any, expected: _Pattern, test_name: str | None = None) -> 'Result':
     """::
 
         unlike_ok(got, r'unexpected', 'test name')
@@ -783,7 +949,7 @@ def unlike_ok(got: Any, expected: _Pattern, test_name: str | None = None) -> boo
     except TypeError:
         check = True
     _ok(check, test_name, None if check else [f'                  {got!r}', f'          matches {regex.pattern!r}'])
-    return check
+    return Result(got, check)
 
 
 class _DoesNotExist:

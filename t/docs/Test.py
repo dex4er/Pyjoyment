@@ -60,6 +60,7 @@ SYNOPSIS = """
     is_deeply_ok(got_complex_structure, expected_complex_structure, 'test name')
     isa_ok(obj, cls)
     throws_ok(lambda: int('x'), ValueError, 'test name')
+    is_ok(got, expected, 'test name').unlike(r'unexpected', 'test name')
 
     with subtest('Parse'):
         is_ok(url.host, 'example.com', 'right host')
@@ -87,16 +88,18 @@ with subtest('Synopsis'):
         'ok 7 - test name\n'
         "ok 8 - An object of class 'Cls' isa 'Cls'\n"
         'ok 9 - test name\n'
+        'ok 10 - test name\n'
+        'ok 11 - test name\n'
         '# Subtest: Parse\n'
         '    ok 1 - right host\n'
         '    1..1\n'
-        'ok 10 - Parse\n'
+        'ok 12 - Parse\n'
         '# Subtest: Format\n'
         '    ok 1 - right format\n'
         '    1..1\n'
-        'ok 11 - Format\n'
+        'ok 13 - Format\n'
         '# what happens next\n'
-        '1..11\n',
+        '1..13\n',
         'all tests pass',
     )
     is_ok(err, "# here's what went wrong\n", 'diagnostic message')
@@ -174,6 +177,27 @@ with subtest('Subtests'):
         'ok 3 - Callback\n'
         '1..3\n',
         'three subtests',
+    )
+    is_ok(code, 0, 'right exit status')
+
+with subtest('Chains'):
+    out, err, code = run(
+        r"""
+        is_ok(url.host, 'example.com', 'right host').like(r'\.com$', 'top-level domain')
+
+        (
+            isa_ok(answer, int)
+            .cmp('>', 0, 'positive')
+            .is_(42, 'meaning of life')
+        )
+        """,
+        setup="import Pyjo.URL\nurl = Pyjo.URL.new('http://example.com')\nanswer = 42",
+    )
+    is_ok(
+        out,
+        'ok 1 - right host\nok 2 - top-level domain\n'
+        "ok 3 - An object of class 'int' isa 'int'\nok 4 - positive\nok 5 - meaning of life\n1..5\n",
+        'every method is a test',
     )
     is_ok(code, 0, 'right exit status')
 
@@ -493,6 +517,88 @@ with subtest('skip'):
     )
     is_ok(out, 'ok 1 # skip set TEST_ONLINE to enable this test\n1..1\n', 'skipped')
     is_ok(code, 0, 'right exit status')
+
+with subtest('Result'):
+    out, err, code = run(
+        """
+        isa_ok(answer, str).is_('42', 'meaning of life') or diag('the answer is lost')
+        """,
+        setup='answer = 42',
+    )
+    is_ok(out, "not ok 1 - An object of class 'int' isa 'str'\nnot ok 2 - meaning of life\n1..2\n", 'failed')
+    like_ok(err, r'(?m)^# the answer is lost$', 'diagnostic message')
+
+with subtest('Result.got'):
+    result = is_ok(42, 42)
+    got = result.got
+    is_ok(got, 42, 'got')
+    result = throws_ok(lambda: int('x'), ValueError)
+    isa_ok(result.got, ValueError, 'exception')
+
+with subtest('Result.passed'):
+    result = is_ok(42, 42)
+    boolean = result.passed
+    is_ok(boolean, True, 'passed')
+
+with subtest('Result.__bool__'):
+    result = is_ok(42, 42)
+    boolean = bool(result)
+    is_ok(boolean, True, 'true')
+
+with subtest('Result.cmp'):
+    out, err, code = run("ok(count, 'some').cmp('<', 10, 'small enough')", setup='count = 3')
+    is_ok(out, 'ok 1 - some\nok 2 - small enough\n1..2\n', 'passed')
+
+with subtest('Result.in_'):
+    out, err, code = run("isa_ok(names, list).in_('foo', \"there's a foo\")", setup="names = ['foo']")
+    like_ok(out, r"(?m)^ok 2 - there's a foo$", 'passed')
+    is_ok(code, 0, 'right exit status')
+
+with subtest('Result.is_'):
+    out, err, code = run("isa_ok(answer, int).is_(42, 'meaning of life')", setup='answer = 42')
+    like_ok(out, r'(?m)^ok 2 - meaning of life$', 'passed')
+    is_ok(code, 0, 'right exit status')
+
+with subtest('Result.is_deeply'):
+    out, err, code = run("isa_ok(got, dict).is_deeply({'a': [1, 2]}, 'deep structure')", setup="got = {'a': [1, 2]}")
+    like_ok(out, r'(?m)^ok 2 - deep structure$', 'passed')
+    is_ok(code, 0, 'right exit status')
+
+with subtest('Result.isa'):
+    out, err, code = run("throws_ok(lambda: {}['x'], KeyError).isa(LookupError)")
+    is_ok(out, "ok 1\nok 2 - An object of class 'KeyError' isa 'LookupError'\n1..2\n", 'passed')
+
+with subtest('Result.isnt'):
+    out, err, code = run("isa_ok(foo, str).isnt('', 'got some foo')", setup="foo = 'bar'")
+    like_ok(out, r'(?m)^ok 2 - got some foo$', 'passed')
+    is_ok(code, 0, 'right exit status')
+
+with subtest('Result.like'):
+    out, err, code = run("isa_ok(got, str).like(r'expected', 'test name')", setup="got = 'the expected value'")
+    like_ok(out, r'(?m)^ok 2 - test name$', 'passed')
+    is_ok(code, 0, 'right exit status')
+
+with subtest('Result.none'):
+    out, err, code = run(
+        """isnt_ok(req.headers.transfer_encoding, 'chunked').none('no "Transfer-Encoding" value')""",
+        setup='import Pyjo.Message.Request\nreq = Pyjo.Message.Request.new()',
+    )
+    is_ok(out, 'ok 1\nok 2 - no "Transfer-Encoding" value\n1..2\n', 'passed')
+
+with subtest('Result.not_in'):
+    out, err, code = run("in_ok(names, 'foo').not_in('bar', 'no bar')", setup="names = ['foo']")
+    is_ok(out, 'ok 1\nok 2 - no bar\n1..2\n', 'passed')
+
+with subtest('Result.ok'):
+    out, err, code = run("isa_ok(items, list).ok('not empty')", setup='items = [1]')
+    like_ok(out, r'(?m)^ok 2 - not empty$', 'passed')
+    is_ok(code, 0, 'right exit status')
+
+with subtest('Result.unlike'):
+    out, err, code = run(
+        "like_ok(got, r'expected').unlike(r'unexpected', 'test name')", setup="got = 'the expected value'"
+    )
+    is_ok(out, 'ok 1\nok 2 - test name\n1..2\n', 'passed')
 
 with subtest('subtest'):
     out, err, code = run(
