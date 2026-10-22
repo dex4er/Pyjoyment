@@ -40,6 +40,13 @@ servers of `hello_world_uvicorn.py` and `hello_world_werkzeug.py` or the
 uv run --with uvicorn python examples/servers/hello_world_uvicorn.py
 ```
 
+The frameworks that the scripts of `mount/` mount, as Flask, Starlette and the
+MCP SDK, are in the dependency group `servers` of the project:
+
+```sh
+uv run --group servers python examples/mount/mount_mcp.py daemon
+```
+
 A script that needs a program which Pyjoyment does not run, as php-fpm for
 `mount_fastcgi_php.py`, says how to start it in its comment:
 

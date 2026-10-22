@@ -55,6 +55,12 @@ An application of Pyjoyment as the ASGI application, in the same file:
     .. include:: ../examples/mount/mount_asgi_inception.py
        :code: python
 
+A server of the MCP SDK, whose transport of Streamable HTTP is an ASGI
+application, under a path of an application of ``Pyjoyment.Lite``:
+
+    .. include:: ../examples/mount/mount_mcp.py
+       :code: python
+
 PHP on php-fpm, a FastCGI application, under a path of an application of
 ``Pyjoyment.Lite``, with the scripts of its directory and the pool of
 php-fpm:

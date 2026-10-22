@@ -32,10 +32,10 @@ renderer, plugins, ``Pyjoyment.Lite`` and the command line interface. It
 renders JSON, YAML and TOML, and reads its configuration from Python, JSON,
 YAML and TOML files.
 
-It mounts the applications of other frameworks under a path or a host, next
-to its own routes: WSGI applications, as those of Flask, and ASGI
-applications, as those of Starlette, in the same process and on the same
-server, whose responses stream at the pace of the client, with their
+It mounts the applications of other frameworks under a path or a host, next to
+its own routes: WSGI applications, as those of Flask, and ASGI applications, as
+those of Starlette and the servers of the MCP SDK, in the same process and on
+the same server, whose responses stream at the pace of the client, with their
 WebSockets, FastCGI applications, as PHP on php-fpm, which it connects to, CGI
 programs, which it runs, as a web server does, with one script for every path
 or the scripts of a directory, and event functions of AWS Lambda, which it runs

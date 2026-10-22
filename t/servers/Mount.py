@@ -25,7 +25,7 @@ import time
 # The applications of other frameworks, which Pyjoyment.Plugin.Mount mounts, of the dependency group "servers": uv run
 # --only-group servers python -m Pyjo.Prove t/servers
 if missing := [
-    m for m in ('flask', 'mangum', 'starlette', 'waitress', 'websockets') if not importlib.util.find_spec(m)
+    m for m in ('flask', 'mangum', 'mcp', 'starlette', 'waitress', 'websockets') if not importlib.util.find_spec(m)
 ]:
     plan(skip_all=f'needs the dependency group "servers", without {", ".join(missing)}')
 
@@ -61,6 +61,9 @@ PHP_FPM = shutil.which('php-fpm') or next(
 # The example of php-cgi, which runs php-cgi of PATH
 EXAMPLE_PHP_CGI = os.path.join(os.path.dirname(__file__), '..', '..', 'examples', 'mount', 'mount_cgi_php.py')
 PHP_CGI = shutil.which('php-cgi')
+
+# The example of a server of the MCP SDK
+EXAMPLE_MCP = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'examples', 'mount', 'mount_mcp.py'))
 
 # The example of Starlette on Mangum, an event function of AWS Lambda
 EXAMPLE_MANGUM = os.path.join(os.path.dirname(__file__), '..', '..', 'examples', 'mount', 'mount_lambda_mangum.py')
@@ -369,6 +372,73 @@ with subtest('Starlette on Mangum on Lambda'):
             t.get_ok('/mangum/foo/bar').status_is(200).content_is('Hello Starlette for /foo/bar on Mangum!')
         finally:
             os.environ.update(saved)
+
+with subtest('MCP SDK'):
+    import asyncio
+
+    from mcp import Client
+
+    # The tools of the server for clients at the same time, each with its calls
+    async def tools(url, clients=1, calls=1):
+        async def client():
+            async with Client(url) as mcp:
+                names = [tool.name for tool in (await mcp.list_tools()).tools]
+                results = [(await mcp.call_tool('add', {'a': n, 'b': 2})).structured_content for n in range(calls)]
+                return names, results
+
+        return await asyncio.gather(*(client() for _ in range(clients)))
+
+    # The MCP SDK needs the event loop of asyncio, which Pyjo.Reactor.Poll does not run
+    if Pyjo.Reactor.object.detect() != 'Pyjo.Reactor.Asyncio':
+        skip('needs Pyjo.Reactor.Asyncio, as the MCP SDK runs on asyncio', 1)
+    else:
+        with tempfile.TemporaryDirectory() as dir:
+            # The example on the daemon, whose end shuts the lifespan of the server down, the manager of its sessions
+            server = Server(dir, [PYTHON, EXAMPLE_MCP, 'daemon', '-l', 'http://127.0.0.1:{port}'])
+            try:
+                status, headers, body = server.request('GET', '/')
+                is_ok(body, 'I ♥ Pyjoyment!'.encode(), 'right content')
+                is_deeply_ok(
+                    asyncio.run(tools(f'http://127.0.0.1:{server.port}/mcp/')),
+                    [(['add'], [{'result': 2}])],
+                    'tool of the MCP server',
+                )
+            except Exception:
+                diag(server.output())
+                raise
+            finally:
+                server.close()
+            with open(os.path.join(dir, 'server.log')) as file:
+                log = file.read()
+            # Windows stops a server immediately with Ctrl-Break
+            if sys.platform == 'win32':
+                skip('no graceful stop on Windows', 1)
+            else:
+                like_ok(log, r'session manager shutting down', 'lifespan shut down')
+
+            # Without sessions, as the guide Mounting has it, on the workers of the pre-forking server
+            if not hasattr(os, 'fork'):
+                skip('no os.fork', 1)
+            else:
+                with open(EXAMPLE_MCP) as file:
+                    script = file.read().replace(
+                        "mcp.streamable_http_app(streamable_http_path='/')",
+                        "mcp.streamable_http_app(streamable_http_path='/', stateless_http=True)",
+                    )
+                with open(os.path.join(dir, 'stateless.py'), 'w') as file:
+                    file.write(script)
+                server = Server(dir, [PYTHON, 'stateless.py', 'prefork', '-w', '4', '-l', 'http://127.0.0.1:{port}'])
+                try:
+                    is_deeply_ok(
+                        asyncio.run(tools(f'http://127.0.0.1:{server.port}/mcp/', clients=8, calls=5)),
+                        [(['add'], [{'result': n + 2} for n in range(5)])] * 8,
+                        'tools for eight clients on four workers',
+                    )
+                except Exception:
+                    diag(server.output())
+                    raise
+                finally:
+                    server.close()
 
 with tempfile.TemporaryDirectory() as dir:
     shutil.copy(EXAMPLE, os.path.join(dir, 'inception.py'))
