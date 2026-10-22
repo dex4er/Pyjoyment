@@ -1090,7 +1090,19 @@ The event ``spawn`` comes once the program runs, ``close`` once it has
 exited and its output has ended, with its exit code, and ``error`` if it
 cannot run. ``stop`` and ``start`` of the stream of its output pause and
 resume reading it, as for a slow client, and
-:meth:`~Pyjo.IOLoop.ChildProcess.Pyjo_IOLoop_ChildProcess.kill` ends it early.
+:meth:`~Pyjo.IOLoop.ChildProcess.Pyjo_IOLoop_ChildProcess.kill` ends it early,
+with the programs that it starts when it runs ``detached``, in a process group
+of its own.
+
+:meth:`~Pyjo.IOLoop.ChildProcess.Pyjo_IOLoop_ChildProcess.run_p` gives its exit
+code, its output and its error at once, as a promise, which a coroutine awaits.
+
+.. code-block:: python
+
+    @get('/system')
+    async def system(c):
+        code, out, err = await Pyjo.IOLoop.ChildProcess.new().run_p(['uname', '-s'])
+        c.render(text=out.strip().decode())
 
 Exceptions in non-blocking operations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

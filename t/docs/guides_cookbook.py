@@ -414,10 +414,26 @@ with subtest('Timers and subprocesses'):
 
     # A program in a child process, whose output streams as it comes
     if os.name == 'nt':
-        skip('child processes need pipes that the reactor watches', 3)
+        skip('child processes need pipes that the reactor watches', 6)
     else:
         with cookbook('sort') as t:
             t.post_ok('/sort', b'b\na\n').status_is(200).content_is('a\nb\n')
+
+        # The snippet of run_p, copied
+        import Pyjo.IOLoop.ChildProcess
+
+        import platform
+
+        app = Pyjoyment.new()
+        app.log.level = 'fatal'
+
+        async def system(c):
+            code, out, err = await Pyjo.IOLoop.ChildProcess.new().run_p(['uname', '-s'])
+            c.render(text=out.strip().decode())
+
+        app.routes.get('/system').to(cb=system)
+        with Pyjo.Test.Pyjo.new(app) as t:
+            t.get_ok('/system').status_is(200).content_is(platform.system())
 
     with cookbook('background') as t:
         t.get_ok('/').status_is(200).json_is('/title', 'Got no title yet.')

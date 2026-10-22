@@ -56,10 +56,17 @@ with subtest('Synopsis'):
         child.stdout.on('read', lambda stream, chunk: print(chunk))
         child.stdin.write(b'b\na\n')
         child.stdin.close_gracefully()
-
-        # Start reactor if necessary
         wait(child)
     is_ok(stdout.getvalue(), "b'a\\nb\\n'\n", 'sorted')
+
+    # Its output as a promise, also in a coroutine
+    with redirect_stdout(io.StringIO()) as stdout:
+        child = Pyjo.IOLoop.ChildProcess.new()
+        promise = child.run_p(LS).then(lambda code, out, err: print(out))
+
+        # Start reactor if necessary
+        promise.wait()
+    is_ok(stdout.getvalue(), 'total 0\n\n', 'promise')
 
 with subtest('close'):
     with redirect_stdout(io.StringIO()) as stdout:
@@ -164,6 +171,28 @@ with subtest('kill'):
     wait(child)
     is_ok(child.signal_code, signal.SIGKILL, 'killed')
 
+with subtest('run_p'):
+    import Pyjo.Promise
+
+    results = []
+    promise = Pyjo.IOLoop.ChildProcess.new().run_p(LS)
+    promise.then(lambda *values: results.extend(values)).wait()
+    is_deeply_ok(results, [0, b'total 0\n', b''], 'output')
+    results = []
+    promise = Pyjo.IOLoop.ChildProcess.new().run_p(SORT, input=b'b\na\n', cwd='/')
+    promise.then(lambda *values: results.extend(values)).wait()
+    is_ok(results[1], b'a\nb\n', 'input')
+
+    # The output of a program in a coroutine
+    @Pyjo.Promise.coroutine
+    async def coroutine():
+        code, out, err = await Pyjo.IOLoop.ChildProcess.new().run_p(LS)
+        return out
+
+    results = []
+    coroutine().then(lambda out: results.append(out)).wait()
+    is_deeply_ok(results, [b'total 0\n'], 'awaited')
+
 with subtest('spawn'):
     child = Pyjo.IOLoop.ChildProcess.new()
     child = child.spawn(LS)
@@ -178,5 +207,11 @@ with subtest('spawn'):
     child.stdout.on('read', lambda stream, chunk: chunks.append(chunk))
     wait(child)
     is_ok(b''.join(chunks).strip(), b'200', 'environment')
+    child = Pyjo.IOLoop.ChildProcess.new()
+    child = child.spawn([sys.executable, '-c', 'import os; print(os.getsid(0) == os.getpid())'], detached=True)
+    chunks = []
+    child.stdout.on('read', lambda stream, chunk: chunks.append(chunk))
+    wait(child)
+    is_ok(b''.join(chunks).strip(), b'True', 'session of its own')
 
 done_testing()

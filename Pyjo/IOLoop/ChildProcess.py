@@ -25,6 +25,10 @@ Pyjo.IOLoop.ChildProcess - Non-blocking child process
     child.stdin.write(b'b\\na\\n')
     child.stdin.close_gracefully()
 
+    # Its output as a promise, also in a coroutine
+    child = Pyjo.IOLoop.ChildProcess.new()
+    child.run_p(['ls', '-l']).then(lambda code, out, err: print(out))
+
     # Start reactor if necessary
     if not child.reactor.is_running:
         child.reactor.start()
@@ -90,7 +94,8 @@ spawn
 
     child.on('spawn', lambda child: ...)
 
-Emitted once the process has been spawned. ::
+Emitted once the process has been spawned, before its output and its error
+are read, so that the subscribers of this event get all of them. ::
 
     child.on('spawn', lambda child: print(f'Running process {child.pid}'))
 
@@ -147,6 +152,7 @@ class Pyjo_IOLoop_ChildProcess(Pyjo.EventEmitter.object):
         super().__init__()
 
         self._check = 0
+        self._detached = False
         self._ended = 0
         self._exit_code: int | None = None
         self._process: subprocess.Popen[bytes] | None = None
@@ -258,30 +264,95 @@ class Pyjo_IOLoop_ChildProcess(Pyjo.EventEmitter.object):
             boolean = child.kill(signal.SIGKILL)
 
         Send a signal to the process, ``SIGTERM`` by default, if it is still
-        running.
+        running, or to the processes of its group, which it may have started,
+        when it has been spawned ``detached``, while any of them runs.
         """
-        if (process := self._process) is None or process.poll() is not None:
+        if (process := self._process) is None:
+            return False
+        if self._detached:
+            try:
+                os.killpg(process.pid, signal)
+
+            # No process of the group, or only the process that has exited and has not been reaped yet, for which macOS
+            # gives EPERM
+            except (ProcessLookupError, PermissionError):
+                return False
+            return True
+        if process.poll() is not None:
             return False
         process.send_signal(signal)
         return True
+
+    def run_p(self, args: Sequence[str | bytes | os.PathLike[str]], *, input: bytes = b'', **options: Any) -> Any:
+        """::
+
+            promise = child.run_p(['ls', '-l'])
+            promise = child.run_p(['sort'], input=b'b\\na\\n', cwd='/tmp')
+
+        Same as :meth:`spawn`, with the options of :meth:`spawn`, but writes
+        ``input`` to the standard input of the process and ends it, and
+        returns a :mod:`Pyjo.Promise` object, which is fulfilled with the exit
+        code, ``None`` for a signal, and the whole output and error of the
+        process as :mod:`Pyjo.String.Bytes` objects once it closes, or
+        rejected if the program could not be run. ::
+
+            # The output of a program in a coroutine
+            code, out, err = await Pyjo.IOLoop.ChildProcess.new().run_p(['git', 'log', '-1'])
+        """
+        # Imported here, as Pyjo.Promise uses Pyjo.IOLoop
+        import Pyjo.Promise
+        import Pyjo.String.Bytes
+
+        p = Pyjo.Promise.new()
+        out: list[bytes] = []
+        err: list[bytes] = []
+
+        def close(child: Pyjo_IOLoop_ChildProcess, code: int | None, signal: int | None) -> None:
+            p.resolve(code, Pyjo.String.Bytes.new(b''.join(out)), Pyjo.String.Bytes.new(b''.join(err)))
+
+        def error(child: Pyjo_IOLoop_ChildProcess, e: BaseException) -> None:
+            p.reject(e)
+
+        def output(stream: Any, chunk: bytes) -> None:
+            out.append(chunk)
+
+        def errors(stream: Any, chunk: bytes) -> None:
+            err.append(chunk)
+
+        self.once('close', close)
+        self.once('error', error)
+        self.spawn(args, **options)
+        if (stdout := self._stdout) is not None and (stderr := self._stderr) is not None:
+            stdout.on('read', output)
+            stderr.on('read', errors)
+        if (stdin := self._stdin) is not None:
+            stdin.write(input).close_gracefully()
+        return p
 
     def spawn(
         self,
         args: Sequence[str | bytes | os.PathLike[str]],
         *,
         cwd: str | bytes | os.PathLike[str] | None = None,
+        detached: bool = False,
         env: Mapping[str, str] | Mapping[bytes, bytes] | None = None,
     ) -> Self:
         """::
 
             child = child.spawn(['ls', '-l'])
             child = child.spawn(['php-cgi', 'index.php'], cwd='/var/www', env={'REDIRECT_STATUS': '200'})
+            child = child.spawn(['make', 'all'], detached=True)
 
         Run a program, the first of ``args``, with the others as its
         arguments, in the directory ``cwd`` and with the environment ``env``,
-        the ones of this process by default. The events ``spawn`` or ``error``
-        are emitted in the next tick of the reactor, so that the ones that are
-        subscribed after the call get them too.
+        the ones of this process by default. With ``detached``, the process
+        runs in a session of its own, as the leader of a process group, as
+        ``detached`` of Node.js, so that :meth:`kill` signals the processes
+        that it starts too, and a signal of the terminal of this process, as
+        of Ctrl-C, does not reach it. The events ``spawn`` or ``error`` are
+        emitted in the next tick of the reactor, so that the ones that are
+        subscribed after the call get them too, and the output and the error
+        are read from the event ``spawn`` on.
         """
         reactor = self.reactor
         if os.name == 'nt':
@@ -292,24 +363,26 @@ class Pyjo_IOLoop_ChildProcess(Pyjo.EventEmitter.object):
                 bufsize=0,
                 cwd=cwd,
                 env=env,
+                start_new_session=detached,
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             )
         except OSError as e:
             return self._later('error', e)
+        self._detached = detached
         _running[self] = os.getpid()
         assert process.stdin is not None and process.stdout is not None and process.stderr is not None
 
-        # The output and the error, until their end, which the end of the process usually is
+        # The output and the error, until their end, which the end of the process usually is, read from the event
+        # spawn on
         for name, handle in (('_stdout', process.stdout), ('_stderr', process.stderr)):
             os.set_blocking(handle.fileno(), False)
-            stream = Pyjo.IOLoop.Stream.new(handle)
+            stream = _Output(handle)
             stream.reactor = reactor
             stream.timeout = 0
             stream.on('close', self._closed)
             setattr(self, name, stream)
-            stream.start()
 
         # The input, which the reactor writes without reading
         os.set_blocking(process.stdin.fileno(), False)
@@ -319,7 +392,20 @@ class Pyjo_IOLoop_ChildProcess(Pyjo.EventEmitter.object):
         stdin.start()
 
         self._wait(_DELAYS[-1])
-        return self._later('spawn')
+        ref = weakref.ref(self)
+
+        # The output and the error are read once the subscribers of the event spawn can read them, as a reactor may
+        # read before the next tick
+        def spawned(reactor: Any) -> None:
+            if (child := ref()) is None:
+                return
+            for stream in (child._stdout, child._stderr):
+                if isinstance(stream, _Output):
+                    stream.begin()
+            child.emit('spawn')
+
+        reactor.next_tick(spawned)
+        return self
 
     # The output or the error of the process has ended, so that it has likely exited
     def _closed(self, stream: Any) -> None:
@@ -372,6 +458,29 @@ class Pyjo_IOLoop_ChildProcess(Pyjo.EventEmitter.object):
         self._timer = reactor.timer(after, self._poll)
 
 
+# The output or the error of a process, which the reactor reads from the event spawn on, and which keeps whether it is
+# paused until then
+class _Output(Pyjo.IOLoop.Stream.object):
+    _begun = False
+
+    def begin(self) -> None:
+        self._begun = True
+        paused, self._paused = self._paused, False
+        super().start()
+        if paused:
+            super().stop()
+
+    def start(self) -> None:
+        if self._begun:
+            return super().start()
+        self._paused = False
+
+    def stop(self) -> None:
+        if self._begun:
+            return super().stop()
+        self._paused = True
+
+
 # The standard input of a process, which the reactor writes and does not read, so that it closes when a write fails,
 # where a stream finds an error when it reads
 class _Input(Pyjo.IOLoop.Stream.object):
@@ -417,7 +526,7 @@ def _kill() -> None:
         if owner != pid or (process := child._process) is None:  # pyright: ignore[reportPrivateUsage]
             continue
         if process.poll() is None:
-            process.kill()
+            child.kill(signals.SIGKILL)
         process.wait()
         for stream in (child.stdin, child.stdout, child.stderr):
             if stream is not None:
