@@ -18,6 +18,7 @@ scratch directory and adapt them to what it measures, keeping the rules in
 - `curl`, `lsof`, `netstat` and `ab` (ApacheBench, part of macOS and of the
   `apache2-utils` package on Debian)
 - The Python of `mise.toml`, and PyPy for its scenarios
+- php-fpm for `fastcgi.sh`
 - A venv with the other servers, next to the scripts:
 
   ```sh
@@ -35,6 +36,7 @@ scratch directory and adapt them to what it measures, keeping the rules in
 | `bench.sh [SCENARIO...]`                       | Every server, or the scenarios named: keep-alive 3 times, a new connection per request, and `ab -c 1`                                                                                                                                       |
 | `ab.sh [-n PAIRS] [-r REACTOR]... [REF]`       | `Pyjo.Server.Daemon` of a git ref (default `main`) against the working tree, interleaved, with the medians and the gain                                                                                                                     |
 | `profile.sh [-n REQUESTS] [-r REACTOR] [ROOT]` | `cProfile` of `Pyjo.Server.Daemon` under keep-alive requests, with the function calls per request and the top of the profile                                                                                                                |
+| `fastcgi.sh [-n ROUNDS] [-m MAX] [-r REACTOR]` | `Pyjo.App.FastCGI` with `hello.php` on php-fpm, over TCP/IP and a UNIX domain socket, with a connection for each request and with `MAX` connections kept, interleaved in rounds, with the medians and the `TIME_WAIT` sockets left          |
 | `ka.py PORT N`                                 | The client: `GET /` on one connection, reads by `Content-Length`; `RECONNECT=1` opens a connection for every request, `WARMUP` sets the requests before the measurement                                                                     |
 | `workers.sh [PATTERN...]`                      | `Pyjo.Server.Prefork` and `Pyjo.Server.Prethread` on a CPython with the GIL and free-threaded, `Pyjo.Server.Prefork` on PyPy, and the other servers with as many workers, rounds of oha at several numbers of connections, with the medians |
 
@@ -46,12 +48,15 @@ smallest application of each framework. The scenarios `pyjoyment-*` run the
 same servers with `Pyjoyment.HelloWorld`, an application of the web framework
 with a route, which answers `Your Pyjoyment is working!`: `pyjoyment_hello.py`,
 `pyjoyment_daemon.py`, `pyjoyment_asgi_app.py` and `pyjoyment_wsgi_app.py`.
+`pyjo_fastcgi.py` is `Pyjo.App.FastCGI` on `Pyjo.Server.Daemon`, with
+`hello.php` on php-fpm, which answers `Your PHP is working!`.
 
 ```sh
 PYTHON=$(mise exec -- which python) PYPY=pypy3 benchmarks/bench.sh
 PYTHON=$(mise exec -- which python) benchmarks/bench.sh pyjo-daemon-asyncio pyjo-daemon-poll
 PYTHON=$(mise exec -- which python) benchmarks/ab.sh -n 8 -r Asyncio main
 PYTHON=$(mise exec -- which python) benchmarks/profile.sh -r Poll
+PYTHON=$(mise exec -- which python) benchmarks/fastcgi.sh -n 7 -m 4
 ```
 
 ## Servers of workers
