@@ -66,8 +66,10 @@ chunked content is sent without its framing and without the
 ``Transfer-Encoding`` header, and the ``Date`` header is the one of the ASGI
 server, unless the application sets one. A WebSocket handshake is a
 :mod:`Pyjo.Transaction.WebSocket`, as with :mod:`Pyjo.Server.Daemon`; a
-response other than ``101`` rejects it, and the ASGI server negotiates
-``permessage-deflate`` on its own.
+response other than ``101`` rejects it, the ASGI server negotiates
+``permessage-deflate`` on its own, and a ``Ping`` frame, which ASGI cannot
+send, is answered with a ``Pong`` frame, as the ASGI server pings the client
+itself.
 
 This needs a reactor that runs in the event loop of the ASGI server and
 gives awaitables for it. :mod:`Pyjo.Reactor.Asyncio`, the default, does so in
@@ -117,7 +119,17 @@ import Pyjo.Transaction.HTTP
 import Pyjo.Transaction.WebSocket
 
 from Pyjo.Util import url_escape
-from Pyjo.WebSocket import WS_BINARY, WS_CLOSE, WS_CONTINUATION, WS_TEXT, Frame, parse_frame, server_handshake
+from Pyjo.WebSocket import (
+    WS_BINARY,
+    WS_CLOSE,
+    WS_CONTINUATION,
+    WS_PING,
+    WS_PONG,
+    WS_TEXT,
+    Frame,
+    parse_frame,
+    server_handshake,
+)
 
 import struct
 import sys
@@ -383,6 +395,11 @@ class _Writer:
                 {'type': 'websocket.close', 'code': code, 'reason': payload[2:].decode('utf-8', 'replace')}
             )
             self.closed = True
+            return
+
+        # A ping, which ASGI cannot send, is answered as by the client, as the ASGI server keeps the connection alive
+        if op == WS_PING:
+            self._ws.parse_message((1, 0, 0, 0, WS_PONG, payload))
             return
 
         # Text or binary message, which may come in fragments

@@ -2,6 +2,7 @@ import Pyjo.IOLoop
 import Pyjo.Server.ASGI
 
 from Pyjo.Test import *
+from Pyjo.WebSocket import WS_PING, WS_PONG
 
 import importlib
 import os
@@ -327,6 +328,24 @@ with subtest('WebSocket drain callbacks'):
         ],
         'messages sent as the ones before are written',
     )
+
+with subtest('WebSocket ping'):
+    events = []
+
+    def ping(tx):
+        @tx.on('message')
+        def message(ws, msg):
+            ws.on('frame', lambda ws, frame: events.append(frame[4]))
+            ws.send((1, 0, 0, 0, WS_PING, b'test'))
+
+        tx.res.code = 101
+        tx.resume()
+
+    app = server(ping)
+    messages = [{'type': 'websocket.receive', 'text': 'go'}, {'type': 'websocket.disconnect', 'code': 1000}]
+    sent = ASGIClient.run(app, *ASGIClient.websocket('/ws', messages))
+    is_deeply_ok(sent, [{'type': 'websocket.accept', 'subprotocol': None}], 'no message for the ping')
+    is_deeply_ok(events[:1], [WS_PONG], 'pong of the server')
 
 with subtest('WebSocket closed abnormally'):
     events = []
