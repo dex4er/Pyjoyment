@@ -668,7 +668,8 @@ class Result:
             got = result.got
 
         The value that the tests check: the first argument of the function,
-        or the exception that the callback of :func:`throws_ok` raised.
+        or the exception that the callback of :func:`throws_ok` raised, without
+        its traceback.
         """
 
         self.passed = passed
@@ -928,7 +929,8 @@ def throws_ok(
     try:
         cb()
     except catch as e:
-        error = e
+        # Without its traceback, whose frames would keep what the callback had, as a socket, in a cycle with this frame
+        error = e.with_traceback(None)
         if isinstance(expected, type):
             got = type(e).__name__
             check = isinstance(e, expected)

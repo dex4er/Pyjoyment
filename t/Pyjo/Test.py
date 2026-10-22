@@ -395,6 +395,37 @@ with subtest('Chains'):
     )
     is_ok(code, 1, 'right exit status')
 
+    # The exception of throws_ok keeps no frame of the callback, whose objects, as a socket, are freed at once
+    if sys.implementation.name == 'pypy':
+        skip('PyPy frees objects only when its garbage collector runs', 3)
+    else:
+        out, err, code = run("""
+            import gc
+            import weakref
+            from Pyjo.Test import *
+
+            class Resource:
+                pass
+
+            def main():
+                refs = []
+
+                def fail():
+                    resource = Resource()
+                    refs.append(weakref.ref(resource))
+                    raise ValueError('bad')
+
+                result = throws_ok(fail, ValueError, 'raised').isa(Exception, 'an exception')
+                print('#', refs[0]() is None, type(result.got).__name__)
+
+            gc.disable()
+            main()
+            done_testing()
+        """)
+        is_ok(out, 'ok 1 - raised\nok 2 - an exception\n# True ValueError\n1..2\n', 'freed without the collector')
+        is_ok(err, '', 'no diagnostics')
+        is_ok(code, 0, 'right exit status')
+
 with subtest('Exceptions'):
     out, err, code = run("""
         import Pyjo.Test
