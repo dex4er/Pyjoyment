@@ -68,7 +68,7 @@ resource "aws_lambda_function" "function" {
   # The directory of the layer, which the runtime does not put in the path of Python, as it does /opt/python
   environment {
     variables = {
-      PYJO_MODE  = "production"
+      PYJO_MODE  = "development"
       PYTHONPATH = "/opt"
     }
   }

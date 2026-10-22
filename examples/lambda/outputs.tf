@@ -1,8 +1,13 @@
 data "aws_region" "current" {}
 
 output "url" {
-  description = "The URL of the function behind the load balancer, for TEST_LAMBDA_URL"
-  value       = "http://${aws_lb.this.dns_name}"
+  description = "The Function URL of the function, for TEST_LAMBDA_URL"
+  value       = trimsuffix(aws_lambda_function_url.function.function_url, "/")
+}
+
+output "alb_url" {
+  description = "The URL of the function behind the load balancer, for TEST_LAMBDA_ALB_URL"
+  value       = var.alb ? "http://${aws_lb.this[0].dns_name}" : null
 }
 
 output "function_name" {
