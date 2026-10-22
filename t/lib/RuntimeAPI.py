@@ -36,8 +36,6 @@ def invoke(command, events, posts, cwd, env=None, ends=False):
         def action(c):
             got.append((kind, c.param('id'), c.req.headers.header('Lambda-Runtime-Function-Error-Type'), c.req.json()))
             c.render(data=b'', status=202)
-            if len(got) == posts:
-                Pyjo.IOLoop.stop()
 
         return action
 
@@ -55,9 +53,10 @@ def invoke(command, events, posts, cwd, env=None, ends=False):
     }
     process = subprocess.Popen(command, cwd=cwd, env=environ)
     try:
-        # Until the posts, a process that ends before them, or a timeout
+        # Until the posts, which the event loop answers in the meantime, and the end of a process that ends by itself, a
+        # process that ends before them, or a timeout
         def ended(loop):
-            if process.poll() is not None:
+            if process.poll() is not None or len(got) >= posts and not ends:
                 loop.stop()
 
         waiting = [Pyjo.IOLoop.recurring(0.05, ended), Pyjo.IOLoop.timer(30, lambda loop: loop.stop())]
