@@ -249,6 +249,9 @@ with subtest('Binding'):
 
     app.hook('before_server_start', before_server_start)
 
+    # Not in Mojolicious: the end of the server, after its response
+    app.hook('after_server_stop', lambda server_, app: server.append('stopped'))
+
     with local(
         {
             'PATH_INFO': '/',
@@ -267,7 +270,7 @@ with subtest('Binding'):
     is_ok(res.headers.content_length, '21', 'right "Content-Length" value')
     is_ok(res.headers.content_type, 'text/html;charset=UTF-8', 'right "Content-Type" value')
     is_ok(res.body, b'Your Mojo is working!', 'right content')
-    is_deeply_ok(server, ['Pyjo.Server.CGI.Pyjo_Server_CGI', 'development'], 'hook has been emitted once')
+    is_deeply_ok(server, ['Pyjo.Server.CGI.Pyjo_Server_CGI', 'development', 'stopped'], 'hooks have been emitted once')
 
 with subtest('Reverse proxy'):
     with local(

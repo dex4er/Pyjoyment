@@ -432,6 +432,54 @@ with subtest('Lifespan'):
         sent, [{'type': 'lifespan.startup.complete'}, {'type': 'lifespan.shutdown.complete'}], 'startup and shutdown'
     )
 
+with subtest('Lifespan of the server of the application'):
+    import Pyjo.Promise
+    import Pyjoyment
+
+    events = []
+    application = Pyjoyment.new()
+    application.log.level = 'fatal'
+    application.hook('before_server_start', lambda server, app: events.append(type(server).__module__))
+
+    @application.hook('after_server_stop')
+    def after_server_stop(server, app):
+        events.append('stopping')
+        return Pyjo.Promise.timer(0.05).then(lambda *args: events.append('stopped'))
+
+    app = Pyjo.Server.ASGI.new(app=application).to_asgi_app()
+    sent = ASGIClient.run(app, {'type': 'lifespan'}, [{'type': 'lifespan.startup'}, {'type': 'lifespan.shutdown'}])
+    is_deeply_ok(
+        sent, [{'type': 'lifespan.startup.complete'}, {'type': 'lifespan.shutdown.complete'}], 'startup and shutdown'
+    )
+    is_deeply_ok(events, ['Pyjo.Server.ASGI', 'stopping', 'stopped'], 'hooks, and the cleanup waited for')
+
+    # Failed
+    application = Pyjoyment.new()
+    application.log.level = 'fatal'
+
+    @application.hook('before_server_start')
+    def fail_start(server, app):
+        raise Exception('No database')
+
+    app = Pyjo.Server.ASGI.new(app=application).to_asgi_app()
+    sent = ASGIClient.run(app, {'type': 'lifespan'}, [{'type': 'lifespan.startup'}])
+    is_deeply_ok(sent, [{'type': 'lifespan.startup.failed', 'message': 'No database'}], 'startup failed')
+
+    application = Pyjoyment.new()
+    application.log.level = 'fatal'
+
+    @application.hook('after_server_stop')
+    def fail_stop(server, app):
+        raise Exception('Still busy')
+
+    app = Pyjo.Server.ASGI.new(app=application).to_asgi_app()
+    sent = ASGIClient.run(app, {'type': 'lifespan'}, [{'type': 'lifespan.startup'}, {'type': 'lifespan.shutdown'}])
+    is_deeply_ok(
+        sent,
+        [{'type': 'lifespan.startup.complete'}, {'type': 'lifespan.shutdown.failed', 'message': 'Still busy'}],
+        'shutdown failed',
+    )
+
 with subtest('Unsupported connection type'):
     app = server(hello)
     throws_ok(

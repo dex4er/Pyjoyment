@@ -169,6 +169,21 @@ after_dispatch
     Useful for rewriting outgoing responses and other post-processing tasks.
     (Passed the current controller object)
 
+after_server_stop
+    Emitted right after the application server has stopped gracefully, in
+    each process and thread that has run the application, for web servers
+    that support it, which includes all the built-in ones but
+    :mod:`Pyjo.Server.WSGI` and :mod:`Pyjo.Server.Lambda`, which do not know
+    when they stop. The event loop no longer runs, and the server runs it
+    until a :mod:`Pyjo.Promise` that the hook returns is settled. ::
+
+        @app.hook('after_server_stop')
+        def after_server_stop(server, app): ...
+
+    Useful for cleaning up what the application has started for the
+    server, as the connections of a pool. (Passed the server and application
+    objects)
+
 Helpers
 -------
 
@@ -790,6 +805,22 @@ class Pyjoyment_App(Pyjo.App.object):
         Emits the ``before_server_start`` hook.
         """
         self.plugins.emit_hook('before_server_start', server, self)
+
+    # Not in Mojolicious: the end of the server, as server is its start
+    def server_stopped(self, server: Pyjo.Server.object) -> 'Pyjo.Promise.object | None':
+        """::
+
+            promise = app.server_stopped(Pyjo.Server.new())
+
+        Emits the ``after_server_stop`` hook, and returns a promise of the
+        promises that its callbacks return.
+        """
+        promises = [
+            promise
+            for cb in self.plugins.subscribers('after_server_stop')
+            if isinstance(promise := cb(server, self), Pyjo.Promise.object)
+        ]
+        return Pyjo.Promise.all_settled(*promises) if promises else None
 
     def start(self, *args: str) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride]
         """::

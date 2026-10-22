@@ -507,4 +507,37 @@ with subtest('Signals'):
         ok(time.monotonic() - started < 2, 'a connection kept alive closes after its next response')
         is_ok(restored[-1], 100, 'max_requests is set back')
 
+# Not in Mojolicious: the end of the server, which the application learns once the event loop has stopped, and whose
+# cleanup the server waits for, unless it stops immediately
+with subtest('End of the server'):
+
+    def end(stop):
+        events = []
+        with (
+            Pyjo.IOLoop.new() as loop,
+            Pyjo.Server.Daemon.new(ioloop=loop, listen=['http://127.0.0.1'], silent=True) as daemon,
+        ):
+            app = daemon.app = Pyjoyment.new()
+            app.log.level = 'fatal'
+            app.hook('before_server_start', lambda server, app: events.append('started'))
+
+            def after_server_stop(server, app):
+                events.append('running' if loop.is_running else 'stopped')
+                promise = Pyjo.Promise.new()
+                promise.ioloop = loop
+                loop.timer(0.05, lambda loop: (events.append('cleaned up'), promise.resolve()))
+                return promise
+
+            app.hook('after_server_stop', after_server_stop)
+            loop.timer(0.1, stop)
+            daemon.run()
+        return events
+
+    is_deeply_ok(end(lambda loop: loop.stop_gracefully()), ['started', 'stopped', 'cleaned up'], 'graceful stop')
+    is_deeply_ok(end(lambda loop: loop.stop()), ['started', 'stopped', 'cleaned up'], 'stop')
+    if sys.platform == 'win32':
+        skip('no signals of POSIX', 1)
+    else:
+        is_deeply_ok(end(lambda loop: os.kill(os.getpid(), signal.SIGQUIT)), ['started'], 'immediate stop')
+
 done_testing()

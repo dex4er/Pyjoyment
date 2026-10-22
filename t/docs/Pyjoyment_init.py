@@ -96,9 +96,16 @@ with subtest('Hooks'):
     def after_dispatch(c):
         calls.append('after_dispatch')
 
+    @app.hook('after_server_stop')
+    def after_server_stop(server, app):
+        calls.append('after_server_stop')
+
     app.routes.get('/', lambda c: c.render(text='hooks'))
     is_ok(request(app, '/').res.text, 'hooks', 'right content')
     is_ok(calls[0], 'before_server_start', 'server hook first')
+    ok('after_server_stop' not in calls, 'server still running')
+    app.server_stopped(Pyjo.Server.new())
+    is_ok(calls[-1], 'after_server_stop', 'server hook last')
     is_deeply_ok(
         calls[calls.index('after_build_tx') :],
         [
@@ -111,6 +118,7 @@ with subtest('Hooks'):
             'after_render',
             'after_dispatch',
             'around_dispatch (after)',
+            'after_server_stop',
         ],
         'hooks in order',
     )
@@ -466,6 +474,21 @@ with subtest('server'):
     server = Pyjo.Server.new()
     app.server(server)
     is_ok(servers[0], server, 'hook emitted')
+
+with subtest('server_stopped'):
+    import Pyjo.Promise
+
+    app = Pyjoyment.new()
+    is_ok(app.server_stopped(Pyjo.Server.new()), None, 'nothing to wait for')
+    servers = []
+    app.hook('after_server_stop', lambda server, app: servers.append(server))
+    app.hook('after_server_stop', lambda server, app: Pyjo.Promise.resolve('cleaned up'))
+    server = Pyjo.Server.new()
+    promise = app.server_stopped(server)
+    is_ok(servers[0], server, 'hook emitted')
+    results = []
+    promise.then(lambda *values: results.extend(values)).wait()
+    is_deeply_ok(results, [{'status': 'fulfilled', 'value': ['cleaned up']}], 'promises of the callbacks')
 
 with subtest('start'):
     import contextlib

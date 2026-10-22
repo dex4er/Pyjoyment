@@ -79,6 +79,20 @@ the intervals of :attr:`ping_interval` and :attr:`ping_timeout`, so that the
 inactivity timeout of the server does not close a WebSocket without messages,
 and a client that is gone is found.
 
+The lifespan of the application, the connection ``lifespan``, starts with
+the first request in each event loop, as of each process of
+:mod:`Pyjo.Server.Prefork` and each thread of :mod:`Pyjo.Server.Prethread`,
+or with :meth:`startup`, and the requests wait for its
+``lifespan.startup.complete``, after which each gets a copy of its ``state``.
+A ``lifespan.startup.failed`` is logged, and the requests get the response
+``500``. An application that fails or returns before its startup has no
+lifespan, as uvicorn takes it, and one that neither answers nor fails keeps
+the requests waiting. The lifespan shuts down once the server has stopped
+gracefully, with :meth:`server_stopped`, which
+:mod:`Pyjoyment.Plugin.Mount` calls with the hook ``after_server_stop``,
+with :meth:`close`, as at the end of a ``with`` block, and at the end of the
+interpreter, where nothing has shut it down.
+
 Attributes
 ----------
 
@@ -107,7 +121,9 @@ import Pyjo.Transaction
 from Pyjo.Server.ASGI import Application, Message, Scope
 from Pyjo.Util import url_unescape
 
+import atexit
 import traceback
+import weakref
 import wsgiref.util
 
 from typing import Any
@@ -156,7 +172,23 @@ class Pyjo_App_ASGI(Pyjo.App.object):
         uvicorn. ``None`` or ``0`` waits for no answer.
         """
 
+        # The lifespan of the application in each event loop, as each thread has one
+        self._lifespans: weakref.WeakKeyDictionary[Any, _Lifespan] = weakref.WeakKeyDictionary()
+
         super().__init__(attrs, **kwargs)
+
+    def close(self) -> None:
+        """::
+
+            app.close()
+
+        Shut the lifespan of the application down, and wait for it, unless
+        the event loop runs, as the end of a ``with`` block does, and close
+        the connections and the servers of :attr:`ua`.
+        """
+        if (promise := self.shutdown()) is not None and not Pyjo.IOLoop.is_running():
+            promise.wait()
+        super().close()
 
     def handler(self, tx: Any) -> None:
         """::
@@ -177,10 +209,57 @@ class Pyjo_App_ASGI(Pyjo.App.object):
             if not Pyjo.App._within(c):  # pyright: ignore[reportPrivateUsage]
                 return c.helpers.reply.not_found()
             c.render_later()
-        if tx.is_websocket:
-            _WebSocket(self, application, tx, c).start()
-        else:
-            _Call(self, application, tx, c).start()
+        call = _WebSocket(self, application, tx, c) if tx.is_websocket else _Call(self, application, tx, c)
+
+        # The lifespan of the application starts with its first request, which waits for its startup
+        if (lifespan := self._lifespan()).ready:
+            return call.start(lifespan)
+        lifespan.started.then(lambda *args: call.start(lifespan))
+
+    def server_stopped(self, server: Any) -> Pyjo.Promise.object | None:
+        """::
+
+            promise = app.server_stopped(Pyjo.Server.Daemon.new())
+
+        Shut the lifespan of the application down, as :meth:`shutdown` does,
+        once the server has stopped.
+        """
+        return self.shutdown()
+
+    def shutdown(self) -> Pyjo.Promise.object | None:
+        """::
+
+            promise = app.shutdown()
+
+        Shut the lifespan of the application in the event loop of the thread
+        down, with the message ``lifespan.shutdown``, and return a promise
+        that is fulfilled once the application has answered it, or ``None``
+        when the lifespan has not started.
+        """
+        if (lifespan := self._lifespans.pop(Pyjo.IOLoop.object.singleton(), None)) is None:
+            return None
+        return lifespan.shutdown()
+
+    def startup(self) -> Pyjo.Promise.object:
+        """::
+
+            promise = app.startup()
+
+        Start the lifespan of the application in the event loop of the
+        thread, with the message ``lifespan.startup``, unless it has started,
+        and return a promise that is fulfilled once the application has
+        answered it, as the first request does.
+        """
+        return self._lifespan().started
+
+    def _lifespan(self) -> '_Lifespan':
+        loop = Pyjo.IOLoop.object.singleton()
+        if (lifespan := self._lifespans.get(loop)) is None:
+            if (application := self.app) is None:
+                raise Pyjo.Exception.new('No ASGI application')
+            lifespan = self._lifespans[loop] = _Lifespan(self, application)
+            lifespan.start()
+        return lifespan
 
 
 # A call of the application, whose messages are the request and the response of the transaction
@@ -201,10 +280,12 @@ class _Call:
         self.status: int | None = None
         self.written: Pyjo.Promise.object | None = None
 
-    def start(self) -> None:
+    def start(self, lifespan: '_Lifespan') -> None:
         self.tx.on('finish', self._finish)
+        if lifespan.failed is not None:
+            return self._error(Pyjo.Exception.new(f'ASGI application failed to start: {lifespan.failed}'))
         try:
-            coro = self.application(_scope(self.tx, self.c), self._receive, self._send)
+            coro = self.application(lifespan.scope(_scope(self.tx, self.c)), self._receive, self._send)
         except Exception as e:
             return self._error(e)
         Pyjo.Promise.new(coro).then(self._returned, self._error)
@@ -359,13 +440,15 @@ class _WebSocket(_Call):
         self.waiting: Pyjo.Promise.object | None = None
         self.ws = ws
 
-    def start(self) -> None:
+    def start(self, lifespan: '_Lifespan') -> None:
         ws = self.ws
         ws.on('message', self._message)
         ws.on('finish', self._disconnect)
+        if lifespan.failed is not None:
+            return self._error(Pyjo.Exception.new(f'ASGI application failed to start: {lifespan.failed}'))
         ws.heartbeat(self.app.ping_interval, self.app.ping_timeout)
         try:
-            coro = self.application(_scope(self.tx, self.c, ws), self._receive, self._send)
+            coro = self.application(lifespan.scope(_scope(self.tx, self.c, ws)), self._receive, self._send)
         except Exception as e:
             return self._error(e)
         Pyjo.Promise.new(coro).then(self._returned, self._error)
@@ -484,6 +567,113 @@ class _WebSocket(_Call):
         if (waiting := self.waiting) is not None:
             self.waiting = None
             waiting.resolve()
+
+
+# The lifespan of the application in an event loop, whose state the requests get a copy of, or nothing for an
+# application without lifespan, which fails or returns before its startup, as uvicorn takes it
+class _Lifespan:
+    def __init__(self, app: Pyjo_App_ASGI, application: Application) -> None:
+        self.app = app
+        self.application = application
+        self.failed: str | None = None
+        self.loop = Pyjo.IOLoop.object.singleton()
+        self.ready = False
+        self.received = False
+        self.requested = Pyjo.Promise.new()
+        self.started = Pyjo.Promise.new()
+        self.state: dict[str, Any] = {}
+        self.stopped = Pyjo.Promise.new()
+        self.supported = True
+
+    def scope(self, scope: Scope) -> Scope:
+        return {**scope, 'state': dict(self.state)} if self.supported else scope
+
+    def shutdown(self) -> Pyjo.Promise.object:
+        _running.discard(self)
+        if self.ready:
+            self.requested.resolve()
+        else:
+            self.started.then(lambda *args: self.requested.resolve())
+        return self.stopped
+
+    def start(self) -> None:
+        _exit()
+        _running.add(self)
+        scope = {'type': 'lifespan', 'asgi': {'version': '3.0', 'spec_version': '2.0'}, 'state': self.state}
+        try:
+            coro = self.application(scope, self._receive, self._send)
+        except Exception as e:
+            return self._error(e)
+        Pyjo.Promise.new(coro).then(self._returned, self._error)
+
+    def _end(self) -> None:
+        self._ready()
+        _running.discard(self)
+        self.stopped.resolve()
+
+    def _error(self, e: Any) -> None:
+        if not self.ready and self.failed is None:
+            self.supported = False
+            self.app.log.debug(f'ASGI application without lifespan: {e!r}')
+        elif self.ready:
+            self.app.log.error(f'ASGI application failed: {_message(e)}')
+        self._end()
+
+    def _ready(self) -> None:
+        if not self.ready:
+            self.ready = True
+            self.started.resolve()
+
+    async def _receive(self) -> Message:
+        if not self.received:
+            self.received = True
+            return {'type': 'lifespan.startup'}
+        await self.requested
+        return {'type': 'lifespan.shutdown'}
+
+    def _returned(self, *args: Any) -> None:
+        if not self.ready:
+            self.supported = False
+        self._end()
+
+    async def _send(self, message: Message) -> None:
+        type = message['type']
+        if type == 'lifespan.startup.complete':
+            self._ready()
+        elif type == 'lifespan.startup.failed':
+            self.failed = str(message.get('message') or '')
+            self.app.log.error(f'ASGI application failed to start: {self.failed}')
+            self._ready()
+        elif type == 'lifespan.shutdown.complete':
+            self._end()
+        elif type == 'lifespan.shutdown.failed':
+            self.app.log.error(f'ASGI application failed to stop: {message.get("message") or ""}')
+            self._end()
+        else:
+            raise Pyjo.Exception.new(f'Unknown ASGI message "{type}"')
+
+
+# The lifespans that have started, which the end of the interpreter shuts down, where no server has stopped, as at the
+# end of a test, before the reactor of asyncio cancels the tasks that are left, as its handler of the end of the
+# interpreter is registered before
+_running: weakref.WeakSet[_Lifespan] = weakref.WeakSet()
+_registered: list[bool] = []
+
+
+def _exit() -> None:
+    if not _registered:
+        _registered.append(True)
+        atexit.register(_shutdown)
+
+
+def _shutdown() -> None:
+    try:
+        loop = Pyjo.IOLoop.object.singleton()
+        for lifespan in list(_running):
+            if lifespan.loop is loop and not loop.is_running:
+                lifespan.shutdown().wait()
+    except Exception:
+        pass
 
 
 # The connection scope of the request of the transaction, or of the handshake of a WebSocket: the path that a route

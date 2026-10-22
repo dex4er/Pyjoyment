@@ -1123,6 +1123,12 @@ WebSockets are WebSockets of the server of :mod:`Pyjoyment`, as the echo of
 without :mod:`asyncio`, as :mod:`Pyjo.Reactor.Poll`, runs only an application
 that awaits nothing but ``receive`` and ``send``.
 
+The lifespan of an ``ASGI`` application starts with its first request in
+each process, which waits for its startup, and gets a copy of its state, and
+it shuts down once the server has stopped gracefully, as the hook
+``after_server_stop`` of :mod:`Pyjoyment` comes then, so that what the
+application has started, as a pool of connections, outlives the requests.
+
 The servers of :mod:`Pyjoyment` close a connection that has been inactive for
 their inactivity timeout, 30 seconds by default, as a WebSocket without
 messages, so the WebSockets of an ``ASGI`` application are pinged every 20

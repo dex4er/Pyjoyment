@@ -311,12 +311,16 @@ class Pyjo_Server_Prethread(Pyjo.Server.Prefork.object):
             loop.recurring(self.heartbeat_interval, heartbeat)
 
             # The manager stops the worker with a byte, gracefully, or immediately, also when it is gone
+            immediate = False
+
             def command(reactor: Any, writable: bool) -> None:
+                nonlocal immediate
                 try:
                     chunk = control.recv(4096)
                 except OSError:
                     return
                 if not chunk or b'Q' in chunk:
+                    immediate = True
                     loop.stop()
                 else:
                     loop.stop_gracefully()
@@ -325,6 +329,10 @@ class Pyjo_Server_Prethread(Pyjo.Server.Prefork.object):
 
             self.app.log.info(f'Worker {threading.get_native_id()} started')
             loop.start()
+
+            # Not in Mojolicious: the end of the server in the thread of the worker, unless it has stopped immediately
+            if not immediate:
+                worker._server_stopped()
         except BaseException:
             traceback.print_exc()
         finally:

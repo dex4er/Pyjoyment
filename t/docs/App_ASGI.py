@@ -57,6 +57,23 @@ with subtest('new'):
     app = Pyjo.App.ASGI.new(app=application)
     ok(app.app is hello, 'application')
 
+with subtest('close'):
+    events = []
+
+    async def lifespan(scope, receive, send):
+        if scope['type'] == 'lifespan':
+            while (await receive())['type'] == 'lifespan.startup':
+                events.append('started')
+                await send({'type': 'lifespan.startup.complete'})
+            events.append('stopped')
+            return await send({'type': 'lifespan.shutdown.complete'})
+        await hello(scope, receive, send)
+
+    app = Pyjo.App.ASGI.new(app=lifespan)
+    app.startup().wait()
+    app.close()
+    is_deeply_ok(events, ['started', 'stopped'], 'shut down')
+
 with subtest('handler'):
     app = Pyjo.App.ASGI.new(app=hello)
     tx = Pyjo.Transaction.HTTP.new()
@@ -67,6 +84,34 @@ with subtest('handler'):
     codes = []
     resumed.then(codes.append).wait()
     is_deeply_ok(codes, [200], 'handled')
+    app.close()
+
+with subtest('server_stopped'):
+    import Pyjo.Server.Daemon
+
+    events = []
+    app = Pyjo.App.ASGI.new(app=lifespan)
+    app.startup().wait()
+    promise = app.server_stopped(Pyjo.Server.Daemon.new())
+    promise.wait()
+    is_deeply_ok(events, ['started', 'stopped'], 'shut down')
+
+with subtest('shutdown'):
+    events = []
+    app = Pyjo.App.ASGI.new(app=lifespan)
+    is_ok(app.shutdown(), None, 'not started')
+    app.startup().wait()
+    promise = app.shutdown()
+    promise.wait()
+    is_deeply_ok(events, ['started', 'stopped'], 'shut down')
+
+with subtest('startup'):
+    events = []
+    app = Pyjo.App.ASGI.new(app=lifespan)
+    promise = app.startup()
+    promise.wait()
+    is_deeply_ok(events, ['started'], 'started')
+    ok(app.startup() is promise, 'started once')
     app.close()
 
 done_testing()

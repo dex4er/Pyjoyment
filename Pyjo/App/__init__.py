@@ -65,6 +65,7 @@ Mojolicious until Mojolicious 7.
 import Pyjo.Base
 import Pyjo.Home
 import Pyjo.Log
+import Pyjo.Promise
 import Pyjo.Server
 import Pyjo.Transaction.HTTP
 import Pyjo.UserAgent
@@ -281,6 +282,21 @@ class Pyjo_App(Pyjo.Base.object):
         Called by the server before it starts. Meant to be overloaded in a
         subclass.
         """
+
+    # Not in Mojolicious: the end of a server, as server is its start, after which the application cleans up what it has
+    # started, as the lifespan of an ASGI application
+    def server_stopped(self, server: Pyjo.Server.object) -> 'Pyjo.Promise.object | None':
+        """::
+
+            promise = app.server_stopped(Pyjo.Server.new())
+
+        Called by the server once it has stopped gracefully, in each process
+        and thread that has run the application, with the event loop no longer
+        running. A promise that it returns is waited for, so that the
+        application can clean up with the event loop. Meant to be overloaded
+        in a subclass.
+        """
+        return None
 
     def start(self, *args: str) -> Self:
         """::

@@ -473,6 +473,11 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
             while self._running:
                 self._manage()
             self.app.log.info(f'Manager {os.getpid()} stopped')
+
+            # Not in Mojolicious: the end of the server in the manager, which has started it, once the workers have
+            # stopped, unless it has stopped immediately
+            if self._graceful:
+                self._server_stopped()
         finally:
             signal.set_wakeup_fd(wakeup)
 
@@ -731,6 +736,7 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
             # Perl defers the handlers of signals to a safe point, and a socket pair that Python writes to on a signal
             # wakes the event loop up, as Python repeats a system call that a signal interrupts until its timeout
             noted: list[int] = []
+            immediate = False
 
             def note(signum: int, frame: Any) -> None:
                 noted.append(signum)
@@ -749,8 +755,10 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
                     pass
                 # Unlike Mojolicious: TERM stops the worker gracefully, and QUIT immediately, where Mojo has QUIT for a
                 # graceful stop
+                nonlocal immediate
                 while noted:
                     if noted.pop(0) == signal.SIGQUIT:
+                        immediate = True
                         loop.stop()
                     else:
                         loop.stop_gracefully()
@@ -773,6 +781,10 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
 
             self.app.log.info(f'Worker {os.getpid()} started')
             loop.start()
+
+            # Not in Mojolicious: the end of the server in the worker, unless it has stopped immediately
+            if not immediate:
+                self._server_stopped()
 
         # Not in Mojolicious: sys.exit() is the exit of the worker, as exit is in Perl
         except SystemExit as e:

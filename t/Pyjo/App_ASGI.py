@@ -3,6 +3,7 @@ import Pyjo.IOLoop
 import Pyjo.Promise
 import Pyjo.Reactor
 import Pyjo.Server.ASGI
+import Pyjo.Server.Daemon
 import Pyjo.Test.Pyjo
 import Pyjo.Transaction.HTTP
 import Pyjoyment
@@ -565,6 +566,8 @@ with subtest('WebSocket closed before its handshake'):
     events = []
 
     async def waiting(scope, receive, send):
+        if scope['type'] != 'websocket':
+            return
         events.append((await receive())['type'])
         events.append(await receive())
         await send({'type': 'websocket.accept'})
@@ -625,6 +628,114 @@ with subtest('WebSocket pings'):
         t, frames = quiet_for(app, 2)
         is_deeply_ok(frames, [], 'no pings')
         ok(t.tx.is_finished, 'closed by the inactivity timeout')
+
+
+# The lifespan of an application, whose startup and shutdown come later, with the state of the requests
+def lifespan(events, failed=None):
+    async def application(scope, receive, send):
+        if scope['type'] == 'lifespan':
+            while True:
+                message = await receive()
+                events.append(message['type'])
+                await Pyjo.Promise.timer(0.05)
+                if message['type'] == 'lifespan.startup':
+                    if failed is not None:
+                        return await send({'type': 'lifespan.startup.failed', 'message': failed})
+                    scope['state']['pool'] = 'connected'
+                    await send({'type': 'lifespan.startup.complete'})
+                else:
+                    await send({'type': 'lifespan.shutdown.complete'})
+                    return
+        await receive()
+        state = scope['state']
+        body = f'{state.get("pool")} {state.get("changed")}'.encode()
+        state['changed'] = True
+        events.append('request')
+        await send({'type': 'http.response.start', 'status': 200, 'headers': [(b'content-type', b'text/plain')]})
+        await send({'type': 'http.response.body', 'body': body})
+
+    return application
+
+
+with subtest('Lifespan'):
+    events = []
+    app = Pyjo.App.ASGI.new(app=lifespan(events))
+    t = Pyjo.Test.Pyjo.new(app)
+    is_deeply_ok(events, [], 'not started')
+    t.get_ok('/').status_is(200).content_is('connected None')
+    t.get_ok('/').status_is(200).content_is('connected None')
+    is_deeply_ok(events, ['lifespan.startup', 'request', 'request'], 'started by the first request, once')
+
+    # Shut down
+    app.close()
+    is_deeply_ok(events, ['lifespan.startup', 'request', 'request', 'lifespan.shutdown'], 'shut down')
+    ok(app.shutdown() is None, 'not started again')
+
+    # Started again, as of the next request, and by the end of the server
+    t = Pyjo.Test.Pyjo.new(app)
+    t.get_ok('/').status_is(200).content_is('connected None')
+    promise = app.server_stopped(Pyjo.Server.Daemon.new())
+    promise.wait()
+    is_deeply_ok(events[-3:], ['lifespan.startup', 'request', 'lifespan.shutdown'], 'shut down by the server')
+    is_ok(app.server_stopped(Pyjo.Server.Daemon.new()), None, 'nothing to shut down')
+    app.close()
+
+with subtest('Lifespan started before the requests'):
+    events = []
+    with Pyjo.App.ASGI.new(app=lifespan(events)) as app:
+        t = Pyjo.Test.Pyjo.new(app)
+        app.startup().wait()
+        is_deeply_ok(events, ['lifespan.startup'], 'started')
+        t.get_ok('/').status_is(200).content_is('connected None')
+        is_deeply_ok(events, ['lifespan.startup', 'request'], 'request after the startup')
+    is_deeply_ok(events, ['lifespan.startup', 'request', 'lifespan.shutdown'], 'shut down by the end of the block')
+
+    # Requests that wait for the startup together
+    events = []
+    with Pyjo.App.ASGI.new(app=lifespan(events)) as app:
+        t = Pyjo.Test.Pyjo.new(app)
+        codes = []
+        for _ in range(3):
+            t.ua.get('/', lambda ua, tx: codes.append(tx.res.code))
+        while len(codes) < 3:
+            Pyjo.IOLoop.one_tick()
+        is_deeply_ok(codes, [200, 200, 200], 'all served')
+        is_deeply_ok(events, ['lifespan.startup', 'request', 'request', 'request'], 'one startup')
+
+with subtest('Lifespan failed'):
+    events = []
+    with Pyjo.App.ASGI.new(app=lifespan(events, failed='No database')) as app:
+        app.log.level = 'fatal'
+        t = Pyjo.Test.Pyjo.new(app)
+        with app.log.capture('error') as messages:
+            t.get_ok('/').status_is(500).content_is('Internal Server Error')
+            t.get_ok('/').status_is(500)
+        like_ok(str(messages), r'failed to start: No database', 'right error')
+        is_deeply_ok(events, ['lifespan.startup'], 'no request')
+
+    # In a route
+    with Pyjo.App.ASGI.new(app=lifespan([], failed='No database')) as asgi:
+        t = Pyjo.Test.Pyjo.new(application(asgi))
+        t.get_ok('/prefix').status_is(500).content_like(r'No database')
+
+with subtest('Application without lifespan'):
+
+    async def unsupported(scope, receive, send):
+        assert scope['type'] == 'http'
+        await send({'type': 'http.response.start', 'status': 200, 'headers': []})
+        await send({'type': 'http.response.body', 'body': str('state' in scope).encode()})
+
+    async def returned(scope, receive, send):
+        if scope['type'] != 'http':
+            return
+        await unsupported(scope, receive, send)
+
+    for application_ in (unsupported, returned):
+        with Pyjo.App.ASGI.new(app=application_) as app:
+            app.log.level = 'fatal'
+            t = Pyjo.Test.Pyjo.new(app)
+            t.get_ok('/').status_is(200).content_is('False')
+            ok(app.shutdown() is not None, f'lifespan of {application_.__name__}')
 
 with subtest('Pyjoyment on ASGI'):
     # An application of Pyjoyment as the ASGI application, whose response and content come in later ticks of the event

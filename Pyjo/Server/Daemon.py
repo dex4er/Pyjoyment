@@ -496,15 +496,16 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
         # Make sure the event loop can be stopped in regular intervals
         loop = self.ioloop
         interval = loop.recurring(1, lambda loop: None)
-        graceful = False
+        graceful = immediate = False
 
         # Unlike Mojolicious: INT and TERM stop the event loop gracefully, as Docker and Kubernetes stop the server with
         # TERM, and QUIT immediately, where Mojo stops it immediately on INT and TERM; a second INT, as of Ctrl-C pressed
         # twice, stops it immediately, and the graceful stop is left to the next tick, as a handler of Python runs in the
         # middle of what the event loop does
         def stop(signum: int, frame: Any) -> None:
-            nonlocal graceful
+            nonlocal graceful, immediate
             if signum == _QUIT or (signum == signal.SIGINT and graceful):
+                immediate = True
                 loop.stop()
             elif not graceful:
                 graceful = True
@@ -530,12 +531,35 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
                 handlers[signal.SIGHUP] = signal.signal(signal.SIGHUP, signal.SIG_IGN)
         try:
             self.start().ioloop.start()
+
+            # Not in Mojolicious: the end of the server, unless it has stopped immediately, whose cleanup a signal that
+            # stops it immediately interrupts
+            if not immediate:
+                self._server_stopped()
         finally:
             for name, handler in handlers.items():
                 signal.signal(name, handler)
             loop.remove(interval)
             loop.unsubscribe('finish', finished)
             self.max_requests = max_requests
+
+    # Not in Mojolicious: the cleanup of the application runs the event loop of its promise, which a signal that stops
+    # the server immediately stops, as it is the one of the server
+    def _server_stopped(self) -> None:
+        import Pyjo.Promise
+
+        if not isinstance(promise := self.app.server_stopped(self), Pyjo.Promise.object):
+            return
+        loop = promise.ioloop
+        done: list[bool] = []
+
+        def finish(*args: Any) -> None:
+            done.append(True)
+            loop.stop()
+
+        promise.then(finish, finish)
+        if not done:
+            loop.start()
 
     def start(self) -> Self:
         """::

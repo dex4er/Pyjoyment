@@ -71,6 +71,14 @@ response other than ``101`` rejects it, the ASGI server negotiates
 send, is answered with a ``Pong`` frame, as the ASGI server pings the client
 itself.
 
+The lifespan of the ASGI server is the one of the server of the application:
+its startup calls :meth:`Pyjo.App.Pyjo_App.server`, which emits the hook
+``before_server_start`` of :mod:`Pyjoyment`, and its shutdown calls
+:meth:`Pyjo.App.Pyjo_App.server_stopped`, which emits the hook
+``after_server_stop``, and waits for the promise that it returns, as of the
+lifespan of a mounted ASGI application. An exception of either fails the
+lifespan of the ASGI server with its message.
+
 This needs a reactor that runs in the event loop of the ASGI server and
 gives awaitables for it. :mod:`Pyjo.Reactor.Asyncio`, the default, does so in
 an ASGI server on :mod:`asyncio`, whose loop may be another implementation of
@@ -85,16 +93,18 @@ reactor for it, which may come from another distribution, as
 ASGI servers
 ------------
 
-* uvicorn, on :mod:`asyncio` or uvloop: HTTP and WebSocket.
-* Hypercorn, on :mod:`asyncio` or uvloop: HTTP and WebSocket; on Trio only
-  with a reactor for Trio, which Pyjoyment does not have.
+* uvicorn, on :mod:`asyncio` or uvloop: HTTP, WebSocket and lifespan.
+* Hypercorn, on :mod:`asyncio` or uvloop: HTTP, WebSocket and lifespan; on
+  Trio only with a reactor for Trio, which Pyjoyment does not have.
 * Daphne: HTTP and WebSocket. It adds no ``Date`` header, so a response has
   one only when the application sets it, and it sends no reason with a
-  WebSocket close code.
-* Granian: HTTP only. A ``websocket.close`` that the application sends is not
-  delivered while a ``receive`` is waiting, and an application of WebSocket
-  always waits for the next message, so a WebSocket that the application
-  closes stays open until the client closes it.
+  WebSocket close code. It has no lifespan, so the start and the end of the
+  server are not emitted, and the lifespan of a mounted ASGI application does
+  not shut down.
+* Granian: HTTP, WebSocket and lifespan. A ``websocket.close`` that the
+  application sends is not delivered while a ``receive`` is waiting, and an
+  application of WebSocket always waits for the next message, so a WebSocket
+  that the application closes stays open until the client closes it.
 
 Events
 ------
@@ -260,12 +270,24 @@ class Pyjo_Server_ASGI(Pyjo.Server.object):
         await send({'type': 'http.response.body', 'body': b'', 'more_body': False})
         tx.closed()
 
+    # The start and the end of the server, which the application learns, and whose cleanup the ASGI server waits for
     async def _lifespan(self, receive: Receive, send: Send) -> None:
         while True:
             message = await receive()
             if message['type'] == 'lifespan.startup':
+                try:
+                    self.app.server(self)
+                except Exception as e:
+                    await send({'type': 'lifespan.startup.failed', 'message': str(e)})
+                    return
                 await send({'type': 'lifespan.startup.complete'})
             elif message['type'] == 'lifespan.shutdown':
+                try:
+                    if isinstance(promise := self.app.server_stopped(self), Pyjo.Promise.object):
+                        await promise
+                except Exception as e:
+                    await send({'type': 'lifespan.shutdown.failed', 'message': str(e)})
+                    return
                 await send({'type': 'lifespan.shutdown.complete'})
                 return
 

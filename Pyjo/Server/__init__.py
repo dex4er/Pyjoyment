@@ -105,6 +105,8 @@ class Application(Protocol):
 
     def server(self, server: 'Pyjo_Server') -> Anything: ...
 
+    def server_stopped(self, server: 'Pyjo_Server') -> Anything: ...
+
 
 # Not in Mojolicious: a namespace that other distributions can add servers to
 __path__ = extend_path(__path__, __name__)
@@ -339,6 +341,14 @@ class Pyjo_Server(Pyjo.EventEmitter.object):
         Run server. Meant to be overloaded in a subclass.
         """
         raise NotImplementedError('Method "run" not implemented by subclass')
+
+    # Not in Mojolicious: the end of the server, which the application learns as it learns its start, and whose cleanup
+    # the server waits for, with the event loop
+    def _server_stopped(self) -> None:
+        import Pyjo.Promise
+
+        if isinstance(promise := self.app.server_stopped(self), Pyjo.Promise.object):
+            promise.wait()
 
 
 # Not in Mojolicious: the script as a module of its own with a loader, where runpy.run_path gives it none, so that

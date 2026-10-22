@@ -133,6 +133,10 @@ with subtest('handler'):
 with subtest('server'):
     is_ok(MyApp.new().server(Pyjo.Server.new()), None, 'nothing by default')
 
+with subtest('server_stopped'):
+    promise = MyApp.new().server_stopped(Pyjo.Server.new())
+    is_ok(promise, None, 'nothing by default')
+
 with subtest('start'):
     app = MyApp.new()
     app = app.start()
