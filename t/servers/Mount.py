@@ -36,12 +36,12 @@ Server = importlib.import_module('ServerProcess').Server
 
 # The examples of an application of Pyjoyment on WSGI and on ASGI, mounted in an application of Pyjoyment.Lite, on the
 # WSGI and the ASGI servers
-EXAMPLE = os.path.join(os.path.dirname(__file__), '..', '..', 'examples', 'pyjoyment', 'mount_wsgi_inception.py')
-EXAMPLE_ASGI = os.path.join(os.path.dirname(__file__), '..', '..', 'examples', 'pyjoyment', 'mount_asgi_inception.py')
+EXAMPLE = os.path.join(os.path.dirname(__file__), '..', '..', 'examples', 'mount', 'mount_wsgi_inception.py')
+EXAMPLE_ASGI = os.path.join(os.path.dirname(__file__), '..', '..', 'examples', 'mount', 'mount_asgi_inception.py')
 
 # The script of PHP of the example of php-fpm, which a FastCGI application runs, and php-fpm, as it is on PATH, as
 # Debian names it with its version, or as Homebrew installs it
-PHP = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'examples', 'pyjoyment', 'php', 'index.php'))
+PHP = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'examples', 'mount', 'php', 'index.php'))
 PHP_FPM = shutil.which('php-fpm') or next(
     (
         path
@@ -52,7 +52,7 @@ PHP_FPM = shutil.which('php-fpm') or next(
 )
 
 # The example of php-cgi, which runs php-cgi of PATH
-EXAMPLE_PHP_CGI = os.path.join(os.path.dirname(__file__), '..', '..', 'examples', 'pyjoyment', 'mount_cgi_php.py')
+EXAMPLE_PHP_CGI = os.path.join(os.path.dirname(__file__), '..', '..', 'examples', 'mount', 'mount_cgi_php.py')
 PHP_CGI = shutil.which('php-cgi')
 PYTHON = sys.executable
 UWSGI = shutil.which('uwsgi', path=os.path.dirname(sys.executable))

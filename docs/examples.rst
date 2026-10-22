@@ -25,65 +25,65 @@ Applications of other frameworks
 A WSGI application, in a file of its own, under a path of an application of
 ``Pyjoyment.Lite``:
 
-    .. include:: ../examples/pyjoyment/mount_wsgi.py
+    .. include:: ../examples/mount/mount_wsgi.py
        :code: python
 
 The WSGI application, which also runs on its own, on the WSGI server of the
 standard library:
 
-    .. include:: ../examples/pyjoyment/hello_wsgi.py
+    .. include:: ../examples/mount/hello_wsgi.py
        :code: python
 
 An application of Pyjoyment as the WSGI application, in the same file:
 
-    .. include:: ../examples/pyjoyment/mount_wsgi_inception.py
+    .. include:: ../examples/mount/mount_wsgi_inception.py
        :code: python
 
 An ASGI application, in a file of its own, under a path of an application of
 ``Pyjoyment.Lite``, whose events stream at the pace of the client:
 
-    .. include:: ../examples/pyjoyment/mount_asgi.py
+    .. include:: ../examples/mount/mount_asgi.py
        :code: python
 
 The ASGI application, which also runs on its own, on an ASGI server:
 
-    .. include:: ../examples/pyjoyment/hello_asgi.py
+    .. include:: ../examples/mount/hello_asgi.py
        :code: python
 
 An application of Pyjoyment as the ASGI application, in the same file:
 
-    .. include:: ../examples/pyjoyment/mount_asgi_inception.py
+    .. include:: ../examples/mount/mount_asgi_inception.py
        :code: python
 
 PHP on php-fpm, a FastCGI application, under a path of an application of
 ``Pyjoyment.Lite``, with the scripts of its directory and the pool of
 php-fpm:
 
-    .. include:: ../examples/pyjoyment/mount_fastcgi_php.py
+    .. include:: ../examples/mount/mount_fastcgi_php.py
        :code: python
 
-    .. include:: ../examples/pyjoyment/php/index.php
+    .. include:: ../examples/mount/php/index.php
        :code: php
 
-    .. include:: ../examples/pyjoyment/php/phpinfo.php
+    .. include:: ../examples/mount/php/phpinfo.php
        :code: php
 
-    .. include:: ../examples/pyjoyment/php/php-fpm.conf
+    .. include:: ../examples/mount/php/php-fpm.conf
        :code: ini
 
 A CGI program of Python in the directory ``cgi-bin``, under a path of an
 application of ``Pyjoyment.Lite``, a process for each request:
 
-    .. include:: ../examples/pyjoyment/mount_cgi.py
+    .. include:: ../examples/mount/mount_cgi.py
        :code: python
 
-    .. include:: ../examples/pyjoyment/cgi-bin/hello.py
+    .. include:: ../examples/mount/cgi-bin/hello.py
        :code: python
 
 PHP on php-cgi, with the scripts of the same directory as for php-fpm, a
 process of php-cgi for each request:
 
-    .. include:: ../examples/pyjoyment/mount_cgi_php.py
+    .. include:: ../examples/mount/mount_cgi_php.py
        :code: python
 
 

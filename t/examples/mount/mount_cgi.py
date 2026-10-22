@@ -9,8 +9,8 @@ import os
 if os.name == 'nt':
     plan(skip_all='CGI applications need pipes that the event loop watches, which Windows does not have')
 
-# The application of examples/mount_cgi.py, which the test loads without starting a server
-examples = curfile().dirname().dirname().dirname().sibling('examples', 'pyjoyment')
+# The application of examples/mount/mount_cgi.py, which the test loads without starting a server
+examples = curfile().dirname().dirname().dirname().sibling('examples', 'mount')
 t = Pyjo.Test.Pyjo.new(examples.child('mount_cgi.py'))
 
 with subtest('Pyjoyment'):

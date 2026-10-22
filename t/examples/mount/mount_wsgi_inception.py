@@ -4,10 +4,8 @@ from Pyjo.File import curfile
 from Pyjo.Test import *
 
 
-# The application of examples/mount_wsgi_inception.py, which the test loads without starting a server
-t = Pyjo.Test.Pyjo.new(
-    curfile().dirname().dirname().dirname().sibling('examples', 'pyjoyment', 'mount_wsgi_inception.py')
-)
+# The application of examples/mount/mount_wsgi_inception.py, which the test loads without starting a server
+t = Pyjo.Test.Pyjo.new(curfile().dirname().dirname().dirname().sibling('examples', 'mount', 'mount_wsgi_inception.py'))
 
 with subtest('Pyjoyment.Lite'):
     t.get_ok('/').status_is(200).content_is('I ♥ Pyjoyment!')
