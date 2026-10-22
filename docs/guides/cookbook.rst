@@ -42,7 +42,8 @@ non-blocking. You have to use specialized non-blocking code available through
 modules like :mod:`Pyjo.IOLoop` and :mod:`Pyjo.UserAgent`, or the coroutines
 of :mod:`asyncio`. You can wrap your blocking code in
 :meth:`subprocesses <Pyjo.IOLoop.Pyjo_IOLoop.subprocess>` though to prevent
-it from interfering with your non-blocking code.
+it from interfering with your non-blocking code, and run programs in
+:meth:`child processes <Pyjo.IOLoop.Pyjo_IOLoop.spawn>`.
 
 Event loops
 ~~~~~~~~~~~
@@ -1064,6 +1065,44 @@ The callback passed to :meth:`Pyjo.IOLoop.Subprocess.Pyjo_IOLoop_Subprocess.run_
 will be executed in a child process, without blocking the event loop of the
 parent process. The results of the callback will then be shared between both
 processes, and the promise fulfilled or rejected in the parent process.
+
+Child processes
+~~~~~~~~~~~~~~~
+
+A program, as a command line tool, runs in a child process too, with
+:meth:`Pyjo.IOLoop.Pyjo_IOLoop.spawn`, which gives a
+:mod:`Pyjo.IOLoop.ChildProcess` object, as ``child_process`` of Node.js does.
+Its standard input, output and error are streams of the event loop, so that
+the program gets the body of the request and the client gets its output as it
+comes, without blocking the event loop.
+
+.. literalinclude:: cookbook/sort.py
+    :language: python
+    :caption: myapp.py
+
+.. code-block:: sh
+
+    $ curl --data-binary $'b\na\n' http://localhost:3000/sort
+    a
+    b
+
+The event ``spawn`` comes once the program runs, ``close`` once it has
+exited and its output has ended, with its exit code, and ``error`` if it
+cannot run. ``stop`` and ``start`` of the stream of its output pause and
+resume reading it, as for a slow client, and
+:meth:`~Pyjo.IOLoop.ChildProcess.Pyjo_IOLoop_ChildProcess.kill` ends it early,
+with the programs that it starts when it runs ``detached``, in a process group
+of its own.
+
+:meth:`~Pyjo.IOLoop.ChildProcess.Pyjo_IOLoop_ChildProcess.run_p` gives its exit
+code, its output and its error at once, as a promise, which a coroutine awaits.
+
+.. code-block:: python
+
+    @get('/system')
+    async def system(c):
+        code, out, err = await Pyjo.IOLoop.ChildProcess.new().run_p(['uname', '-s'])
+        c.render(text=out.strip().decode())
 
 Exceptions in non-blocking operations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

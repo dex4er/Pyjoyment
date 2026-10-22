@@ -21,8 +21,8 @@ web framework:
 * Python-ish templates and template strings, with automatic escaping.
 * Containers for URLs, paths, query strings, headers, cookies and HTTP
   messages.
-* Event emitter, event loop with TCP, UDP and UNIX domain sockets, logger
-  and utility functions.
+* Event emitter, event loop with TCP, UDP and UNIX domain sockets and child
+  processes, logger and utility functions.
 * Test scripts which print the `Test Anything Protocol <https://testanything.org/>`_
   (TAP), with ``Pyjo.Test``, inspired by Perl's ``Test::More``, and a test
   harness, ``Pyjo.Prove``, inspired by Perl's ``prove``.
@@ -35,9 +35,10 @@ YAML and TOML files.
 It mounts the applications of other frameworks under a path or a host, next
 to its own routes: WSGI applications, as those of Flask, and ASGI
 applications, as those of Starlette, in the same process and on the same
-server, whose responses stream at the pace of the client, and FastCGI
-applications, as PHP on php-fpm, which it connects to, as a web server does,
-with one script for every path or the scripts of a directory.
+server, whose responses stream at the pace of the client, FastCGI
+applications, as PHP on php-fpm, which it connects to, and CGI programs, which
+it runs, as a web server does, with one script for every path or the scripts
+of a directory.
 
 Both are cloud native: ``generate dockerfile`` writes the image of an
 application, whose server stops gracefully on the ``TERM`` of its container

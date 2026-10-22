@@ -201,6 +201,7 @@ This is the class hierarchy of the :mod:`Pyjoyment` distribution.
   - :mod:`Pyjo.App`
 
     - :mod:`Pyjo.App.ASGI`
+    - :mod:`Pyjo.App.CGI`
     - :mod:`Pyjo.App.FastCGI`
     - :mod:`Pyjo.App.WSGI`
     - :mod:`Pyjo.HelloWorld`
@@ -232,6 +233,7 @@ This is the class hierarchy of the :mod:`Pyjoyment` distribution.
       - :mod:`Pyjo.Content.Single`
 
     - :mod:`Pyjo.IOLoop`
+    - :mod:`Pyjo.IOLoop.ChildProcess`
     - :mod:`Pyjo.IOLoop.Client`
     - :mod:`Pyjo.IOLoop.Datagram`
     - :mod:`Pyjo.IOLoop.Server`

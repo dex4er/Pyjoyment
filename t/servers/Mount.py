@@ -1,4 +1,5 @@
 import Pyjo.App.FastCGI
+import Pyjo.File
 import Pyjo.Reactor
 import Pyjo.Test.Pyjo
 import Pyjoyment
@@ -35,12 +36,12 @@ Server = importlib.import_module('ServerProcess').Server
 
 # The examples of an application of Pyjoyment on WSGI and on ASGI, mounted in an application of Pyjoyment.Lite, on the
 # WSGI and the ASGI servers
-EXAMPLE = os.path.join(os.path.dirname(__file__), '..', '..', 'examples', 'pyjoyment', 'mount_wsgi_inception.py')
-EXAMPLE_ASGI = os.path.join(os.path.dirname(__file__), '..', '..', 'examples', 'pyjoyment', 'mount_asgi_inception.py')
+EXAMPLE = os.path.join(os.path.dirname(__file__), '..', '..', 'examples', 'mount', 'mount_wsgi_inception.py')
+EXAMPLE_ASGI = os.path.join(os.path.dirname(__file__), '..', '..', 'examples', 'mount', 'mount_asgi_inception.py')
 
 # The script of PHP of the example of php-fpm, which a FastCGI application runs, and php-fpm, as it is on PATH, as
 # Debian names it with its version, or as Homebrew installs it
-PHP = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'examples', 'pyjoyment', 'php', 'index.php'))
+PHP = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'examples', 'mount', 'php', 'index.php'))
 PHP_FPM = shutil.which('php-fpm') or next(
     (
         path
@@ -49,6 +50,10 @@ PHP_FPM = shutil.which('php-fpm') or next(
     ),
     None,
 )
+
+# The example of php-cgi, which runs php-cgi of PATH
+EXAMPLE_PHP_CGI = os.path.join(os.path.dirname(__file__), '..', '..', 'examples', 'mount', 'mount_cgi_php.py')
+PHP_CGI = shutil.which('php-cgi')
 PYTHON = sys.executable
 UWSGI = shutil.which('uwsgi', path=os.path.dirname(sys.executable))
 GUNICORN = [PYTHON, '-m', 'gunicorn', 'served:application', '--bind', '127.0.0.1:{port}']
@@ -264,6 +269,26 @@ with subtest('PHP on php-fpm'):
                 finally:
                     fpm.terminate()
                     fpm.wait(10)
+
+with subtest('PHP on php-cgi'):
+    if PHP_CGI is None or sys.platform == 'win32':
+        skip('needs php-cgi', 1)
+    else:
+        # The scripts of the directory of the example, a process of php-cgi for each request
+        t = Pyjo.Test.Pyjo.new(Pyjo.File.path(EXAMPLE_PHP_CGI).to_abs())
+        t.get_ok('/').status_is(200).content_is('I ♥ Pyjoyment!')
+        # Not X-Powered-By, which the php.ini of setup-php leaves out, as php-cgi reads it
+        t.get_ok('/php/').status_is(200).content_type_like(r'^text/plain')
+        t.content_is('Hello PHP at /php/index.php for  (GET /php/)!\n')
+        t.get_ok('/php/index.php/foo/bar?x=1').status_is(200)
+        t.content_is('Hello PHP at /php/index.php for /foo/bar (GET /php/index.php/foo/bar?x=1)!\n')
+        t.post_ok('/php/index.php/form', form={'a': '1'}).status_is(200)
+        t.content_is('Hello PHP at /php/index.php for /form (POST /php/index.php/form)!\n')
+        t.get_ok('/php/index.php/events').status_is(200).content_type_like(r'^text/event-stream')
+        t.content_is('data: 0\n\ndata: 1\n\ndata: 2\n\n')
+        t.get_ok('/php/phpinfo.php').status_is(200).content_like(r'<title>PHP [\d.]+ - phpinfo\(\)</title>')
+        t.get_ok('/php/missing.php').status_is(404)
+        t.get_ok('/php/php-fpm.conf').status_is(404)
 
 with tempfile.TemporaryDirectory() as dir:
     shutil.copy(EXAMPLE, os.path.join(dir, 'inception.py'))

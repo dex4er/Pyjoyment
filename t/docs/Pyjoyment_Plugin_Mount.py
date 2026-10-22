@@ -1,3 +1,4 @@
+import Pyjo.App.CGI
 import Pyjo.App.FastCGI
 import Pyjo.File
 import Pyjo.Server.Daemon
@@ -135,6 +136,12 @@ with subtest('Synopsis'):
     route = app.plugin('Mount', {'/blog': 'fcgi://127.0.0.1:9000?document_root=%2Fvar%2Fwww&script=index.php'})
     like_ok(route.pattern.defaults['app'].url, r'\?document_root=%2Fvar%2Fwww&script=index\.php$', 'with its query')
     daemon.close()
+
+    # CGI application, as an object, as a string is the path of a script
+    app = application()
+    route = app.plugin('Mount', {'/cgi-bin': Pyjo.App.CGI.new(document_root='/usr/lib/cgi-bin')})
+    ok(isinstance(route.pattern.defaults['app'], Pyjo.App.CGI.object), 'CGI application')
+    is_ok(route.pattern.defaults['app'].document_root, '/usr/lib/cgi-bin', 'directory of the programs')
 
     # A regular expression of the whole path, whose group path is the rest of
     # the path for the application, and whose other named groups are captures

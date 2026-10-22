@@ -16,6 +16,7 @@ EXAMPLES = curfile().dirname().dirname().sibling('docs', 'guides', 'routing')
 PLUGINS = [EXAMPLES.child(name).to_str() for name in ('werewolf', 'app_plugin')]
 sys.path[0:0] = PLUGINS
 
+import Pyjo.App.CGI  # noqa: E402
 import Pyjo.App.FastCGI  # noqa: E402
 import Pyjo.IOLoop  # noqa: E402
 import Pyjo.Test.Pyjo  # noqa: E402
@@ -736,6 +737,23 @@ with subtest('Mount applications of other frameworks'):
         like_ok(str(mounts['/app'].url), r'\?script=/srv/app/public/index\.php$', 'one script')
         like_ok(str(mounts['/php'].url), r'^fcgi\+unix://.*\?document_root=/var/www/php$', 'directory')
         like_ok(str(mounts['/blog'].url), r'document_root=/var/www/wordpress&script=index\.php&static=1$', 'WordPress')
+
+        # CGI
+        app = Pyjoyment.new()
+
+        # The programs of cgi-bin
+        app.plugin('Mount', {'/cgi-bin': Pyjo.App.CGI.new(document_root='/usr/lib/cgi-bin')})
+
+        # PHP on php-cgi, with its files
+        php = Pyjo.App.CGI.new(
+            command=['php-cgi'], document_root='/var/www/php', script_extensions=['.php'], static=True
+        )
+        app.plugin('Mount', {'/php': php})
+
+        mounts = {str(route.pattern.unparsed): route.pattern.defaults['app'] for route in app.routes.children}
+        ok(all(isinstance(cgi, Pyjo.App.CGI.object) for cgi in mounts.values()), 'CGI applications')
+        is_ok(mounts['/cgi-bin'].document_root, '/usr/lib/cgi-bin', 'directory of the programs')
+        is_deeply_ok(mounts['/php'].command, ['php-cgi'], 'command of the scripts')
 
 with subtest('Embed applications'):
     with application('embed_lite'):

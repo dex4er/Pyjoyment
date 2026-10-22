@@ -280,6 +280,30 @@ with subtest('Directory of the scripts'):
         t.get_ok('/php/foo').status_is(200)
         is_ok(params(requests[-1])['SCRIPT_FILENAME'], '/srv/www/index.php', 'script of the attribute')
 
+    # Other extensions of the scripts, the first one of the index of a directory
+    with Pyjo.App.FastCGI.new(url=url, document_root='/var/www', script_extensions=['.phtml', '.php']) as fcgi:
+        t = Pyjo.Test.Pyjo.new(application(fcgi, '/php'))
+        for path, script, info in (
+            ('/php/', '/var/www/index.phtml', ''),
+            ('/php/page.phtml/x', '/var/www/page.phtml', '/x'),
+            ('/php/info.php', '/var/www/info.php', ''),
+        ):
+            t.get_ok(path).status_is(200)
+            env = params(requests[-1])
+            is_ok(env['SCRIPT_FILENAME'], script, f'right script file of {path}')
+            is_ok(env['PATH_INFO'], info, f'right path of {path}')
+    with Pyjo.App.FastCGI.new(
+        url=f'{url}?document_root=%2Fvar%2Fwww&script_extensions=.cgi&script_extensions=.fcgi'
+    ) as fcgi:
+        t = Pyjo.Test.Pyjo.new(application(fcgi, '/php'))
+        t.get_ok('/php/app.fcgi/x').status_is(200)
+        is_ok(params(requests[-1])['SCRIPT_FILENAME'], '/var/www/app.fcgi', 'extensions of the query')
+        t.get_ok('/php/').status_is(200)
+        is_ok(params(requests[-1])['SCRIPT_FILENAME'], '/var/www/index.cgi', 'index of the query')
+        fcgi.script_extensions = ['.php']
+        t.get_ok('/php/').status_is(200)
+        is_ok(params(requests[-1])['SCRIPT_FILENAME'], '/var/www/index.php', 'extensions of the attribute')
+
     # The script of the parameters of the application takes its place
     with Pyjo.App.FastCGI.new(url=url, document_root='/var/www', env={'SCRIPT_FILENAME': '/srv/app.php'}) as fcgi:
         t = Pyjo.Test.Pyjo.new(application(fcgi, '/php'))
@@ -362,19 +386,48 @@ with subtest('X-Sendfile'):
         t.get_ok('/dl/file').status_is(200).content_is('0123456789')
     Pyjo.IOLoop.remove(id)
 
-    # A file of the document root with static, and not one of another directory
-    url, requests, id = sendfile(root.child('style.css').to_str())
-    with Pyjo.App.FastCGI.new(url=url, document_root=root.to_str(), static=True) as fcgi:
-        t = Pyjo.Test.Pyjo.new(application(fcgi, '/dl'))
-        t.get_ok('/dl/file.php').status_is(200).content_is('body { color: red }')
-    Pyjo.IOLoop.remove(id)
+    # Several directories, of the attribute and of the query
+    for path in (root.child('style.css').to_str(), private.child('file.bin').to_str()):
+        url, requests, id = sendfile(path)
+        with Pyjo.App.FastCGI.new(url=url, sendfile=[root.to_str(), private.to_str()]) as fcgi:
+            t = Pyjo.Test.Pyjo.new(application(fcgi, '/dl'))
+            t.get_ok('/dl/file').status_is(200).content_like(r'^(body|0123)')
+        with Pyjo.App.FastCGI.new(url=f'{url}?sendfile={root.to_str()}&sendfile={private.to_str()}') as fcgi:
+            t = Pyjo.Test.Pyjo.new(application(fcgi, '/dl'))
+            t.get_ok('/dl/file').status_is(200).content_like(r'^(body|0123)')
+        Pyjo.IOLoop.remove(id)
+
+    # A regular expression of the whole path of the file, once its symbolic links are resolved
+    real = re.escape(os.path.realpath(private.to_str()) + os.sep)
     url, requests, id = sendfile(private.child('file.bin').to_str())
-    with Pyjo.App.FastCGI.new(url=url, document_root=root.to_str(), static=True) as fcgi:
+    with Pyjo.App.FastCGI.new(url=url, sendfile=re.compile(real + r'[^/\\]+\.bin')) as fcgi:
+        t = Pyjo.Test.Pyjo.new(application(fcgi, '/dl'))
+        t.get_ok('/dl/file').status_is(200).content_is('0123456789')
+    with Pyjo.App.FastCGI.new(url=url, sendfile=[root.to_str(), re.compile(real + r'[^/\\]+\.txt')]) as fcgi:
         fcgi.log.level = 'fatal'
         t = Pyjo.Test.Pyjo.new(application(fcgi, '/dl'))
         with fcgi.log.capture('error') as messages:
-            t.get_ok('/dl/file.php').status_is(404)
-        like_ok(str(messages), r'FastCGI application sent the file ".*file\.bin", which is not in', 'right error')
+            t.get_ok('/dl/file').status_is(404)
+        like_ok(
+            str(messages),
+            r'FastCGI application sent the file ".*file\.bin", which sendfile does not allow',
+            'right error',
+        )
+    Pyjo.IOLoop.remove(id)
+    url, requests, id = sendfile('file.bin')
+    with Pyjo.App.FastCGI.new(url=url, sendfile=re.compile(r'.*')) as fcgi:
+        fcgi.log.level = 'fatal'
+        t = Pyjo.Test.Pyjo.new(application(fcgi, '/dl'))
+        t.get_ok('/dl/file').status_is(404)
+    Pyjo.IOLoop.remove(id)
+
+    # Not the files of the document root with static, as the directories of sendfile are the only ones
+    url, requests, id = sendfile(root.child('style.css').to_str())
+    with Pyjo.App.FastCGI.new(url=url, document_root=root.to_str(), static=True) as fcgi:
+        t = Pyjo.Test.Pyjo.new(application(fcgi, '/dl'))
+        t.get_ok('/dl/file.php').status_is(200).content_is('').header_like('X-Sendfile', r'style\.css$')
+    Pyjo.IOLoop.remove(id)
+    url, requests, id = sendfile(private.child('file.bin').to_str())
 
     # The header as the application sends it without the directories
     with Pyjo.App.FastCGI.new(url=url) as fcgi:

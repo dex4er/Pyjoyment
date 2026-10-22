@@ -1154,15 +1154,18 @@ without rules of rewriting:
   application that takes every path, as mod_rewrite sends them all to
   ``index.php``;
 * ``document_root`` is the directory of the scripts, as a web server runs
-  them: the path up to its first part that ends with ``.php`` names the
-  script, and a path that ends with a slash names ``index.php``;
+  them: the path up to its first part that ends with ``.php``, or with one of
+  the extensions of ``script_extensions``, names the script, and a path that
+  ends with a slash names ``index.php``, ``index`` with the first of them;
 * both together send every path that names no script of the directory to the
   one script, as ``try_files`` of nginx does for WordPress;
 * ``static`` replies with the files of the directory for the paths that name
   them, as the stylesheets and the images of WordPress, before the one
-  script, for an application on the same file system as Pyjoyment, and lets
-  the application reply with such a file by the header ``X-Sendfile``, which
-  ``sendfile`` allows for a directory of private files too.
+  script, for an application on the same file system as Pyjoyment;
+* ``sendfile`` lets the application reply with a file of its directories by
+  the header ``X-Sendfile``, as private files, also more than one, repeated
+  in the query, and the attribute of :mod:`Pyjo.App.FastCGI` takes regular
+  expressions of the whole path of the file too.
 
 The paths are the ones that php-fpm sees, which may be in another container,
 so Pyjoyment does not look for the files.
@@ -1182,8 +1185,37 @@ The query also takes ``inactivity_timeout`` and ``connect_timeout``, in
 seconds, for an application that answers slowly, which the client waits for
 without the inactivity timeout of the server until the response starts. The
 attributes of :mod:`Pyjo.App.FastCGI` take the same, and more, as parameters
-of its own for the environment of each request. The page of
-:doc:`/examples` has PHP on php-fpm with the pool of php-fpm that runs it.
+of its own for the environment of each request.
+
+A ``CGI`` program runs in a process of its own for each request, which
+:mod:`Pyjo.App.CGI` starts, mounted as an object of it, as a string is the
+path of a script of :mod:`Pyjoyment`. Its attributes tell which program
+answers a path, as for ``FastCGI``:
+
+* ``script`` is the one program for every path;
+* ``document_root`` is the directory of the programs, as cgi-bin: the path up
+  to its first part that is a file of the directory names the program;
+* ``command`` runs the scripts with an interpreter, as php-cgi, and
+  ``script_extensions`` tells them from the other files, which are not run,
+  and which ``static`` replies with.
+
+A program whose name starts with ``nph-`` writes the start line of its
+response, as ``nph`` tells of the others. The event loop reads the pipes of
+the process, which it can on POSIX systems, not on Windows.
+
+.. code-block:: python
+
+    import Pyjo.App.CGI
+
+    # The programs of cgi-bin
+    plugin('Mount', {'/cgi-bin': Pyjo.App.CGI.new(document_root='/usr/lib/cgi-bin')})
+
+    # PHP on php-cgi, with its files
+    php = Pyjo.App.CGI.new(command=['php-cgi'], document_root='/var/www/php', script_extensions=['.php'], static=True)
+    plugin('Mount', {'/php': php})
+
+The page of :doc:`/examples` has PHP on php-fpm with the pool of php-fpm that
+runs it, PHP on php-cgi, and a program of Python in cgi-bin.
 
 Embed applications
 ~~~~~~~~~~~~~~~~~~

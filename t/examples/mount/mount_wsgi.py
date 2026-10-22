@@ -9,9 +9,9 @@ import sys
 from wsgiref.validate import validator
 
 
-# The application of examples/mount_wsgi.py, which the test loads without starting a server, with the directory of the
+# The application of examples/mount/mount_wsgi.py, which the test loads without starting a server, with the directory of the
 # script in sys.path, as Python has it when it runs the script, so that hello_wsgi.py is found
-examples = curfile().dirname().dirname().dirname().sibling('examples', 'pyjoyment')
+examples = curfile().dirname().dirname().dirname().sibling('examples', 'mount')
 sys.path.insert(0, examples.to_str())
 t = Pyjo.Test.Pyjo.new(examples.child('mount_wsgi.py'))
 

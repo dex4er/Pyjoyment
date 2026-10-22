@@ -98,6 +98,7 @@ import Pyjo.IOLoop.Client
 import Pyjo.Reactor
 
 import atexit
+import builtins
 import collections
 import errno
 import os
@@ -116,8 +117,10 @@ from typing import Any, Self
 # The address of a peer: a tuple as recvfrom gives it, or the path of a UNIX domain socket
 type Peer = tuple[Any, ...] | str
 
+type Anything = builtins.object
+
 # A callback of a send gets the datagram socket once the datagram has been sent
-type SendCallback = Callable[[Any], object]
+type SendCallback = Callable[[Any], Anything]
 
 # The largest datagram that UDP carries
 _SIZE = 65535

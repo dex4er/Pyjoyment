@@ -96,6 +96,7 @@ import Pyjo.Headers
 
 from Pyjo.SSE import build_event, parse_event
 
+import builtins
 import os
 import re
 import zlib
@@ -104,8 +105,10 @@ from collections.abc import Callable, Mapping
 from typing import Any, Self
 
 
+type Anything = builtins.object
+
 # A callback of a write gets the content once all data has been written
-type DrainCallback = Callable[..., object]
+type DrainCallback = Callable[..., Anything]
 
 BOUNDARY_RE = re.compile(r'multipart.*boundary\s*=\s*(?:"([^"]+)"|([\w\'(),.:?\-+/]+))', re.I)
 

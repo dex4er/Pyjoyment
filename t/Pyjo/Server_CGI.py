@@ -1,4 +1,6 @@
+import Pyjo.IOLoop
 import Pyjo.Message.Response
+import Pyjo.Promise
 import Pyjo.Server.CGI
 import Pyjoyment.Command.cgi
 
@@ -44,6 +46,30 @@ def chunked(c):
         c.write_chunk(chunk, cb if chunk else None)
 
     cb(c)
+
+
+# Not in Mojolicious: responses that come later, from the event loop
+@get('/later')
+def later(c):
+    c.render_later()
+    Pyjo.IOLoop.timer(0.01, lambda loop: c.render(text='Later!'))
+
+
+@get('/later/chunks')
+def later_chunks(c):
+    c.render_later()
+    Pyjo.IOLoop.timer(
+        0.01,
+        lambda loop: c.write_chunk(
+            b'one', lambda c: Pyjo.IOLoop.timer(0.01, lambda loop: c.write_chunk(b'two', lambda c: c.finish()))
+        ),
+    )
+
+
+@get('/later/promise')
+async def later_promise(c):
+    await Pyjo.Promise.timer(0.01)
+    c.render(text='Promised!')
 
 
 @get('/params')
@@ -144,11 +170,53 @@ with subtest('Chunked'):
         msg = stdout.getvalue()
     is_ok(status, 200, 'right status')
 
-    like_ok(msg, rb'chunked', 'is chunked')
+    # Unlike Mojolicious: the body without the chunked transfer encoding, which a CGI script does not return (RFC 3875
+    # 6.3.4)
+    unlike_ok(msg, rb'chunked', 'is not chunked')
     res = Pyjo.Message.Response.new().parse(b'HTTP/1.1 200 OK\x0d\x0a' + msg)
     is_ok(res.code, 200, 'right status')
     is_ok(res.headers.status, '200 OK', 'right "Status" value')
     is_ok(res.body, b'1234567', 'right content')
+    # Not in Mojolicious: the chunks without their sizes
+    ok(msg.endswith(b'\x0d\x0a\x0d\x0a1234567'), 'body without sizes')
+
+# Not in Mojolicious: responses that come later, once the application resumes the transaction, where Mojo writes the
+# default response
+with subtest('Later'):
+    for path, body in (('/later', b'Later!'), ('/later/chunks', b'onetwo'), ('/later/promise', b'Promised!')):
+        with local(
+            {
+                'PATH_INFO': path,
+                'REQUEST_METHOD': 'GET',
+                'SCRIPT_NAME': '/',
+                'HTTP_HOST': 'localhost:8080',
+                'SERVER_PROTOCOL': 'HTTP/1.1',
+            }
+        ) as stdout:
+            status = Pyjoyment.Command.cgi.new(app=app).run()
+            msg = stdout.getvalue()
+        is_ok(status, 200, f'right status of {path}')
+        res = Pyjo.Message.Response.new().parse(b'HTTP/1.1 200 OK\x0d\x0a' + msg)
+        is_ok(res.headers.status, '200 OK', f'right "Status" value of {path}')
+        is_ok(res.headers.transfer_encoding, None, f'no "Transfer-Encoding" value of {path}')
+        ok(msg.endswith(b'\x0d\x0a\x0d\x0a' + body), f'right content of {path}')
+
+    # The chunks of non-parsed header mode with their sizes, as the client gets them
+    with local(
+        {
+            'PATH_INFO': '/later/chunks',
+            'REQUEST_METHOD': 'GET',
+            'SCRIPT_NAME': '/',
+            'HTTP_HOST': 'localhost:8080',
+            'SERVER_PROTOCOL': 'HTTP/1.1',
+        }
+    ) as stdout:
+        status = Pyjoyment.Command.cgi.new(app=app).run('--nph')
+        msg = stdout.getvalue()
+    res = Pyjo.Message.Response.new().parse(msg)
+    is_ok(res.code, 200, 'right status')
+    like_ok(msg, rb'\x0d\x0aTransfer-Encoding: chunked\x0d\x0a', 'is chunked')
+    is_ok(res.body, b'onetwo', 'right content')
 
 with subtest('Parameters'):
     with local(

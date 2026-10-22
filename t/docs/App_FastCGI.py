@@ -78,12 +78,25 @@ with subtest('script'):
     app.script = 'index.php'
     is_ok(app.script, 'index.php', 'script of the directory')
 
-with subtest('sendfile'):
+with subtest('script_extensions'):
     app = Pyjo.App.FastCGI.new()
-    directory = app.sendfile
-    is_ok(directory, None, 'no directory')
+    extensions = app.script_extensions
+    is_ok(extensions, None, 'of the query or PHP')
+    app.script_extensions = ['.php', '.phtml']
+    is_deeply_ok(app.script_extensions, ['.php', '.phtml'], 'extensions')
+
+with subtest('sendfile'):
+    import re
+
+    app = Pyjo.App.FastCGI.new()
+    places = app.sendfile
+    is_ok(places, None, 'none')
     app.sendfile = '/var/www/private'
     is_ok(app.sendfile, '/var/www/private', 'directory')
+    app.sendfile = ['/var/www/private', '/var/www/media']
+    is_deeply_ok(app.sendfile, ['/var/www/private', '/var/www/media'], 'directories')
+    app.sendfile = re.compile(r'/var/www/[^/]+/private/.*')
+    ok(app.sendfile.fullmatch('/var/www/blog/private/file.pdf'), 'regular expression')
 
 with subtest('static'):
     app = Pyjo.App.FastCGI.new()
