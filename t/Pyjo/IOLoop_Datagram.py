@@ -116,8 +116,9 @@ with subtest('Name resolution'):
         loop.stop()
 
     client.send(b'by name', ('localhost', server.port))
-    loop.timer(5, lambda loop: loop.stop())
+    timer = loop.timer(5, lambda loop: loop.stop())
     loop.start()
+    loop.remove(timer)
     is_deeply_ok(got, [b'by name'], 'resolved')
 
     errors = []
@@ -128,8 +129,9 @@ with subtest('Name resolution'):
         loop.stop()
 
     client.send(b'nowhere', ('nonexistent.invalid', 53))
-    loop.timer(10, lambda loop: loop.stop())
+    timer = loop.timer(10, lambda loop: loop.stop())
     loop.start()
+    loop.remove(timer)
     like_ok(errors[0], r"^Can't resolve", 'error of the name resolution')
     ok(client.handle, 'still open')
     client.close()
