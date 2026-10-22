@@ -564,8 +564,8 @@ with subtest('Heartbeat'):
 
     Pyjo.IOLoop.start()
     ok(len(got['frames']) > 5, 'pings')
-    is_deeply_ok(set(got['frames'][:-1]), {9}, 'only pings')
-    is_ok(got['frames'][-1], 8, 'and the close')
+    # The close of the server may come after the end of the connection of the client
+    is_deeply_ok(set(got['frames']) - {8}, {9}, 'only pings')
     while got['stash'].get('finished') is None:
         Pyjo.IOLoop.one_tick()
     is_ok(got['stash']['finished'], 1005, 'closed by the client after its inactivity timeout')
