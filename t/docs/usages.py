@@ -1,6 +1,7 @@
 import Pyjo.File
 import Pyjo.GetOpt
 import Pyjo.Server.Hot
+import Pyjo.Server.Lambda
 import Pyjo.Server.Reload
 import Pyjo.Util
 import Pyjoyment
@@ -126,7 +127,11 @@ with captured(Pyjoyment.Commands) as specs:
 check('Pyjoyment.Commands', extract_usage(Pyjoyment.Commands.__file__), specs)
 
 # The scripts of the servers, whose usage is a section of the docstring of the module
-for module, section in ((Pyjo.Server.Reload, 'pyjo-reload'), (Pyjo.Server.Hot, 'pyjo-hot')):
+for module, section in (
+    (Pyjo.Server.Reload, 'pyjo-reload'),
+    (Pyjo.Server.Hot, 'pyjo-hot'),
+    (Pyjo.Server.Lambda, 'Runtime client'),
+):
     with (
         captured(module) as specs,
         contextlib.redirect_stderr(io.StringIO()),

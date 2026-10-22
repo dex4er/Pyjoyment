@@ -247,6 +247,16 @@ import Pyjo.Server.Lambda
 handler = Pyjo.Server.Lambda.new(app=Pyjo.HelloWorld.new()).to_lambda_app()
 ```
 
+On a custom runtime, as `provided.al2023`, its `bootstrap` runs it with the
+runtime client of Pyjoyment:
+
+```sh
+#!/bin/sh
+# The bootstrap of a custom runtime of AWS Lambda, as provided.al2023, which runs the handler of the function, as
+# "hello_world_lambda.handler" of _HANDLER, with the runtime client of Pyjoyment
+exec python3 -m Pyjo.Server.Lambda
+```
+
 ## Distributions
 
 Pyjoyment needs nothing besides the Python standard library, so what needs

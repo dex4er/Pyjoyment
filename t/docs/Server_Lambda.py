@@ -79,6 +79,54 @@ with subtest('Description'):
     handler = Pyjo.Server.Lambda.new(app=app).to_lambda_app()
     is_ok(handler(event(), 'context')['body'], 'context', 'context')
 
+
+# What the runtime client of a command posts for an invocation of a Runtime API of the test, of an application of
+# Pyjoyment as "myapp.handler"
+def invoke(command, env=None):
+    import Pyjo.File
+
+    import importlib
+    import sys
+
+    sys.path.insert(0, Pyjo.File.curfile().dirname().sibling('lib').to_str())
+    tmp = Pyjo.File.tempdir()
+    tmp.child('myapp.py').spew(
+        b'from Pyjoyment.Lite import app, get\n'
+        b'import Pyjo.Server.Lambda\n\n'
+        b"get('/', lambda c: c.render(text='Hello Lambda!'))\n"
+        b"app.log.level = 'fatal'\n"
+        b'handler = Pyjo.Server.Lambda.new(app=app).to_lambda_app()\n'
+    )
+    event = {'version': '2.0', 'rawPath': '/', 'requestContext': {'http': {'method': 'GET'}}}
+    got, code = importlib.import_module('RuntimeAPI').invoke(command, [('a1', event)], 1, tmp.to_str(), env)
+    return got[0][3] if got else None
+
+
+with subtest('Runtime client'):
+    from Pyjo.Util import extract_usage
+
+    import contextlib
+    import io
+    import sys
+
+    with contextlib.redirect_stderr(io.StringIO()):
+        try:
+            Pyjo.Server.Lambda.main(['-h'])
+        except SystemExit as e:
+            message = str(e)
+    is_ok(message + '\n', extract_usage(Pyjo.Server.Lambda.__file__, section='Runtime client'), 'usage')
+
+    response = invoke([sys.executable, '-m', 'Pyjo.Server.Lambda', 'myapp.handler'])
+    is_ok(response['body'], 'Hello Lambda!', 'python -m Pyjo.Server.Lambda myapp.handler')
+
+    # The bootstrap of a custom runtime, with the Python of the test
+    if sys.platform == 'win32':
+        skip('no shell of POSIX on Windows', 1)
+    else:
+        bootstrap = f'#!/bin/sh\n# The bootstrap of a custom runtime, as provided.al2023\nexec {sys.executable} -m Pyjo.Server.Lambda\n'
+        response = invoke(['sh', '-c', bootstrap], {'_HANDLER': 'myapp.handler'})
+        is_ok(response['body'], 'Hello Lambda!', 'bootstrap')
+
 with subtest('run'):
     server = Pyjo.Server.Lambda.new(app=app)
     response = server.run(event(), 'context')
@@ -87,5 +135,11 @@ with subtest('run'):
 with subtest('to_lambda_app'):
     handler = server.to_lambda_app()
     ok(callable(handler), 'handler')
+
+with subtest('main'):
+    import sys
+
+    response = invoke([sys.executable, '-c', "import Pyjo.Server.Lambda; Pyjo.Server.Lambda.main(['myapp.handler'])"])
+    is_ok(response['statusCode'], 200, 'command line interface')
 
 done_testing()

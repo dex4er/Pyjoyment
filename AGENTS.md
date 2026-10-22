@@ -548,7 +548,10 @@ the program closes it, and a reactor of poll reports its hang-up when it
 watches for nothing),
 `Pyjo.Server.Lambda`
 and `Pyjoyment.Command.lambda` (the server and the command of the event
-functions of AWS Lambda, inspired by `Pyjo.Server.WSGI` and its command),
+functions of AWS Lambda, inspired by `Pyjo.Server.WSGI` and its command, and
+the client of the Runtime API of Lambda, `python -m Pyjo.Server.Lambda`,
+which runs any handler, with `http.client` outside of the event loop, as a
+handler that runs an event loop of its own, as Mangum, cannot run in one),
 `Pyjo.Server.FastCGI` and `Pyjoyment.Command.fastcgi` (FastCGI on the
 connections of the listen locations `fcgi://` and `fcgi+unix://` of
 `Pyjo.Server.Daemon`, written from the specification of FastCGI 1.0, and the
