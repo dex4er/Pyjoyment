@@ -73,32 +73,11 @@ its return, before the response of the handshake is a response ``500``, and
 after it is logged and closes the WebSocket with the status ``1011``, unless
 the application has closed it.
 
-A server of :mod:`Pyjo` closes a connection that has been inactive for its
-inactivity timeout, as a WebSocket without messages, where an ``ASGI`` server
-pings the clients of its WebSockets. A subclass pings them, and their clients
-answer with a pong::
-
-    import Pyjo.App.ASGI
-    import Pyjo.IOLoop
-    import Pyjo.Transaction
-
-    from Pyjo.WebSocket import WS_PING
-
-
-    # Ping the WebSockets every 20 seconds, of the transaction or of the controller of a route
-    class KeepAlive(Pyjo.App.ASGI.object):
-        interval = 20
-
-        def handler(self, tx):
-            ws = tx if isinstance(tx, Pyjo.Transaction.object) else tx.tx
-            if ws.is_websocket:
-                ping = (1, 0, 0, 0, WS_PING, b'')
-                timer = Pyjo.IOLoop.recurring(self.interval, lambda loop: ws.established and ws.send(ping))
-                ws.on('finish', lambda ws, code, reason: Pyjo.IOLoop.remove(timer))
-            super().handler(tx)
-
-
-    app = KeepAlive.new(app=application)
+The WebSockets are pinged, as by an ``ASGI`` server, with
+:meth:`Pyjo.Transaction.WebSocket.Pyjo_Transaction_WebSocket.heartbeat` and
+the intervals of :attr:`ping_interval` and :attr:`ping_timeout`, so that the
+inactivity timeout of the server does not close a WebSocket without messages,
+and a client that is gone is found.
 
 Attributes
 ----------
@@ -154,6 +133,27 @@ class Pyjo_App_ASGI(Pyjo.App.object):
             app.app = application
 
         The ``ASGI`` application to run.
+        """
+
+        self.ping_interval: float | None = 20
+        """::
+
+            interval = app.ping_interval
+            app.ping_interval = 60
+
+        Interval in seconds of the pings of the WebSockets, defaults to
+        ``20``, as of uvicorn. ``None`` or ``0`` sends no pings.
+        """
+
+        self.ping_timeout: float | None = 20
+        """::
+
+            timeout = app.ping_timeout
+            app.ping_timeout = 60
+
+        Timeout in seconds of the answer of a client to a ping of a WebSocket,
+        after which its connection is closed, defaults to ``20``, as of
+        uvicorn. ``None`` or ``0`` waits for no answer.
         """
 
         super().__init__(attrs, **kwargs)
@@ -363,6 +363,7 @@ class _WebSocket(_Call):
         ws = self.ws
         ws.on('message', self._message)
         ws.on('finish', self._disconnect)
+        ws.heartbeat(self.app.ping_interval, self.app.ping_timeout)
         try:
             coro = self.application(_scope(self.tx, self.c, ws), self._receive, self._send)
         except Exception as e:

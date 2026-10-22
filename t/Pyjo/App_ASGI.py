@@ -9,6 +9,7 @@ import Pyjoyment
 
 from Pyjo.JSON import encode_json
 from Pyjo.Test import *
+from Pyjo.WebSocket import WS_PING, WS_PONG
 
 import asyncio
 import concurrent.futures
@@ -589,6 +590,42 @@ with subtest('WebSocket closed before its handshake'):
             'disconnect, and send does nothing',
         )
 
+with subtest('WebSocket pings'):
+
+    async def quiet(scope, receive, send):
+        await receive()
+        await send({'type': 'websocket.accept'})
+        while (await receive())['type'] != 'websocket.disconnect':
+            pass
+
+    # A WebSocket of a server whose inactivity timeout is shorter than the time without messages
+    def quiet_for(app, seconds):
+        os.environ['PYJO_INACTIVITY_TIMEOUT'] = '0.3'
+        try:
+            t = Pyjo.Test.Pyjo.new(app)
+            frames = []
+            t.websocket_ok('/').tx.on('frame', lambda ws, frame: frames.append(frame[4]))
+            timer = Pyjo.IOLoop.timer(seconds, lambda loop: loop.stop())
+            t.tx.on('finish', lambda *args: Pyjo.IOLoop.stop())
+            Pyjo.IOLoop.start()
+            Pyjo.IOLoop.remove(timer)
+        finally:
+            del os.environ['PYJO_INACTIVITY_TIMEOUT']
+        return t, frames
+
+    with Pyjo.App.ASGI.new(app=quiet, ping_interval=0.05, ping_timeout=0.2) as app:
+        t, frames = quiet_for(app, 0.6)
+        ok(len(frames) > 5, 'pings')
+        is_deeply_ok(set(frames), {WS_PING}, 'only pings')
+        ok(not t.tx.is_finished, 'kept alive')
+        t.finish_ok().finished_ok(1005)
+
+    with Pyjo.App.ASGI.new(app=quiet, ping_interval=None) as app:
+        app.log.level = 'fatal'
+        t, frames = quiet_for(app, 2)
+        is_deeply_ok(frames, [], 'no pings')
+        ok(t.tx.is_finished, 'closed by the inactivity timeout')
+
 with subtest('Pyjoyment on ASGI'):
     # An application of Pyjoyment as the ASGI application, whose response and content come in later ticks of the event
     # loop
@@ -614,6 +651,13 @@ with subtest('Pyjoyment on ASGI'):
     def echo_ws(c):
         c.on('message', lambda c, msg: c.send(f'echo: {msg} at {c.url_for("/")}'))
 
+    pongs = []
+
+    @inner.routes.websocket('/pinged')
+    def pinged(c):
+        c.tx.heartbeat(0.05, 0.1).on('frame', lambda ws, frame: pongs.append(frame[4]))
+        c.on('message', lambda c, msg: c.send(f'still here: {msg}'))
+
     @inner.routes.websocket('/forbidden')
     def forbidden(c):
         c.render(text='Forbidden!', status=403)
@@ -625,6 +669,14 @@ with subtest('Pyjoyment on ASGI'):
         t.get_ok('/prefix/missing').status_is(404)
         t.websocket_ok('/prefix/echo').send_ok('hi').message_ok().message_is('echo: hi at /prefix').finish_ok()
         handshake(t, '/prefix/forbidden').status_is(403)
+
+        # The pings of the inner WebSocket, which ASGI cannot send, are answered by its server
+        t.websocket_ok('/prefix/pinged')
+        Pyjo.IOLoop.timer(0.3, lambda loop: loop.stop())
+        Pyjo.IOLoop.start()
+        t.send_ok('hi').message_ok().message_is('still here: hi').finish_ok()
+        ok(len(pongs) > 2, 'pongs')
+        is_deeply_ok(set(pongs[:3]), {WS_PONG}, 'only pongs')
 
 with subtest('Event loop of asyncio'):
 

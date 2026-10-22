@@ -1125,24 +1125,27 @@ that awaits nothing but ``receive`` and ``send``.
 
 The servers of :mod:`Pyjoyment` close a connection that has been inactive for
 their inactivity timeout, 30 seconds by default, as a WebSocket without
-messages, where an ``ASGI`` server pings the clients of its WebSockets. The
-option ``-i`` of the commands of the servers makes it longer, or a hook pings
-the WebSockets, and their clients answer with a pong.
+messages, so the WebSockets of an ``ASGI`` application are pinged every 20
+seconds, as an ``ASGI`` server pings them, which
+:attr:`~Pyjo.App.ASGI.Pyjo_App_ASGI.ping_interval` changes. A WebSocket of
+:mod:`Pyjoyment` is pinged with
+:meth:`~Pyjo.Transaction.WebSocket.Pyjo_Transaction_WebSocket.heartbeat`.
 
 .. code-block:: python
 
-    import Pyjo.IOLoop
+    import Pyjo.App.ASGI
 
-    from Pyjo.WebSocket import WS_PING
+    import api
+
+    # Pings every 60 seconds
+    plugin('Mount', {'/api': Pyjo.App.ASGI.new(app=api.app, ping_interval=60)})
 
 
-    # Ping the WebSockets every 20 seconds
-    @hook('before_dispatch')
-    def keep_alive(c):
-        if (ws := c.tx).is_websocket:
-            ping = (1, 0, 0, 0, WS_PING, b'')
-            timer = Pyjo.IOLoop.recurring(20, lambda loop: ws.established and ws.send(ping))
-            ws.on('finish', lambda ws, code, reason: Pyjo.IOLoop.remove(timer))
+    # A WebSocket of Pyjoyment pinged every 20 seconds
+    @websocket('/echo')
+    def echo(c):
+        c.tx.heartbeat()
+        c.on('message', lambda c, msg: c.send(f'echo: {msg}'))
 
 The path of a mount is a pattern of a route, which matches the beginning of
 the path of a request, as in Mojolicious, so that ``/legacy`` matches
