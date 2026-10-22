@@ -65,5 +65,10 @@ TEST_LAMBDA_URL=$(tofu -chdir=examples/lambda output -raw url) \
 tofu -chdir=examples/lambda destroy
 ```
 
+The variable `layers` adds layers to the function, as the one of PHP of
+[Bref](https://bref.sh), which is in its default, commented out: `app.py`
+starts its php-fpm and serves `phpinfo.php` under `/php` with
+`Pyjo.App.FastCGI`.
+
 The tests in [`t/examples/`](../t/examples), in the same groups, check some of
 the scripts, and the documentation shows them on its page of examples.

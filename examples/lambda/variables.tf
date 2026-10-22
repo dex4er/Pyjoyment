@@ -27,3 +27,12 @@ variable "alb" {
   type        = bool
   default     = false
 }
+
+variable "layers" {
+  description = "More layers of the function, after the one of the framework"
+  type        = list(string)
+  default = [
+    # PHP 8.5 of Bref, https://bref.sh, whose php-fpm app.py starts, with phpinfo.php under /php, in eu-central-1
+    # "arn:aws:lambda:eu-central-1:873528684822:layer:arm-php-85:21",
+  ]
+}

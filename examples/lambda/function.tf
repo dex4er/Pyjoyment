@@ -27,6 +27,12 @@ data "archive_file" "function" {
     content  = file("${path.module}/app.py")
     filename = "app.py"
   }
+
+  # For the PHP of a layer of the variable "layers"
+  source {
+    content  = file("${path.module}/phpinfo.php")
+    filename = "phpinfo.php"
+  }
 }
 
 resource "aws_iam_role" "function" {
@@ -61,7 +67,7 @@ resource "aws_lambda_function" "function" {
   handler          = "app.handler"
   filename         = data.archive_file.function.output_path
   source_code_hash = data.archive_file.function.output_base64sha256
-  layers           = [aws_lambda_layer_version.framework.arn]
+  layers           = concat([aws_lambda_layer_version.framework.arn], var.layers)
   memory_size      = 128
   timeout          = 10
 
