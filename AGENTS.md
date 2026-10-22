@@ -108,7 +108,17 @@ of them is a regression.
   and `wsgi.run_once` say, comes from the server, through `server` of the
   application and the hook `before_server_start`, or from the environment of
   an outer WSGI server, best-effort, not from an environment variable, which
-  every server of the process and its children would share.
+  every server of the process and its children would share. The end of a
+  server is the counterpart of its start: `server_stopped` of the application
+  and the hook `after_server_stop`, once the server has stopped gracefully,
+  in each process and thread that has run the application, with the event
+  loop no longer running, which the server runs until the promise that they
+  return is settled. What an application starts for a server, as the
+  lifespan of an ASGI application, ends there, not at the beginning of a
+  graceful stop, while requests are still served, nor in `atexit`, which a
+  worker of `Pyjo.Server.Prefork` leaves with `os._exit`, as the child of a
+  fork has the handlers of the manager, and which comes after the loop of an
+  ASGI server is closed.
 - **Python 3.12 is the minimum, template strings come with 3.14.** t-strings
   (PEP 750) keep interpolations separate from the literal text, which gives
   templates auto-escaping without a template language. The `t"..."` syntax is

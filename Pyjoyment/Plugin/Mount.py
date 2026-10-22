@@ -138,13 +138,17 @@ class Pyjoyment_Plugin_Mount(Pyjoyment.Plugin.object):
             embed.secrets = app.secrets
 
         # Not in Mojolicious: another application of Pyjo, as one of Pyjo.App.WSGI, gets the server that runs it before it
-        # starts, as the application that mounts it gets it
+        # starts and after it stops, as the application that mounts it gets it
         else:
 
             def before_server_start(server: Pyjo.Server.object, app: Any) -> None:
                 embed.server(server)
 
+            def after_server_stop(server: Pyjo.Server.object, app: Any) -> Any:
+                return embed.server_stopped(server)
+
             app.hook('before_server_start', before_server_start)
+            app.hook('after_server_stop', after_server_stop)
         embed.log = app.log
 
         # Not in Mojolicious: a regular expression that matches the whole path, as the ones of PromQL do, whose group

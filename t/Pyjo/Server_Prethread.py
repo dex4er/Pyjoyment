@@ -111,8 +111,17 @@ with subtest('Multiple workers and graceful shutdown'):
         server.extend([server_.workers, app.mode])
 
     prethread.app.hook('before_server_start', before_server_start)
+
+    # Not in Mojolicious: the end of the server, in each worker and in the manager
+    stopped = []
+
+    def after_server_stop(server_, app):
+        stopped.append(threading.get_native_id())
+
+    prethread.app.hook('after_server_stop', after_server_stop)
     prethread.run()
     is_deeply_ok(server, [4, 'development'], 'hook has been emitted once')
+    is_deeply_ok(sorted(stopped), sorted([*spawn, threading.get_native_id()]), 'end in the workers and the manager')
     is_ok(len(spawn), 4, 'four workers spawned')
     is_ok(len(reap), 4, 'four workers reaped')
     ok(worker in spawn, 'worker has a heartbeat')

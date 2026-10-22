@@ -125,8 +125,22 @@ with subtest('Multiple workers and graceful shutdown'):
         server.extend([server_.workers, app.mode])
 
     prefork.app.hook('before_server_start', before_server_start)
+
+    # Not in Mojolicious: the end of the server, in each worker and in the manager, which writes its process id
+    stopped = dir.child('stopped')
+
+    def after_server_stop(server_, app):
+        with open(stopped.to_str(), 'a') as file:
+            file.write(f'{os.getpid()}\n')
+
+    prefork.app.hook('after_server_stop', after_server_stop)
     prefork.run()
     is_deeply_ok(server, [4, 'development'], 'hook has been emitted once')
+    is_deeply_ok(
+        sorted(int(pid) for pid in stopped.slurp().split()),
+        sorted([*spawn, os.getpid()]),
+        'end in the workers and the manager',
+    )
     is_ok(len(spawn), 4, 'four workers spawned')
     is_ok(len(reap), 4, 'four workers reaped')
     ok(worker in spawn, 'worker has a heartbeat')

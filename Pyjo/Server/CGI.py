@@ -131,6 +131,14 @@ class Pyjo_Server_CGI(Pyjo.Server.object):
         Run CGI.
         """
         self.app.server(self)
+        try:
+            return self._run()
+
+        # Not in Mojolicious: the end of the server, as it serves one request
+        finally:
+            self._server_stopped()
+
+    def _run(self) -> int | None:
         tx = self.build_tx()
         req = tx.req.parse(dict(os.environ))
         tx.local_port = int(port) if (port := os.environ.get('SERVER_PORT')) else None
