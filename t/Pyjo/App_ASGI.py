@@ -9,10 +9,12 @@ import Pyjoyment
 
 from Pyjo.JSON import encode_json
 from Pyjo.Test import *
+from Pyjo.WebSocket import WS_PING, WS_PONG
 
 import asyncio
 import concurrent.futures
 import http.client
+import json
 import os
 import re
 
@@ -362,6 +364,268 @@ with subtest('Disconnect after the response'):
             Pyjo.IOLoop.one_tick()
         is_deeply_ok(events, ['http.disconnect'], 'disconnect')
 
+
+# A WebSocket that echoes its messages, closes as the client asks and keeps the messages that it receives
+async def chat(scope, receive, send):
+    events = scope.get('events', [])
+    events.append(await receive())
+    path = scope['path'][len(scope['root_path']) :]
+    protocols = scope['subprotocols']
+    await send({'type': 'websocket.accept', 'subprotocol': protocols[0] if protocols else None})
+    if path == '/scope':
+        values = {
+            **scope,
+            'headers': [[name.decode('latin-1'), value.decode('latin-1')] for name, value in scope['headers']],
+            'raw_path': scope['raw_path'].decode('latin-1'),
+            'query_string': scope['query_string'].decode('latin-1'),
+        }
+        await send({'type': 'websocket.send', 'text': encode_json(values).decode()})
+    while True:
+        message = await receive()
+        received.append(message)
+        if message['type'] == 'websocket.disconnect':
+            return
+        if (text := message.get('text')) is not None:
+            if text.startswith('close'):
+                _, code, reason = text.split(' ', 2)
+                await send({'type': 'websocket.close', 'code': int(code), 'reason': reason})
+                await send({'type': 'websocket.send', 'text': 'ignored'})
+            else:
+                await send({'type': 'websocket.send', 'text': f'echo: {text}'})
+        else:
+            await send({'type': 'websocket.send', 'bytes': message['bytes'][::-1]})
+
+
+received = []
+
+
+# The response of a WebSocket handshake that is not established
+def handshake(t, path):
+    t.tx = t.ua.start(t.ua.build_websocket_tx(path))
+    ok(not t.tx.is_websocket, 'not a WebSocket')
+    return t
+
+
+with subtest('WebSocket scope'):
+    with Pyjo.App.ASGI.new(app=chat) as app:
+        t = Pyjo.Test.Pyjo.new(app)
+        del received[:]
+        t.websocket_ok('/scope?a=1', {'X-Foo': 'bar', 'Sec-WebSocket-Protocol': 'foo, bar'}).message_ok()
+        scope = json.loads(t.message[1])
+        is_ok(scope['type'], 'websocket', 'right type')
+        is_deeply_ok(scope['asgi'], {'version': '3.0', 'spec_version': '2.4'}, 'right version')
+        is_ok(scope['http_version'], '1.1', 'right HTTP version')
+        ok('method' not in scope, 'no method')
+        is_ok(scope['scheme'], 'ws', 'right scheme')
+        is_ok(scope['root_path'], '', 'no root path')
+        is_ok(scope['path'], '/scope', 'right path')
+        is_ok(scope['raw_path'], '/scope', 'right raw path')
+        is_ok(scope['query_string'], 'a=1', 'right query')
+        is_deeply_ok(scope['server'], ['127.0.0.1', t.ua.server.url().port], 'right server')
+        is_ok(scope['client'][0], '127.0.0.1', 'right client address')
+        is_deeply_ok(header(scope, 'x-foo'), ['bar'], 'right header')
+        is_deeply_ok(header(scope, 'upgrade'), ['websocket'], 'right upgrade header')
+        is_deeply_ok(scope['subprotocols'], ['foo', 'bar'], 'right subprotocols')
+        is_deeply_ok(scope['extensions'], {'websocket.http.response': {}}, 'response of HTTP')
+        t.header_is('Sec-WebSocket-Protocol', 'foo').finish_ok()
+        while not received:
+            Pyjo.IOLoop.one_tick()
+        is_deeply_ok(received, [{'type': 'websocket.disconnect', 'code': 1005, 'reason': ''}], 'disconnect')
+
+with subtest('WebSocket'):
+    with Pyjo.App.ASGI.new(app=chat) as app:
+        t = Pyjo.Test.Pyjo.new(app)
+        del received[:]
+        t.websocket_ok('/').header_is('Sec-WebSocket-Protocol', None)
+        t.send_ok('hi').message_ok().message_is('echo: hi')
+        t.send_ok('I ♥ Pyjoyment!').message_ok().message_is('echo: I ♥ Pyjoyment!')
+        t.send_ok({'binary': b'abc'}).message_ok().message_is(b'cba')
+        t.finish_ok(4001, 'bye').finished_ok(4001)
+        while len(received) < 4:
+            Pyjo.IOLoop.one_tick()
+        is_deeply_ok(
+            received,
+            [
+                {'type': 'websocket.receive', 'text': 'hi'},
+                {'type': 'websocket.receive', 'text': 'I ♥ Pyjoyment!'},
+                {'type': 'websocket.receive', 'bytes': b'abc'},
+                {'type': 'websocket.disconnect', 'code': 4001, 'reason': 'bye'},
+            ],
+            'right messages',
+        )
+
+        # Closed by the application, which sends nothing more
+        del received[:]
+        t.websocket_ok('/').send_ok('close 4000 Done!').finished_ok(4000)
+        while len(received) < 2:
+            Pyjo.IOLoop.one_tick()
+        is_deeply_ok(
+            received,
+            [
+                {'type': 'websocket.receive', 'text': 'close 4000 Done!'},
+                {'type': 'websocket.disconnect', 'code': 4000, 'reason': 'Done!'},
+            ],
+            'right messages',
+        )
+
+    # In a route
+    with Pyjo.App.ASGI.new(app=chat) as asgi:
+        t = Pyjo.Test.Pyjo.new(application(asgi))
+        t.websocket_ok('/prefix/scope').message_ok().json_message_is('/root_path', '/prefix')
+        t.json_message_is('/path', '/prefix/scope').send_ok('hi').message_ok().message_is('echo: hi').finish_ok()
+
+with subtest('WebSocket rejected'):
+
+    async def reject(scope, receive, send):
+        await receive()
+        await send({'type': 'websocket.close'})
+
+    async def deny(scope, receive, send):
+        await receive()
+        await send({'type': 'websocket.http.response.start', 'status': 401, 'headers': [(b'x-test', b'yes')]})
+        await send({'type': 'websocket.http.response.body', 'body': b'Denied', 'more_body': True})
+        await send({'type': 'websocket.http.response.body', 'body': b'!'})
+
+    with Pyjo.App.ASGI.new(app=reject) as app:
+        handshake(Pyjo.Test.Pyjo.new(app), '/').status_is(403).content_is('')
+
+    with Pyjo.App.ASGI.new(app=deny) as app:
+        handshake(Pyjo.Test.Pyjo.new(app), '/').status_is(401).header_is('X-Test', 'yes').content_is('Denied!')
+
+    with Pyjo.App.ASGI.new(app=deny) as asgi:
+        handshake(Pyjo.Test.Pyjo.new(application(asgi)), '/prefix').status_is(401).content_is('Denied!')
+
+with subtest('WebSocket errors'):
+
+    async def silent_ws(scope, receive, send):
+        await receive()
+
+    async def fail_ws(scope, receive, send):
+        await receive()
+        raise Exception('Something went wrong')
+
+    async def early(scope, receive, send):
+        await receive()
+        await send({'type': 'websocket.send', 'text': 'Too early'})
+
+    for application_, error in (
+        (fail_ws, r'Something went wrong'),
+        (silent_ws, r'returned without a response'),
+        (early, r'"websocket\.send" before "websocket\.accept"'),
+    ):
+        with Pyjo.App.ASGI.new(app=application_) as app:
+            app.log.level = 'fatal'
+            t = Pyjo.Test.Pyjo.new(app)
+            with app.log.capture('error') as messages:
+                handshake(t, '/').status_is(500).content_is('Internal Server Error')
+            like_ok(str(messages), error, f'right error of {application_.__name__}')
+
+    # The WebSocket is closed with the status of an error of the server
+    async def broken_ws(scope, receive, send):
+        await receive()
+        await send({'type': 'websocket.accept'})
+        await receive()
+        raise Exception('Broken WebSocket')
+
+    async def returned(scope, receive, send):
+        await receive()
+        await send({'type': 'websocket.accept'})
+        await receive()
+
+    for application_, error in (
+        (broken_ws, r'Broken WebSocket'),
+        (returned, r'returned without closing its WebSocket'),
+    ):
+        with Pyjo.App.ASGI.new(app=application_) as app:
+            app.log.level = 'fatal'
+            t = Pyjo.Test.Pyjo.new(app)
+            with app.log.capture('error') as messages:
+                t.websocket_ok('/').send_ok('hi').finished_ok(1011)
+            like_ok(str(messages), error, f'right error of {application_.__name__}')
+
+    # The WebSocket that the application has closed
+    async def closed(scope, receive, send):
+        await receive()
+        await send({'type': 'websocket.accept'})
+        await send({'type': 'websocket.close', 'code': 4000})
+        raise Exception('After the close')
+
+    with Pyjo.App.ASGI.new(app=closed) as app:
+        app.log.level = 'fatal'
+        t = Pyjo.Test.Pyjo.new(app)
+        with app.log.capture('error') as messages:
+            t.websocket_ok('/').finished_ok(4000)
+        like_ok(str(messages), r'After the close', 'right error of closed')
+
+    # The exception page of Pyjoyment, in a route
+    with Pyjo.App.ASGI.new(app=fail_ws) as asgi:
+        handshake(Pyjo.Test.Pyjo.new(application(asgi)), '/prefix').status_is(500).content_like(r'Something went')
+
+with subtest('WebSocket closed before its handshake'):
+    events = []
+
+    async def waiting(scope, receive, send):
+        events.append((await receive())['type'])
+        events.append(await receive())
+        await send({'type': 'websocket.accept'})
+        events.append('accepted')
+
+    with Pyjo.App.ASGI.new(app=waiting) as app:
+        t = Pyjo.Test.Pyjo.new(app)
+        port = t.ua.server.nb_url().port
+
+        @Pyjo.IOLoop.client(address='127.0.0.1', port=port)
+        def client(loop, err, stream):
+            stream.write(
+                b'GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n'
+                b'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n',
+                lambda stream: Pyjo.IOLoop.timer(0.05, lambda loop: stream.close()),
+            )
+
+        while len(events) < 3:
+            Pyjo.IOLoop.one_tick()
+        is_deeply_ok(
+            events,
+            ['websocket.connect', {'type': 'websocket.disconnect', 'code': 1006, 'reason': ''}, 'accepted'],
+            'disconnect, and send does nothing',
+        )
+
+with subtest('WebSocket pings'):
+
+    async def quiet(scope, receive, send):
+        await receive()
+        await send({'type': 'websocket.accept'})
+        while (await receive())['type'] != 'websocket.disconnect':
+            pass
+
+    # A WebSocket of a server whose inactivity timeout is shorter than the time without messages
+    def quiet_for(app, seconds):
+        os.environ['PYJO_INACTIVITY_TIMEOUT'] = '0.3'
+        try:
+            t = Pyjo.Test.Pyjo.new(app)
+            frames = []
+            t.websocket_ok('/').tx.on('frame', lambda ws, frame: frames.append(frame[4]))
+            timer = Pyjo.IOLoop.timer(seconds, lambda loop: loop.stop())
+            t.tx.on('finish', lambda *args: Pyjo.IOLoop.stop())
+            Pyjo.IOLoop.start()
+            Pyjo.IOLoop.remove(timer)
+        finally:
+            del os.environ['PYJO_INACTIVITY_TIMEOUT']
+        return t, frames
+
+    with Pyjo.App.ASGI.new(app=quiet, ping_interval=0.05, ping_timeout=0.2) as app:
+        t, frames = quiet_for(app, 0.6)
+        ok(len(frames) > 5, 'pings')
+        is_deeply_ok(set(frames), {WS_PING}, 'only pings')
+        ok(not t.tx.is_finished, 'kept alive')
+        t.finish_ok().finished_ok(1005)
+
+    with Pyjo.App.ASGI.new(app=quiet, ping_interval=None) as app:
+        app.log.level = 'fatal'
+        t, frames = quiet_for(app, 2)
+        is_deeply_ok(frames, [], 'no pings')
+        ok(t.tx.is_finished, 'closed by the inactivity timeout')
+
 with subtest('Pyjoyment on ASGI'):
     # An application of Pyjoyment as the ASGI application, whose response and content come in later ticks of the event
     # loop
@@ -383,11 +647,36 @@ with subtest('Pyjoyment on ASGI'):
 
         write(0)
 
+    @inner.routes.websocket('/echo')
+    def echo_ws(c):
+        c.on('message', lambda c, msg: c.send(f'echo: {msg} at {c.url_for("/")}'))
+
+    pongs = []
+
+    @inner.routes.websocket('/pinged')
+    def pinged(c):
+        c.tx.heartbeat(0.05, 0.1).on('frame', lambda ws, frame: pongs.append(frame[4]))
+        c.on('message', lambda c, msg: c.send(f'still here: {msg}'))
+
+    @inner.routes.websocket('/forbidden')
+    def forbidden(c):
+        c.render(text='Forbidden!', status=403)
+
     with Pyjo.App.ASGI.new(app=Pyjo.Server.ASGI.new(app=inner).to_asgi_app()) as asgi:
         t = Pyjo.Test.Pyjo.new(application(asgi))
         t.get_ok('/prefix/later').status_is(200).content_is('Hello later at /prefix!')
         t.get_ok('/prefix/chunks').status_is(200).content_is('012')
         t.get_ok('/prefix/missing').status_is(404)
+        t.websocket_ok('/prefix/echo').send_ok('hi').message_ok().message_is('echo: hi at /prefix').finish_ok()
+        handshake(t, '/prefix/forbidden').status_is(403)
+
+        # The pings of the inner WebSocket, which ASGI cannot send, are answered by its server
+        t.websocket_ok('/prefix/pinged')
+        Pyjo.IOLoop.timer(0.3, lambda loop: loop.stop())
+        Pyjo.IOLoop.start()
+        t.send_ok('hi').message_ok().message_is('still here: hi').finish_ok()
+        ok(len(pongs) > 2, 'pongs')
+        is_deeply_ok(set(pongs[:3]), {WS_PONG}, 'only pongs')
 
 with subtest('Event loop of asyncio'):
 

@@ -127,6 +127,7 @@ Ported from `Mojo::Transaction::WebSocket <https://github.com/mojolicious/mojo/b
 of Mojolicious 9.49.
 """
 
+import Pyjo.IOLoop
 import Pyjo.Message.Request
 import Pyjo.Message.Response
 import Pyjo.Transaction
@@ -139,6 +140,7 @@ from Pyjo.WebSocket import WS_BINARY, WS_CLOSE, WS_PING, WS_PONG, WS_TEXT, Frame
 
 import os
 import struct
+import weakref
 import zlib
 
 from collections.abc import Callable, Mapping, Sequence
@@ -212,6 +214,7 @@ class Pyjo_Transaction_WebSocket(Pyjo.Transaction.object):
         # The state of the transaction, as the keys of Mojo's hash
         self._close: list[Any] | None = None
         self._closing = False
+        self._heartbeat: _Heartbeat | None = None
         self._inflate: Any = None
         self._message: bytes | None = None
         self._op: int | None = None
@@ -333,6 +336,38 @@ class Pyjo_Transaction_WebSocket(Pyjo.Transaction.object):
             close[0] = 1005
         self.send((1, 0, 0, 0, WS_CLOSE, payload))._closing = True
 
+        return self
+
+    # Not in Mojolicious: the pings that ASGI servers and other WebSocket servers send, so that an application does not
+    # repeat a recurring timer and its end for every WebSocket
+    def heartbeat(self, interval: float | None = 20, timeout: float | None = 20) -> Self:
+        """::
+
+            ws = ws.heartbeat()
+            ws = ws.heartbeat(60, 10)
+            ws = ws.heartbeat(None)
+
+        Send a ``Ping`` frame every ``interval`` seconds while the WebSocket
+        connection is established, so that the inactivity timeout of the
+        connection does not close a WebSocket without messages, and close the
+        connection, with the status ``1006`` of the event ``finish``, when the
+        peer sends no frame, as the ``Pong`` that answers it, within
+        ``timeout`` seconds. The timers are of :data:`Pyjo.IOLoop.singleton`,
+        whose connection :attr:`connection` is. An ``interval`` of ``None``
+        or ``0`` stops the pings, and a ``timeout`` of ``None`` or ``0`` waits
+        for no frame. ::
+
+            # Keep the WebSocket of a route alive
+            @websocket('/echo')
+            def echo(c):
+                c.tx.heartbeat()
+                c.on('message', lambda c, msg: c.send(f'echo: {msg}'))
+        """
+        if (heartbeat := self._heartbeat) is not None:
+            self._heartbeat = None
+            heartbeat.stop()
+        if interval:
+            self._heartbeat = _Heartbeat(self, interval, timeout)
         return self
 
     @property
@@ -607,6 +642,66 @@ class Pyjo_Transaction_WebSocket(Pyjo.Transaction.object):
 
         self.res.headers.sec_websocket_protocol = proto
         return proto
+
+
+# The pings of a WebSocket, whose timers refer to it weakly, and which end with it
+class _Heartbeat:
+    def __init__(self, ws: Pyjo_Transaction_WebSocket, interval: float, timeout: float | None) -> None:
+        self.loop = Pyjo.IOLoop.object.singleton()
+        self.pong: str | None = None
+        self.timeout = timeout
+        self.ws = weakref.ref(ws)
+        ref = weakref.ref(self)
+
+        def ping(loop: Any) -> None:
+            if (this := ref()) is not None:
+                this.ping()
+
+        def frame(ws: Any, frame: Any) -> None:
+            if (this := ref()) is not None:
+                this.frame()
+
+        def finish(ws: Any, *args: Any) -> None:
+            if (this := ref()) is not None:
+                this.stop()
+
+        self.events = [ws.on('frame', frame), ws.on('finish', finish)]
+        self.timer = self.loop.recurring(interval, ping)
+
+    # A frame of the peer, which is there
+    def frame(self) -> None:
+        if (pong := self.pong) is not None:
+            self.pong = None
+            self.loop.remove(pong)
+
+    # The connection of a peer that has not answered
+    def gone(self) -> None:
+        self.pong = None
+        if (ws := self.ws()) is not None and (connection := ws.connection) is not None:
+            self.loop.remove(connection)
+
+    def ping(self) -> None:
+        if (ws := self.ws()) is None:
+            return self.stop()
+        if not ws.established or self.pong is not None:
+            return
+        ws.send((1, 0, 0, 0, WS_PING, b''))
+        if self.timeout:
+            ref = weakref.ref(self)
+
+            def gone(loop: Any) -> None:
+                if (this := ref()) is not None:
+                    this.gone()
+
+            self.pong = self.loop.timer(self.timeout, gone)
+
+    def stop(self) -> None:
+        self.loop.remove(self.timer)
+        if (pong := self.pong) is not None:
+            self.pong = None
+            self.loop.remove(pong)
+        if (ws := self.ws()) is not None:
+            ws.unsubscribe('frame', self.events[0]).unsubscribe('finish', self.events[1])
 
 
 new = Pyjo_Transaction_WebSocket.new

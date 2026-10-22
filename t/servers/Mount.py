@@ -22,13 +22,17 @@ import time
 
 # The applications of other frameworks, which Pyjoyment.Plugin.Mount mounts, of the dependency group "servers": uv run
 # --only-group servers python -m Pyjo.Prove t/servers
-if missing := [m for m in ('flask', 'mangum', 'starlette', 'waitress') if not importlib.util.find_spec(m)]:
+if missing := [
+    m for m in ('flask', 'mangum', 'starlette', 'waitress', 'websockets') if not importlib.util.find_spec(m)
+]:
     plan(skip_all=f'needs the dependency group "servers", without {", ".join(missing)}')
 
 import flask  # noqa: E402
 import starlette.applications  # noqa: E402
 import starlette.responses  # noqa: E402
 import starlette.routing  # noqa: E402
+
+from websockets.exceptions import ConnectionClosed, InvalidStatus  # noqa: E402
 
 
 # The servers in processes of their own
@@ -193,6 +197,19 @@ with subtest('Starlette'):
     async def fail(request):
         raise RuntimeError('Something went wrong')
 
+    async def chat(websocket):
+        await websocket.accept(subprotocol='chat')
+        async for text in websocket.iter_text():
+            if text == 'quit':
+                return await websocket.close(4000, 'Bye!')
+            await websocket.send_text(f'echo: {text} at {websocket.url.path}')
+
+    async def denied(websocket):
+        await websocket.send_denial_response(starlette.responses.PlainTextResponse('Denied!', status_code=401))
+
+    async def closed(websocket):
+        await websocket.close()
+
     hello = starlette.applications.Starlette(
         routes=[
             starlette.routing.Route('/', index, name='index'),
@@ -201,6 +218,9 @@ with subtest('Starlette'):
             starlette.routing.Route('/redirect', redirect),
             starlette.routing.Route('/stream', stream),
             starlette.routing.Route('/fail', fail),
+            starlette.routing.WebSocketRoute('/ws', chat),
+            starlette.routing.WebSocketRoute('/ws/denied', denied),
+            starlette.routing.WebSocketRoute('/ws/closed', closed),
         ]
     )
 
@@ -216,6 +236,12 @@ with subtest('Starlette'):
     t.get_ok('/starlette/stream').status_is(200).content_type_like(r'^text/plain').content_is('onetwo')
     t.get_ok('/starlette/missing').status_is(404).content_like(r'Not Found')
     t.get_ok('/starlette/fail').status_is(500).content_like(r'Internal Server Error')
+    t.websocket_ok('/starlette/ws', {'Sec-WebSocket-Protocol': 'chat'}).header_is('Sec-WebSocket-Protocol', 'chat')
+    t.send_ok('hi').message_ok().message_is('echo: hi at /starlette/ws').send_ok('quit').finished_ok(4000)
+    t.tx = t.ua.start(t.ua.build_websocket_tx('/starlette/ws/denied'))
+    t.status_is(401).content_is('Denied!')
+    t.tx = t.ua.start(t.ua.build_websocket_tx('/starlette/ws/closed'))
+    t.status_is(403)
 
 with subtest('PHP on php-fpm'):
     if PHP_FPM is None or sys.platform == 'win32':
@@ -405,6 +431,15 @@ def chunks(c):
             c.finish()
 
     write(0)
+
+
+@hello.routes.websocket('/echo')
+def echo(c):
+    @c.on('message')
+    def message(c, msg):
+        if msg == 'quit':
+            return c.finish(4000, 'Bye!')
+        c.send(f'echo: {msg} at {c.url_for("/")}')
 """)
 
     for name, module, command in ASGI_SERVERS:
@@ -443,6 +478,27 @@ def chunks(c):
 
                 status, headers, body = server.request('GET', '/asgi/chunks')
                 is_ok(body, b'012', 'chunks given later')
+
+                with server.websocket('/asgi/echo') as ws:
+                    ws.send('hi')
+                    is_ok(ws.recv(10), 'echo: hi at /asgi', 'WebSocket message')
+                    ws.send('quit')
+
+                    # Granian does not deliver the websocket.close of the application while a receive is waiting
+                    if name == 'Granian':
+                        throws_ok(lambda: ws.recv(2), TimeoutError, 'close not delivered')
+                    else:
+                        try:
+                            ws.recv(10)
+                            fail_ok('closed by the application')
+                        except ConnectionClosed as e:
+                            is_ok(e.rcvd.code if e.rcvd else None, 4000, 'closed by the application')
+
+                def missing(server=server):
+                    with server.websocket('/asgi/missing'):
+                        pass
+
+                throws_ok(missing, InvalidStatus, 'rejected handshake')
             except Exception:
                 diag(server.output())
                 raise

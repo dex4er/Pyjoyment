@@ -1,10 +1,12 @@
+import Pyjo.IOLoop
 import Pyjo.Message.Request
 import Pyjo.Message.Response
+import Pyjo.Test.Pyjo
 import Pyjo.Transaction.HTTP
 import Pyjo.Transaction.WebSocket
 
 from Pyjo.Test import *
-from Pyjo.WebSocket import WS_BINARY, WS_CLOSE, WS_TEXT, build_frame, parse_frame
+from Pyjo.WebSocket import WS_BINARY, WS_CLOSE, WS_PING, WS_TEXT, build_frame, parse_frame
 
 import contextlib
 import io
@@ -219,6 +221,31 @@ with subtest('finish'):
     ws = Pyjo.Transaction.WebSocket.new()
     ws = ws.finish(1003, 'Cannot accept data!')
     is_deeply_ok(frames(ws.server_write()), [(1, 0, 0, 0, WS_CLOSE, b'\x03\xebCannot accept data!')], 'reason')
+
+with subtest('heartbeat'):
+    ws = Pyjo.Transaction.WebSocket.new(established=True)
+    ws = ws.heartbeat()
+    ok(isinstance(ws, Pyjo.Transaction.WebSocket.object), 'chained')
+    ws = ws.heartbeat(60, 10)
+    ws = ws.heartbeat(None)
+    ok(ws._heartbeat is None, 'stopped')
+    ws.heartbeat(0.01)
+    while not len(written := ws.server_write()):
+        Pyjo.IOLoop.one_tick()
+    is_deeply_ok(frames(written), [(1, 0, 0, 0, WS_PING, b'')], 'ping')
+    ws.heartbeat(None)
+
+    # Keep the WebSocket of a route alive
+    from Pyjoyment.Lite import app, websocket
+
+    @websocket('/echo')
+    def echo(c):
+        c.tx.heartbeat()
+        c.on('message', lambda c, msg: c.send(f'echo: {msg}'))
+
+    app.log.level = 'fatal'
+    t = Pyjo.Test.Pyjo.new(app)
+    t.websocket_ok('/echo').send_ok('hi').message_ok().message_is('echo: hi').finish_ok()
 
 with subtest('is_websocket'):
     ws = Pyjo.Transaction.WebSocket.new()

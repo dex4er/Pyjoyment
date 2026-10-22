@@ -38,6 +38,20 @@ with subtest('app'):
     app.app = hello
     ok(app.app is hello, 'application')
 
+with subtest('ping_interval'):
+    app = Pyjo.App.ASGI.new()
+    interval = app.ping_interval
+    is_ok(interval, 20, 'default')
+    app.ping_interval = 60
+    is_ok(app.ping_interval, 60, 'interval')
+
+with subtest('ping_timeout'):
+    app = Pyjo.App.ASGI.new()
+    timeout = app.ping_timeout
+    is_ok(timeout, 20, 'default')
+    app.ping_timeout = 60
+    is_ok(app.ping_timeout, 60, 'timeout')
+
 with subtest('new'):
     application = hello
     app = Pyjo.App.ASGI.new(app=application)

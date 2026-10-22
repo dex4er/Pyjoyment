@@ -1117,9 +1117,35 @@ for each worker.
 An ``ASGI`` application runs as a coroutine of the event loop: with
 :mod:`Pyjo.Reactor.Asyncio`, the default reactor, a task of :mod:`asyncio`,
 which can await anything of :mod:`asyncio`, and whose responses stream at the
-pace of the client, as the server-sent events of ``api.py`` do. A reactor
+pace of the client, as the server-sent events of ``api.py`` do. Its
+WebSockets are WebSockets of the server of :mod:`Pyjoyment`, as the echo of
+``api.py``, whose handshake waits for the application to accept it. A reactor
 without :mod:`asyncio`, as :mod:`Pyjo.Reactor.Poll`, runs only an application
 that awaits nothing but ``receive`` and ``send``.
+
+The servers of :mod:`Pyjoyment` close a connection that has been inactive for
+their inactivity timeout, 30 seconds by default, as a WebSocket without
+messages, so the WebSockets of an ``ASGI`` application are pinged every 20
+seconds, as an ``ASGI`` server pings them, which
+:attr:`~Pyjo.App.ASGI.Pyjo_App_ASGI.ping_interval` changes. A WebSocket of
+:mod:`Pyjoyment` is pinged with
+:meth:`~Pyjo.Transaction.WebSocket.Pyjo_Transaction_WebSocket.heartbeat`.
+
+.. code-block:: python
+
+    import Pyjo.App.ASGI
+
+    import api
+
+    # Pings every 60 seconds
+    plugin('Mount', {'/api': Pyjo.App.ASGI.new(app=api.app, ping_interval=60)})
+
+
+    # A WebSocket of Pyjoyment pinged every 20 seconds
+    @websocket('/echo')
+    def echo(c):
+        c.tx.heartbeat()
+        c.on('message', lambda c, msg: c.send(f'echo: {msg}'))
 
 The path of a mount is a pattern of a route, which matches the beginning of
 the path of a request, as in Mojolicious, so that ``/legacy`` matches

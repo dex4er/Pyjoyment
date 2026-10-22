@@ -157,6 +157,30 @@ def timeout(c):
         c.stash()['finished'] = c.stash().get('finished', 0) + 1
 
 
+# Not in Mojolicious: a handshake whose response waits, as an ASGI application waits for its websocket.accept
+@websocket('/later')
+def later(c):
+    c.render_later().stash()['ws'] = c.tx
+
+    @c.tx.on('finish')
+    def finish(ws, code, reason):
+        c.stash()['finished'] = code
+        Pyjo.IOLoop.stop()
+
+
+# Not in Mojolicious: a WebSocket kept alive with pings, past its inactivity timeout
+@websocket('/heartbeat')
+def heartbeat(c):
+    c.inactivity_timeout(0.3)
+    c.stash()['ws'] = c.tx.heartbeat(0.05, 0.2)
+    if c.param('stop'):
+        c.tx.heartbeat(None)
+
+    @c.on('finish')
+    def finish(c, code, reason):
+        c.stash()['finished'] = code
+
+
 ua = app.ua
 
 with subtest('URL for WebSocket'):
@@ -504,5 +528,81 @@ with subtest('Ping/pong'):
     Pyjo.IOLoop.start()
     # Unlike Mojolicious: the payload of a frame is bytes
     is_ok(got['pong'], b'test', 'received pong with payload')
+
+# Not in Mojolicious: the WebSocket of a handshake whose connection is closed before its response, which Mojo drops
+# without its event finish
+with subtest('Connection closed before the response of the handshake'):
+    got = {}
+    app.plugins.once('before_dispatch', lambda c: got.update(stash=c.stash()))
+    port = ua.server.nb_url().port
+
+    @Pyjo.IOLoop.client(address='127.0.0.1', port=port)
+    def handshake(loop, err, stream):
+        stream.on('read', lambda stream, chunk: got.update(read=chunk))
+        stream.write(
+            b'GET /later HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n'
+            b'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n',
+            lambda stream: Pyjo.IOLoop.timer(0.1, lambda loop: stream.close()),
+        )
+
+    timer = Pyjo.IOLoop.timer(5, lambda loop: loop.stop())
+    Pyjo.IOLoop.start()
+    Pyjo.IOLoop.remove(timer)
+    is_ok(got['stash'].get('finished'), 1006, 'finish event has been emitted')
+    ok('read' not in got, 'no response')
+
+# Not in Mojolicious: pings that keep a WebSocket alive, and close the connection of a client that does not answer
+with subtest('Heartbeat'):
+    got = {'frames': []}
+    app.plugins.once('before_dispatch', lambda c: got.update(stash=c.stash()))
+
+    @ua.websocket('/heartbeat')
+    def pinged(ua, tx):
+        tx.on('frame', lambda tx, frame: got['frames'].append(frame[4]))
+        Pyjo.IOLoop.timer(0.6, lambda loop: tx.finish())
+        tx.on('finish', lambda tx, code, reason: Pyjo.IOLoop.stop())
+
+    Pyjo.IOLoop.start()
+    ok(len(got['frames']) > 5, 'pings')
+    # The close of the server may come after the end of the connection of the client
+    is_deeply_ok(set(got['frames']) - {8}, {9}, 'only pings')
+    while got['stash'].get('finished') is None:
+        Pyjo.IOLoop.one_tick()
+    is_ok(got['stash']['finished'], 1005, 'closed by the client after its inactivity timeout')
+
+    # Stopped
+    got = {'frames': []}
+    app.plugins.once('before_dispatch', lambda c: got.update(stash=c.stash()))
+
+    @ua.websocket('/heartbeat?stop=1')
+    def stopped(ua, tx):
+        tx.on('frame', lambda tx, frame: got['frames'].append(frame[4]))
+        tx.on('finish', lambda tx, code, reason: Pyjo.IOLoop.stop())
+
+    Pyjo.IOLoop.start()
+    is_deeply_ok(got['frames'], [], 'no pings')
+    is_ok(got['stash']['finished'], 1006, 'closed by the inactivity timeout')
+
+    # A client that does not answer
+    got = {'read': b''}
+    app.plugins.once('before_dispatch', lambda c: got.update(stash=c.stash()))
+    port = ua.server.nb_url().port
+
+    @Pyjo.IOLoop.client(address='127.0.0.1', port=port)
+    def silent(loop, err, stream):
+        stream.on('read', lambda stream, chunk: got.update(read=got['read'] + chunk))
+        stream.on('close', lambda stream: Pyjo.IOLoop.stop())
+        stream.timeout = 0
+        stream.write(
+            b'GET /heartbeat HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n'
+            b'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n'
+        )
+
+    timer = Pyjo.IOLoop.timer(5, lambda loop: loop.stop())
+    Pyjo.IOLoop.start()
+    Pyjo.IOLoop.remove(timer)
+    like_ok(got['read'].decode('latin-1'), r'^HTTP/1\.1 101', 'handshake')
+    ok(got['read'].endswith(b'\x89\x00'), 'ping')
+    is_ok(got['stash']['finished'], 1006, 'connection closed')
 
 done_testing()
