@@ -47,6 +47,9 @@ Pyjoyment.Plugin.Mount - Application mount plugin
     # CGI application, as an object, as a string is the path of a script
     plugin('Mount', {'/cgi-bin': Pyjo.App.CGI.new(document_root='/usr/lib/cgi-bin')})
 
+    # Event function of AWS Lambda, as an object, in a process of its own
+    plugin('Mount', {'/function': Pyjo.App.Lambda.new(function='myfunction.handler')})
+
     # A regular expression of the whole path, whose group path is the rest of
     # the path for the application, and whose other named groups are captures
     plugin('Mount', {re.compile(r'/php(?P<path>/.*)?'): flask_app})
@@ -59,8 +62,9 @@ whose ``__call__`` is a coroutine function, which :mod:`Pyjo.App.ASGI` runs,
 as an application of :mod:`Pyjo` from a script, an object, or the name of a
 module and its attribute, and ``FastCGI`` applications, which
 :mod:`Pyjo.App.FastCGI` connects to, by their location ``fcgi://`` or
-``fcgi+unix://``, and ``CGI`` programs, which :mod:`Pyjo.App.CGI` runs, as an
-object of it. An application that is not one of :mod:`Pyjoyment` gets the
+``fcgi+unix://``, ``CGI`` programs, which :mod:`Pyjo.App.CGI` runs, and
+event functions of AWS Lambda, which :mod:`Pyjo.App.Lambda` runs, as an
+object of them. An application that is not one of :mod:`Pyjoyment` gets the
 server that runs it with :meth:`~Pyjo.App.Pyjo_App.server` before the server
 starts, as the application that mounts it does.
 

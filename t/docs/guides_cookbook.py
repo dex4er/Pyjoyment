@@ -213,6 +213,26 @@ with subtest('WSGI middleware'):
     finally:
         os.chdir(cwd)
 
+
+with subtest('AWS Lambda'):
+    if os.name == 'nt':
+        skip('Lambda functions need pipes that the event loop watches', 3)
+    else:
+        lam = EXAMPLES.child('lambda')
+
+        # The application as the handler of the runtime of Lambda, which AWS_LAMBDA_RUNTIME_API tells
+        os.environ['AWS_LAMBDA_RUNTIME_API'] = '127.0.0.1:9001'
+        try:
+            handler = runpy.run_path(lam.child('myapp.py').to_str(), run_name='myapp')['handler']
+        finally:
+            del os.environ['AWS_LAMBDA_RUNTIME_API']
+        event = {'version': '2.0', 'rawPath': '/', 'requestContext': {'http': {'method': 'GET'}, 'stage': '$default'}}
+        is_ok(handler(event, None)['body'], 'Hello Lambda at /!', 'handler')
+
+        # The function mounted, live and in the tests
+        t = Pyjo.Test.Pyjo.new(lam.child('gateway.py'))
+        t.get_ok('/myapp').status_is(200).content_is('Hello Lambda at /myapp!')
+
 with subtest('Rewriting'):
     app = Pyjoyment.new()
     app.mode = 'production'
