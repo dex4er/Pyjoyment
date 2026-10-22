@@ -593,6 +593,42 @@ with subtest('Connections kept'):
             is_ok(len(connections), 2, 'the connection of the parent used again')
     Pyjo.IOLoop.remove(id)
 
+    # Kept after the end of the request that comes after the whole response, of its length, has been written, unless
+    # more of the response comes
+    head = stdout(b'Status: 200\r\nContent-Length: 4\r\n\r\nlate')[: -len(_record(STDOUT, 1))]
+
+    def late(tail, connections):
+        def accept(loop, stream, id):
+            connections.append(id)
+            buffer = bytearray()
+
+            def read(stream, chunk):
+                buffer.extend(chunk)
+                if _record(STDIN, 1) in buffer:
+                    buffer.clear()
+                    stream.write(head)
+                    Pyjo.IOLoop.timer(0.1, lambda loop: stream.write(tail))
+
+            stream.on('read', read)
+
+        return Pyjo.IOLoop.server(accept, address='127.0.0.1')
+
+    for tail, kept, name in (
+        (_record(STDOUT, 1) + end(), 1, 'kept after the end of the request'),
+        (_record(STDOUT, 1, b'more') + _record(STDOUT, 1) + end(), 0, 'closed after more of the response'),
+    ):
+        connections = []
+        id = late(tail, connections)
+        with Pyjo.App.FastCGI.new(url=f'fcgi://127.0.0.1:{Pyjo.IOLoop.acceptor(id).port}', max_connections=1) as app:
+            t = Pyjo.Test.Pyjo.new(app)
+            t.get_ok('/').status_is(200).content_is('late')
+            Pyjo.IOLoop.timer(0.3, lambda loop: loop.stop())
+            Pyjo.IOLoop.start()
+            is_ok(len(app._queues[Pyjo.IOLoop.singleton]), kept, name)
+            t.get_ok('/').status_is(200).content_is('late')
+            is_ok(len(connections), 2 - kept, 'connections')
+        Pyjo.IOLoop.remove(id)
+
     # Not kept, by default
     connections = []
     url, requests, id = responder(stdout(b'Status: 200\r\n\r\nkept') + end(), close=False, connections=connections)

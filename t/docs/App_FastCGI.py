@@ -134,6 +134,16 @@ with subtest('new'):
 with subtest('close'):
     app = Pyjo.App.FastCGI.new(url=f'{url}?max_connections=1')
     Pyjo.Test.Pyjo.new(app).get_ok('/').status_is(200)
+
+    # The end of the request, which can come after the response of its length
+    def kept(loop):
+        if len(app._queues[Pyjo.IOLoop.singleton]):
+            loop.stop()
+
+    waiting = [Pyjo.IOLoop.recurring(0.01, kept), Pyjo.IOLoop.timer(5, lambda loop: loop.stop())]
+    Pyjo.IOLoop.start()
+    for id in waiting:
+        Pyjo.IOLoop.remove(id)
     is_ok(len(app._queues[Pyjo.IOLoop.singleton]), 1, 'connection kept')
     app.close()
     is_ok(len(app._queues[Pyjo.IOLoop.singleton]), 0, 'closed')

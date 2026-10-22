@@ -348,6 +348,7 @@ class _Call(Pyjo.App.CGI._Response):  # pyright: ignore[reportPrivateUsage]
         self.max: int = config['max']
         self.buffer = bytearray()
         self.connection: str | None = None
+        self.draining = False
         self.ended = False
         self.id: str | None = None
         self.location = ':'.join(str(options[name]) for name in ('path', 'address', 'port') if name in options)
@@ -400,6 +401,25 @@ class _Call(Pyjo.App.CGI._Response):  # pyright: ignore[reportPrivateUsage]
     def _error(self, stream: Any, err: Any) -> None:
         self._failed(f'FastCGI connection failed: {err}')
 
+    # The client has the whole response, of its length, before the end of the request, which a connection that is kept
+    # waits for
+    def _finish(self, *args: Any) -> None:
+        length = self.tx.res.headers.content_length
+        if (
+            self.max
+            and self.started
+            and not self.done
+            and not self.chunked
+            and not len(self.pending)
+            and self.stream is not None
+            and length is not None
+            and length.isdigit()
+            and self.sent >= int(length)
+        ):
+            self.closed = self.done = self.draining = True
+            return
+        super()._finish(*args)
+
     def _open(self, params: dict[str, str]) -> None:
         self.params = _encode_pairs(params)
 
@@ -411,7 +431,7 @@ class _Call(Pyjo.App.CGI._Response):  # pyright: ignore[reportPrivateUsage]
         self._connect()
 
     def _read(self, stream: Any, chunk: bytes) -> None:
-        if self.done:
+        if self.done and not self.draining:
             return
         self.received = True
         buffer = self.buffer
@@ -429,13 +449,28 @@ class _Call(Pyjo.App.CGI._Response):  # pyright: ignore[reportPrivateUsage]
             if id != ID:
                 continue
             if type == STDOUT:
+                if self.draining:
+                    if len(content):
+                        return self._drained(False)
+                    continue
                 self._stdout(content)
             elif type == STDERR and len(content):
                 self.app.log.warn(f'FastCGI application: {content.decode("utf-8", "replace").rstrip()}')
             elif type == END_REQUEST:
                 ended = self.ended = True
                 break
+        if self.draining:
+            if ended:
+                self._drained(True)
+            return
         self._flush(ended)
+
+    # The end of the request after the whole response, or more of the response than its length, which closes it
+    def _drained(self, ended: bool) -> None:
+        self.draining = False
+        if not ended:
+            self.aborted = True
+        self._stop()
 
     # The body of the request, a record once the one before has been written, and an empty record at its end
     def _stdin(self, *args: Any) -> None:
