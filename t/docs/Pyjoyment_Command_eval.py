@@ -31,6 +31,7 @@ with subtest('Synopsis'):
     with contextlib.redirect_stdout(buffer):
         eval_.run('-V', 'app.renderer.paths')
     is_ok(buffer.getvalue(), app.dumper(app.renderer.paths), 'data structure')
+    app.close()
 
 with subtest('Description'):
     app = Pyjoyment.new()
