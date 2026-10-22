@@ -6,13 +6,14 @@ script, which shows the same thing in Perl.
 
 ## Layout
 
-| Directory    | What it holds                                                                                          |
-| ------------ | ------------------------------------------------------------------------------------------------------ |
-| `pyjo/`      | the toolkit: objects, events, URLs, the event loop, and TCP clients and servers on it                  |
-| `pyjoyment/` | applications of the framework, `Pyjoyment.Lite`                                                        |
-| `mount/`     | applications of other frameworks, WSGI, ASGI, FastCGI, CGI and AWS Lambda, mounted in `Pyjoyment.Lite` |
-| `servers/`   | applications on the servers of Pyjoyment, on ASGI, WSGI and CGI, and on AWS Lambda                     |
-| `ua/`        | the user agent: requests, web scraping, and a server and a user agent in one event loop                |
+| Directory    | What it holds                                                                                                        |
+| ------------ | -------------------------------------------------------------------------------------------------------------------- |
+| `pyjo/`      | the toolkit: objects, events, URLs, the event loop, and TCP clients and servers on it                                |
+| `pyjoyment/` | applications of the framework, `Pyjoyment.Lite`                                                                      |
+| `mount/`     | applications of other frameworks, WSGI, ASGI, FastCGI, CGI and AWS Lambda, mounted in `Pyjoyment.Lite`               |
+| `servers/`   | applications on the servers of Pyjoyment, on ASGI, WSGI and CGI, and on AWS Lambda                                   |
+| `lambda/`    | an application of `Pyjoyment.Lite` as an event function of AWS Lambda behind a load balancer, deployed with OpenTofu |
+| `ua/`        | the user agent: requests, web scraping, and a server and a user agent in one event loop                              |
 
 ## Running
 
@@ -46,6 +47,20 @@ A script that needs a program which Pyjoyment does not run, as php-fpm for
 ```sh
 (cd examples/mount && php-fpm -n -y php/php-fpm.conf -F) &
 PYTHONPATH=. mise exec -- python examples/mount/mount_fastcgi_php.py daemon
+```
+
+The event function of `lambda/` runs on AWS Lambda, behind an Application Load
+Balancer in the default VPC, which OpenTofu creates with the credentials and
+the region of the default chain of AWS. Its test runs it with
+`Pyjo.App.Lambda`, or, with the URL of the output `url` in `TEST_LAMBDA_URL`,
+on AWS:
+
+```sh
+tofu -chdir=examples/lambda init
+tofu -chdir=examples/lambda apply
+TEST_LAMBDA_URL=$(tofu -chdir=examples/lambda output -raw url) \
+  mise exec -- python -m Pyjo.Prove -l t/examples/lambda/app.py
+tofu -chdir=examples/lambda destroy
 ```
 
 The tests in [`t/examples/`](../t/examples), in the same groups, check some of
