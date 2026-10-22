@@ -28,6 +28,9 @@ benchmarks/venv/
 *.tfstate
 *.tfstate.*
 
+# Logs, as the one of TF_LOG_PATH of OpenTofu
+*.log
+
 # The packages of npm, which npm run bundle copies from
 node_modules/
 npm-debug.log*
