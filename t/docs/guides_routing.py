@@ -29,6 +29,7 @@ import Pyjoyment.Routes.Pattern  # noqa: E402
 
 from Pyjo import q  # noqa: E402
 from Pyjo.Test import *  # noqa: E402
+from Pyjo.WebSocket import WS_PING  # noqa: E402
 
 
 # The package MyApp of these directories would hide the one of another example, which has no __init__.py
@@ -695,6 +696,21 @@ with subtest('Mount applications of other frameworks'):
             t.get_ok('/api/events').status_is(200).content_type_is('text/event-stream')
             t.content_is('data: 0\n\ndata: 1\n\ndata: 2\n\n')
             t.websocket_ok('/api/echo').send_ok('hi').message_ok().message_is('echo: hi').finish_ok()
+
+            # The hook that pings the WebSockets, every 0.05 seconds
+            def keep_alive(c):
+                if (ws := c.tx).is_websocket:
+                    ping = (1, 0, 0, 0, WS_PING, b'')
+                    timer = Pyjo.IOLoop.recurring(0.05, lambda loop: ws.established and ws.send(ping))
+                    ws.on('finish', lambda ws, code, reason: Pyjo.IOLoop.remove(timer))
+
+            t.app.hook('before_dispatch', keep_alive)
+            frames = []
+            t.websocket_ok('/api/echo').tx.on('frame', lambda ws, frame: frames.append(frame[4]))
+            while not frames:
+                Pyjo.IOLoop.one_tick()
+            is_deeply_ok(frames, [WS_PING], 'ping')
+            t.send_ok('hi').message_ok().message_is('echo: hi').finish_ok()
 
             # The beginning of the path, which an application of another framework answers with 404
             t.get_ok('/legacy.css').status_is(404)

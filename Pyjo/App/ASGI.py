@@ -73,6 +73,33 @@ its return, before the response of the handshake is a response ``500``, and
 after it is logged and closes the WebSocket with the status ``1011``, unless
 the application has closed it.
 
+A server of :mod:`Pyjo` closes a connection that has been inactive for its
+inactivity timeout, as a WebSocket without messages, where an ``ASGI`` server
+pings the clients of its WebSockets. A subclass pings them, and their clients
+answer with a pong::
+
+    import Pyjo.App.ASGI
+    import Pyjo.IOLoop
+    import Pyjo.Transaction
+
+    from Pyjo.WebSocket import WS_PING
+
+
+    # Ping the WebSockets every 20 seconds, of the transaction or of the controller of a route
+    class KeepAlive(Pyjo.App.ASGI.object):
+        interval = 20
+
+        def handler(self, tx):
+            ws = tx if isinstance(tx, Pyjo.Transaction.object) else tx.tx
+            if ws.is_websocket:
+                ping = (1, 0, 0, 0, WS_PING, b'')
+                timer = Pyjo.IOLoop.recurring(self.interval, lambda loop: ws.established and ws.send(ping))
+                ws.on('finish', lambda ws, code, reason: Pyjo.IOLoop.remove(timer))
+            super().handler(tx)
+
+
+    app = KeepAlive.new(app=application)
+
 Attributes
 ----------
 
