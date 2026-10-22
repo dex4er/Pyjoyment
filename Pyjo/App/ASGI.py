@@ -58,6 +58,21 @@ exception after that is logged and closes the connection, as does an
 application that returns before the end of its response, and an exception
 after the end of the response is logged.
 
+A WebSocket handshake is the connection ``websocket``, whose
+``subprotocols`` are the ones that the client offers. The response of the
+handshake waits for the message ``websocket.accept``, whose ``subprotocol``
+and ``headers`` are those of the response ``101``, and a ``websocket.close``
+before it rejects the handshake with the response ``403``, as does a response
+of the application with the extension ``websocket.http.response``. The
+messages of the WebSocket are ``websocket.receive``, and ``send`` of
+``websocket.send`` returns once the message has been written. The end of the
+WebSocket, also of a connection that is gone before the response of its
+handshake, is the message ``websocket.disconnect`` with the status of the
+close, after which ``send`` does nothing. An exception of the application, or
+its return, before the response of the handshake is a response ``500``, and
+after it is logged and closes the WebSocket with the status ``1011``, unless
+the application has closed it.
+
 Attributes
 ----------
 
@@ -135,7 +150,10 @@ class Pyjo_App_ASGI(Pyjo.App.object):
             if not Pyjo.App._within(c):  # pyright: ignore[reportPrivateUsage]
                 return c.helpers.reply.not_found()
             c.render_later()
-        _Call(self, application, tx, c).start()
+        if tx.is_websocket:
+            _WebSocket(self, application, tx, c).start()
+        else:
+            _Call(self, application, tx, c).start()
 
 
 # A call of the application, whose messages are the request and the response of the transaction
@@ -301,9 +319,148 @@ class _Call:
             self._end()
 
 
-# The connection scope of the request of the transaction: the path that a route embeds the application under is
-# root_path, which path begins with
-def _scope(tx: Any, c: Any) -> Scope:
+# A call of the application for a WebSocket, whose handshake waits for websocket.accept, and whose response of HTTP that
+# rejects the handshake is the one of a call for a request
+class _WebSocket(_Call):
+    def __init__(self, app: Pyjo_App_ASGI, application: Application, ws: Any, c: Any) -> None:
+        super().__init__(app, application, ws.handshake, c)
+        self.accepted = False
+        self.closing = False
+        self.connected = False
+        self.messages: list[Message] = []
+        self.responding = False
+        self.waiting: Pyjo.Promise.object | None = None
+        self.ws = ws
+
+    def start(self) -> None:
+        ws = self.ws
+        ws.on('message', self._message)
+        ws.on('finish', self._disconnect)
+        try:
+            coro = self.application(_scope(self.tx, self.c, ws), self._receive, self._send)
+        except Exception as e:
+            return self._error(e)
+        Pyjo.Promise.new(coro).then(self._returned, self._error)
+
+    # The end of the WebSocket, also when the connection is gone before its handshake, after which receive gives
+    # websocket.disconnect and send does nothing
+    def _disconnect(self, ws: Any, code: int | None, reason: str | None) -> None:
+        self.messages.append({'type': 'websocket.disconnect', 'code': code or 1005, 'reason': reason or ''})
+        self._finish()
+        self._wake()
+
+    def _error(self, e: Any) -> None:
+        if not self.accepted:
+            return super()._error(e)
+
+        # The WebSocket is closed with the status of an error of the server, unless the application has closed it
+        if not self.closed:
+            self.app.log.error(f'ASGI application failed: {_message(e)}')
+            self._close_ws(1011)
+
+    def _message(self, ws: Any, message: str | bytes) -> None:
+        self.messages.append(
+            {'type': 'websocket.receive', 'text': message}
+            if isinstance(message, str)
+            else {'type': 'websocket.receive', 'bytes': message}
+        )
+        self._wake()
+
+    async def _receive(self) -> Message:
+        if not self.connected:
+            self.connected = True
+            return {'type': 'websocket.connect'}
+        while not self.messages:
+            self.waiting = Pyjo.Promise.new()
+            await self.waiting
+        return self.messages.pop(0)
+
+    def _returned(self, *args: Any) -> None:
+        if self.closed and not self.accepted:
+            return
+        if not self.accepted:
+            return super()._returned(*args)
+        if not self.closed and not self.closing:
+            self.app.log.error('ASGI application returned without closing its WebSocket')
+            self._close_ws(1011)
+
+    async def _send(self, message: Message) -> None:
+        if self.closed or self.closing:
+            return
+        type = message['type']
+
+        # The response of HTTP that rejects the handshake
+        if self.responding or type == 'websocket.http.response.start':
+            if not type.startswith('websocket.http.response.'):
+                raise Pyjo.Exception.new(f'ASGI message "{type}" after "websocket.http.response.start"')
+            self.responding = True
+            return await super()._send({**message, 'type': type.removeprefix('websocket.')})
+
+        # Handshake
+        if not self.accepted:
+            if type == 'websocket.accept':
+                self.accepted = True
+                ws = self.ws
+                headers = ws.res.headers
+                for name, value in message.get('headers', []):
+                    headers.add(bytes(name).decode('latin-1'), bytes(value).decode('latin-1'))
+                if (protocol := message.get('subprotocol')) is not None:
+                    headers.sec_websocket_protocol = protocol
+                ws.with_compression()
+                return self._accepted()
+
+            # Rejected
+            if type == 'websocket.close':
+                self.started = self.ended = True
+                res = self.tx.res
+                res.code = 403
+                res.body = b''
+                return self._rendered()
+
+            raise Pyjo.Exception.new(f'ASGI message "{type}" before "websocket.accept"')
+
+        # Message
+        if type == 'websocket.send':
+            written = self.written = Pyjo.Promise.new()
+
+            def drained(*args: Any) -> None:
+                written.resolve()
+
+            if (data := message.get('bytes')) is not None:
+                self.ws.send({'binary': bytes(data)}, drained)
+            else:
+                self.ws.send(message.get('text') or '', drained)
+            await written
+            return
+
+        # Close
+        if type == 'websocket.close':
+            return self._close_ws(int(message.get('code') or 1000), message.get('reason') or None)
+
+        raise Pyjo.Exception.new(f'Unknown ASGI message "{type}"')
+
+    # The response 101 of the handshake
+    def _accepted(self) -> None:
+        if (c := self.c) is not None:
+            c.rendered(101)
+        else:
+            self.tx.res.code = 101
+            self.ws.resume()
+
+    def _close_ws(self, code: int, reason: str | None = None) -> None:
+        if not self.closing:
+            self.closing = True
+            self.ws.finish(code, reason)
+
+    def _wake(self) -> None:
+        if (waiting := self.waiting) is not None:
+            self.waiting = None
+            waiting.resolve()
+
+
+# The connection scope of the request of the transaction, or of the handshake of a WebSocket: the path that a route
+# embeds the application under is root_path, which path begins with
+def _scope(tx: Any, c: Any, ws: Any = None) -> Scope:
     req = tx.req
     url = req.url
     base = url.base
@@ -320,11 +477,10 @@ def _scope(tx: Any, c: Any) -> Scope:
 
     https = req.is_secure
     scope: dict[str, Any] = {
-        'type': 'http',
+        'type': 'http' if ws is None else 'websocket',
         'asgi': {'version': '3.0', 'spec_version': '2.4'},
         'http_version': req.version,
-        'method': req.method,
-        'scheme': 'https' if https else 'http',
+        'scheme': ('https' if https else 'http') if ws is None else ('wss' if https else 'ws'),
         'path': _str(script + path),
         'raw_path': (script + path).encode(),
         'query_string': url.query.to_str().encode(),
@@ -332,6 +488,13 @@ def _scope(tx: Any, c: Any) -> Scope:
         'headers': headers,
         'server': (base.host or tx.local_address or 'localhost', base.port or tx.local_port or (443 if https else 80)),
     }
+    if ws is None:
+        scope['method'] = req.method
+    else:
+        # The subprotocols that the client offers, and the response of HTTP that rejects the handshake
+        offered = req.headers.sec_websocket_protocol or ''
+        scope['subprotocols'] = [protocol.strip() for protocol in offered.split(',') if protocol.strip()]
+        scope['extensions'] = {'websocket.http.response': {}}
     if (address := tx.remote_address) is not None:
         scope['client'] = (address, tx.remote_port or 0)
     return scope

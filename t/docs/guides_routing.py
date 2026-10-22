@@ -694,6 +694,7 @@ with subtest('Mount applications of other frameworks'):
             t.get_ok('/api/foo').status_is(200).json_is({'root_path': '/api', 'path': '/api/foo'})
             t.get_ok('/api/events').status_is(200).content_type_is('text/event-stream')
             t.content_is('data: 0\n\ndata: 1\n\ndata: 2\n\n')
+            t.websocket_ok('/api/echo').send_ok('hi').message_ok().message_is('echo: hi').finish_ok()
 
             # The beginning of the path, which an application of another framework answers with 404
             t.get_ok('/legacy.css').status_is(404)

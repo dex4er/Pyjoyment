@@ -1,8 +1,15 @@
 import json
 
 
-# An ASGI application, as an application of Starlette is one, with server-sent events
+# An ASGI application, as an application of Starlette is one, with server-sent events and a WebSocket
 async def app(scope, receive, send):
+    if scope['type'] == 'websocket':
+        await receive()
+        await send({'type': 'websocket.accept'})
+        while (message := await receive())['type'] == 'websocket.receive':
+            await send({'type': 'websocket.send', 'text': f'echo: {message["text"]}'})
+        return
+
     if scope['path'] == f'{scope["root_path"]}/events':
         await send({'type': 'http.response.start', 'status': 200, 'headers': [(b'content-type', b'text/event-stream')]})
         for n in range(3):

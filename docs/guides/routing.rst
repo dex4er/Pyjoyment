@@ -1117,7 +1117,9 @@ for each worker.
 An ``ASGI`` application runs as a coroutine of the event loop: with
 :mod:`Pyjo.Reactor.Asyncio`, the default reactor, a task of :mod:`asyncio`,
 which can await anything of :mod:`asyncio`, and whose responses stream at the
-pace of the client, as the server-sent events of ``api.py`` do. A reactor
+pace of the client, as the server-sent events of ``api.py`` do. Its
+WebSockets are WebSockets of the server of :mod:`Pyjoyment`, as the echo of
+``api.py``, whose handshake waits for the application to accept it. A reactor
 without :mod:`asyncio`, as :mod:`Pyjo.Reactor.Poll`, runs only an application
 that awaits nothing but ``receive`` and ``send``.
 
