@@ -137,6 +137,7 @@ lint:
         - pyright
       paths:
         - benchmarks/**
+        - examples/mount/hello_mangum.py
         - examples/pyjo/resolv_dns.py
         - examples/servers/hello_world_uvicorn.py
         - examples/servers/hello_world_werkzeug.py

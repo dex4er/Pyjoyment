@@ -6,13 +6,13 @@ script, which shows the same thing in Perl.
 
 ## Layout
 
-| Directory    | What it holds                                                                              |
-| ------------ | ------------------------------------------------------------------------------------------ |
-| `pyjo/`      | the toolkit: objects, events, URLs, the event loop, and TCP clients and servers on it      |
-| `pyjoyment/` | applications of the framework, `Pyjoyment.Lite`                                            |
-| `mount/`     | applications of other frameworks, WSGI, ASGI, FastCGI and CGI, mounted in `Pyjoyment.Lite` |
-| `servers/`   | applications on the servers of Pyjoyment, on ASGI, WSGI and CGI, and on AWS Lambda         |
-| `ua/`        | the user agent: requests, web scraping, and a server and a user agent in one event loop    |
+| Directory    | What it holds                                                                                          |
+| ------------ | ------------------------------------------------------------------------------------------------------ |
+| `pyjo/`      | the toolkit: objects, events, URLs, the event loop, and TCP clients and servers on it                  |
+| `pyjoyment/` | applications of the framework, `Pyjoyment.Lite`                                                        |
+| `mount/`     | applications of other frameworks, WSGI, ASGI, FastCGI, CGI and AWS Lambda, mounted in `Pyjoyment.Lite` |
+| `servers/`   | applications on the servers of Pyjoyment, on ASGI, WSGI and CGI, and on AWS Lambda                     |
+| `ua/`        | the user agent: requests, web scraping, and a server and a user agent in one event loop                |
 
 ## Running
 
