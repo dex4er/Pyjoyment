@@ -267,7 +267,9 @@ port 0 instead, which `ports()` gives.
   on the WSGI and the ASGI servers, and PHP on php-fpm with
   `Pyjo.App.FastCGI` and on php-cgi with `Pyjo.App.CGI`, which `setup-php`
   installs in CI, and without which the tests are skipped, and Starlette on
-  Mangum as an event function of AWS Lambda with `Pyjo.App.Lambda`. The servers and
+  Mangum as an event function of AWS Lambda with `Pyjo.App.Lambda`, and the
+  server of the MCP SDK of the example `mount_mcp.py`, which the client of the
+  SDK calls, on the daemon and without sessions on the workers of prefork. The servers and
   the frameworks are in the dependency group `servers`, not in
   `dependencies`; without it, the tests are skipped.
 - `t/lib/` holds helpers shared by the tests. Run on their own, they skip with

@@ -96,6 +96,36 @@ seconds, as an ``ASGI`` server pings them, which
         c.tx.heartbeat()
         c.on('message', lambda c, msg: c.send(f'echo: {msg}'))
 
+MCP servers
+~~~~~~~~~~~
+
+A server of the MCP SDK, ``MCPServer`` of the package ``mcp``, is an ``ASGI``
+application of Starlette with its transport of Streamable HTTP, whose lifespan
+runs the manager of its sessions, so that the tools of an agent of AI run next
+to the routes of the application, on the same server. Its path is ``/`` under
+the mount, so that a client connects to the URL of the mount with a slash at
+the end, as ``http://localhost:3000/mcp/``, which Starlette would otherwise
+redirect to on each request.
+
+.. literalinclude:: ../../examples/mount/mount_mcp.py
+    :language: python
+    :caption: mount_mcp.py
+
+The sessions are kept by the process that has started them, so with the
+workers of the pre-forking server the server runs without them, with
+``stateless_http=True``, as with any server that has more than one process.
+The manager of the sessions runs once, in one event loop, so the server does
+not run in the threads of the pre-threading server, whose lifespan fails in
+the second one.
+
+.. code-block:: python
+
+    plugin('Mount', {'/mcp': mcp.streamable_http_app(streamable_http_path='/', stateless_http=True)})
+
+.. code-block:: sh
+
+    $ python mount_mcp.py prefork -w 4
+
 Paths
 -----
 
