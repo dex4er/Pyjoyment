@@ -97,7 +97,11 @@ of them is a regression.
   `run_coroutine` of the reactor, and `Pyjo.App.CGI` runs the program of
   each request, which a CGI program is, with `Pyjo.IOLoop.ChildProcess`,
   whose pipes the reactor reads and writes, and which it reaps with a timer,
-  without waiting for it. A package that needs the next cycle of the
+  without waiting for it. `Pyjo.App.Lambda` runs an event function of
+  AWS Lambda in a process of its own too, which gets its invocations one
+  after another from a Runtime API that a server on the event loop serves,
+  as an execution environment of Lambda does, as a handler called in the
+  event loop could not run an event loop of its own, as Mangum does. A package that needs the next cycle of the
   event loop asks the reactor for it, and guards itself against being called
   again from inside the event loop. What only a server knows, as how it runs
   an application, which the flags `wsgi.multithread`, `wsgi.multiprocess`
@@ -252,7 +256,8 @@ port 0 instead, which `ports()` gives.
   as the examples `mount_wsgi_inception.py` and `mount_asgi_inception.py` do,
   on the WSGI and the ASGI servers, and PHP on php-fpm with
   `Pyjo.App.FastCGI` and on php-cgi with `Pyjo.App.CGI`, which `setup-php`
-  installs in CI, and without which the tests are skipped. The servers and
+  installs in CI, and without which the tests are skipped, and Starlette on
+  Mangum as an event function of AWS Lambda with `Pyjo.App.Lambda`. The servers and
   the frameworks are in the dependency group `servers`, not in
   `dependencies`; without it, the tests are skipped.
 - `t/lib/` holds helpers shared by the tests. Run on their own, they skip with
@@ -539,6 +544,10 @@ it, the reverse of `Pyjo.Server.FastCGI`), `Pyjo.App.CGI` (the application of
 Pyjo that runs a CGI program in a process of its own for each request, the
 reverse of `Pyjo.Server.CGI`, inspired by `Mojolicious::Plugin::CGI` of CPAN,
 whose base class has the response of CGI that `Pyjo.App.FastCGI` shares),
+`Pyjo.App.Lambda` (the application of Pyjo that runs an event function of AWS
+Lambda in a process of its own, through the Runtime API of Lambda, which it
+serves, the reverse of `Pyjo.Server.Lambda`, whose runtime client runs a
+handler of Python there),
 `Pyjo.IOLoop.ChildProcess` (a program in a process of its own, with its
 standard input, output and error as `Pyjo.IOLoop.Stream` objects, inspired by
 `child_process` of Node.js, whose standard input is a stream that closes when
