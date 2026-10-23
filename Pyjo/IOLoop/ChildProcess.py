@@ -45,6 +45,10 @@ and at once when its output and its error have ended, as most programs end
 them when they exit. The end of the interpreter kills and reaps the processes
 that are left, and closes their pipes.
 
+The child of a fork leaves the processes of its parent to it: it closes its
+copies of their pipes, and neither reaps them nor emits their events, which
+the parent does.
+
 The reactor watches pipes on POSIX systems, not on Windows, where
 :meth:`~Pyjo_IOLoop_ChildProcess.spawn` emits the event ``error``.
 
@@ -372,6 +376,7 @@ class Pyjo_IOLoop_ChildProcess(Pyjo.EventEmitter.object):
             return self._later('error', e)
         self._detached = detached
         _running[self] = os.getpid()
+        _register()
         assert process.stdin is not None and process.stdout is not None and process.stderr is not None
 
         # The output and the error, until their end, which the end of the process usually is, read from the event
@@ -397,7 +402,7 @@ class Pyjo_IOLoop_ChildProcess(Pyjo.EventEmitter.object):
         # The output and the error are read once the subscribers of the event spawn can read them, as a reactor may
         # read before the next tick
         def spawned(reactor: Any) -> None:
-            if (child := ref()) is None:
+            if (child := ref()) is None or child._process is None:
                 return
             for stream in (child._stdout, child._stderr):
                 if isinstance(stream, _Output):
@@ -409,13 +414,30 @@ class Pyjo_IOLoop_ChildProcess(Pyjo.EventEmitter.object):
 
     # The output or the error of the process has ended, so that it has likely exited
     def _closed(self, stream: Any) -> None:
+        if (process := self._process) is None:
+            return
         self._ended += 1
         if self._ended < 2:
             return
-        if self._process is not None and self._process.returncode is not None:
+        if process.returncode is not None:
             return self._emit_close()
         self._check = 0
         self._wait(_DELAYS[0])
+
+    # The process of the parent of a fork, whose pipes the child closes, without the events of its end, as Popen.poll
+    # gives the exit code 0 for a process that is not a child of the process that calls it
+    def _leave(self) -> None:
+        # The poll of a process that is not a child gives it the exit code 0, so that Popen does not warn that it still
+        # runs when it is freed
+        if (process := self._process) is not None:
+            self._process = None
+            process.poll()
+        if (timer := self._timer) is not None:
+            self._timer = None
+            self.reactor.remove(timer)
+        for stream in (self._stdin, self._stdout, self._stderr):
+            if stream is not None:
+                stream.close()
 
     def _emit_close(self) -> None:
         self.emit('close', self._exit_code, self._signal_code)
@@ -516,6 +538,30 @@ class _Input(Pyjo.IOLoop.Stream.object):
             return self.close()
         if self._handle is not None:
             self.reactor.watch(self._handle, False, False)
+
+
+# The child of a fork leaves the processes of its parent, before its event loop reads their pipes. The handler is
+# registered when a process is spawned, after the one of the reactor, which os.register_at_fork calls first, so that the
+# reactor has moved to a loop of its own, as a loop of epoll shares its state with the parent
+_registered = False
+
+
+def _register() -> None:
+    global _registered
+    if not _registered and hasattr(os, 'register_at_fork'):
+        _registered = True
+        os.register_at_fork(after_in_child=_after_fork_in_child)
+
+
+def _after_fork_in_child() -> None:
+    pid = os.getpid()
+    for child, owner in list(_running.items()):
+        if owner != pid:
+            del _running[child]
+            try:
+                child._leave()  # pyright: ignore[reportPrivateUsage]
+            except Exception:
+                pass
 
 
 # The processes that are left, killed and reaped, of this process, not of the one that forked it
