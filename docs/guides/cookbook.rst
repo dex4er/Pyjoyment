@@ -142,6 +142,48 @@ requests by setting ``PYJO_TRUSTED_PROXIES`` to a list of comma separated
 addresses or CIDR networks. For even finer control, `Rewriting`_ includes
 examples of how the changes could be implemented manually.
 
+Hosts and origins
+~~~~~~~~~~~~~~~~~
+
+A server on ``localhost`` is not reachable from other machines, but it is
+from the browser of its user, and so from every page that the browser has
+open. A page of another site can request it, and with *DNS rebinding*, where
+the attacker makes the name of its own site an address of ``127.0.0.1``, even
+read the responses, as the browser takes the server for the site of the page.
+Such a request has the name of the site of the attacker in its ``Host``
+header, and the origin of its page, a scheme, a host and a port, in its
+``Origin`` header, which a browser sends with a request of a page of another
+site.
+
+:mod:`Pyjoyment.Plugin.AllowedHosts` rejects a request whose ``Host`` is not
+one of the hosts of the application, with ``421 Misdirected Request``, and a
+request whose ``Origin`` is not one of its origins, with ``403 Forbidden``.
+Without options, the hosts are those of ``localhost``, on any port, and the
+origins are those of the hosts, which is what a server for development, or
+of the Model Context Protocol on the machine of its user, needs.
+
+.. code-block:: python
+
+    plugin('AllowedHosts')
+
+A deployment names its own hosts, a domain with its subdomains with a leading
+dot, and the origins of the pages that request it, which replace the ones of
+the hosts.
+
+.. literalinclude:: cookbook/hosts.py
+    :language: python
+    :caption: myapp.py
+
+Behind a `Reverse proxy`_, the host is the one of ``Host``, which the proxy
+passes on, so it is the name that the clients use. To check only some routes,
+as the endpoint of MCP of an application whose pages are public, the plugin
+leaves out its hook, and the helper ``allowed_hosts`` checks the routes under
+it, where it ends the dispatch of a request that is not allowed.
+
+.. literalinclude:: cookbook/hosts_under.py
+    :language: python
+    :caption: myapp.py
+
 .. _cookbook-deployment:
 
 Deployment
