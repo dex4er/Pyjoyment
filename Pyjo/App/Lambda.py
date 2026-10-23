@@ -30,8 +30,10 @@ API Gateway, a Function URL or an Application Load Balancer runs it on AWS.
 
 The function runs in a process of its own, as an execution environment of
 Lambda does, which :mod:`Pyjo.IOLoop.ChildProcess` starts on the first
-request and keeps for the next ones, which it gets one after another. The
-process gets its invocations from the `Runtime API
+request and keeps for the next ones, which it gets one after another. Each
+event loop has a process of its own, and the child of a fork, as a worker of
+:mod:`Pyjo.Server.Prefork`, leaves the processes of its parent to it and
+starts its own. The process gets its invocations from the `Runtime API
 <https://docs.aws.amazon.com/lambda/latest/dg/runtimes-api.html>`_ of
 ``AWS_LAMBDA_RUNTIME_API``, which a :mod:`Pyjo.Server.Daemon` on a port of
 the loopback serves on the same event loop, so that a handler of Python runs
@@ -221,6 +223,7 @@ class Pyjo_App_Lambda(Pyjo.App.object):
         # The execution environments of each event loop, of the process that made them
         self._pid = os.getpid()
         self._environments: weakref.WeakKeyDictionary[Any, _Environment] = weakref.WeakKeyDictionary()
+        _apps.add(self)
 
         super().__init__(attrs, **kwargs)
 
@@ -264,16 +267,21 @@ class Pyjo_App_Lambda(Pyjo.App.object):
     def _environment(self) -> '_Environment':
         loop = Pyjo.IOLoop.singleton
 
-        # The child of a fork leaves the processes of its parent to it, and closes the copies of its servers
-        if self._pid != (pid := os.getpid()):
-            if (inherited := self._environments.get(loop)) is not None:
-                inherited.leave()
-            self._pid, self._environments = pid, weakref.WeakKeyDictionary()
-
+        self._leave()
         environment = self._environments.get(loop)
         if environment is None or environment.ended:
+            _register()
             self._environments[loop] = environment = _Environment(self)
         return environment
+
+    # The child of a fork leaves the processes of its parent to it, and closes the copies of their servers, at the fork,
+    # before its event loop reads the connections of the runtime clients of the parent, or of the processes that the
+    # child starts later
+    def _leave(self) -> None:
+        if self._pid != (pid := os.getpid()):
+            for environment in list(self._environments.values()):
+                environment.leave()
+            self._pid, self._environments = pid, weakref.WeakKeyDictionary()
 
 
 # An invocation of the function for a request, and its response
@@ -755,6 +763,28 @@ def _reply(tx: Any, code: int) -> None:
     res.headers.content_type = 'application/json'
     res.body = b'{"status":"OK"}' if code < 400 else b'{"errorMessage":"Not Found"}'
     tx.resume()
+
+
+# The applications whose execution environments the child of a fork leaves, at the fork. The handler is registered with the
+# first environment, after the one of the reactor, which os.register_at_fork calls first, so that the reactor has moved
+# to a loop of its own, as a loop of epoll shares its state with the parent
+_apps: 'weakref.WeakSet[Pyjo_App_Lambda]' = weakref.WeakSet()
+_registered = False
+
+
+def _register() -> None:
+    global _registered
+    if not _registered and hasattr(os, 'register_at_fork'):
+        _registered = True
+        os.register_at_fork(after_in_child=_after_fork_in_child)
+
+
+def _after_fork_in_child() -> None:
+    for app in list(_apps):
+        try:
+            app._leave()  # pyright: ignore[reportPrivateUsage]
+        except Exception:
+            pass
 
 
 new = Pyjo_App_Lambda.new

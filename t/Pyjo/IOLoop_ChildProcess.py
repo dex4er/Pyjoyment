@@ -249,6 +249,30 @@ with subtest('Promise'):
     run_coroutine().then(lambda *values: results.extend(values)).wait()
     is_deeply_ok(results, [(0, b'coroutine')], 'awaited')
 
+with subtest('The child of a fork leaves the processes of its parent'):
+    script = 'import sys, time; time.sleep(0.5); print("parent"); sys.stdout.flush()'
+    child = Pyjo.IOLoop.ChildProcess.new().spawn([PYTHON, '-c', script])
+    chunks = output(child.stdout)
+    pid = os.fork()
+    if pid == 0:
+        code = 1
+        try:
+            # The event loop of the child runs while the process of its parent writes and exits
+            left = []
+            for name in ('spawn', 'exit', 'close'):
+                child.on(name, lambda child, *args, name=name: left.append(name))
+            Pyjo.IOLoop.timer(1, lambda loop: loop.stop())
+            Pyjo.IOLoop.start()
+            code = 0 if not left and not chunks and child.pid is None and not child.kill() else 1
+        finally:
+            sys.stdout.flush()
+            os._exit(code)
+    events = run(child)
+    _, status = os.waitpid(pid, 0)
+    is_ok(os.waitstatus_to_exitcode(status), 0, 'no events, output, process id or signal in the child of the fork')
+    is_deeply_ok(events, [('spawn',), ('exit', 0, None), ('close', 0, None)], 'the events in the parent')
+    is_ok(b''.join(chunks).strip(), b'parent', 'the output in the parent')
+
 with subtest('Event loop'):
     loop = Pyjo.IOLoop.new()
     child = loop.spawn([PYTHON, '-c', 'print("loop")'])

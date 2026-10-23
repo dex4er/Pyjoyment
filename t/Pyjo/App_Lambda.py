@@ -11,6 +11,7 @@ import base64
 import os
 import re
 import sys
+import time
 
 
 if os.name == 'nt':
@@ -320,6 +321,28 @@ with subtest('Process kept'):
             is_deeply_ok(status, [0], 'a process of the child')
             t.get_ok('/').status_is(200).content_is(first)
             is_ok(t.tx.res.text, first, 'the process of the parent')
+
+with subtest('Process kept while the child of a fork runs its event loop'):
+    # The runtime client of the parent asks for its next invocation, which the child does not read first
+    if not hasattr(os, 'fork'):
+        skip('no fork', 3)
+    else:
+        with function('pid', timeout=5) as fcn:
+            t = Pyjo.Test.Pyjo.new(fcn)
+            first = t.get_ok('/').status_is(200).tx.res.text
+            pid = os.fork()
+            if pid == 0:
+                try:
+                    Pyjo.IOLoop.timer(1, lambda loop: loop.stop())
+                    Pyjo.IOLoop.start()
+                finally:
+                    sys.stdout.flush()
+                    os._exit(0)
+            time.sleep(1.5)
+            os.waitpid(pid, 0)
+            start = time.monotonic()
+            t.get_ok('/').status_is(200).content_is(first)
+            ok(time.monotonic() - start < 4, 'without the timeout of the function')
 
 with subtest('Command'):
     command = [sys.executable, '-m', 'Pyjo.Server.Lambda', 'handlers.text']
