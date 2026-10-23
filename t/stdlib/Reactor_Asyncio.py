@@ -286,6 +286,24 @@ b.close()
         is_ok(process.stdout, "True [b'io'] True [b'io']\n", 'a new loop in the child, the loop of the parent in it')
         is_ok(process.stderr, '', 'no warning')
 
+with subtest('The threshold of a slow callback of a loop of its own'):
+    duration = os.environ.pop('PYJO_ASYNCIO_SLOW_CALLBACK', None)
+    try:
+        with Pyjo.Reactor.Asyncio.new() as reactor:
+            is_ok(reactor.loop.slow_callback_duration, 0.1, 'default of asyncio')
+        os.environ['PYJO_ASYNCIO_SLOW_CALLBACK'] = '5'
+        with Pyjo.Reactor.Asyncio.new() as reactor:
+            is_ok(reactor.loop.slow_callback_duration, 5.0, 'PYJO_ASYNCIO_SLOW_CALLBACK')
+        loop = asyncio.new_event_loop()
+        with Pyjo.Reactor.Asyncio.new(loop=loop) as reactor:
+            is_ok(reactor.loop.slow_callback_duration, 0.1, 'a loop that it is given stays as it is')
+        loop.close()
+    finally:
+        if duration is None:
+            os.environ.pop('PYJO_ASYNCIO_SLOW_CALLBACK', None)
+        else:
+            os.environ['PYJO_ASYNCIO_SLOW_CALLBACK'] = duration
+
 with subtest('Context manager'):
     with Pyjo.Reactor.Asyncio.new() as reactor:
         loop = reactor.loop

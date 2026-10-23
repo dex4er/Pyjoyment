@@ -61,6 +61,14 @@ that is running has to be one too, as of
 :class:`asyncio.SelectorEventLoop` of Windows watches sockets only, not pipes
 or files, up to 512 of them, with :func:`select.select`.
 
+In the debug mode of asyncio, as of ``PYTHONDEVMODE``, a loop logs a callback
+that takes longer than its ``slow_callback_duration``, 0.1 seconds. The
+``PYJO_ASYNCIO_SLOW_CALLBACK`` environment variable sets it in seconds for a
+loop that the reactor makes, as on a machine that is busy, where TLS and an
+application of a server take longer. ::
+
+    PYTHONDEVMODE=1 PYJO_ASYNCIO_SLOW_CALLBACK=5 python myapp.py daemon
+
 The end of a ``with`` block closes the event loop that the reactor made.
 
 See also
@@ -701,9 +709,13 @@ def _fileno(handle: Handle) -> int:
 
 
 # Not in Mojolicious: a loop of its own is a SelectorEventLoop on Windows, where the default of asyncio is the
-# ProactorEventLoop, which has no add_reader and add_writer
+# ProactorEventLoop, which has no add_reader and add_writer, with the threshold of a slow callback of
+# PYJO_ASYNCIO_SLOW_CALLBACK, as asyncio has no variable of its own for it
 def _new_event_loop() -> asyncio.AbstractEventLoop:
-    return asyncio.SelectorEventLoop() if sys.platform == 'win32' else asyncio.new_event_loop()
+    loop = asyncio.SelectorEventLoop() if sys.platform == 'win32' else asyncio.new_event_loop()
+    if duration := os.environ.get('PYJO_ASYNCIO_SLOW_CALLBACK'):
+        loop.slow_callback_duration = float(duration)
+    return loop
 
 
 # Not in Mojolicious: the event loops that the reactors make for themselves, which are closed at the exit of the
