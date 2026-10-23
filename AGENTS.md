@@ -137,8 +137,10 @@ of them is a regression.
 - **What an area needs, in patterns that port.** The core is a complete set of
   components of its own, and each gives what its area needs, not the whole of
   a standard or of a library that it follows: `Pyjo.YAML` is the YAML of
-  configuration files, and the builder of `Pyjo.JSON.Schema` the part of zod
-  that JSON Schema has. Its API takes the patterns of the languages that code
+  configuration files, the builder of `Pyjo.JSON.Schema` the part of zod
+  that JSON Schema has, and its validation the keywords of JSON Schema 2020-12
+  that the schemas of tools and of APIs have, which reports the others instead
+  of ignoring them. Its API takes the patterns of the languages that code
   comes from, Perl and JavaScript, whose idioms Mojolicious shares, and Python,
   where they make the work easier, so that code of Mojolicious, of Node.js or
   of a library of Python ports with few changes: `Pyjo.JSON.Schema` takes the
@@ -294,8 +296,16 @@ port 0 instead, which `ports()` gives.
   ruff and pyright check as Python 3.14. `tt/pytest` is a project of test
   scripts and tests of pytest, which the tests of
   `Pyjo.Test.pytest_plugin` copy to a temporary directory and run pytest
-  on. A test does not write files into `t/` or `tt/`: what it makes goes to
-  a temporary directory.
+  on. `tt/JSON-Schema-Test-Suite` holds the files of the official test suite
+  of JSON Schema, JSON-Schema-Test-Suite, for draft 2020-12, with its
+  license, of the keywords and formats that the validation of
+  `Pyjo.JSON.Schema` supports, which `t/Pyjo/JSON_Schema_suite.py` runs. They
+  are copied as they are, which Trunk does not lint, so that a newer version
+  of the suite replaces them; its `README.md` names the commit and the files
+  that are left out, and the test lists the cases of the files that it
+  leaves out, with the reason, and fails when such a case passes. A test does
+  not write files into `t/` or `tt/`: what it makes goes to a temporary
+  directory.
 
 A test script imports the test functions and groups its tests in subtests,
 like Mojo's tests do; Python keywords give some functions an `_ok` suffix
@@ -619,8 +629,9 @@ a subclass of the one of `prefork`),
 by `Mojolicious::Plugin::NotYAMLConfig`, for the format of configuration of
 the standard library), `Pyjo.TOML` (the dumper of TOML, which the standard library only reads),
 `Pyjo.JSON.Schema` (JSON Schema 2020-12 from the type hints of Python and
-from a builder inspired by zod, written from the specification, whose tests
-compare the schemas with the ones of pydantic and of zod),
+from a builder inspired by zod, and its validation, written from the
+specification, whose tests compare the schemas with the ones of pydantic and
+of zod, and run the official test suite of JSON Schema on the validation),
 `Pyjo.Test.pytest_plugin` (the plugin of pytest, which runs the test scripts
 as `Pyjo.Prove` does and the functions of `Pyjo.Test` in the tests of pytest),
 `Pyjo.YAML` (the subset of YAML of `CPAN::Meta::YAML`,

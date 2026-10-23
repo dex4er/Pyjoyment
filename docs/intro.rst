@@ -15,8 +15,8 @@ web framework:
   front of it and to an application behind it, as PHP on php-fpm, and runs as
   an ASGI, WSGI or CGI application, or as an event function of AWS Lambda.
 * HTML/XML parser with CSS selector support.
-* JSON with JSON Pointers and JSON Schema from type hints, YAML and TOML, all
-  loaded and dumped.
+* JSON with JSON Pointers and JSON Schema, from type hints and validated,
+  YAML and TOML, all loaded and dumped.
 * Command line options with ``Pyjo.GetOpt``, in the way of Getopt::Long,
   argparse and Cobra, also from environment variables.
 * Python-ish templates and template strings, with automatic escaping.
