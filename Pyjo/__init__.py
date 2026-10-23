@@ -100,6 +100,7 @@ if TYPE_CHECKING:
     import Pyjo.Collection
     import Pyjo.DOM
     import Pyjo.File
+    import Pyjo.JSON.Schema
     import Pyjo.Message.Response
     import Pyjo.String.Bytes
     import Pyjo.String.Unicode
@@ -114,7 +115,7 @@ __path__ = extend_path(__path__, __name__)
 
 # The functions of ojo, which the modules they use are imported for when they are called, so that a module of Pyjo
 # does not import them
-__all__ = ['a', 'b', 'c', 'd', 'f', 'g', 'h', 'j', 'l', 'n', 'o', 'p', 'q', 'r', 't', 'u', 'w', 'x']
+__all__ = ['a', 'b', 'c', 'd', 'f', 'g', 'h', 'j', 'l', 'n', 'o', 'p', 'q', 'r', 't', 'u', 'w', 'x', 'z']
 
 _agent: 'Pyjo.UserAgent.object | None' = None
 
@@ -410,3 +411,31 @@ def x(*args: Any) -> 'Pyjo.DOM.object':
     import Pyjo.DOM
 
     return Pyjo.DOM.new(*args)
+
+
+# Not in Mojolicious: the builder of Pyjo.JSON.Schema, as z of zod, which imports the module when one of its methods is
+# read, so that from Pyjo import * does not import it
+class _Builder:
+    def __getattr__(self, name: str) -> Any:
+        import Pyjo.JSON.Schema
+
+        return getattr(Pyjo.JSON.Schema.z, name)
+
+    def __repr__(self) -> str:
+        return 'Pyjo.JSON.Schema.z'
+
+
+if TYPE_CHECKING:
+    z = Pyjo.JSON.Schema.z
+else:
+    z = _Builder()
+    """::
+
+        schema = z.object(name=z.string(), stars=z.int().min(0))
+
+    The builder of :mod:`Pyjo.JSON.Schema`, its class ``z``, after ``z`` of
+    zod, whose schemas validate a value, as the JSON of a response. ::
+
+        $ python -m Pyjo 'z.object(port=z.int()).validate(j(f("config.json").slurp()))'
+        $ python -m Pyjo 'z.object(id=z.int()).validate(g("api.github.com/repos/dex4er/Pyjoyment").json()).is_valid'
+    """
