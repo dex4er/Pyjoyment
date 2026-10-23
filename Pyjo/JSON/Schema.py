@@ -2311,7 +2311,7 @@ def _format_uri(regex: re.Pattern[str]) -> Callable[[str], bool]:
         return (
             ip is None
             or _format_ipv6(ip)
-            or re.fullmatch(r"v[0-9A-Fa-f]+\.[A-Za-z0-9\-._~!$&'()*+,;=:]+", ip) is not None
+            or re.fullmatch(r"[vV][0-9A-Fa-f]+\.[A-Za-z0-9\-._~!$&'()*+,;=:]+", ip) is not None
         )
 
     return check

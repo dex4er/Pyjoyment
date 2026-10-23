@@ -1,18 +1,17 @@
 # Files of the tests
 
-Python files that the tests in [`t/`](../t/README.md) use as data, the files
-of the test suite of JSON Schema, and the smoke test of the images, which CI runs with Docker. They are not tests of the
+Python files that the tests in [`t/`](../t/README.md) use as data, and the
+smoke test of the images, which CI runs with Docker. They are not tests of the
 harness: it runs every `.py` file under `t/`, so these are kept outside of it.
 
-| Directory                 | What it holds                                                                                             |
-| ------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `templates/`              | templates of files of `Pyjoyment.Plugin.PyRenderer`, as `files/hello.html.py`                             |
-| `templates_native/`       | the same with the t-strings of Python 3.14, checked by ruff and pyright as Python 3.14                    |
-| `lib/`                    | modules of the tests, as `PyjoymentTest.Plugin.DeploymentPlugin`, where Mojo has `t/mojolicious/lib`      |
-| `external/`               | applications that `Pyjoyment.Plugin.Mount` mounts, where Mojo has `t/mojolicious/external`                |
-| `docker-smoke/`           | the smoke test of the workflow Docker Smoke Test: `smoke.sh` runs the script of a variant, as `app.sh`    |
-| `pytest/`                 | a project of test scripts and tests of pytest, which the tests of `Pyjo.Test.pytest_plugin` run pytest on |
-| `JSON-Schema-Test-Suite/` | the official test suite of JSON Schema for draft 2020-12, which `t/Pyjo/JSON_Schema_suite.py` runs        |
+| Directory           | What it holds                                                                                             |
+| ------------------- | --------------------------------------------------------------------------------------------------------- |
+| `templates/`        | templates of files of `Pyjoyment.Plugin.PyRenderer`, as `files/hello.html.py`                             |
+| `templates_native/` | the same with the t-strings of Python 3.14, checked by ruff and pyright as Python 3.14                    |
+| `lib/`              | modules of the tests, as `PyjoymentTest.Plugin.DeploymentPlugin`, where Mojo has `t/mojolicious/lib`      |
+| `external/`         | applications that `Pyjoyment.Plugin.Mount` mounts, where Mojo has `t/mojolicious/external`                |
+| `docker-smoke/`     | the smoke test of the workflow Docker Smoke Test: `smoke.sh` runs the script of a variant, as `app.sh`    |
+| `pytest/`           | a project of test scripts and tests of pytest, which the tests of `Pyjo.Test.pytest_plugin` run pytest on |
 
 A test adds a directory to the paths of the renderer of its application, and
 renders a template by its name:

@@ -191,6 +191,7 @@ with subtest('Formats'):
         ('relative-json-pointer', '1/a', '-1/a'),
         ('uri', 'https://user@[::1]:443/a?b#c', '/a'),
         ('uri-reference', '../a?b#c', 'a b'),
+        ('uri', 'http://[V1.a]/', 'http://[v1]/'),
         ('uuid', '2eb8aa08-aa98-11ea-b4aa-73b441d16380', '2eb8aa08aa9811eab4aa73b441d16380'),
     ):
         is_deeply_ok(errors({'format': name}, good, True), [], f'{name} {good}')
