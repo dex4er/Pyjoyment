@@ -18,7 +18,7 @@
     "minimumReleaseAge": "0 days"
   },
   "rebaseWhen": "conflicted",
-  "minimumReleaseAge": "3 days",
+  "minimumReleaseAge": "1 day",
   "internalChecksFilter": "strict",
   "lockFileMaintenance": {
     "description": [
