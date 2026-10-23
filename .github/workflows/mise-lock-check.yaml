@@ -35,10 +35,11 @@ jobs:
 
       # Lock file maintenance PRs are automerged and nobody reads their diff,
       # so the one thing a human could have spotted there is checked here: a
-      # checksum that changed while its tool version did not, which means the
-      # artifact behind an already pinned URL was replaced. The comparison is
-      # keyed on tool + version + platform, so adding a platform, or relocking
-      # after a version bump, is not flagged.
+      # checksum that changed while its URL did not, which means the artifact
+      # behind an already pinned URL was replaced. The comparison is keyed on
+      # tool + version + platform + URL, so adding a platform, relocking after a
+      # version bump, or a new build of the same version under a new URL, as
+      # python-build-standalone publishes, is not flagged.
       - name: Check for replaced artifacts
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -57,7 +58,7 @@ jobs:
               with open(path, "rb") as f:
                   lock = tomllib.load(f)
               return {
-                  (tool, entry["version"], key.removeprefix("platforms.")): value.get("checksum")
+                  (tool, entry["version"], key.removeprefix("platforms."), value.get("url")): value.get("checksum")
                   for tool, entries in lock.get("tools", {}).items()
                   for entry in entries
                   for key, value in entry.items()
@@ -67,11 +68,11 @@ jobs:
           base, head = flatten(sys.argv[1]), flatten(sys.argv[2])
           replaced = [(k, base[k], v) for k, v in head.items() if k in base and base[k] != v]
 
-          for (tool, version, platform), was, now in replaced:
-              print(f"  {tool} {version} ({platform})\n    was: {was}\n    now: {now}")
+          for (tool, version, platform, url), was, now in replaced:
+              print(f"  {tool} {version} ({platform})\n    url: {url}\n    was: {was}\n    now: {now}")
 
           if replaced:
-              sys.exit("Checksum changed without a version change - the artifact behind a pinned URL was replaced.")
+              sys.exit("Checksum changed without a URL change - the artifact behind a pinned URL was replaced.")
 
-          print("No checksum changed for an unchanged tool version.")
+          print("No checksum changed for an unchanged URL.")
           EOF
