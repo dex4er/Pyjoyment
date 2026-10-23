@@ -114,8 +114,9 @@ lint:
       paths:
         - .trunk/trunk.yaml
     # Libraries and stylesheets that Pyjoyment bundles as they are, from
-    # their own projects or from Mojolicious, so that a newer version replaces
-    # them without a diff of formatting, and the lock of npm, which npm writes
+    # their own projects or from Mojolicious, and the files of the test suite
+    # of JSON Schema, so that a newer version replaces them without a diff of
+    # formatting, and the lock of npm, which npm writes
     - linters:
         - ALL
       paths:
@@ -123,6 +124,9 @@ lint:
         - Pyjoyment/resources/public/pyjo/bootstrap/**
         - Pyjoyment/resources/public/pyjo/highlight.js/**
         - Pyjoyment/resources/public/pyjo/pyjo.css
+        - tt/JSON-Schema-Test-Suite/LICENSE
+        - tt/JSON-Schema-Test-Suite/remotes/**
+        - tt/JSON-Schema-Test-Suite/tests/**
     # Configuration files of the tests, which are templates of Pyjo.Template
     # before they are JSON, TOML or YAML, as those of Mojolicious
     - linters:
