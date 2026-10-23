@@ -415,7 +415,13 @@ standard error of a script, as a script that fails in a loop, like an I/O
 watcher of `Pyjo.Reactor.Poll` that raises each time the reactor calls it, can
 write hundreds of megabytes of it, which the log of GitHub Actions takes
 minutes to take in; a `ResourceWarning` among the lines left out does not
-fail CI, but such a script fails anyway. A test closes what it
+fail CI, but such a script fails anyway. The development mode is the debug
+mode of asyncio too, whose loop logs a callback that takes longer than 0.1
+seconds, which TLS and the applications of the tests do on a busy runner, so
+CI sets `PYJO_ASYNCIO_SLOW_CALLBACK=5`, which `Pyjo.Reactor.Asyncio` gives the
+loops that it makes, as asyncio has no variable of its own for it; a line of
+`Executing <Handle ...> took` is a callback that blocked the loop that long.
+A test closes what it
 gets, as the handle of an `accept` or `connect` event or a connection of
 `http.client`, where Perl closes it with the last reference. To find where a
 leaked object was made:

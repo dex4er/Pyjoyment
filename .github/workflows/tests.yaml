@@ -47,11 +47,16 @@ jobs:
       # Python; fail now instead. The development mode of Python shows the
       # ResourceWarning of a socket or a file that is not closed, which only
       # goes to the standard error, so the output is checked for it.
+      # Its debug mode of asyncio logs a callback that takes longer than 0.1
+      # seconds, which TLS and the applications of the tests do on a busy
+      # runner, so the loops of Pyjo.Reactor.Asyncio log only one of more than
+      # 5 seconds, with PYJO_ASYNCIO_SLOW_CALLBACK.
       - name: Run tests
         shell: bash
         env:
           PYJO_REACTOR: Pyjo.Reactor.${{ matrix.reactor }}
           PYTHONDEVMODE: "1"
+          PYJO_ASYNCIO_SLOW_CALLBACK: "5"
           PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
           TEST_ONLINE: "1"
         run: |
@@ -90,6 +95,7 @@ jobs:
         env:
           PYJO_REACTOR: Pyjo.Reactor.${{ matrix.reactor }}
           PYTHONDEVMODE: "1"
+          PYJO_ASYNCIO_SLOW_CALLBACK: "5"
           PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
           TEST_ONLINE: "1"
         run: |
@@ -136,6 +142,7 @@ jobs:
         env:
           PYJO_REACTOR: Pyjo.Reactor.${{ matrix.reactor }}
           PYTHONDEVMODE: "1"
+          PYJO_ASYNCIO_SLOW_CALLBACK: "5"
           PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
           TEST_ONLINE: "1"
         run: |-
@@ -196,6 +203,7 @@ jobs:
         shell: bash
         env:
           PYTHONDEVMODE: "1"
+          PYJO_ASYNCIO_SLOW_CALLBACK: "5"
           PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
         run: |-
           uv run --python "$(command -v python)" --only-group servers python -m Pyjo.Prove -l --color --timeout 120 -r t/servers 2>&1 | tee prove.log
@@ -241,6 +249,7 @@ jobs:
         shell: bash
         env:
           PYTHONDEVMODE: "1"
+          PYJO_ASYNCIO_SLOW_CALLBACK: "5"
           PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
         run: |-
           uv run --python "${{ matrix.python }}" --group pytest python -m Pyjo.Prove -l --color --timeout 120 --capture-stderr t/Pyjo/Test_pytest_plugin.py t/docs/Test_pytest_plugin.py t/docs/guides_testing.py 2>&1 | tee prove.log
