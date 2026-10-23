@@ -55,7 +55,8 @@ with subtest('Parse HTTP 1.1 message with huge "Cookie" header exceeding all lim
 
 with subtest('Parse HTTP 1.1 message with huge "Cookie" header exceeding line limit'):
     req = Pyjo.Message.Request.new()
-    is_ok(req.headers.max_line_size, 8192, 'right size')
+    # Unlike Mojolicious: 64KiB, as _MAXLINE of http.client, where Mojo has 8KiB
+    is_ok(req.headers.max_line_size, 65536, 'right size')
     is_ok(req.headers.max_lines, 100, 'right number')
     req.parse(b'GET / HTTP/1.1\x0d\x0a')
     req.parse(b'Cookie: ' + b'a=b; ' * 131072 + b'\x0d\x0a')
@@ -108,7 +109,8 @@ with subtest('Parse broken HTTP 1.1 message with header exceeding line limit'):
     req.parse(b'GET / HTTP/1.1\x0d\x0a')
     req.parse(b'Content-Length: 0\x0d\x0a')
     ok(not req.is_limit_exceeded, 'limit is not exceeded')
-    req.parse(b'Foo: ' + b'a' * 8192)
+    # Unlike Mojolicious: a line longer than 64KiB, as Pyjo.Headers takes one of 8KiB
+    req.parse(b'Foo: ' + b'a' * 65536)
     ok(req.is_finished, 'request is finished')
     is_ok(req.error['message'], 'Maximum header size exceeded', 'right error')
     ok(req.is_limit_exceeded, 'limit is exceeded')
@@ -120,7 +122,8 @@ with subtest('Parse broken HTTP 1.1 message with header exceeding line limit'):
 
 with subtest('Parse broken HTTP 1.1 message with start-line exceeding line limit'):
     req = Pyjo.Message.Request.new()
-    is_ok(req.max_line_size, 8192, 'right size')
+    # Unlike Mojolicious: 64KiB, as _MAXLINE of http.client, where Mojo has 8KiB
+    is_ok(req.max_line_size, 65536, 'right size')
     is_ok(req.headers.max_lines, 100, 'right number')
     req.parse(b'GET /' + b'abcd' * 131072 + b' HTTP/1.1')
     ok(req.is_finished, 'request is finished')

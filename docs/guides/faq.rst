@@ -173,7 +173,7 @@ What does the error "Maximum start-line size exceeded" mean?
 
 This is a very similar protection mechanism to the one described in the
 previous answer, but a little more specific. It limits the maximum length of
-the start-line for HTTP requests and responses. The limit is 8KiB by
+the start-line for HTTP requests and responses. The limit is 64KiB by
 default, you can use the attribute
 :attr:`~Pyjo.Message.Pyjo_Message.max_line_size` or ``PYJO_MAX_LINE_SIZE``
 environment variable to change this value.
@@ -183,7 +183,7 @@ What does the error "Maximum header size exceeded" mean?
 
 Almost the same as the previous answer, but this protection mechanism limits
 the number and maximum length of HTTP request and response headers. The
-limits are 100 headers with 8KiB each by default, you can use the attributes
+limits are 100 headers with 64KiB each by default, you can use the attributes
 :attr:`~Pyjo.Headers.Pyjo_Headers.max_lines` and
 :attr:`~Pyjo.Headers.Pyjo_Headers.max_line_size` or the ``PYJO_MAX_LINES``
 and ``PYJO_MAX_LINE_SIZE`` environment variables to change these values.

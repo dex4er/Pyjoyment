@@ -192,10 +192,12 @@ class Pyjo_Headers(Pyjo.Base.object, Pyjo.String.Mixin.object):
             headers.max_line_size = 1024
 
         Maximum header line size in bytes, defaults to the value of the
-        ``PYJO_MAX_LINE_SIZE`` environment variable or ``8192`` (8KiB).
+        ``PYJO_MAX_LINE_SIZE`` environment variable or ``65536`` (64KiB).
         """
         if self._max_line_size is None:
-            self._max_line_size = int(os.environ.get('PYJO_MAX_LINE_SIZE') or 8192)
+            # Unlike Mojolicious: 64KiB, as _MAXLINE of http.client, where Mojo has 8KiB, which a header of
+            # Content-Security-Policy of github.com exceeds
+            self._max_line_size = int(os.environ.get('PYJO_MAX_LINE_SIZE') or 65536)
         return self._max_line_size
 
     @max_line_size.setter
