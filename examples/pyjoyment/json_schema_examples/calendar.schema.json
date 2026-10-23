@@ -3,7 +3,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "A representation of an event",
   "type": "object",
-  "required": ["dtstart", "summary"],
+  "required": ["startDate", "summary"],
   "properties": {
     "startDate": {
       "type": "string",

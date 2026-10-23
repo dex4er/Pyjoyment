@@ -11,4 +11,5 @@ schema, as `address.schema.json`, and `smartphone.schema.json` and
 `laptop.schema.json` are the schemas that `device.schema.json` refers to by
 their `$id`, as `calendar.schema.json` refers to
 `geographical-location.schema.json`. The files have the JSON of the page as it
-is: the document of the calendar has no `dtstart`, which its schema requires.
+is, but the schema of the calendar, which requires `startDate` where the page
+requires `dtstart`, a property that it does not have.
