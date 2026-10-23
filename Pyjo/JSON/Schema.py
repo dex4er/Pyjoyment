@@ -174,6 +174,10 @@ import Pyjo.Collection
 import Pyjo.Exception
 import Pyjo.JSON
 import Pyjo.JSON.Pointer
+import Pyjo.URL
+
+from Pyjo.JSON import to_json
+from Pyjo.Util import punycode_decode
 
 import builtins
 import collections
@@ -191,7 +195,6 @@ import sys
 import types
 import typing
 import unicodedata
-import urllib.parse
 import uuid
 
 from collections.abc import Callable, Iterable
@@ -897,7 +900,7 @@ class Pyjo_JSON_Schema(Pyjo.Base.object):
             uri = data.get('$id') if isinstance(data, dict) else None
             if not isinstance(uri, str):
                 raise Pyjo.Exception.new('JSON Schema has no $id of the schema to add')
-        self._schemas[urllib.parse.urldefrag(uri).url] = schema
+        self._schemas[_uri('', uri)[0]] = schema
         self._index = None
         return self
 
@@ -1278,8 +1281,7 @@ class _Compiler:
             return cls.string()
         if isinstance(tp, type) and tp in _FORMATS:
             return cls.string().meta(format=_FORMATS[tp])
-        url = sys.modules.get('Pyjo.URL')
-        if url is not None and isinstance(tp, type) and issubclass(tp, url.object):
+        if isinstance(tp, type) and issubclass(tp, Pyjo.URL.object):
             return cls.string().url()
 
         origin, args = typing.get_origin(tp), typing.get_args(tp)
@@ -1528,7 +1530,7 @@ class _Index:
             if keyword in schema:
                 raise Pyjo.Exception.new(f'JSON Schema does not support {keyword} in {where or "/"}')
         if isinstance(schema.get('$id'), str):
-            base = urllib.parse.urldefrag(_join(base, schema['$id'])).url
+            base = _uri(base, schema['$id'])[0]
             self.resources.setdefault(base, schema)
         for keyword in ('$anchor', '$dynamicAnchor'):
             if isinstance(schema.get(keyword), str):
@@ -1554,7 +1556,7 @@ class _Index:
         return pattern
 
     def resolve(self, base: str, ref: str, where: str) -> tuple[dict[str, Any] | bool, str]:
-        uri, fragment = urllib.parse.urldefrag(_join(base, ref))
+        uri, fragment = _uri(base, ref)
         if uri not in self.resources and uri in self.schemas:
             self.add(self.schemas.pop(uri), uri)
         if uri not in self.resources:
@@ -1567,7 +1569,6 @@ class _Index:
         target: Any = None
         if fragment.startswith('/') or not fragment:
             pointer = Pyjo.JSON.Pointer.new(self.resources.get(uri))
-            fragment = urllib.parse.unquote(fragment)
             if uri in self.resources and pointer.contains(fragment):
                 target = pointer.get(fragment)
         else:
@@ -1660,43 +1661,43 @@ class _Validator:
 
     def enum(self, at: _At, argument: Any) -> None:
         if _canonical(at.value) not in [_canonical(item) for item in cast(list[Any], argument)]:
-            at.error(f'Not in enum: {", ".join(_text(item) for item in argument)}.')
+            at.error(f'Not in enum: {", ".join(to_json(item) for item in argument)}.')
 
     def const(self, at: _At, argument: Any) -> None:
         if _canonical(at.value) != _canonical(argument):
-            at.error(f'Not the const: {_text(argument)}.')
+            at.error(f'Not the const: {to_json(argument)}.')
 
     # Numbers
 
     def minimum(self, at: _At, argument: Any) -> None:
         if at.kind in _NUMBERS and at.value < argument:
-            at.error(f'Less than the minimum {_text(argument)}.')
+            at.error(f'Less than the minimum {to_json(argument)}.')
 
     def maximum(self, at: _At, argument: Any) -> None:
         if at.kind in _NUMBERS and at.value > argument:
-            at.error(f'Greater than the maximum {_text(argument)}.')
+            at.error(f'Greater than the maximum {to_json(argument)}.')
 
     def exclusive_minimum(self, at: _At, argument: Any) -> None:
         if at.kind in _NUMBERS and at.value <= argument:
-            at.error(f'Not greater than the exclusive minimum {_text(argument)}.')
+            at.error(f'Not greater than the exclusive minimum {to_json(argument)}.')
 
     def exclusive_maximum(self, at: _At, argument: Any) -> None:
         if at.kind in _NUMBERS and at.value >= argument:
-            at.error(f'Not less than the exclusive maximum {_text(argument)}.')
+            at.error(f'Not less than the exclusive maximum {to_json(argument)}.')
 
     def multiple_of(self, at: _At, argument: Any) -> None:
         if at.kind in _NUMBERS and (_fraction(at.value) / _fraction(argument)).denominator != 1:
-            at.error(f'Not a multiple of {_text(argument)}.')
+            at.error(f'Not a multiple of {to_json(argument)}.')
 
     # Strings
 
     def min_length(self, at: _At, argument: Any) -> None:
         if at.kind == 'string' and len(at.value) < argument:
-            at.error(f'Shorter than {_text(argument)} characters.')
+            at.error(f'Shorter than {to_json(argument)} characters.')
 
     def max_length(self, at: _At, argument: Any) -> None:
         if at.kind == 'string' and len(at.value) > argument:
-            at.error(f'Longer than {_text(argument)} characters.')
+            at.error(f'Longer than {to_json(argument)} characters.')
 
     def pattern(self, at: _At, argument: Any) -> None:
         if at.kind == 'string' and not self.index.pattern(argument).search(at.value):
@@ -1722,11 +1723,11 @@ class _Validator:
 
     def min_items(self, at: _At, argument: Any) -> None:
         if at.kind == 'array' and len(at.value) < argument:
-            at.error(f'Fewer than {_text(argument)} items.')
+            at.error(f'Fewer than {to_json(argument)} items.')
 
     def max_items(self, at: _At, argument: Any) -> None:
         if at.kind == 'array' and len(at.value) > argument:
-            at.error(f'More than {_text(argument)} items.')
+            at.error(f'More than {to_json(argument)} items.')
 
     def unique_items(self, at: _At, argument: Any) -> None:
         if at.kind == 'array' and argument is True:
@@ -1744,11 +1745,11 @@ class _Validator:
         least, most = at.schema.get('minContains', 1), at.schema.get('maxContains')
         parent = at.where.rpartition('/')[0]
         if count < least and 'minContains' in at.schema:
-            at.error(f'Fewer than {_text(least)} items match the schema of contains.', where=f'{parent}/minContains')
+            at.error(f'Fewer than {to_json(least)} items match the schema of contains.', where=f'{parent}/minContains')
         elif count < least:
             at.error('No item matches the schema of contains.')
         if most is not None and count > most:
-            at.error(f'More than {_text(most)} items match the schema of contains.', where=f'{parent}/maxContains')
+            at.error(f'More than {to_json(most)} items match the schema of contains.', where=f'{parent}/maxContains')
 
     # Objects
 
@@ -1793,18 +1794,18 @@ class _Validator:
 
     def min_properties(self, at: _At, argument: Any) -> None:
         if at.kind == 'object' and len(at.value) < argument:
-            at.error(f'Fewer than {_text(argument)} properties.')
+            at.error(f'Fewer than {to_json(argument)} properties.')
 
     def max_properties(self, at: _At, argument: Any) -> None:
         if at.kind == 'object' and len(at.value) > argument:
-            at.error(f'More than {_text(argument)} properties.')
+            at.error(f'More than {to_json(argument)} properties.')
 
     def dependent_required(self, at: _At, argument: Any) -> None:
         if at.kind == 'object':
             for name, names in cast(dict[str, list[str]], argument).items():
                 for required in names if name in at.value else []:
                     if required not in at.value:
-                        message = f'Missing property, which {_text(name)} requires.'
+                        message = f'Missing property, which {to_json(name)} requires.'
                         at.error(message, at.child(required), f'{at.where}/{_escape(name)}')
 
     def dependent_schemas(self, at: _At, argument: Any) -> None:
@@ -1958,10 +1959,6 @@ def _json_errors(value: Any, path: str, errors: list[Error]) -> None:
         errors.append(Error(path, '', f'Not a JSON value: {type(value).__name__}.'))
 
 
-def _text(value: Any) -> str:
-    return Pyjo.JSON.to_json(value)
-
-
 def _instance_type(value: Any) -> str:
     if isinstance(value, float):
         return 'integer' if value.is_integer() else 'number'
@@ -1969,17 +1966,7 @@ def _instance_type(value: Any) -> str:
 
 
 def _type_name(value: Any) -> str:
-    if value is None:
-        return 'null'
-    if isinstance(value, bool):
-        return 'boolean'
-    if isinstance(value, builtins.int):
-        return 'integer'
-    if isinstance(value, float):
-        return 'number'
-    if isinstance(value, str):
-        return 'string'
-    return 'object' if isinstance(value, dict) else 'array'
+    return _json_type(value) or ('object' if isinstance(value, dict) else 'array')
 
 
 def _canonical(value: Any) -> Any:
@@ -2004,10 +1991,12 @@ def _escape(name: Any) -> str:
     return str(name).replace('~', '~0').replace('/', '~1')
 
 
-def _join(base: str, ref: str) -> str:
-    if ref.startswith('#'):
-        return urllib.parse.urldefrag(base).url + ref
-    return urllib.parse.urljoin(base, ref)
+def _uri(base: str, ref: str) -> tuple[str, str]:
+    # The URI of a reference without its fragment, and the fragment, decoded
+    url = Pyjo.URL.new(ref).to_abs(Pyjo.URL.new(base))
+    fragment = url.fragment or ''
+    url.fragment = None
+    return url.to_str(), fragment
 
 
 # The classes of ECMAScript, ASCII but the white space, as ranges of code points
@@ -2287,7 +2276,7 @@ def _punycode(label: str) -> bool:
     if label[:4].lower() != 'xn--':
         return True
     try:
-        label[4:].encode('ascii').decode('punycode')
+        punycode_decode(label[4:])
     except UnicodeError:
         return False
     return True
@@ -2437,14 +2426,14 @@ def _description(tp: Any) -> str | None:
         return None
     if dataclasses.is_dataclass(tp) and re.fullmatch(re.escape(name) + r'\(.*\)', doc, re.S):
         return None
-    return _docstring_text(inspect.cleandoc(doc))[0]
+    return _docstringto_json(inspect.cleandoc(doc))[0]
 
 
 def _docstring(function: Callable[..., Any]) -> tuple[str | None, dict[str, str], str | None]:
-    return _docstring_text(inspect.getdoc(function) or '')
+    return _docstringto_json(inspect.getdoc(function) or '')
 
 
-def _docstring_text(doc: str) -> tuple[str | None, dict[str, str], str | None]:
+def _docstringto_json(doc: str) -> tuple[str | None, dict[str, str], str | None]:
     # The first paragraph, and the descriptions of the parameters and of the return value, in the fields of
     # reStructuredText or in the sections of the Google Python Style Guide, each with the lines that continue it
     lines = doc.splitlines()
