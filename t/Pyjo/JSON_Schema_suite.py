@@ -5,14 +5,37 @@ from Pyjo.File import curfile
 from Pyjo.JSON.Schema import Schema
 from Pyjo.Test import *
 
+import os
+
 from typing import Any
 
 
-# Not in Mojolicious: the official test suite of JSON Schema, JSON-Schema-Test-Suite, for draft 2020-12, in
-# tt/JSON-Schema-Test-Suite, with the files of the keywords that the validation supports
+# Not in Mojolicious: the official test suite of JSON Schema, JSON-Schema-Test-Suite, for draft 2020-12, of the
+# devDependencies of package.json, which npm ci installs
 
-SUITE = curfile().dirname().dirname().sibling('tt', 'JSON-Schema-Test-Suite')
+ROOT = curfile().dirname().dirname().dirname()
+SUITE = ROOT.child('node_modules', 'json-schema-test-suite')
 TESTS = SUITE.child('tests', 'draft2020-12')
+
+if not os.path.exists(TESTS.to_str()):
+    plan(skip_all='JSON-Schema-Test-Suite is not installed, npm ci installs it')
+
+# The files that are left out, with the reason
+LEFT_OUT_FILES = {
+    'dynamicRef.json': '$dynamicRef',
+    'unevaluatedItems.json': 'unevaluatedItems',
+    'unevaluatedProperties.json': 'unevaluatedProperties',
+    'vocabulary.json': 'the vocabularies of a metaschema of its own',
+    'optional/cross-draft.json': 'the dialects of the older drafts',
+    'optional/dependencies-compatibility.json': 'dependencies of the older drafts, which 2020-12 does not have',
+    'optional/dynamicRef.json': '$dynamicRef',
+    'optional/format-assertion.json': 'the vocabularies of a metaschema of its own',
+    'optional/format/idn-email.json': 'a format that stays an annotation',
+    'optional/format/idn-hostname.json': 'a format that stays an annotation',
+    'optional/format/iri.json': 'a format that stays an annotation',
+    'optional/format/iri-reference.json': 'a format that stays an annotation',
+    'optional/format/uri-template.json': 'a format that stays an annotation',
+}
 
 # The cases that are left out, by their file and the description of their group, with the reason
 LEFT_OUT = {
@@ -28,7 +51,8 @@ LEFT_OUT = {
     ),
 }
 
-# The schemas that a $ref refers to, on the host of the test suite
+# The schemas that a $ref refers to, on the host of the test suite, which the registry indexes when a $ref looks for
+# them, so that the ones of the older drafts and of $dynamicRef are left alone
 remotes: dict[str, Any] = {}
 for file in SUITE.child('remotes').list_tree().sort():
     remotes[f'http://localhost:1234/{file.to_rel(SUITE.child("remotes")).to_str().replace("\\", "/")}'] = (
@@ -45,6 +69,11 @@ def valid(schema: Schema, data: Any, formats: bool) -> bool | str:
 
 for file in TESTS.list_tree().sort():
     name = file.to_rel(TESTS).to_str().replace('\\', '/')
+    if not name.endswith('.json'):
+        continue
+    if name in LEFT_OUT_FILES:
+        skip(f'{name}: {LEFT_OUT_FILES[name]}')
+        continue
     # The formats are assertions in the tests of formats, as the test suite says
     formats = name.startswith('optional/format/')
     with subtest(name):

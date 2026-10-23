@@ -296,16 +296,8 @@ port 0 instead, which `ports()` gives.
   ruff and pyright check as Python 3.14. `tt/pytest` is a project of test
   scripts and tests of pytest, which the tests of
   `Pyjo.Test.pytest_plugin` copy to a temporary directory and run pytest
-  on. `tt/JSON-Schema-Test-Suite` holds the files of the official test suite
-  of JSON Schema, JSON-Schema-Test-Suite, for draft 2020-12, with its
-  license, of the keywords and formats that the validation of
-  `Pyjo.JSON.Schema` supports, which `t/Pyjo/JSON_Schema_suite.py` runs. They
-  are copied as they are, which Trunk does not lint, so that a newer version
-  of the suite replaces them; its `README.md` names the commit and the files
-  that are left out, and the test lists the cases of the files that it
-  leaves out, with the reason, and fails when such a case passes. A test does
-  not write files into `t/` or `tt/`: what it makes goes to a temporary
-  directory.
+  on. A test does not write files into `t/` or `tt/`: what it makes goes to
+  a temporary directory.
 
 A test script imports the test functions and groups its tests in subtests,
 like Mojo's tests do; Python keywords give some functions an `_ok` suffix
@@ -391,6 +383,20 @@ as the bounds of the safe integers of JavaScript that zod gives an integer, is
 left out by a normalization with a comment of its own, so that a new one fails
 the test. A major release of zod needs no approval in the Dependency
 Dashboard, as the test checks it.
+
+The validation of `Pyjo.JSON.Schema` runs the official test suite of JSON
+Schema, JSON-Schema-Test-Suite, for draft 2020-12, in
+`t/Pyjo/JSON_Schema_suite.py`, from the files of the suite in `node_modules`,
+which the same `npm ci` installs, so that the repository does not keep a copy
+of them; without it, the test is skipped. The suite is not on npm, so the
+`devDependencies` take it from its repository of GitHub, at a commit, not at
+a tag: the tags of the suite, as `Test-JSON-Schema-Acceptance-1.039`, are not
+versions that the manager of npm of Renovate updates, which skips them as an
+unversioned reference, and a commit is a digest that it updates to the last
+commit of the suite, with `package-lock.json`. The test lists the files and
+the cases that it leaves out with the reason, as the keywords that the
+validation does not support, and fails when a case that it leaves out passes,
+so that a newer suite tells what the list can lose.
 
 uWSGI is the package `uwsgi`, built from its source with a C compiler, as the
 wheels of `pyuwsgi` have no plugin `cgi`. `extra-build-variables` in
