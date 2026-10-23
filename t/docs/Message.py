@@ -111,7 +111,7 @@ with subtest('default_charset'):
 with subtest('max_line_size'):
     msg = Pyjo.Message.Request.new()
     size = msg.max_line_size
-    is_ok(size, int(os.environ.get('PYJO_MAX_LINE_SIZE') or 8192), 'default')
+    is_ok(size, int(os.environ.get('PYJO_MAX_LINE_SIZE') or 65536), 'default')
     msg.max_line_size = 1024
     is_ok(msg.max_line_size, 1024, 'set')
 

@@ -61,7 +61,7 @@ with subtest('new'):
 
 with subtest('max_line_size'):
     size = headers.max_line_size
-    is_ok(size, 8192, 'size')
+    is_ok(size, 65536, 'size')
     headers.max_line_size = 1024
     is_ok(headers.max_line_size, 1024, 'headers.max_line_size')
 

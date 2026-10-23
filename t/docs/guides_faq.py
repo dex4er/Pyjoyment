@@ -135,14 +135,14 @@ with subtest('What does the error "Maximum message size exceeded" mean?'):
     t.content_is('Maximum message size exceeded')
 
 with subtest('What does the error "Maximum start-line size exceeded" mean?'):
-    is_ok(Pyjo.Message.Request.new().max_line_size, 8192, '8KiB')
+    is_ok(Pyjo.Message.Request.new().max_line_size, 65536, '64KiB')
     with patch.dict(os.environ, PYJO_MAX_LINE_SIZE='16'):
         req = Pyjo.Message.Request.new().parse(f'GET /{"a" * 16} HTTP/1.1\x0d\x0a'.encode())
     is_ok(req.error['message'], 'Maximum start-line size exceeded', 'right error')
 
 with subtest('What does the error "Maximum header size exceeded" mean?'):
     is_ok(Pyjo.Headers.new().max_lines, 100, '100 headers')
-    is_ok(Pyjo.Headers.new().max_line_size, 8192, '8KiB each')
+    is_ok(Pyjo.Headers.new().max_line_size, 65536, '64KiB each')
     with patch.dict(os.environ, PYJO_MAX_LINES='1'):
         req = Pyjo.Message.Request.new().parse(b'GET / HTTP/1.1\x0d\x0aA: 1\x0d\x0aB: 2\x0d\x0a')
     is_ok(req.error['message'], 'Maximum header size exceeded', 'right error')
