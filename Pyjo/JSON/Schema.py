@@ -1504,6 +1504,7 @@ class _Index:
         self.bases: dict[builtins.int, str] = {}
         self.schemas = dict(schemas)
         self.keep: list[Any] = []
+        self.patterns: dict[str, re.Pattern[str]] = {}
         self.root = root
         self.add(root, '')
 
@@ -1544,6 +1545,13 @@ class _Index:
                     self.walk(item, base, f'{where}/{keyword}/{i}')
             elif keyword in _SCHEMAS or keyword in _SCHEMA_LISTS:
                 raise Pyjo.Exception.new(f'JSON Schema has no schemas in {where}/{keyword}')
+
+    def pattern(self, source: str) -> re.Pattern[str]:
+        # The regular expressions of the schemas, which are compiled once for the schema
+        pattern = self.patterns.get(source)
+        if pattern is None:
+            pattern = self.patterns[source] = _regex(source)
+        return pattern
 
     def resolve(self, base: str, ref: str, where: str) -> tuple[dict[str, Any] | bool, str]:
         uri, fragment = urllib.parse.urldefrag(_join(base, ref))
@@ -1691,7 +1699,7 @@ class _Validator:
             at.error(f'Longer than {_text(argument)} characters.')
 
     def pattern(self, at: _At, argument: Any) -> None:
-        if at.kind == 'string' and not _regex(argument).search(at.value):
+        if at.kind == 'string' and not self.index.pattern(argument).search(at.value):
             at.error(f'Does not match the pattern {argument}.')
 
     def format(self, at: _At, argument: Any) -> None:
@@ -1754,14 +1762,16 @@ class _Validator:
         if at.kind == 'object':
             for pattern, schema in cast(dict[str, Any], argument).items():
                 for name, item in cast(dict[str, Any], at.value).items():
-                    if _regex(pattern).search(name):
+                    if self.index.pattern(pattern).search(name):
                         self.apply(item, schema, at, at.child(name), f'{at.where}/{_escape(pattern)}')
 
     def additional_properties(self, at: _At, argument: Any) -> None:
         if at.kind != 'object':
             return
         properties = cast(dict[str, Any], at.schema.get('properties', {}))
-        patterns = [_regex(pattern) for pattern in cast(dict[str, Any], at.schema.get('patternProperties', {}))]
+        patterns = [
+            self.index.pattern(pattern) for pattern in cast(dict[str, Any], at.schema.get('patternProperties', {}))
+        ]
         for name, item in cast(dict[str, Any], at.value).items():
             if name in properties or any(pattern.search(name) for pattern in patterns):
                 continue
@@ -2116,7 +2126,6 @@ def _complement(
     return [*complement, (start, sys.maxunicode)] if start <= sys.maxunicode else complement
 
 
-@functools.lru_cache(maxsize=1024)
 def _regex(source: str) -> re.Pattern[str]:
     # A regular expression of ECMAScript as one of Python: \d, \w and \b are ASCII, \s has the white space of
     # ECMAScript, . matches no line terminator, $ only the end, and the named groups have the syntax of Python
