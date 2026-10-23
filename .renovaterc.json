@@ -46,6 +46,7 @@
     {
       "description": "The JavaScript libraries of the bundled templates, which Bundle Check copies into Pyjoyment/resources/public/pyjo. A major release can change the API that the templates call, and the tests do not run JavaScript, so it waits for an approval in the Dependency Dashboard.",
       "matchManagers": ["npm"],
+      "matchDepTypes": ["dependencies"],
       "matchUpdateTypes": ["major"],
       "dependencyDashboardApproval": true
     }

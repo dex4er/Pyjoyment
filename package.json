@@ -1,7 +1,7 @@
 {
   "name": "pyjoyment-bundled",
   "private": true,
-  "description": "The JavaScript libraries of the bundled templates of Pyjoyment, which npm run bundle copies into Pyjoyment/resources/public/pyjo",
+  "description": "The JavaScript libraries of the bundled templates of Pyjoyment, which npm run bundle copies into Pyjoyment/resources/public/pyjo, and zod, whose schemas the tests compare with the ones of Pyjo.JSON.Schema",
   "license": "Artistic-2.0",
   "scripts": {
     "bundle": "node --input-type=module --eval \"import fs from 'node:fs'; const { bundle } = JSON.parse(fs.readFileSync('package.json')).pyjoyment; for (const [to, from] of Object.entries(bundle)) fs.copyFileSync('node_modules/' + from, to);\""
@@ -20,5 +20,8 @@
       "Pyjoyment/resources/public/pyjo/highlight.js/LICENSE": "@highlightjs/cdn-assets/LICENSE",
       "Pyjoyment/resources/public/pyjo/highlight.js/highlight.min.js": "@highlightjs/cdn-assets/highlight.min.js"
     }
+  },
+  "devDependencies": {
+    "zod": "4.6.7"
   }
 }

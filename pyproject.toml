@@ -65,7 +65,8 @@ Issues = "https://github.com/dex4er/Pyjoyment/issues"
 
 # Not dependencies of the package: the ASGI, WSGI and CGI servers that the tests in t/servers run Pyjo.Server.ASGI,
 # Pyjo.Server.WSGI, Pyjo.Server.CGI and the examples on, a client of WebSocket for them, and the frameworks, Flask,
-# Starlette and the MCP SDK, whose applications Pyjoyment.Plugin.Mount mounts
+# Starlette and the MCP SDK, whose applications Pyjoyment.Plugin.Mount mounts, and pydantic, whose schemas the tests
+# compare with the ones of Pyjo.JSON.Schema
 [dependency-groups]
 servers = [
   "daphne>=4.2.3",
@@ -75,6 +76,7 @@ servers = [
   "hypercorn>=0.18.0",
   "mangum>=0.19.0",
   "mcp>=2.3.0",
+  "pydantic>=2.14.1",
   "uwsgi>=2.0.30; sys_platform != 'win32'",
   "uvicorn>=0.54.0",
   "uvloop>=0.23.0; sys_platform != 'win32'",
