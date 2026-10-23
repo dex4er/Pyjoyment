@@ -32,6 +32,12 @@
   },
   "packageRules": [
     {
+      "description": "requires-python of pyproject.toml is the lowest Python that the distribution supports, on purpose, not the Python of mise.toml, so rangeStrategy bump must not raise it.",
+      "matchManagers": ["pep621"],
+      "matchDepTypes": ["requires-python"],
+      "enabled": false
+    },
+    {
       "description": "The dependency groups of pyproject.toml, as the servers of the tests in t/servers, in one pull request.",
       "matchManagers": ["pep621"],
       "matchDepTypes": ["dependency-groups"],
