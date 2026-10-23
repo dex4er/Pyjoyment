@@ -49,6 +49,10 @@ with subtest('Synopsis'):
         'z.object(...).data',
     )
 
+    result = Schema.parameters(weather).validate({'city': 'Warsaw', 'days': 'three'})
+    ok(not result, 'not result')
+    is_ok(str(result), '/days: Expected integer - got string.', 'print(result)')
+
     # Or import the module, as in Google Python Style Guide
 
     import Pyjo.JSON.Schema
@@ -65,6 +69,10 @@ with subtest('Description'):
         {'$schema': 'https://json-schema.org/draft/2020-12/schema', 'type': 'string'},
         'DIALECT',
     )
+
+with subtest('Validation'):
+    # /days: Expected integer - got string.
+    is_ok(str(z.object(days=z.int()).validate({'days': 'three'})), '/days: Expected integer - got string.', 'print')
 
 with subtest('new'):
     schema = Pyjo.JSON.Schema.new()
@@ -405,6 +413,38 @@ with subtest('meta'):
     schema = z.string().meta(title='City', examples=['Warsaw'])
     is_deeply_ok(schema.data, {'type': 'string', 'title': 'City', 'examples': ['Warsaw']}, 'meta of keywords')
 
+with subtest('add_schema'):
+    schema = z.object(
+        address=z.any().meta({'$ref': 'https://example.com/address'}),
+        name=z.any().meta({'$ref': 'https://example.com/name'}),
+    )
+    is_ok(schema.add_schema({'$id': 'https://example.com/address', 'type': 'object'}), schema, 'add_schema by $id')
+    is_ok(schema.add_schema(z.string(), 'https://example.com/name'), schema, 'add_schema by URI')
+    ok(schema.validate({'address': {}, 'name': 'Joe'}), 'valid')
+    is_ok(
+        str(schema.validate({'address': [], 'name': 1})),
+        '/address: Expected object - got array.\n/name: Expected string - got integer.',
+        'invalid',
+    )
+
+with subtest('parse'):
+    schema = z.object(city=z.string())
+    value = schema.parse({'city': 'Warsaw'})
+    is_deeply_ok(value, {'city': 'Warsaw'}, 'value')
+    throws_ok(lambda: schema.parse({}), re.compile(r'^/city: Missing property\.$', re.M), 'errors')
+
+with subtest('validate'):
+    schema = z.object(city=z.string(), date=z.iso.date().optional())
+    result = schema.validate({'city': 'Warsaw'})
+    ok(result, 'valid')
+    result = schema.validate({'city': 'Warsaw', 'date': '2026-10-23'}, formats=True)
+    ok(result, 'valid with formats')
+    ok(not schema.validate({'city': 'Warsaw', 'date': 'today'}, formats=True), 'invalid with formats')
+    ok(schema.validate({'city': 'Warsaw', 'date': 'today'}), 'format as an annotation')
+
+    # "/days: Expected integer - got string."
+    is_ok(str(z.object(days=z.int()).validate({'days': 'three'})), '/days: Expected integer - got string.', 'str')
+
 with subtest('any'):
     schema = z.any()
     is_deeply_ok(schema.data, {}, 'any')
@@ -453,5 +493,66 @@ with subtest('iso'):
     is_deeply_ok(schema.data, {'type': 'string', 'format': 'date'}, 'date')
     schema = z.iso.time()
     is_deeply_ok(schema.data, {'type': 'string', 'format': 'time'}, 'time')
+
+with subtest('Error'):
+    error = z.object(days=z.int()).validate({'days': 'three'}).errors[0]
+
+    # "/days: Expected integer - got string."
+    is_ok(str(error), '/days: Expected integer - got string.', 'str')
+
+with subtest('Error.path'):
+    path = error.path
+    is_ok(path, '/days', 'path')
+
+with subtest('Error.keyword_path'):
+    keyword_path = error.keyword_path
+    is_ok(keyword_path, '/properties/days/type', 'keyword_path')
+
+with subtest('Error.message'):
+    message = error.message
+    is_ok(message, 'Expected integer - got string.', 'message')
+
+with subtest('Error.__json__'):
+    data = error.__json__()
+    is_deeply_ok(
+        data,
+        {'path': '/days', 'keyword_path': '/properties/days/type', 'message': 'Expected integer - got string.'},
+        '__json__',
+    )
+
+with subtest('Error.__str__'):
+    string = str(error)
+    is_ok(string, '/days: Expected integer - got string.', '__str__')
+
+with subtest('Result'):
+    schema = z.object(days=z.int())
+    value = {'days': 'three'}
+    output = []
+
+    result = schema.validate(value)
+    if not result:
+        for error in result.errors:
+            output.append((error.path, error.message))
+    is_deeply_ok(output, [('/days', 'Expected integer - got string.')], 'errors')
+
+with subtest('Result.errors'):
+    errors = result.errors
+    is_ok(len(errors), 1, 'errors')
+
+with subtest('Result.__bool__'):
+    boolean = bool(result)
+    is_ok(boolean, False, '__bool__')
+
+with subtest('Result.__json__'):
+    data = result.__json__()
+    is_deeply_ok(data, {'valid': False, 'errors': [errors[0].__json__()]}, '__json__')
+
+with subtest('Result.__str__'):
+    string = str(result)
+    is_ok(string, '/days: Expected integer - got string.', '__str__')
+
+with subtest('Result.is_valid'):
+    boolean = result.is_valid
+    is_ok(boolean, False, 'is_valid')
 
 done_testing()

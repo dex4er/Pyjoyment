@@ -44,9 +44,10 @@ jobs:
           version: 2026.10.4 # datasource=github-releases depName=jdx/mise
 
       # zod, whose schemas t/Pyjo/JSON_Schema_zod.py compares with the ones of
-      # Pyjo.JSON.Schema, on the Node.js of mise.toml. npm ci checks every
-      # package against its integrity in package-lock.json, and no script of
-      # the packages runs.
+      # Pyjo.JSON.Schema, on the Node.js of mise.toml, and JSON-Schema-Test-Suite,
+      # which t/Pyjo/JSON_Schema_suite.py runs. npm ci checks every package
+      # against its integrity in package-lock.json, and no script of the
+      # packages runs.
       - name: Install the packages of npm
         run: npm ci --ignore-scripts
 

@@ -89,6 +89,16 @@ with subtest('Regular expression'):
     ok(q(r'hello', re.I).fullmatch('HeLLo'), 'flags')
 
 
+# Not in Mojolicious: z for the builder of Pyjo.JSON.Schema, as z of zod
+with subtest('JSON Schema'):
+    import Pyjo.JSON.Schema
+
+    is_ok(z.object, Pyjo.JSON.Schema.z.object, 'builder')
+    is_ok(repr(z), 'Pyjo.JSON.Schema.z', 'repr')
+    ok(z.object(a=z.int()).validate({'a': 1}), 'valid')
+    is_ok(str(z.object(a=z.int()).validate({'a': 'b'})), '/a: Expected integer - got string.', 'errors')
+
+
 # Not in Mojolicious: b for bytes, next to u for characters
 with subtest('Bytes'):
     is_ok(b(b'<foo>').url_escape(), b'%3Cfoo%3E', 'right result')
@@ -106,6 +116,7 @@ with subtest('python -m Pyjo'):
     is_ok(result.returncode, 0, 'right exit status')
     is_ok(one_liner('None').stdout, '', 'nothing printed for None')
     is_ok(one_liner('print(c(1, 2, 3).join("-"))').stdout, '1-2-3\n', 'statement')
+    is_ok(one_liner('z.object(a=z.int()).validate({"a": 1}).is_valid').stdout, 'True\n', 'builder of JSON Schema')
     is_ok(one_liner('import sys; print(sys.argv)', 'a', 'b').stdout, "['-c', 'a', 'b']\n", 'arguments')
     is_ok(one_liner('import os; print(os.environ["PYJO_LOG_LEVEL"])').stdout, 'fatal\n', 'silent')
     is_ok(
@@ -128,5 +139,12 @@ with subtest('Lazy imports'):
         text=True,
     )
     is_ok(result.stdout, 'False\n', 'no user agent for a module of Pyjo')
+    result = subprocess.run(
+        [sys.executable, '-c', 'import sys; from Pyjo import *; print("Pyjo.JSON.Schema" in sys.modules)'],
+        env=dict(os.environ, PYTHONPATH=ROOT),
+        capture_output=True,
+        text=True,
+    )
+    is_ok(result.stdout, 'False\n', 'no JSON Schema for the functions of ojo')
 
 done_testing()

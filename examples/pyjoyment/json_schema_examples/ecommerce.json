@@ -1,0 +1,15 @@
+{
+  "order": {
+    "orderId": "ORD123",
+    "items": [
+      {
+        "name": "Product A",
+        "price": 50
+      },
+      {
+        "name": "Product B",
+        "price": 30
+      }
+    ]
+  }
+}

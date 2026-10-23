@@ -1,6 +1,6 @@
 """
-Pyjo.JSON.Schema - JSON Schema from type hints
-==============================================
+Pyjo.JSON.Schema - JSON Schema from type hints, and its validation
+==================================================================
 ::
 
     from Pyjo.JSON.Schema import Schema, z
@@ -16,6 +16,10 @@ Pyjo.JSON.Schema - JSON Schema from type hints
     print(Schema.returns(weather).data)
 
     print(z.object(city=z.string().describe('Name of the city'), days=z.int().min(1).optional()).data)
+
+    result = Schema.parameters(weather).validate({'city': 'Warsaw', 'days': 'three'})
+    if not result:
+        print(result)
 
     # Or import the module, as in Google Python Style Guide
 
@@ -88,31 +92,109 @@ required, and the properties that it does not name are not forbidden, unless
 the object is strict. Where zod gives another schema of the same, the method
 says so.
 
+Validation
+----------
+
+:meth:`~Pyjo_JSON_Schema.validate` validates a value, as :mod:`Pyjo.JSON`
+decodes it, with a schema of any of the three forms, and gives a
+:class:`Result`, which is false if the value is not valid, with the errors of
+the value, each with the JSON Pointer of the value and of the keyword. ::
+
+    # /days: Expected integer - got string.
+    print(z.object(days=z.int()).validate({'days': 'three'}))
+
+It is the validation of JSON Schema 2020-12 with the keywords that the schema of
+a tool, of a body of an API or of a configuration has:
+
+* ``type``, ``enum`` and ``const``;
+* ``minimum``, ``maximum``, ``exclusiveMinimum``, ``exclusiveMaximum`` and
+  ``multipleOf`` of numbers;
+* ``minLength``, ``maxLength``, ``pattern`` and ``format`` of strings;
+* ``items``, ``prefixItems``, ``minItems``, ``maxItems``, ``uniqueItems``,
+  ``contains``, ``minContains`` and ``maxContains`` of arrays;
+* ``properties``, ``required``, ``additionalProperties``,
+  ``patternProperties``, ``propertyNames``, ``minProperties``,
+  ``maxProperties``, ``dependentRequired`` and ``dependentSchemas`` of
+  objects;
+* ``allOf``, ``anyOf``, ``oneOf``, ``not``, ``if``, ``then`` and ``else``;
+* ``$ref`` to the schemas of the document, by a JSON Pointer, as to ``$defs``,
+  by their ``$anchor`` and by the ``$id`` of a schema in the schema, also to
+  itself, and to the schemas of the registry of
+  :meth:`~Pyjo_JSON_Schema.add_schema`, which it never downloads.
+
+The keywords of 2020-12 that it does not support, ``$dynamicRef``,
+``unevaluatedItems`` and ``unevaluatedProperties``, and a ``$schema`` of
+another dialect, fail with a :mod:`Pyjo.Exception`, as a ``$ref`` to a schema
+that it does not have does, and a keyword that 2020-12 does not have, as
+``additionalItems`` of the older drafts, is ignored, as the specification says
+of a keyword that it does not know. The annotations, as ``title``,
+``default`` and ``contentMediaType``, validate nothing.
+
+The values are those of JSON: ``bool`` is not an ``integer`` nor a ``number``,
+a ``float`` without a fraction is an ``integer``, ``1`` and ``1.0`` are equal
+for ``enum``, ``const`` and ``uniqueItems``, ``True`` and ``1`` are not, and a
+``tuple`` is an ``array``. A value that JSON does not have, as ``bytes``, a
+``set``, ``nan`` or a name of a property that is not a string, is an error of
+its own, whatever the schema.
+
+``format`` is an annotation, as JSON Schema has it by default, and an
+assertion with ``formats``, for the formats ``date-time``, ``date``, ``time``
+and ``duration`` of RFC 3339, ``email``, ``hostname``, ``ipv4``, ``ipv6``,
+``uri``, ``uri-reference``, ``uuid``, ``regex``, ``json-pointer`` and
+``relative-json-pointer``. Another format, as ``idn-email``, ``iri`` or
+``uri-template``, stays an annotation.
+
+A ``pattern`` is a regular expression of ECMAScript, which is one of
+:mod:`re` with these translations: ``\\d``, ``\\w`` and ``\\b`` are of ASCII,
+``\\s`` is the white space of ECMAScript, ``.`` matches no line terminator,
+``$`` matches only at the end, a named group is ``(?<name>...)`` and its
+backreference ``\\k<name>``, ``\\p{...}`` is a general category of Unicode,
+or ``ASCII``, ``Any`` and ``Assigned``, and ``\\cX``, ``\\u{...}``, ``[]``
+and ``[^]`` are as ECMAScript has them. What :mod:`re` does not have, as a
+lookbehind of a variable width or ``\\p{Script=...}``, and the syntax of
+Python that ECMAScript does not have, as ``(?P<name>...)``, fail with a
+:mod:`Pyjo.Exception`.
+
 See also
 --------
 
 :mod:`Pyjo.JSON`, :mod:`Pyjo.JSON.Pointer`, https://mojolicious.org.
 
 It has no counterpart in Mojolicious, it is written from the specification of
-JSON Schema 2020-12, and its builder is inspired by `zod <https://zod.dev>`_.
+JSON Schema 2020-12, its builder is inspired by `zod <https://zod.dev>`_, and
+its validation is tested with the official test suite of JSON Schema,
+`JSON-Schema-Test-Suite <https://github.com/json-schema-org/JSON-Schema-Test-Suite>`_.
 
 Classes
 -------
 """
 
 import Pyjo.Base
+import Pyjo.Collection
 import Pyjo.Exception
+import Pyjo.JSON
+import Pyjo.JSON.Pointer
+import Pyjo.URL
+
+from Pyjo.JSON import to_json
+from Pyjo.Util import punycode_decode
 
 import builtins
 import collections
+import contextlib
 import dataclasses
 import datetime
 import enum
+import fractions
+import functools
 import inspect
+import ipaddress
+import math
 import re
 import sys
 import types
 import typing
+import unicodedata
 import uuid
 
 from collections.abc import Callable, Iterable
@@ -181,6 +263,8 @@ class Pyjo_JSON_Schema(Pyjo.Base.object):
     _optional: bool
     _lazy: '_Lazy | None'
     _data: dict[str, Any] | bool | None
+    _schemas: 'dict[str, Pyjo_JSON_Schema | dict[str, Any] | bool]'
+    _index: '_Index | None'
 
     def __init__(self, data: dict[str, Any] | bool | None = None) -> None:
         """::
@@ -196,6 +280,8 @@ class Pyjo_JSON_Schema(Pyjo.Base.object):
         self._optional = False
         self._lazy = None
         self._data = None
+        self._schemas = {}
+        self._index = None
 
         self.name: str | None = None
         """::
@@ -797,6 +883,59 @@ class Pyjo_JSON_Schema(Pyjo.Base.object):
         schema._keywords = {**cast(dict[str, Any], schema._keywords), **(keywords or {}), **kwargs}
         return schema
 
+    # Validation
+
+    def add_schema(self, schema: 'Pyjo_JSON_Schema | dict[str, Any] | bool', uri: str | None = None) -> Self:
+        """::
+
+            schema = schema.add_schema({'$id': 'https://example.com/address', 'type': 'object'})
+            schema = schema.add_schema(z.string(), 'https://example.com/name')
+
+        Add a schema to the registry of the schema, under its ``$id`` or the
+        URI, where a ``$ref`` of the schema finds it, and its ``$id`` and
+        ``$anchor`` too.
+        """
+        if uri is None:
+            data = schema.data if isinstance(schema, Pyjo_JSON_Schema) else schema
+            uri = data.get('$id') if isinstance(data, dict) else None
+            if not isinstance(uri, str):
+                raise Pyjo.Exception.new('JSON Schema has no $id of the schema to add')
+        self._schemas[_uri('', uri)[0]] = schema
+        self._index = None
+        return self
+
+    def parse(self, value: Any, formats: bool = False) -> Any:
+        """::
+
+            value = schema.parse({'city': 'Warsaw'})
+
+        The value, if the schema validates it, as :meth:`validate` does, or a
+        :mod:`Pyjo.Exception` with the errors, one in each line.
+        """
+        result = self.validate(value, formats)
+        if not result:
+            raise Pyjo.Exception.new(str(result))
+        return value
+
+    def validate(self, value: Any, formats: bool = False) -> 'Result':
+        """::
+
+            result = schema.validate({'city': 'Warsaw'})
+            result = schema.validate({'date': '2026-10-23'}, formats=True)
+
+        Validate a value, as :mod:`Pyjo.JSON` decodes it, and return a
+        :class:`Result`, which is true if the value is valid, with the
+        :class:`Error` objects of the value otherwise. ``format`` is an
+        annotation, as JSON Schema has it by default, and an assertion with
+        ``formats``. ::
+
+            # "/days: Expected integer - got string."
+            str(z.object(days=z.int()).validate({'days': 'three'}))
+        """
+        if self._index is None:
+            self._index = _Index(self.data, self._schemas)
+        return Result(_Validator(self._index, formats).validate(value))
+
     # Internals
 
     def _copy(self) -> Self:
@@ -805,6 +944,7 @@ class Pyjo_JSON_Schema(Pyjo.Base.object):
         schema = type(self)(dict(self._keywords))
         schema._optional = self._optional
         schema._lazy = self._lazy
+        schema._schemas = dict(self._schemas)
         return schema
 
     def _types(self) -> list[str]:
@@ -916,6 +1056,131 @@ class Pyjo_JSON_Schema(Pyjo.Base.object):
     """
 
 
+class Error(Pyjo.Base.object):
+    """
+    An error of a value, which :meth:`~Pyjo_JSON_Schema.validate` gives, with
+    where it is in the value and in the schema. ::
+
+        # "/days: Expected integer - got string."
+        str(error)
+    """
+
+    def __init__(self, path: str = '', keyword_path: str = '', message: str = '') -> None:
+        self.path = path
+        """::
+
+            path = error.path
+
+        The JSON Pointer of the value in the validated value, as
+        :mod:`Pyjo.JSON.Pointer` takes it, or of the missing property of
+        ``required``.
+        """
+
+        self.keyword_path = keyword_path
+        """::
+
+            keyword_path = error.keyword_path
+
+        The JSON Pointer of the keyword in the schema, through the ``$ref``
+        that the validation follows, as ``/properties/days/type``.
+        """
+
+        self.message = message
+        """::
+
+            message = error.message
+
+        What is wrong with the value.
+        """
+
+        self._expected: list[str] | None = None
+
+    def __json__(self) -> dict[str, str]:
+        """::
+
+            data = error.__json__()
+
+        The error as :mod:`Pyjo.JSON` encodes it, with ``path``,
+        ``keyword_path`` and ``message``.
+        """
+        return {'path': self.path, 'keyword_path': self.keyword_path, 'message': self.message}
+
+    def __repr__(self) -> str:
+        return f'{type(self).__module__}.{type(self).__qualname__}({self.__json__()!r})'
+
+    def __str__(self) -> str:
+        """::
+
+            string = str(error)
+
+        The path, with ``/`` for the whole value, and the message.
+        """
+        return f'{self.path or "/"}: {self.message}'
+
+
+class Result:
+    """
+    The result of :meth:`~Pyjo_JSON_Schema.validate`, which is true if the
+    value is valid, as the assertions of :mod:`Pyjo.Test` are. ::
+
+        result = schema.validate(value)
+        if not result:
+            for error in result.errors:
+                print(error.path, error.message)
+    """
+
+    def __init__(self, errors: Iterable[Error] = ()) -> None:
+        self.errors: Pyjo.Collection.object[Error] = Pyjo.Collection.new(*errors)
+        """::
+
+            errors = result.errors
+
+        The :class:`Error` objects of the value, in a :mod:`Pyjo.Collection`,
+        empty if the value is valid.
+        """
+
+    def __bool__(self) -> bool:
+        """::
+
+            boolean = bool(result)
+
+        The value of :attr:`is_valid`.
+        """
+        return self.is_valid
+
+    def __json__(self) -> dict[str, Any]:
+        """::
+
+            data = result.__json__()
+
+        The result as :mod:`Pyjo.JSON` encodes it, ``valid`` and the ``errors``.
+        """
+        return {'valid': self.is_valid, 'errors': [error.__json__() for error in self.errors]}
+
+    def __repr__(self) -> str:
+        return f'<{type(self).__module__}.{type(self).__qualname__} is_valid={self.is_valid}>'
+
+    def __str__(self) -> str:
+        """::
+
+            string = str(result)
+
+        The errors, one in each line, or an empty string if the value is
+        valid.
+        """
+        return '\n'.join(str(error) for error in self.errors)
+
+    @property
+    def is_valid(self) -> bool:
+        """::
+
+            boolean = result.is_valid
+
+        True if the value is valid, without errors.
+        """
+        return not len(self.errors)
+
+
 class _Lazy:
     """The function of a lazy schema, and the schema that it gives, which the copies of the lazy schema share, so that
     they refer to the same schema."""
@@ -1016,8 +1281,7 @@ class _Compiler:
             return cls.string()
         if isinstance(tp, type) and tp in _FORMATS:
             return cls.string().meta(format=_FORMATS[tp])
-        url = sys.modules.get('Pyjo.URL')
-        if url is not None and isinstance(tp, type) and issubclass(tp, url.object):
+        if isinstance(tp, type) and issubclass(tp, Pyjo.URL.object):
             return cls.string().url()
 
         origin, args = typing.get_origin(tp), typing.get_args(tp)
@@ -1231,6 +1495,844 @@ class _Emitter:
         return {**data, **own}
 
 
+class _Index:
+    """The schemas by their URI, of $id, $anchor and the registry, with the base URI of each schema."""
+
+    def __init__(
+        self, root: dict[str, Any] | bool, schemas: dict[str, Pyjo_JSON_Schema | dict[str, Any] | bool]
+    ) -> None:
+        self.resources: dict[str, dict[str, Any] | bool] = {}
+        self.anchors: dict[str, dict[str, Any]] = {}
+        self.bases: dict[builtins.int, str] = {}
+        self.schemas = dict(schemas)
+        self.keep: list[Any] = []
+        self.patterns: dict[str, re.Pattern[str]] = {}
+        self.root = root
+        self.add(root, '')
+
+    def add(self, schema: Pyjo_JSON_Schema | dict[str, Any] | bool, uri: str) -> None:
+        data = schema.data if isinstance(schema, Pyjo_JSON_Schema) else schema
+        # The ids of the schemas are the keys of the bases, so the schemas stay
+        self.keep.append(data)
+        self.resources[uri] = data
+        self.walk(data, uri, '')
+
+    def walk(self, schema: Any, base: str, where: str) -> None:
+        if isinstance(schema, bool):
+            return
+        if not isinstance(schema, dict):
+            raise Pyjo.Exception.new(f'JSON Schema has no schema in {where or "/"}')
+        schema = cast(dict[str, Any], schema)
+        dialect = schema.get('$schema')
+        if dialect is not None and (not isinstance(dialect, str) or dialect.rstrip('#') != DIALECT):
+            raise Pyjo.Exception.new(f'JSON Schema does not support the dialect {dialect}')
+        for keyword in _UNSUPPORTED:
+            if keyword in schema:
+                raise Pyjo.Exception.new(f'JSON Schema does not support {keyword} in {where or "/"}')
+        if isinstance(schema.get('$id'), str):
+            base = _uri(base, schema['$id'])[0]
+            self.resources.setdefault(base, schema)
+        for keyword in ('$anchor', '$dynamicAnchor'):
+            if isinstance(schema.get(keyword), str):
+                self.anchors[f'{base}#{schema[keyword]}'] = schema
+        self.bases[id(schema)] = base
+        for keyword, value in schema.items():
+            if keyword in _SCHEMA:
+                self.walk(value, base, f'{where}/{keyword}')
+            elif keyword in _SCHEMAS and isinstance(value, dict):
+                for name, item in cast(dict[str, Any], value).items():
+                    self.walk(item, base, f'{where}/{keyword}/{_escape(name)}')
+            elif keyword in _SCHEMA_LISTS and isinstance(value, list):
+                for i, item in enumerate(cast(list[Any], value)):
+                    self.walk(item, base, f'{where}/{keyword}/{i}')
+            elif keyword in _SCHEMAS or keyword in _SCHEMA_LISTS:
+                raise Pyjo.Exception.new(f'JSON Schema has no schemas in {where}/{keyword}')
+
+    def pattern(self, source: str) -> re.Pattern[str]:
+        # The regular expressions of the schemas, which are compiled once for the schema
+        pattern = self.patterns.get(source)
+        if pattern is None:
+            pattern = self.patterns[source] = _regex(source)
+        return pattern
+
+    def resolve(self, base: str, ref: str, where: str) -> tuple[dict[str, Any] | bool, str]:
+        uri, fragment = _uri(base, ref)
+        if uri not in self.resources and uri in self.schemas:
+            self.add(self.schemas.pop(uri), uri)
+        if uri not in self.resources:
+            # An embedded resource of a schema of the registry, which has to be indexed to be found, of the schemas
+            # that the validation supports
+            while self.schemas:
+                key, schema = self.schemas.popitem()
+                with contextlib.suppress(Pyjo.Exception.object):
+                    self.add(schema, key)
+        target: Any = None
+        if fragment.startswith('/') or not fragment:
+            pointer = Pyjo.JSON.Pointer.new(self.resources.get(uri))
+            if uri in self.resources and pointer.contains(fragment):
+                target = pointer.get(fragment)
+        else:
+            target = self.anchors.get(f'{uri}#{fragment}')
+        if not isinstance(target, (dict, bool)):
+            raise Pyjo.Exception.new(f'JSON Schema has no schema of the $ref {ref} in {where}')
+        found = cast(dict[str, Any] | bool, target)
+        return found, self.bases.get(id(found), uri)
+
+
+@dataclasses.dataclass(slots=True)
+class _At:
+    """A value and a schema whose keywords validate it, with the JSON Pointers of the value and of the keyword."""
+
+    value: Any
+    kind: str
+    schema: dict[str, Any]
+    base: str
+    path: str
+    where: str
+    errors: list[Error]
+
+    def error(self, message: str, path: str | None = None, where: str | None = None) -> Error:
+        error = Error(self.path if path is None else path, self.where if where is None else where, message)
+        self.errors.append(error)
+        return error
+
+    def child(self, name: Any) -> str:
+        return f'{self.path}/{_escape(name)}'
+
+
+class _Validator:
+    """The evaluation of a value against a schema, which collects the errors."""
+
+    def __init__(self, index: _Index, formats: bool) -> None:
+        self.index = index
+        self.formats = formats
+        self.stack: set[tuple[builtins.int, str]] = set()
+
+    def validate(self, value: Any) -> list[Error]:
+        errors: list[Error] = []
+        _json_errors(value, '', errors)
+        if not errors:
+            self.evaluate(value, self.index.root, '', '', '', errors)
+        return errors
+
+    def evaluate(
+        self, value: Any, schema: dict[str, Any] | bool, base: str, path: str, where: str, errors: list[Error]
+    ) -> None:
+        if schema is True:
+            return
+        if schema is False:
+            errors.append(Error(path, where, 'Not allowed.'))
+            return
+        key = (id(schema), path)
+        if key in self.stack:
+            raise Pyjo.Exception.new(f'JSON Schema refers to itself in {where} without a value of its own')
+        self.stack.add(key)
+        try:
+            at = _At(value, _instance_type(value), schema, self.index.bases.get(id(schema), base), path, where, errors)
+            for keyword, argument in schema.items():
+                check = _KEYWORDS.get(keyword)
+                if check is not None:
+                    at.where = f'{where}/{keyword}'
+                    check(self, at, argument)
+        finally:
+            self.stack.discard(key)
+
+    def errors(
+        self, value: Any, schema: Any, at: _At, path: str | None = None, where: str | None = None
+    ) -> list[Error]:
+        errors: list[Error] = []
+        self.evaluate(
+            value, schema, at.base, at.path if path is None else path, at.where if where is None else where, errors
+        )
+        return errors
+
+    def apply(self, value: Any, schema: Any, at: _At, path: str | None = None, where: str | None = None) -> None:
+        self.evaluate(
+            value, schema, at.base, at.path if path is None else path, at.where if where is None else where, at.errors
+        )
+
+    # Types
+
+    def type(self, at: _At, argument: Any) -> None:
+        types = [argument] if isinstance(argument, str) else cast(list[str], argument)
+        if at.kind not in types and not (at.kind == 'integer' and 'number' in types):
+            error = at.error(f'Expected {" or ".join(types)} - got {_type_name(at.value)}.')
+            error._expected = types  # pyright: ignore[reportPrivateUsage]
+
+    def enum(self, at: _At, argument: Any) -> None:
+        if _canonical(at.value) not in [_canonical(item) for item in cast(list[Any], argument)]:
+            at.error(f'Not in enum: {", ".join(to_json(item) for item in argument)}.')
+
+    def const(self, at: _At, argument: Any) -> None:
+        if _canonical(at.value) != _canonical(argument):
+            at.error(f'Not the const: {to_json(argument)}.')
+
+    # Numbers
+
+    def minimum(self, at: _At, argument: Any) -> None:
+        if at.kind in _NUMBERS and at.value < argument:
+            at.error(f'Less than the minimum {to_json(argument)}.')
+
+    def maximum(self, at: _At, argument: Any) -> None:
+        if at.kind in _NUMBERS and at.value > argument:
+            at.error(f'Greater than the maximum {to_json(argument)}.')
+
+    def exclusive_minimum(self, at: _At, argument: Any) -> None:
+        if at.kind in _NUMBERS and at.value <= argument:
+            at.error(f'Not greater than the exclusive minimum {to_json(argument)}.')
+
+    def exclusive_maximum(self, at: _At, argument: Any) -> None:
+        if at.kind in _NUMBERS and at.value >= argument:
+            at.error(f'Not less than the exclusive maximum {to_json(argument)}.')
+
+    def multiple_of(self, at: _At, argument: Any) -> None:
+        if at.kind in _NUMBERS and (_fraction(at.value) / _fraction(argument)).denominator != 1:
+            at.error(f'Not a multiple of {to_json(argument)}.')
+
+    # Strings
+
+    def min_length(self, at: _At, argument: Any) -> None:
+        if at.kind == 'string' and len(at.value) < argument:
+            at.error(f'Shorter than {to_json(argument)} characters.')
+
+    def max_length(self, at: _At, argument: Any) -> None:
+        if at.kind == 'string' and len(at.value) > argument:
+            at.error(f'Longer than {to_json(argument)} characters.')
+
+    def pattern(self, at: _At, argument: Any) -> None:
+        if at.kind == 'string' and not self.index.pattern(argument).search(at.value):
+            at.error(f'Does not match the pattern {argument}.')
+
+    def format(self, at: _At, argument: Any) -> None:
+        check = _FORMAT_CHECKS.get(argument)
+        if self.formats and at.kind == 'string' and check is not None and not check(at.value):
+            at.error(f'Does not match the format {argument}.')
+
+    # Arrays
+
+    def items(self, at: _At, argument: Any) -> None:
+        if at.kind == 'array':
+            start = len(cast(list[Any], at.schema.get('prefixItems', [])))
+            for i, item in enumerate(at.value[start:], start):
+                self.apply(item, argument, at, at.child(i))
+
+    def prefix_items(self, at: _At, argument: Any) -> None:
+        if at.kind == 'array':
+            for i, (item, schema) in enumerate(zip(at.value, argument, strict=False)):
+                self.apply(item, schema, at, at.child(i), f'{at.where}/{i}')
+
+    def min_items(self, at: _At, argument: Any) -> None:
+        if at.kind == 'array' and len(at.value) < argument:
+            at.error(f'Fewer than {to_json(argument)} items.')
+
+    def max_items(self, at: _At, argument: Any) -> None:
+        if at.kind == 'array' and len(at.value) > argument:
+            at.error(f'More than {to_json(argument)} items.')
+
+    def unique_items(self, at: _At, argument: Any) -> None:
+        if at.kind == 'array' and argument is True:
+            seen: dict[Any, builtins.int] = {}
+            for i, item in enumerate(at.value):
+                first = seen.setdefault(_canonical(item), i)
+                if first != i:
+                    at.error(f'Items {first} and {i} are equal.')
+                    return
+
+    def contains(self, at: _At, argument: Any) -> None:
+        if at.kind != 'array':
+            return
+        count = sum(not self.errors(item, argument, at, at.child(i)) for i, item in enumerate(at.value))
+        least, most = at.schema.get('minContains', 1), at.schema.get('maxContains')
+        parent = at.where.rpartition('/')[0]
+        if count < least and 'minContains' in at.schema:
+            at.error(f'Fewer than {to_json(least)} items match the schema of contains.', where=f'{parent}/minContains')
+        elif count < least:
+            at.error('No item matches the schema of contains.')
+        if most is not None and count > most:
+            at.error(f'More than {to_json(most)} items match the schema of contains.', where=f'{parent}/maxContains')
+
+    # Objects
+
+    def properties(self, at: _At, argument: Any) -> None:
+        if at.kind == 'object':
+            for name, schema in cast(dict[str, Any], argument).items():
+                if name in at.value:
+                    self.apply(at.value[name], schema, at, at.child(name), f'{at.where}/{_escape(name)}')
+
+    def pattern_properties(self, at: _At, argument: Any) -> None:
+        if at.kind == 'object':
+            for pattern, schema in cast(dict[str, Any], argument).items():
+                for name, item in cast(dict[str, Any], at.value).items():
+                    if self.index.pattern(pattern).search(name):
+                        self.apply(item, schema, at, at.child(name), f'{at.where}/{_escape(pattern)}')
+
+    def additional_properties(self, at: _At, argument: Any) -> None:
+        if at.kind != 'object':
+            return
+        properties = cast(dict[str, Any], at.schema.get('properties', {}))
+        patterns = [
+            self.index.pattern(pattern) for pattern in cast(dict[str, Any], at.schema.get('patternProperties', {}))
+        ]
+        for name, item in cast(dict[str, Any], at.value).items():
+            if name in properties or any(pattern.search(name) for pattern in patterns):
+                continue
+            if argument is False:
+                at.error('Property not allowed.', at.child(name))
+            else:
+                self.apply(item, argument, at, at.child(name))
+
+    def property_names(self, at: _At, argument: Any) -> None:
+        if at.kind == 'object':
+            for name in at.value:
+                self.apply(name, argument, at, at.child(name))
+
+    def required(self, at: _At, argument: Any) -> None:
+        if at.kind == 'object':
+            for name in cast(list[str], argument):
+                if name not in at.value:
+                    at.error('Missing property.', at.child(name))
+
+    def min_properties(self, at: _At, argument: Any) -> None:
+        if at.kind == 'object' and len(at.value) < argument:
+            at.error(f'Fewer than {to_json(argument)} properties.')
+
+    def max_properties(self, at: _At, argument: Any) -> None:
+        if at.kind == 'object' and len(at.value) > argument:
+            at.error(f'More than {to_json(argument)} properties.')
+
+    def dependent_required(self, at: _At, argument: Any) -> None:
+        if at.kind == 'object':
+            for name, names in cast(dict[str, list[str]], argument).items():
+                for required in names if name in at.value else []:
+                    if required not in at.value:
+                        message = f'Missing property, which {to_json(name)} requires.'
+                        at.error(message, at.child(required), f'{at.where}/{_escape(name)}')
+
+    def dependent_schemas(self, at: _At, argument: Any) -> None:
+        if at.kind == 'object':
+            for name, schema in cast(dict[str, Any], argument).items():
+                if name in at.value:
+                    self.apply(at.value, schema, at, where=f'{at.where}/{_escape(name)}')
+
+    # Combinations
+
+    def all_of(self, at: _At, argument: Any) -> None:
+        for i, schema in enumerate(cast(list[Any], argument)):
+            self.apply(at.value, schema, at, where=f'{at.where}/{i}')
+
+    def any_of(self, at: _At, argument: Any) -> None:
+        failures: list[list[Error]] = []
+        for i, schema in enumerate(cast(list[Any], argument)):
+            failure = self.errors(at.value, schema, at, where=f'{at.where}/{i}')
+            if not failure:
+                return
+            failures.append(failure)
+        at.errors.extend(_mismatch(at, failures))
+
+    def one_of(self, at: _At, argument: Any) -> None:
+        failures: list[list[Error]] = []
+        valid: list[str] = []
+        for i, schema in enumerate(cast(list[Any], argument)):
+            failure = self.errors(at.value, schema, at, where=f'{at.where}/{i}')
+            if failure:
+                failures.append(failure)
+            else:
+                valid.append(str(i))
+        if len(valid) > 1:
+            at.error(f'Matches more than one schema of oneOf: {", ".join(valid)}.')
+        elif not valid:
+            at.errors.extend(_mismatch(at, failures))
+
+    def not_(self, at: _At, argument: Any) -> None:
+        if not self.errors(at.value, argument, at):
+            at.error('Matches the schema of not.')
+
+    def if_(self, at: _At, argument: Any) -> None:
+        keyword = 'else' if self.errors(at.value, argument, at) else 'then'
+        if keyword in at.schema:
+            self.apply(at.value, at.schema[keyword], at, where=f'{at.where.rpartition("/")[0]}/{keyword}')
+
+    # References
+
+    def ref(self, at: _At, argument: Any) -> None:
+        target, base = self.index.resolve(at.base, argument, at.where)
+        self.evaluate(at.value, target, base, at.path, at.where, at.errors)
+
+    def unsupported(self, at: _At, argument: Any) -> None:
+        raise Pyjo.Exception.new(f'JSON Schema does not support {at.where.rpartition("/")[2]} in {at.where}')
+
+
+type _Check = Callable[[_Validator, _At, Any], None]
+
+# The keywords of the validation, and the ones of 2020-12 that it does not support, which a schema refers to through
+# a $ref of a JSON Pointer too
+_KEYWORDS: dict[str, _Check] = {
+    'type': _Validator.type,
+    'enum': _Validator.enum,
+    'const': _Validator.const,
+    'minimum': _Validator.minimum,
+    'maximum': _Validator.maximum,
+    'exclusiveMinimum': _Validator.exclusive_minimum,
+    'exclusiveMaximum': _Validator.exclusive_maximum,
+    'multipleOf': _Validator.multiple_of,
+    'minLength': _Validator.min_length,
+    'maxLength': _Validator.max_length,
+    'pattern': _Validator.pattern,
+    'format': _Validator.format,
+    'items': _Validator.items,
+    'prefixItems': _Validator.prefix_items,
+    'minItems': _Validator.min_items,
+    'maxItems': _Validator.max_items,
+    'uniqueItems': _Validator.unique_items,
+    'contains': _Validator.contains,
+    'properties': _Validator.properties,
+    'patternProperties': _Validator.pattern_properties,
+    'additionalProperties': _Validator.additional_properties,
+    'propertyNames': _Validator.property_names,
+    'required': _Validator.required,
+    'minProperties': _Validator.min_properties,
+    'maxProperties': _Validator.max_properties,
+    'dependentRequired': _Validator.dependent_required,
+    'dependentSchemas': _Validator.dependent_schemas,
+    'allOf': _Validator.all_of,
+    'anyOf': _Validator.any_of,
+    'oneOf': _Validator.one_of,
+    'not': _Validator.not_,
+    'if': _Validator.if_,
+    '$ref': _Validator.ref,
+    '$dynamicRef': _Validator.unsupported,
+    'unevaluatedItems': _Validator.unsupported,
+    'unevaluatedProperties': _Validator.unsupported,
+}
+
+# The types of the numbers, and the keywords of 2020-12 that the validation does not support
+_NUMBERS = ('integer', 'number')
+_UNSUPPORTED = ('$dynamicRef', 'unevaluatedItems', 'unevaluatedProperties')
+
+# The keywords of a schema, of an object of schemas and of an array of schemas
+_SCHEMA = (
+    'additionalProperties',
+    'contains',
+    'contentSchema',
+    'else',
+    'if',
+    'items',
+    'not',
+    'propertyNames',
+    'then',
+)
+_SCHEMAS = ('$defs', 'dependentSchemas', 'patternProperties', 'properties')
+_SCHEMA_LISTS = ('allOf', 'anyOf', 'oneOf', 'prefixItems')
+
+
+def _mismatch(at: _At, failures: list[list[Error]]) -> list[Error]:
+    # The errors of the schemas of anyOf or oneOf of the type of the value, or one of the types that they expect
+    def expected(failure: list[Error]) -> list[str] | None:
+        for error in failure:
+            if error._expected is not None and error.path == at.path:  # pyright: ignore[reportPrivateUsage]
+                return error._expected  # pyright: ignore[reportPrivateUsage]
+        return None
+
+    errors = [error for failure in failures if expected(failure) is None for error in failure]
+    if errors:
+        return errors
+    types = list(dict.fromkeys(t for failure in failures for t in expected(failure) or []))
+    error = Error(at.path, at.where, f'Expected {" or ".join(types)} - got {_type_name(at.value)}.')
+    error._expected = types  # pyright: ignore[reportPrivateUsage]
+    return [error]
+
+
+def _json_errors(value: Any, path: str, errors: list[Error]) -> None:
+    # The values that JSON does not have, which no schema validates
+    if isinstance(value, dict):
+        for name, item in cast(dict[Any, Any], value).items():
+            if not isinstance(name, str):
+                errors.append(Error(path, '', f'Not a JSON value: the name {name!r}.'))
+            else:
+                _json_errors(item, f'{path}/{_escape(name)}', errors)
+    elif isinstance(value, (list, builtins.tuple)):
+        for i, item in enumerate(cast(list[Any], value)):
+            _json_errors(item, f'{path}/{i}', errors)
+    elif isinstance(value, float) and not math.isfinite(value):
+        errors.append(Error(path, '', f'Not a JSON value: {value!r}.'))
+    elif not (value is None or isinstance(value, (bool, builtins.int, float, str))):
+        errors.append(Error(path, '', f'Not a JSON value: {type(value).__name__}.'))
+
+
+def _instance_type(value: Any) -> str:
+    if isinstance(value, float):
+        return 'integer' if value.is_integer() else 'number'
+    return _type_name(value)
+
+
+def _type_name(value: Any) -> str:
+    return _json_type(value) or ('object' if isinstance(value, dict) else 'array')
+
+
+def _canonical(value: Any) -> Any:
+    # A value that is equal to another one as JSON has it: 1 and 1.0 are, True and 1 are not
+    if isinstance(value, bool) or value is None:
+        return ('literal', value)
+    if isinstance(value, (builtins.int, float)):
+        return ('number', value)
+    if isinstance(value, dict):
+        return ('object', frozenset((name, _canonical(item)) for name, item in cast(dict[str, Any], value).items()))
+    if isinstance(value, (list, builtins.tuple)):
+        return ('array', builtins.tuple(_canonical(item) for item in cast(list[Any], value)))
+    return ('string', value)
+
+
+def _fraction(number: float) -> fractions.Fraction:
+    # The number as JSON writes it, so that 0.0075 is a multiple of 0.0001
+    return fractions.Fraction(number) if isinstance(number, builtins.int) else fractions.Fraction(repr(number))
+
+
+def _escape(name: Any) -> str:
+    return str(name).replace('~', '~0').replace('/', '~1')
+
+
+def _uri(base: str, ref: str) -> tuple[str, str]:
+    # The URI of a reference without its fragment, and the fragment, decoded
+    url = Pyjo.URL.new(ref).to_abs(Pyjo.URL.new(base))
+    fragment = url.fragment or ''
+    url.fragment = None
+    return url.to_str(), fragment
+
+
+# The classes of ECMAScript, ASCII but the white space, as ranges of code points
+_ECMA_CLASSES: dict[str, list[builtins.tuple[builtins.int, builtins.int]]] = {
+    'd': [(0x30, 0x39)],
+    'w': [(0x30, 0x39), (0x41, 0x5A), (0x5F, 0x5F), (0x61, 0x7A)],
+    's': [
+        (0x09, 0x0D),
+        (0x20, 0x20),
+        (0xA0, 0xA0),
+        (0x1680, 0x1680),
+        (0x2000, 0x200A),
+        (0x2028, 0x2029),
+        (0x202F, 0x202F),
+        (0x205F, 0x205F),
+        (0x3000, 0x3000),
+        (0xFEFF, 0xFEFF),
+    ],
+}
+
+
+def _ranges(ranges: list[builtins.tuple[builtins.int, builtins.int]], negate: bool) -> str:
+    if negate:
+        ranges = _complement(ranges)
+    return ''.join(f'\\U{low:08x}' if low == high else f'\\U{low:08x}-\\U{high:08x}' for low, high in ranges)
+
+
+# The groups of ECMAScript, with the modifiers of ES2025
+_RE_ECMA_GROUP = re.compile(r'\(\?(?:[:=!]|<[=!]|[ims]*(?:-[ims]*)?:)')
+
+# The general categories of Unicode, by their aliases, which \p of ECMAScript takes
+_CATEGORIES = {
+    'C': 'C Other',
+    'Cc': 'Cc Control cntrl',
+    'Cf': 'Cf Format',
+    'Cn': 'Cn Unassigned',
+    'Co': 'Co Private_Use',
+    'Cs': 'Cs Surrogate',
+    'L': 'L Letter',
+    'LC': 'LC Cased_Letter',
+    'Ll': 'Ll Lowercase_Letter',
+    'Lm': 'Lm Modifier_Letter',
+    'Lo': 'Lo Other_Letter',
+    'Lt': 'Lt Titlecase_Letter',
+    'Lu': 'Lu Uppercase_Letter',
+    'M': 'M Mark Combining_Mark',
+    'Mc': 'Mc Spacing_Mark',
+    'Me': 'Me Enclosing_Mark',
+    'Mn': 'Mn Nonspacing_Mark',
+    'N': 'N Number',
+    'Nd': 'Nd Decimal_Number digit',
+    'Nl': 'Nl Letter_Number',
+    'No': 'No Other_Number',
+    'P': 'P Punctuation punct',
+    'Pc': 'Pc Connector_Punctuation',
+    'Pd': 'Pd Dash_Punctuation',
+    'Pe': 'Pe Close_Punctuation',
+    'Pf': 'Pf Final_Punctuation',
+    'Pi': 'Pi Initial_Punctuation',
+    'Po': 'Po Other_Punctuation',
+    'Ps': 'Ps Open_Punctuation',
+    'S': 'S Symbol',
+    'Sc': 'Sc Currency_Symbol',
+    'Sk': 'Sk Modifier_Symbol',
+    'Sm': 'Sm Math_Symbol',
+    'So': 'So Other_Symbol',
+    'Z': 'Z Separator',
+    'Zl': 'Zl Line_Separator',
+    'Zp': 'Zp Paragraph_Separator',
+    'Zs': 'Zs Space_Separator',
+}
+_CATEGORY_ALIASES = {alias: category for category, aliases in _CATEGORIES.items() for alias in aliases.split()}
+
+
+@functools.cache
+def _category_ranges() -> dict[str, list[builtins.tuple[builtins.int, builtins.int]]]:
+    # The ranges of the code points of each general category of unicodedata, once a pattern has \p
+    ranges: dict[str, list[builtins.tuple[builtins.int, builtins.int]]] = {}
+    start, current = 0, unicodedata.category('\0')
+    for code in range(1, sys.maxunicode + 2):
+        category = unicodedata.category(chr(code)) if code <= sys.maxunicode else ''
+        if category != current:
+            ranges.setdefault(current, []).append((start, code - 1))
+            start, current = code, category
+    return ranges
+
+
+def _property(source: str, name: str) -> list[builtins.tuple[builtins.int, builtins.int]]:
+    # The code points of a property of \p, a general category or ASCII, Any and Assigned
+    name = name.removeprefix('General_Category=').removeprefix('gc=')
+    if name in ('ASCII', 'Any'):
+        return [(0, 0x7F if name == 'ASCII' else sys.maxunicode)]
+    category = 'Cn' if name == 'Assigned' else _CATEGORY_ALIASES.get(name)
+    if category is None:
+        raise Pyjo.Exception.new(f'JSON Schema does not support the pattern {source}: the property {name}')
+    ranges = sorted(
+        r
+        for c, rs in _category_ranges().items()
+        if c == category or (len(category) == 1 and c[0] == category) or (category == 'LC' and c in ('Ll', 'Lt', 'Lu'))
+        for r in rs
+    )
+    if name == 'Assigned':
+        return _complement(ranges)
+    return ranges
+
+
+def _complement(
+    ranges: list[builtins.tuple[builtins.int, builtins.int]],
+) -> list[builtins.tuple[builtins.int, builtins.int]]:
+    complement: list[builtins.tuple[builtins.int, builtins.int]] = []
+    start = 0
+    for low, high in ranges:
+        if low > start:
+            complement.append((start, low - 1))
+        start = high + 1
+    return [*complement, (start, sys.maxunicode)] if start <= sys.maxunicode else complement
+
+
+def _regex(source: str) -> re.Pattern[str]:
+    # A regular expression of ECMAScript as one of Python: \d, \w and \b are ASCII, \s has the white space of
+    # ECMAScript, . matches no line terminator, $ only the end, and the named groups have the syntax of Python
+    out: list[str] = []
+    i, in_class = 0, False
+    while i < len(source):
+        c = source[i]
+        if c == '\\' and i + 1 < len(source):
+            e = source[i + 1]
+            i += 2
+            if e in 'dDsSwW' or (e in 'pP' and source.startswith('{', i) and '}' in source[i:]):
+                if e in 'pP':
+                    end = source.index('}', i)
+                    ranges = _ranges(_property(source, source[i + 1 : end]), e == 'P')
+                    i = end + 1
+                else:
+                    ranges = _ranges(_ECMA_CLASSES[e.lower()], e.isupper())
+                out.append(ranges if in_class else f'[{ranges}]')
+            elif e in 'bB' and not in_class:
+                out.append(f'(?a:\\{e})')
+            elif e == 'k' and source.startswith('<', i) and '>' in source[i:]:
+                end = source.index('>', i)
+                out.append(f'(?P={source[i + 1 : end]})')
+                i = end + 1
+            elif e == 'c' and i < len(source) and source[i].isascii() and source[i].isalpha():
+                out.append(f'\\x{ord(source[i]) % 32:02x}')
+                i += 1
+            elif e == 'u' and source.startswith('{', i) and '}' in source[i:]:
+                end = source.index('}', i)
+                out.append(f'\\U{builtins.int(source[i + 1 : end], 16):08x}')
+                i = end + 1
+            elif e.isascii() and e.isalpha() and e not in 'bBcdDfknpPrsStuvwWx':
+                raise Pyjo.Exception.new(f'JSON Schema does not support the pattern {source}: \\{e} of Python')
+            else:
+                out.append(c + e)
+            continue
+        if in_class:
+            if c == ']':
+                in_class = False
+            out.append(f'\\{c}' if c in '[&~|' else c)
+        elif source.startswith('[]', i):
+            out.append('(?!)')
+            i += 1
+        elif source.startswith('[^]', i):
+            out.append('[\\s\\S]')
+            i += 2
+        elif c == '[':
+            in_class = True
+            out.append('[^' if source.startswith('[^', i) else '[')
+            i += 1 if source.startswith('[^', i) else 0
+        elif c == '.':
+            out.append('[^\\n\\r\\u2028\\u2029]')
+        elif c == '$':
+            out.append('\\Z')
+        elif source.startswith('(?<', i) and not source.startswith(('(?<=', '(?<!'), i):
+            out.append('(?P<')
+            i += 2
+        elif source.startswith('(?', i) and not _RE_ECMA_GROUP.match(source, i):
+            raise Pyjo.Exception.new(f'JSON Schema does not support the pattern {source}: a group of Python')
+        else:
+            out.append(c)
+        i += 1
+    try:
+        return re.compile(''.join(out))
+    except re.error as e:
+        raise Pyjo.Exception.new(f'JSON Schema does not support the pattern {source}: {e}') from None
+
+
+# The formats of RFC 3339, of RFC 3986 and the others, which validate a string
+_RE_DATE = re.compile(r'([0-9]{4})-([0-9]{2})-([0-9]{2})')
+_RE_TIME = re.compile(r'([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\.[0-9]+)?(?:[Zz]|([+-])([0-9]{2}):([0-9]{2}))')
+_RE_DURATION = re.compile(
+    r'P(?:[0-9]+W|(?:[0-9]+Y(?:[0-9]+M(?:[0-9]+D)?)?|[0-9]+M(?:[0-9]+D)?|[0-9]+D)(?:T(?:{0}))?|T(?:{0}))'.format(
+        r'[0-9]+H(?:[0-9]+M(?:[0-9]+S)?)?|[0-9]+M(?:[0-9]+S)?|[0-9]+S'
+    )
+)
+_RE_EMAIL_LOCAL = re.compile(
+    r'''[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*|"(?:[\x20\x21\x23-\x5b\x5d-\x7e]|\\[\x20-\x7e])*"'''
+)
+_RE_HOSTNAME_LABEL = re.compile(r'[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?')
+_RE_IPV4 = re.compile(
+    r'(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])'
+)
+_RE_JSON_POINTER = re.compile(r'(?:/(?:[^~/]|~[01])*)*')
+_RE_RELATIVE_JSON_POINTER = re.compile(r'(?:0|[1-9][0-9]*)(?:#|(?:/(?:[^~/]|~[01])*)*)')
+_RE_UUID = re.compile(r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}')
+
+_URI_PCHAR = r"(?:[A-Za-z0-9\-._~!$&'()*+,;=:@]|%[0-9A-Fa-f]{2})"
+_URI_SEGMENT_NC = r"(?:[A-Za-z0-9\-._~!$&'()*+,;=@]|%[0-9A-Fa-f]{2})"
+_URI_AUTHORITY = (
+    r"//(?:(?:[A-Za-z0-9\-._~!$&'()*+,;=:]|%[0-9A-Fa-f]{2})*@)?"
+    r"(?:\[(?P<ip>[^\]]*)\]|(?:[A-Za-z0-9\-._~!$&'()*+,;=]|%[0-9A-Fa-f]{2})*)(?::[0-9]*)?"
+)
+_URI_ABSOLUTE = rf'/(?:{_URI_PCHAR}+(?:/{_URI_PCHAR}*)*)?'
+_URI_END = rf'(?:\?(?:{_URI_PCHAR}|[/?])*)?(?:#(?:{_URI_PCHAR}|[/?])*)?'
+_URI = (
+    rf'[A-Za-z][A-Za-z0-9+\-.]*:(?:{_URI_AUTHORITY}(?:/{_URI_PCHAR}*)*|{_URI_ABSOLUTE}'
+    rf'|{_URI_PCHAR}+(?:/{_URI_PCHAR}*)*)?{_URI_END}'
+)
+_RE_URI = re.compile(_URI)
+_RE_URI_REFERENCE = re.compile(
+    rf'{_URI}|(?:{_URI_AUTHORITY.replace("(?P<ip>", "(?P<relative_ip>")}(?:/{_URI_PCHAR}*)*|{_URI_ABSOLUTE}'
+    rf'|{_URI_SEGMENT_NC}+(?:/{_URI_PCHAR}*)*)?{_URI_END}'
+)
+
+
+def _date(year: str, month: str, day: str) -> bool:
+    try:
+        datetime.date(builtins.int(year), builtins.int(month), builtins.int(day))
+    except ValueError:
+        return False
+    return True
+
+
+def _time(value: str) -> bool:
+    match = _RE_TIME.fullmatch(value)
+    if match is None:
+        return False
+    hour, minute, second, sign, offset_hour, offset_minute = match.groups('0')
+    if builtins.int(hour) > 23 or builtins.int(minute) > 59 or builtins.int(second) > 60:
+        return False
+    if builtins.int(offset_hour) > 23 or builtins.int(offset_minute) > 59:
+        return False
+    if second == '60':
+        # A leap second is the last second of a day of UTC
+        offset = (builtins.int(offset_hour) * 60 + builtins.int(offset_minute)) * (-1 if sign == '-' else 1)
+        return (builtins.int(hour) * 60 + builtins.int(minute) - offset) % 1440 == 23 * 60 + 59
+    return True
+
+
+def _format_date(value: str) -> bool:
+    match = _RE_DATE.fullmatch(value)
+    return match is not None and _date(*match.groups())
+
+
+def _format_date_time(value: str) -> bool:
+    match = _RE_DATE.match(value)
+    return match is not None and value[10:11] in ('T', 't') and _date(*match.groups()) and _time(value[11:])
+
+
+def _format_email(value: str) -> bool:
+    local, at, domain = value.rpartition('@')
+    if not at or _RE_EMAIL_LOCAL.fullmatch(local) is None:
+        return False
+    if domain[:6].lower() == '[ipv6:' and domain.endswith(']'):
+        return _format_ipv6(domain[6:-1])
+    if domain.startswith('[') and domain.endswith(']'):
+        return _RE_IPV4.fullmatch(domain[1:-1]) is not None
+    return _format_hostname(domain)
+
+
+def _format_hostname(value: str) -> bool:
+    labels = value.split('.')
+    return len(value) <= 253 and all(_RE_HOSTNAME_LABEL.fullmatch(label) and _punycode(label) for label in labels)
+
+
+def _punycode(label: str) -> bool:
+    # An A-label of IDNA is Punycode
+    if label[:4].lower() != 'xn--':
+        return True
+    try:
+        punycode_decode(label[4:])
+    except UnicodeError:
+        return False
+    return True
+
+
+def _format_ipv6(value: str) -> bool:
+    if not value.isascii() or '%' in value:
+        return False
+    try:
+        ipaddress.IPv6Address(value)
+    except ValueError:
+        return False
+    return True
+
+
+def _format_regex(value: str) -> bool:
+    try:
+        _regex(value)
+    except Pyjo.Exception.object:
+        return False
+    return True
+
+
+def _format_uri(regex: re.Pattern[str]) -> Callable[[str], bool]:
+    def check(value: str) -> bool:
+        match = regex.fullmatch(value)
+        if match is None:
+            return False
+        ip = match.groupdict().get('ip') or match.groupdict().get('relative_ip')
+        return (
+            ip is None
+            or _format_ipv6(ip)
+            or re.fullmatch(r"[vV][0-9A-Fa-f]+\.[A-Za-z0-9\-._~!$&'()*+,;=:]+", ip) is not None
+        )
+
+    return check
+
+
+_FORMAT_CHECKS: dict[str, Callable[[str], bool]] = {
+    'date': _format_date,
+    'date-time': _format_date_time,
+    'duration': lambda value: _RE_DURATION.fullmatch(value) is not None,
+    'email': _format_email,
+    'hostname': _format_hostname,
+    'ipv4': lambda value: _RE_IPV4.fullmatch(value) is not None,
+    'ipv6': _format_ipv6,
+    'json-pointer': lambda value: _RE_JSON_POINTER.fullmatch(value) is not None,
+    'regex': _format_regex,
+    'relative-json-pointer': lambda value: _RE_RELATIVE_JSON_POINTER.fullmatch(value) is not None,
+    'time': _time,
+    'uri': _format_uri(_RE_URI),
+    'uri-reference': _format_uri(_RE_URI_REFERENCE),
+    'uuid': lambda value: _RE_UUID.fullmatch(value) is not None,
+}
+
+
 def _literal(values: list[Any], enumeration: bool = False) -> dict[str, Any]:
     keywords: dict[str, Any] = {}
     types = {_json_type(value) for value in values}
@@ -1324,14 +2426,14 @@ def _description(tp: Any) -> str | None:
         return None
     if dataclasses.is_dataclass(tp) and re.fullmatch(re.escape(name) + r'\(.*\)', doc, re.S):
         return None
-    return _docstring_text(inspect.cleandoc(doc))[0]
+    return _docstringto_json(inspect.cleandoc(doc))[0]
 
 
 def _docstring(function: Callable[..., Any]) -> tuple[str | None, dict[str, str], str | None]:
-    return _docstring_text(inspect.getdoc(function) or '')
+    return _docstringto_json(inspect.getdoc(function) or '')
 
 
-def _docstring_text(doc: str) -> tuple[str | None, dict[str, str], str | None]:
+def _docstringto_json(doc: str) -> tuple[str | None, dict[str, str], str | None]:
     # The first paragraph, and the descriptions of the parameters and of the return value, in the fields of
     # reStructuredText or in the sections of the Google Python Style Guide, each with the lines that continue it
     lines = doc.splitlines()

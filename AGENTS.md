@@ -137,8 +137,10 @@ of them is a regression.
 - **What an area needs, in patterns that port.** The core is a complete set of
   components of its own, and each gives what its area needs, not the whole of
   a standard or of a library that it follows: `Pyjo.YAML` is the YAML of
-  configuration files, and the builder of `Pyjo.JSON.Schema` the part of zod
-  that JSON Schema has. Its API takes the patterns of the languages that code
+  configuration files, the builder of `Pyjo.JSON.Schema` the part of zod
+  that JSON Schema has, and its validation the keywords of JSON Schema 2020-12
+  that the schemas of tools and of APIs have, which reports the others instead
+  of ignoring them. Its API takes the patterns of the languages that code
   comes from, Perl and JavaScript, whose idioms Mojolicious shares, and Python,
   where they make the work easier, so that code of Mojolicious, of Node.js or
   of a library of Python ports with few changes: `Pyjo.JSON.Schema` takes the
@@ -382,6 +384,20 @@ left out by a normalization with a comment of its own, so that a new one fails
 the test. A major release of zod needs no approval in the Dependency
 Dashboard, as the test checks it.
 
+The validation of `Pyjo.JSON.Schema` runs the official test suite of JSON
+Schema, JSON-Schema-Test-Suite, for draft 2020-12, in
+`t/Pyjo/JSON_Schema_suite.py`, from the files of the suite in `node_modules`,
+which the same `npm ci` installs, so that the repository does not keep a copy
+of them; without it, the test is skipped. The suite is not on npm, so the
+`devDependencies` take it from its repository of GitHub, at a commit, not at
+a tag: the tags of the suite, as `Test-JSON-Schema-Acceptance-1.039`, are not
+versions that the manager of npm of Renovate updates, which skips them as an
+unversioned reference, and a commit is a digest that it updates to the last
+commit of the suite, with `package-lock.json`. The test lists the files and
+the cases that it leaves out with the reason, as the keywords that the
+validation does not support, and fails when a case that it leaves out passes,
+so that a newer suite tells what the list can lose.
+
 uWSGI is the package `uwsgi`, built from its source with a C compiler, as the
 wheels of `pyuwsgi` have no plugin `cgi`. `extra-build-variables` in
 `pyproject.toml` builds the plugin into it with `UWSGI_EMBED_PLUGINS=cgi`, and
@@ -619,8 +635,9 @@ a subclass of the one of `prefork`),
 by `Mojolicious::Plugin::NotYAMLConfig`, for the format of configuration of
 the standard library), `Pyjo.TOML` (the dumper of TOML, which the standard library only reads),
 `Pyjo.JSON.Schema` (JSON Schema 2020-12 from the type hints of Python and
-from a builder inspired by zod, written from the specification, whose tests
-compare the schemas with the ones of pydantic and of zod),
+from a builder inspired by zod, and its validation, written from the
+specification, whose tests compare the schemas with the ones of pydantic and
+of zod, and run the official test suite of JSON Schema on the validation),
 `Pyjo.Test.pytest_plugin` (the plugin of pytest, which runs the test scripts
 as `Pyjo.Prove` does and the functions of `Pyjo.Test` in the tests of pytest),
 `Pyjo.YAML` (the subset of YAML of `CPAN::Meta::YAML`,
@@ -834,7 +851,10 @@ copy:
   imports, and `perl -Mojo -E` is `python -m Pyjo`. A function imports the
   modules it uses when it is called, as every `import Pyjo.X` runs
   `Pyjo/__init__.py`. Its `u`, PUT, is `w`, as `u` is for characters, as in
-  `Pyjo.String.Unicode`.
+  `Pyjo.String.Unicode`. `z`, which ojo does not have, is the builder of
+  `Pyjo.JSON.Schema`, as `z` of zod: an object that imports the module when a
+  method of the builder is read, as the class itself would need the import
+  when `from Pyjo import *` runs, and that type checkers take for the class.
 - Where Mojo uses an optional XS module for speed, as `Mojo::JSON` uses
   `Cpanel::JSON::XS`, the port uses the module of the standard library in its
   place and keeps the port of the pure-Perl code behind a `PYJO_NO_*`
