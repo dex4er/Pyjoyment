@@ -117,11 +117,14 @@ testpaths = ["t"]
 line-length = 120
 target-version = "py312"
 
-# The tests of t-strings (PEP 750), which only Python 3.14 compiles; Pyjo.Prove
-# skips them on an older Python, as their requires-python of PEP 723 says. The
-# templates of files in tt/templates_native are rendered by such tests only.
+# The tests of t-strings (PEP 750), which only Python 3.14 compiles, and of the
+# lazy annotations of PEP 649, which name a type that is defined after them;
+# Pyjo.Prove skips them on an older Python, as their requires-python of PEP 723
+# says. The templates of files in tt/templates_native are rendered by such tests
+# only.
 [tool.ruff.per-file-target-version]
 "t/Pyjo/String_Template_native.py" = "py314"
+"t/Pyjo/JSON_Schema_lazy.py" = "py314"
 "t/docs/String_Template.py" = "py314"
 "t/Pyjoyment/py_native_lite_app.py" = "py314"
 "t/docs/Pyjoyment_Plugin_PyRenderer.py" = "py314"
@@ -210,8 +213,11 @@ lines-after-imports = 2
 
 [tool.pyright]
 pythonVersion = "3.12"
-# The tests of t-strings, as in per-file-target-version of ruff
+# The tests of Python 3.14, of t-strings and lazy annotations, as in per-file-target-version of ruff
 executionEnvironments = [
+  { root = "t/Pyjo/JSON_Schema_lazy.py", pythonVersion = "3.14", extraPaths = [
+    ".",
+  ] },
   { root = "t/Pyjo/String_Template_native.py", pythonVersion = "3.14", extraPaths = [
     ".",
   ] },
@@ -277,6 +283,7 @@ strict = [
   "Pyjo/IOLoop/TLS.py",
   "Pyjo/JSON/__init__.py",
   "Pyjo/JSON/Pointer.py",
+  "Pyjo/JSON/Schema.py",
   "Pyjo/Loader.py",
   "Pyjo/Log.py",
   "Pyjo/Message/__init__.py",
