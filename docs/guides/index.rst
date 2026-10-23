@@ -286,6 +286,7 @@ This is the class hierarchy of the :mod:`Pyjoyment` distribution.
   - :mod:`Pyjo.GetOpt`
   - :mod:`Pyjo.Headers`
   - :mod:`Pyjo.JSON.Pointer`
+  - :mod:`Pyjo.JSON.Schema`
   - :mod:`Pyjo.Parameters`
   - :mod:`Pyjo.Path`
   - :mod:`Pyjo.Promise`

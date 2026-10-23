@@ -43,6 +43,13 @@ jobs:
         with:
           version: 2026.10.4 # datasource=github-releases depName=jdx/mise
 
+      # zod, whose schemas t/Pyjo/JSON_Schema_zod.py compares with the ones of
+      # Pyjo.JSON.Schema, on the Node.js of mise.toml. npm ci checks every
+      # package against its integrity in package-lock.json, and no script of
+      # the packages runs.
+      - name: Install the packages of npm
+        run: npm ci --ignore-scripts
+
       # Invalid escape sequences and deprecated APIs become errors in a future
       # Python; fail now instead. The development mode of Python shows the
       # ResourceWarning of a socket or a file that is not closed, which only

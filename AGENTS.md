@@ -134,6 +134,16 @@ of them is a regression.
   with the reason in the skip message.
 - **No runtime dependencies.** Development tools are fine; `dependencies` in
   `pyproject.toml` stays empty.
+- **What an area needs, in patterns that port.** The core is a complete set of
+  components of its own, and each gives what its area needs, not the whole of
+  a standard or of a library that it follows: `Pyjo.YAML` is the YAML of
+  configuration files, and the builder of `Pyjo.JSON.Schema` the part of zod
+  that JSON Schema has. Its API takes the patterns of the languages that code
+  comes from, Perl and JavaScript, whose idioms Mojolicious shares, and Python,
+  where they make the work easier, so that code of Mojolicious, of Node.js or
+  of a library of Python ports with few changes: `Pyjo.JSON.Schema` takes the
+  type hints of Python and the chains of zod. A feature that Mojolicious does
+  not have is welcome by this measure.
 
 ## Development Environment
 
@@ -269,8 +279,10 @@ port 0 instead, which `ports()` gives.
   installs in CI, and without which the tests are skipped, and Starlette on
   Mangum as an event function of AWS Lambda with `Pyjo.App.Lambda`, and the
   server of the MCP SDK of the example `mount_mcp.py`, which the client of the
-  SDK calls, on the daemon and without sessions on the workers of prefork. The servers and
-  the frameworks are in the dependency group `servers`, not in
+  SDK calls, on the daemon and without sessions on the workers of prefork, and
+  compares the schemas of the type hints of `Pyjo.JSON.Schema` with the ones
+  of pydantic, which the MCP SDK gives its tools. The servers, the frameworks
+  and pydantic are in the dependency group `servers`, not in
   `dependencies`; without it, the tests are skipped.
 - `t/lib/` holds helpers shared by the tests. Run on their own, they skip with
   `plan(skip_all=...)`, so `-r t` reports them as skipped instead of failing.
@@ -357,6 +369,18 @@ tells that the documentation of `Pyjo.Server.ASGI`, `Pyjo.Server.WSGI` or
 `PYTHONWARNINGS` or `PYTHONDEVMODE`, as the warnings of the servers and their
 libraries are not ours. Renovate bumps the dependency groups in one pull
 request.
+
+The schemas of `Pyjo.JSON.Schema` are compared with the ones of the libraries
+that its two forms follow: `t/servers/JSON_Schema_pydantic.py` with pydantic,
+for the type hints, and `t/Pyjo/JSON_Schema_zod.py` with `z.toJSONSchema()`
+of zod, for the builder, whose code in JavaScript runs on the Node.js of
+`mise.toml`, with zod of the `devDependencies` of `package.json`, which
+`npm ci --ignore-scripts` installs, as the job of CI on the Python of
+`mise.toml` does; without it, the test is skipped. A difference of a library,
+as the bounds of the safe integers of JavaScript that zod gives an integer, is
+left out by a normalization with a comment of its own, so that a new one fails
+the test. A major release of zod needs no approval in the Dependency
+Dashboard, as the test checks it.
 
 uWSGI is the package `uwsgi`, built from its source with a C compiler, as the
 wheels of `pyuwsgi` have no plugin `cgi`. `extra-build-variables` in
@@ -594,6 +618,9 @@ a subclass of the one of `prefork`),
 `Mojolicious::Plugin::EPLRenderer`), `Pyjoyment.Plugin.TOMLConfig` (inspired
 by `Mojolicious::Plugin::NotYAMLConfig`, for the format of configuration of
 the standard library), `Pyjo.TOML` (the dumper of TOML, which the standard library only reads),
+`Pyjo.JSON.Schema` (JSON Schema 2020-12 from the type hints of Python and
+from a builder inspired by zod, written from the specification, whose tests
+compare the schemas with the ones of pydantic and of zod),
 `Pyjo.Test.pytest_plugin` (the plugin of pytest, which runs the test scripts
 as `Pyjo.Prove` does and the functions of `Pyjo.Test` in the tests of pytest),
 `Pyjo.YAML` (the subset of YAML of `CPAN::Meta::YAML`,

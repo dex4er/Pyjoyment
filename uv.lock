@@ -3,8 +3,8 @@ revision = 5
 requires-python = ">=3.12"
 resolution-markers = [
     "python_full_version >= '3.14' and platform_python_implementation == 'PyPy' and sys_platform == 'win32'",
-    "python_full_version < '3.14' and platform_python_implementation == 'PyPy' and sys_platform == 'win32'",
     "(python_full_version >= '3.14' and platform_python_implementation != 'PyPy') or (python_full_version >= '3.14' and sys_platform != 'win32')",
+    "python_full_version < '3.14' and platform_python_implementation == 'PyPy' and sys_platform == 'win32'",
     "(python_full_version < '3.14' and platform_python_implementation != 'PyPy') or (python_full_version < '3.14' and sys_platform != 'win32')",
 ]
 
@@ -1047,6 +1047,7 @@ servers = [
     { name = "hypercorn" },
     { name = "mangum" },
     { name = "mcp" },
+    { name = "pydantic" },
     { name = "starlette" },
     { name = "uvicorn" },
     { name = "uvloop", marker = "sys_platform != 'win32'" },
@@ -1071,6 +1072,7 @@ servers = [
     { name = "hypercorn", specifier = ">=0.18.0" },
     { name = "mangum", specifier = ">=0.19.0" },
     { name = "mcp", specifier = ">=2.3.0" },
+    { name = "pydantic", specifier = ">=2.14.1" },
     { name = "starlette", specifier = ">=1.9.0" },
     { name = "uvicorn", specifier = ">=0.54.0" },
     { name = "uvloop", marker = "sys_platform != 'win32'", specifier = ">=0.23.0" },
