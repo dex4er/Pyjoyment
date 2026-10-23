@@ -21,15 +21,32 @@ class MyApp(Pyjo.App.object):
 
 
 with subtest('Defaults'):
-    app = MyApp.new()
+    level = os.environ.pop('PYJO_LOG_LEVEL', None)
+    try:
+        app = MyApp.new()
+        isa_ok(app.log, Pyjo.Log.object, 'log')
+        is_ok(app.log.level, 'trace', 'all messages')
+    finally:
+        if level is not None:
+            os.environ['PYJO_LOG_LEVEL'] = level
     isa_ok(app.home, Pyjo.Home.object, 'home')
-    isa_ok(app.log, Pyjo.Log.object, 'log')
-    is_ok(app.log.level, 'trace', 'all messages')
     isa_ok(app.ua, Pyjo.UserAgent.object, 'user agent')
     is_ok(app.moniker, 'my_app', 'moniker of a class in a script')
     is_deeply_ok(app.config(), {}, 'no configuration')
     isa_ok(app.build_tx(), Pyjo.Transaction.HTTP.object, 'transaction')
     is_ok(app.server(Pyjo.Server.new()), None, 'nothing to do before the server starts')
+
+with subtest('Log level from the environment'):
+    level = os.environ.get('PYJO_LOG_LEVEL')
+    os.environ['PYJO_LOG_LEVEL'] = 'fatal'
+    try:
+        is_ok(MyApp.new().log.level, 'fatal', 'PYJO_LOG_LEVEL')
+        is_ok(Pyjoyment.new().log.level, 'fatal', 'as Pyjoyment has it')
+    finally:
+        if level is None:
+            del os.environ['PYJO_LOG_LEVEL']
+        else:
+            os.environ['PYJO_LOG_LEVEL'] = level
 
 with subtest('Attributes'):
     log = Pyjo.Log.new()

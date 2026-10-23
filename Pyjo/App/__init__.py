@@ -148,13 +148,20 @@ class Pyjo_App(Pyjo.Base.object):
             app.log = Pyjo.Log.new()
 
         The logging layer of your application, defaults to a :mod:`Pyjo.Log`
-        object. ::
+        object. The level will default to the ``PYJO_LOG_LEVEL`` environment
+        variable, or ``trace``, and the messages will be written to
+        ``sys.stderr``. ::
 
             # Log debug message
             app.log.debug('It works')
         """
         if self._log is None:
-            self._log = Pyjo.Log.new()
+            log = Pyjo.Log.new()
+            # The level of the environment, as an application of Pyjoyment has it, which the tests of Pyjo.Test.Pyjo
+            # set, so that an application of Pyjo, as an adapter of another framework, logs as quietly
+            if level := os.environ.get('PYJO_LOG_LEVEL'):
+                log.level = level
+            self._log = log
         return self._log
 
     @log.setter
