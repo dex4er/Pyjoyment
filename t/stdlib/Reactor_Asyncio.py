@@ -99,6 +99,46 @@ with subtest('Handles and timers move to the loop that is running'):
     is_ok(got[-1], 'back', 'and back in a loop of its own')
     ok(reactor.loop is own, 'the same loop of its own')
 
+with subtest('The next tick moves to the loop that is running with its timer'):
+    reactor = Pyjo.Reactor.Asyncio.new()
+    got = []
+
+    # The timer of the next tick in a loop of its own that does not run, as one that stopped in the middle of a tick, as
+    # in Pyjo.Promise.wait, leaves it
+    reactor.next_tick(lambda reactor: got.append('before'))
+
+    async def outer():
+        reactor.next_tick(lambda reactor: got.append(asyncio.get_running_loop()))
+        await asyncio.sleep(0.05)
+        return asyncio.get_running_loop()
+
+    running = asyncio.run(outer())
+    is_deeply_ok(got, ['before', running], 'the next ticks ran in the loop that was running')
+    reactor.close()
+
+with subtest('A blocking request to an application after a wait for a promise'):
+    import Pyjo.IOLoop
+    import Pyjo.Promise
+    import Pyjo.UserAgent
+    import Pyjoyment
+
+    # The promise of the action settles on the event loop of the singleton, whose reactor follows the one of the
+    # blocking request, also after Pyjo.Promise.wait has stopped it in the middle of a tick
+    if not isinstance(Pyjo.IOLoop.singleton.reactor, Pyjo.Reactor.Asyncio.object):
+        skip('needs Pyjo.Reactor.Asyncio as the reactor of the singleton, as another one does not follow a loop', 1)
+    else:
+        app = Pyjoyment.new()
+        app.log.level = 'fatal'
+        app.routes.get('/promise', lambda c: Pyjo.Promise.resolve('promise').then(lambda text: c.render(text=text)))
+        texts = []
+        for _ in range(3):
+            with Pyjo.UserAgent.new(request_timeout=5) as ua:
+                ua.server.app = app
+                tx = ua.get('/promise')
+                texts.append(tx.res.text if tx.error is None else tx.error['message'])
+            Pyjo.Promise.resolve(1).wait()
+        is_deeply_ok(texts, ['promise', 'promise', 'promise'], 'each request gets its response')
+
 with subtest('A timer that again restarts waits for its new time'):
     reactor = Pyjo.Reactor.Asyncio.new()
     fired = []

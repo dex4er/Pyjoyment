@@ -393,7 +393,7 @@ with subtest('server'):
     is_ok(text, 'Later!', 'blocking request on the event loop of the singleton')
 
     # The event loop of the singleton, which a blocking request on an event loop of its own does not run, as a reactor of
-    # poll shows, where the one of asyncio can follow the loop that runs
+    # poll shows, where the one of asyncio follows the loop that runs
     if type(Pyjo.IOLoop.singleton.reactor).__module__ == 'Pyjo.Reactor.Poll':
         other = Pyjo.UserAgent.new(request_timeout=0.5)
         other.server.app = app
