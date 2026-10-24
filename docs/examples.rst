@@ -19,6 +19,17 @@ A WebSocket service used by the template to extract the title from a website:
        :code: python
 
 
+JSON-RPC
+--------
+
+A calculator with Bootstrap, which is a client of the server of JSON-RPC of the
+same application, whose methods validate their parameters with the schema of
+their type hints, and shows the request and the response of each call:
+
+    .. include:: ../examples/pyjoyment/json_rpc.py
+       :code: python
+
+
 Applications of other frameworks
 --------------------------------
 
