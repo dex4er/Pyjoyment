@@ -88,6 +88,7 @@ from Pyjo.Util import md5_sum
 
 import asyncio
 import atexit
+import collections
 import os
 import random
 import sys
@@ -137,7 +138,8 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
 
         self._error: BaseException | None = None
         self._io: dict[int, _IO] = {}
-        self._next_tick: list[TimerCallback] = []
+        # A deque, whose popleft takes the first callback as shift of Perl does, where pop(0) of a list moves all the others
+        self._next_tick: collections.deque[TimerCallback] = collections.deque()
         self._next_timer: str | None = None
         self._one = 0
         self._run = 0
@@ -490,7 +492,7 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
             timer['handle'].cancel()
         self._events = {}
         self._io = {}
-        self._next_tick = []
+        self._next_tick.clear()
         self._next_timer = None
         self._running = 0
         self._tasks = set()
@@ -669,7 +671,7 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
     def _next(self) -> None:
         self._next_timer = None
         while len(self._next_tick):
-            self._next_tick.pop(0)(self)
+            self._next_tick.popleft()(self)
 
     # A handle is ready
     def _ready(self, fd: int, writable: bool) -> None:
