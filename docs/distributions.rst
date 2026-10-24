@@ -2,10 +2,11 @@ Distributions
 =============
 
 Pyjoyment needs nothing besides the Python standard library, so what needs
-another library is a distribution of its own, which adds a module to a
-namespace of Pyjoyment, as ``Pyjo.Reactor`` for a reactor or
-``Pyjoyment.Plugin`` for a plugin. They are installed from their Git
-repositories until they are on PyPI.
+another library is a distribution of its own, and so is what follows a
+specification that is revised more often than Pyjoyment is released. A
+distribution adds a module to a namespace of Pyjoyment, as ``Pyjo.Reactor``
+for a reactor, ``Pyjoyment.Plugin`` for a plugin or ``Pyjo`` for a protocol.
+They are installed from their Git repositories until they are on PyPI.
 
 Reactors
 --------
@@ -19,3 +20,13 @@ of its own for it. A reactor passes the whole test suite of Pyjoyment.
 
 - `Pyjo.Reactor.Twisted - Low-level event reactor with Twisted support
   <https://pyjoyment.readthedocs.io/projects/pyjo-reactor-twisted/en/latest/>`_
+
+Protocols
+---------
+
+A protocol is a package of the namespace ``Pyjo``, with a server and a client
+made with Pyjoyment: a route of an application of :mod:`Pyjoyment` and the user
+agent of :mod:`Pyjo.UserAgent`.
+
+- `Pyjo.MCP - Model Context Protocol for Pyjoyment
+  <https://pyjoyment.readthedocs.io/projects/pyjo-mcp/en/latest/>`_
