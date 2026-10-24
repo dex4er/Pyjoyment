@@ -16,6 +16,9 @@ with subtest('Description'):
 
 with subtest('dump'):
     string = dump({'name': 'Pyjoyment'})
+    string = dump({'name': 'Pyjoyment', 'license': 'Artistic-2.0'}, sort_keys=True)
+    is_ok(string, 'license = "Artistic-2.0"\nname = "Pyjoyment"\n', 'sorted')
+    string = dump({'name': 'Pyjoyment'})
 
     # 'name = "Pyjoyment"\n'
     is_ok(string, 'name = "Pyjoyment"\n', 'string')
