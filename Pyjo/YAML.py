@@ -99,6 +99,7 @@ import Pyjo.Exception
 import base64
 import binascii
 import builtins
+import collections
 import datetime
 import math
 import re
@@ -374,7 +375,8 @@ def _unquote_single(string: str) -> str:
 class _Loader:
     def __init__(self, string: str) -> None:
         self.anchors: dict[str, Any] = {}
-        self.lines = re.split(r'\r\r?\n|\r|\n', string.removeprefix('\ufeff'))
+        # A deque, whose popleft takes the first line as shift of Perl does, where pop(0) of a list moves all the others
+        self.lines = collections.deque(re.split(r'\r\r?\n|\r|\n', string.removeprefix('\ufeff')))
 
         # The line break at the end ends the last line, it does not start an empty one
         if self.lines[-1] == '':
@@ -396,7 +398,7 @@ class _Loader:
         while lines:
             if not lines[0].strip():
                 block.append('')
-                lines.pop(0)
+                lines.popleft()
                 continue
             if depth is None:
                 if indent is not None and _indent(lines[0]) <= indent:
@@ -404,7 +406,7 @@ class _Loader:
                 depth = _indent(lines[0])
             if _indent(lines[0]) < depth:
                 break
-            block.append(lines.pop(0)[depth:])
+            block.append(lines.popleft()[depth:])
 
         # The empty lines at the end, which the chomping indicator keeps, strips or clips to one line break
         trailing = len(block) - len(content := _rstrip_empty(block))
@@ -420,7 +422,7 @@ class _Loader:
 
         # The directive of the version
         if self.skip() and re.search(r'^%YAML[: ][\d.]+', lines[0]):
-            lines.pop(0)
+            lines.popleft()
 
         while self.skip():
             # The anchors of a document are its own
@@ -428,7 +430,7 @@ class _Loader:
 
             # The start of a document, with a scalar after it
             if m := re.search(r'^---\s*(?:(.+?)\s*)?\Z', lines[0]):
-                lines.pop(0)
+                lines.popleft()
                 if m[1] is not None and not re.search(r'^(?:#.+|%YAML[: ][\d.]+)\Z', m[1]):
                     documents.append(self.scalar(m[1], None))
                     continue
@@ -438,7 +440,7 @@ class _Loader:
             if not self.skip() or re.search(r'^(?:---|\.\.\.)', lines[0]):
                 documents.append(None)
                 while lines and not lines[0].startswith('---'):
-                    lines.pop(0)
+                    lines.popleft()
                 explicit = False
 
             # Only the first document can do without its start
@@ -451,7 +453,7 @@ class _Loader:
 
             # A flow collection
             elif re.search(r'^\s*[\[{]', lines[0]):
-                documents.append(self.scalar(lines.pop(0).strip(), None))
+                documents.append(self.scalar(lines.popleft().strip(), None))
 
             # A mapping
             else:
@@ -466,7 +468,7 @@ class _Loader:
         if not re.search(r'^(?:---|\.\.\.)', lines[0]):
             return False
         while lines and not lines[0].startswith('---'):
-            lines.pop(0)
+            lines.popleft()
         return True
 
     def flow(self, string: str) -> Any:
@@ -475,7 +477,7 @@ class _Loader:
         while (end := _flow_end(text)) is None:
             if not self.lines:
                 raise _error(f"failed to find the end of the flow collection '{string}'")
-            if not _RE_BLANK.search(line := self.lines.pop(0)):
+            if not _RE_BLANK.search(line := self.lines.popleft()):
                 text += ' ' + line.strip()
         if (rest := text[end:].strip()) and not rest.startswith('#'):
             raise _error(f"found illegal characters after the flow collection '{text}'")
@@ -517,7 +519,7 @@ class _Loader:
             else:
                 raise _error(f"failed to classify line '{line}'")
             rest = line[m.end() :]
-            lines.pop(0)
+            lines.popleft()
             try:
                 hash(key)
             except TypeError:
@@ -548,7 +550,7 @@ class _Loader:
             line = lines[0].strip()
             if line.startswith('#'):
                 break
-            lines.pop(0)
+            lines.popleft()
             if not line:
                 empty += 1
                 continue
@@ -571,7 +573,7 @@ class _Loader:
         while not (m := pattern.search(text)):
             if not self.lines:
                 raise _error(f"failed to find the end of the quoted scalar '{string}'")
-            line = self.lines.pop(0).strip()
+            line = self.lines.popleft().strip()
             if not line:
                 empty += 1
                 continue
@@ -646,12 +648,12 @@ class _Loader:
 
             # An item whose value is below it, or none
             elif re.search(r'^\s*-\s*(?:#.*)?\Z', lines[0]):
-                lines.pop(0)
+                lines.popleft()
                 sequence.append(self.value(indent, True))
 
             # An item with a value
             elif m := re.search(r'^\s*-\s+(.+?)\s*\Z', lines[0]):
-                lines.pop(0)
+                lines.popleft()
                 sequence.append(self.scalar(m[1], indent, True))
 
             # The key of a mapping after a sequence at its indentation
@@ -667,7 +669,7 @@ class _Loader:
         # The empty lines and the lines of comments, before the next line of the structure
         lines = self.lines
         while lines and _RE_BLANK.search(lines[0]):
-            lines.pop(0)
+            lines.popleft()
         return bool(lines)
 
     def text(self, string: str, indent: int | None, resolve: bool) -> Any:
@@ -700,7 +702,7 @@ class _Loader:
             return self.mapping(depth, indent)
         if re.search(r'^\s*\?', lines[0]):
             raise _error(f"does not support a feature in line '{lines[0]}'")
-        return self.scalar(lines.pop(0).strip(), indent)
+        return self.scalar(lines.popleft().strip(), indent)
 
 
 class _Flow:

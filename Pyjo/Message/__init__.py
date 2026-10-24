@@ -92,6 +92,7 @@ from Pyjo.JSON import j
 from Pyjo.Util import decode
 
 import builtins
+import collections
 import os
 import re
 
@@ -778,11 +779,13 @@ class Pyjo_Message(Pyjo.EventEmitter.object):
         charset = content.charset or self.default_charset
 
         # Check all parts recursively
-        parts: list[Pyjo.Content.object] = [content]
+        # A deque, whose popleft and extendleft take and put back the parts as shift and unshift of Perl do, where pop(0) of
+        # a list moves all the others, which the many parts of a form of a client would make slow
+        parts: collections.deque[Pyjo.Content.object] = collections.deque([content])
         while parts:
-            part = parts.pop(0)
+            part = parts.popleft()
             if part.is_multipart:
-                parts[:0] = cast(Pyjo.Content.MultiPart.object, part).parts
+                parts.extendleft(reversed(cast(Pyjo.Content.MultiPart.object, part).parts))
                 continue
 
             if not (disposition := part.headers.content_disposition):

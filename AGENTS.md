@@ -951,6 +951,13 @@ sub {...}` is `get('/foo', cb)` or the decorator `@get('/foo')`, as a route
 - A method of `Mojo::Collection` that has the name of a `list` method, like
   `sort` and `reverse`, returns a new collection, as in Mojo, and
   `list.sort(collection)` sorts in place.
+- `shift` and `unshift` of an array of Perl that is a queue, as the callbacks of
+  `next_tick` of a reactor or the parts of a multipart form, are `popleft` and
+  `extendleft` of a `collections.deque`, not `pop(0)` and an assignment to
+  `[:0]` of a `list`, which move all the other items, so that a queue that the
+  input makes long does not make the loop that empties it grow with its
+  square. A queue that a limit keeps short, as the connections that
+  `max_connections` keeps, stays a `list`.
 - Perl's `split` is `Pyjo.String.Unicode.split`, not `str.split` or
   `re.split`: its pattern is a regular expression, a match of no length at
   the beginning makes no field, and the empty fields at the end are left out.

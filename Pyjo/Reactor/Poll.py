@@ -69,6 +69,7 @@ import Pyjo.Reactor
 from Pyjo.Reactor import Handle, IOCallback, TimerCallback
 from Pyjo.Util import md5_sum
 
+import collections
 import random
 import select
 import sys
@@ -105,7 +106,8 @@ class Pyjo_Reactor_Poll(Pyjo.Reactor.object):
         """
         super().__init__()
         self._io: dict[int, _IO] = {}
-        self._next_tick: list[TimerCallback] = []
+        # A deque, whose popleft takes the first callback as shift of Perl does, where pop(0) of a list moves all the others
+        self._next_tick: collections.deque[TimerCallback] = collections.deque()
         self._next_timer: str | None = None
         self._running = 0
         self._timers: dict[str, _Timer] = {}
@@ -269,7 +271,7 @@ class Pyjo_Reactor_Poll(Pyjo.Reactor.object):
         """
         self._events = {}
         self._io = {}
-        self._next_tick = []
+        self._next_tick.clear()
         self._next_timer = None
         self._running = 0
         self._timers = {}
@@ -351,7 +353,7 @@ class Pyjo_Reactor_Poll(Pyjo.Reactor.object):
     def _next(self) -> None:
         self._next_timer = None
         while len(self._next_tick):
-            self._next_tick.pop(0)(self)
+            self._next_tick.popleft()(self)
 
     def _timer(self, recurring: bool, after: float, cb: TimerCallback) -> str:
         id = self._id()
