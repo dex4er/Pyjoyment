@@ -159,6 +159,7 @@ from Pyjo.Util import warn
 
 import atexit
 import builtins
+import collections
 import concurrent.futures
 import functools
 import os
@@ -446,15 +447,17 @@ class Pyjo_Promise(Pyjo.Base.object):
         if not concurrency or len(items) <= concurrency:
             return cls.all(*(cb(item) for item in items))
 
-        rest = list(items[concurrency:])
+        # Deques, whose popleft takes the first item as shift of Perl does, where pop(0) of a list moves all the others
+        rest = collections.deque(items[concurrency:])
         start = [cb(item) for item in items[:concurrency]]
         wait = [start[0].clone() for _ in rest]
+        waiting = collections.deque(wait)
 
         def start_next(*values: Any) -> None:
             if not len(rest):
                 return
-            item = rest.pop(0)
-            chain = wait.pop(0)
+            item = rest.popleft()
+            chain = waiting.popleft()
 
             def resolve(*values: Any) -> None:
                 chain.resolve(*values)

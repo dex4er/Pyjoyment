@@ -122,6 +122,7 @@ from Pyjo.Server.ASGI import Application, Message, Scope
 from Pyjo.Util import url_unescape
 
 import atexit
+import collections
 import traceback
 import weakref
 import wsgiref.util
@@ -435,7 +436,8 @@ class _WebSocket(_Call):
         self.accepted = False
         self.closing = False
         self.connected = False
-        self.messages: list[Message] = []
+        # A deque, whose popleft takes the first message, where pop(0) of a list moves all the others
+        self.messages: collections.deque[Message] = collections.deque()
         self.responding = False
         self.waiting: Pyjo.Promise.object | None = None
         self.ws = ws
@@ -484,7 +486,7 @@ class _WebSocket(_Call):
         while not self.messages:
             self.waiting = Pyjo.Promise.new()
             await self.waiting
-        return self.messages.pop(0)
+        return self.messages.popleft()
 
     def _returned(self, *args: Any) -> None:
         if self.closed and not self.accepted:
