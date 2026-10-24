@@ -89,8 +89,9 @@ with subtest('Custom'):
     schema = {**schema, 'required': ['name'], 'properties': {'email': {'type': 'string', 'format': 'email'}}}
     form = {'example': 'custom', 'schema': Pyjo.JSON.to_json(schema), 'formats': '1'}
     t.post_ok('/', form={**form, 'document': '{"email": "joe"}'}).status_is(200)
-    t.text_is('#result li:nth-child(1)', '/email: Does not match the format email.')
-    t.text_is('#result li:nth-child(2)', '/name: Missing property.')
+    # The errors in the order of the keywords of the schema, required before properties
+    t.text_is('#result li:nth-child(1)', '/name: Missing property.')
+    t.text_is('#result li:nth-child(2)', '/email: Does not match the format email.')
     t.post_ok('/', form={'example': 'custom', 'document': '1', 'schema': '{"type": "string"}'}).status_is(200)
     t.text_is('nav a.active', 'Custom').text_is('#result li', '/: Expected string - got integer.')
 

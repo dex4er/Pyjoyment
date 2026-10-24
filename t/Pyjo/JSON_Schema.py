@@ -693,12 +693,12 @@ with subtest('Hand-written'):
 with subtest('Encoding'):
     is_ok(
         Pyjo.JSON.encode_json(z.string().min(1)),
-        b'{"minLength":1,"type":"string"}',
-        'encode_json, with the keys sorted',
+        b'{"type":"string","minLength":1}',
+        'encode_json, with the keys in the order of the schema',
     )
     is_ok(
         Pyjo.JSON.to_json({'inputSchema': z.object(a=z.int())}),
-        '{"inputSchema":{"properties":{"a":{"type":"integer"}},"required":["a"],"type":"object"}}',
+        '{"inputSchema":{"type":"object","properties":{"a":{"type":"integer"}},"required":["a"]}}',
         'to_json of a schema in a structure',
     )
     is_ok(repr(z.string()), "Pyjo.JSON.Schema.Pyjo_JSON_Schema({'type': 'string'})", 'repr')

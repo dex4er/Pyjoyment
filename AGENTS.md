@@ -871,6 +871,11 @@ copy:
   variable. Mojo's tests of the pure-Perl code set the variable, and those of
   the XS module run against the standard library.
 - `TO_JSON` is `__json__`.
+- A hash of Perl has no order, which `Mojo::JSON` makes up for by sorting the keys
+  of an object, so that its output is the same each time. A `dict` keeps the order
+  of its keys, which tells something, as the order of the parameters of a
+  function in its JSON Schema, so `Pyjo.JSON`, `Pyjo.YAML` and `Pyjo.TOML` write
+  the keys in that order, and sort them only with `sort_keys`.
 - `Mojo::ByteStream` is `Pyjo.String.Unicode` for characters and
   `Pyjo.String.Bytes` for bytes. A Mojo test's `b(...)` is `u(...)` or
   `b(...)`, by what the string holds.

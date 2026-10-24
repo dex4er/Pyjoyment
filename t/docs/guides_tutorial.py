@@ -274,7 +274,7 @@ with subtest('JSON-RPC'):
     t.get_ok('/divide/x/0').status_is(404)
     message = '{"jsonrpc":"2.0","method":"divide","params":[7,2],"id":1}'
     result = command('json_rpc', 'get', '-M', 'POST', '-c', message, '/rpc')
-    is_ok(result.stdout, '{"id":1,"jsonrpc":"2.0","result":3.5}', 'server from the command line')
+    is_ok(result.stdout, '{"jsonrpc":"2.0","result":3.5,"id":1}', 'server from the command line')
     result = command('json_rpc', 'get', '/divide/7/2')
     is_ok(result.stdout, '{"result":3.5}', 'client from the command line')
 
