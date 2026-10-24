@@ -636,11 +636,11 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
         :mod:`Pyjo.IOLoop` by default. A blocking request to an application
         whose action waits for one of them gets no response until its
         ``request_timeout``, or never without it, as nothing runs the event loop
-        of the singleton then. On :mod:`Pyjo.Reactor.Asyncio`, whose reactor of
-        the singleton can follow the event loop of asyncio that runs, such a
-        request may get its response, which nothing guarantees. The blocking
-        requests of such an application run on the singleton, as those of
-        :mod:`Pyjo.Test.Pyjo` do. ::
+        of the singleton then. On :mod:`Pyjo.Reactor.Asyncio`, the reactor of the
+        singleton follows the event loop of asyncio that runs, unless it is given
+        a loop, so such a request gets its response there. The blocking requests
+        of such an application run on the singleton, as those of
+        :mod:`Pyjo.Test.Pyjo` do, so that they do not depend on the reactor. ::
 
             # An application whose action settles a promise
             app = Pyjoyment.new()
