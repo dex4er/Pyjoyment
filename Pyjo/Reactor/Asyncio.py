@@ -201,6 +201,10 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
         it moves to a new loop of its own, as the selector of the loop of the
         parent is not the child's.
         """
+        return self._follow()
+
+    # The loop that is running, which a reactor that is not given a loop follows, or the one of the reactor
+    def _follow(self) -> asyncio.AbstractEventLoop:
         loop = self._loop
         if self._fixed and loop is not None:
             return loop
@@ -393,6 +397,12 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
         self._next_tick.append(cb)
         if self._next_timer is None:
             self._next_timer = self.timer(0, Pyjo_Reactor_Asyncio._next)
+
+        # Not in Mojolicious: a reactor that follows the loop that is running moves there with the timer of the next tick,
+        # which a loop that stopped in the middle of a tick, as in Pyjo.Promise.wait, leaves where nothing runs it; its
+        # own loop that runs, as most of the time, needs no move
+        elif not self._fixed and (loop := self._loop) is not None and not loop.is_running():
+            self._follow()
         return None
 
     def one_tick(self) -> None:
