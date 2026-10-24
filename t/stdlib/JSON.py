@@ -35,8 +35,13 @@ with subtest('Same result as json.dumps'):
     data = {'foo': [1, 2.5, 'bar', None, True, False], 'baz': {'a': 'b'}}
     is_ok(
         to_json(data),
+        json.dumps(data, separators=(',', ':'), ensure_ascii=False),
+        'to_json is json.dumps, compact and in the order of the dict',
+    )
+    is_ok(
+        to_json(data, sort_keys=True),
         json.dumps(data, separators=(',', ':'), sort_keys=True, ensure_ascii=False),
-        'to_json is json.dumps, compact and sorted',
+        'to_json with sort_keys is json.dumps, compact and sorted',
     )
     is_ok(to_json('a/b'), json.dumps('a/b').replace('/', '\\/'), 'with "/" escaped')
 

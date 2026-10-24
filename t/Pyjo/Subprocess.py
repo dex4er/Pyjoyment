@@ -222,8 +222,9 @@ with subtest('Non-zero exit status'):
     subprocess.run(lambda subprocess: sys.exit(3), parent)
     Pyjo.IOLoop.start()
     is_ok(subprocess.exit_code, 3, 'right exit code')
-    # Unlike Mojolicious: the message of the json module for no input, where Mojo::JSON names the offset
-    like_ok(fail, r'char 0', 'right error')
+    # Unlike Mojolicious: the message of the json module for no input, where the port of Mojo::JSON, as Mojo, names the
+    # offset
+    like_ok(fail, r'char 0|offset 0', 'right error')
 
 with subtest('Serialization error'):
     fail = None

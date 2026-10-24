@@ -63,12 +63,14 @@ _RE_ESCAPE_MULTILINE = re.compile(r'["\\\x00-\x08\x0b-\x1f\x7f\ud800-\udfff]')
 _ESCAPED = {'"': '\\"', '\\': '\\\\', '\b': '\\b', '\t': '\\t', '\n': '\\n', '\f': '\\f', '\r': '\\r'}
 
 
-def dump(value: Any) -> str:
+def dump(value: Any, *, sort_keys: bool = False) -> str:
     """::
 
         string = dump(value)
+        string = dump(value, sort_keys=True)
 
-    Dump a table to a TOML string. ::
+    Dump a table to a TOML string, with the keys of a table in the order of the
+    :class:`dict`, or sorted with ``sort_keys``. ::
 
         # 'name = "Pyjoyment"\\n'
         dump({'name': 'Pyjoyment'})
@@ -77,7 +79,7 @@ def dump(value: Any) -> str:
     if not isinstance(table, dict):
         raise _error(f'needs a table at the top, not a {type(table).__name__}')
     lines: list[str] = []
-    _Dumper(lines).table(cast(dict[Any, Any], table), [], None)
+    _Dumper(lines, sort_keys).table(cast(dict[Any, Any], table), [], None)
     return ''.join(f'{line}\n' for line in lines)
 
 
@@ -108,8 +110,9 @@ def _error(message: str) -> Pyjo.Exception.object:
 
 
 class _Dumper:
-    def __init__(self, lines: list[str]) -> None:
+    def __init__(self, lines: list[str], sort_keys: bool = False) -> None:
         self.lines = lines
+        self.sort_keys = sort_keys
         self.parents: set[int] = set()
 
     def enter(self, value: Any) -> None:
@@ -128,7 +131,7 @@ class _Dumper:
         if isinstance(value, dict):
             mapping = cast(dict[Any, Any], value)
             self.enter(mapping)
-            pairs = [f'{_key(key)} = {self.inline(item)}' for key, item in mapping.items()]
+            pairs = [f'{_key(key)} = {self.inline(item)}' for key, item in self.items(mapping)]
             self.parents.remove(id(mapping))
             return f'{{ {", ".join(pairs)} }}' if pairs else '{}'
         if isinstance(value, (list, tuple)):
@@ -144,7 +147,7 @@ class _Dumper:
         keys: list[tuple[str, Any]] = []
         tables: list[tuple[str, dict[Any, Any]]] = []
         arrays: list[tuple[str, list[dict[Any, Any]]]] = []
-        for key, value in table.items():
+        for key, value in self.items(table):
             name = _key(key)
             value = _data(value)
             if isinstance(value, dict):
@@ -165,6 +168,13 @@ class _Dumper:
             for item in items:
                 self.table(item, [*path, name], f'[[{".".join([*path, name])}]]')
         self.parents.remove(id(table))
+
+    def items(self, mapping: dict[Any, Any]) -> list[tuple[Any, Any]]:
+        # The keys and the values of a table, in its order or sorted
+        items = list(mapping.items())
+        if self.sort_keys:
+            items.sort(key=lambda item: str(item[0]))
+        return items
 
     def multiline(self, value: Any) -> str:
         # A string of several lines in a multi-line basic string, whose line break after the quotes is not its own

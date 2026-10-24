@@ -111,6 +111,25 @@ with subtest('Dump objects and errors'):
     recursive['self'] = recursive
     throws_ok(lambda: dump(recursive), re.compile(r'^TOML found a collection inside itself'), 'recursion')
 
+with subtest('Dump the order of the keys'):
+    value = {
+        'b': 1,
+        'a': {'d': 1, 'c': {'z': 1, 'y': 2}},
+        'x': [{'q': 1, 'p': {'s': 1, 'r': 2}}],
+        'm': [3, {'s': 1, 'r': 2}],
+    }
+    is_ok(
+        dump(value),
+        'b = 1\nm = [3, { s = 1, r = 2 }]\n\n[a]\nd = 1\n\n[a.c]\nz = 1\ny = 2\n\n[[x]]\nq = 1\n\n[x.p]\ns = 1\nr = 2\n',
+        'order of the dict',
+    )
+    is_ok(
+        dump(value, sort_keys=True),
+        'b = 1\nm = [3, { r = 2, s = 1 }]\n\n[a]\nd = 1\n\n[a.c]\ny = 2\nz = 1\n\n[[x]]\nq = 1\n\n[x.p]\nr = 2\ns = 1\n',
+        'keys sorted, with the keys of a table before its tables',
+    )
+    is_deeply_ok(load(dump(value, sort_keys=True)), load(dump(value)), 'same table')
+
 with subtest('Dump round trip'):
     data = {
         'title': 'TOML "Example"',

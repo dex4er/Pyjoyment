@@ -186,8 +186,16 @@ with subtest('Encode object'):
     is_ok(data, b'{"foo":[]}', "encode {'foo': []}")
     data = encode_json({'foo': ['bar']})
     is_ok(data, b'{"foo":["bar"]}', "encode {'foo': ['bar']}")
-    data = encode_json({'foo': 'bar', 'baz': 'yada'})
+    # Unlike Mojolicious: the keys in the order of the dict, which Mojo sorts, as a hash of Perl has no order
+    data = encode_json({'foo': 'bar', 'baz': 'yada'}, sort_keys=True)
     is_ok(data, b'{"baz":"yada","foo":"bar"}', "encode {'foo': 'bar', 'baz': 'yada'}")
+    # Not in Mojolicious: the order of the dict
+    data = encode_json({'foo': 'bar', 'baz': 'yada'})
+    is_ok(data, b'{"foo":"bar","baz":"yada"}', "encode {'foo': 'bar', 'baz': 'yada'} in order")
+    data = encode_json({'foo': {'b': 1, 'a': 2}, 'bar': [{'d': 3, 'c': 4}]}, sort_keys=True)
+    is_ok(data, b'{"bar":[{"c":4,"d":3}],"foo":{"a":2,"b":1}}', 'encode nested objects with the keys sorted')
+    data = encode_json({'foo': {'b': 1, 'a': 2}, 'bar': [{'d': 3, 'c': 4}]})
+    is_ok(data, b'{"foo":{"b":1,"a":2},"bar":[{"d":3,"c":4}]}', 'encode nested objects in order')
 
 with subtest('Encode name'):
     data = encode_json([Pyjo.JSON.true])

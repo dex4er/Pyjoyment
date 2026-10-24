@@ -3,6 +3,8 @@ import Pyjo.Test.Pyjo
 from Pyjo.File import curfile
 from Pyjo.Test import *
 
+import re
+
 
 # The application of examples/pyjoyment/json_rpc.py, which the test loads without starting a server, and which requests
 # its own server of JSON-RPC with the user agent of the application
@@ -23,14 +25,15 @@ with subtest('Operations'):
     t.post_ok('/', form={'a': '7', 'b': '2', 'method': 'add'}).status_is(200)
     t.text_is('#result.alert-success', '7 + 2 = 9').element_exists('input[value=add][checked]')
     t.attr_is('input[name=a]', 'value', '7').attr_is('input[name=b]', 'value', '2')
-    t.text_is('#request', '{"id":1,"jsonrpc":"2.0","method":"add","params":[7,2]}')
-    t.text_is('#response', '{"id":1,"jsonrpc":"2.0","result":9}')
+    t.text_is('#request', '{"jsonrpc":"2.0","method":"add","params":[7,2],"id":1}')
+    t.text_is('#response', '{"jsonrpc":"2.0","result":9,"id":1}')
     t.post_ok('/', form={'a': '7', 'b': '2', 'method': 'subtract'}).status_is(200)
     t.text_is('#result.alert-success', '7 − 2 = 5').element_exists('input[value=subtract][checked]')
     t.element_count_is('input[checked]', 1)
     t.post_ok('/', form={'a': '1.5', 'b': '2', 'method': 'multiply'}).status_is(200)
     t.text_is('#result.alert-success', '1.5 × 2 = 3')
-    t.text_is('#response', '{"id":1,"jsonrpc":"2.0","result":3.0}')
+    # 3.0 of the json module, or 3 of the port of Mojo::JSON, as Perl writes it
+    t.text_like('#response', re.compile(r'^\{"jsonrpc":"2\.0","result":3(?:\.0)?,"id":1\}$'))
     t.post_ok('/', form={'a': '7', 'b': '2', 'method': 'divide'}).status_is(200)
     t.text_is('#result.alert-success', '7 ÷ 2 = 3.5')
     t.post_ok('/', form={'a': '-6', 'b': '3', 'method': 'divide'}).status_is(200)
@@ -39,10 +42,10 @@ with subtest('Operations'):
 with subtest('Errors'):
     t.post_ok('/', form={'a': '1', 'b': '0', 'method': 'divide'}).status_is(200)
     t.text_is('#result.alert-danger', 'Division by zero (1)')
-    t.text_is('#response', '{"error":{"code":1,"message":"Division by zero"},"id":1,"jsonrpc":"2.0"}')
+    t.text_is('#response', '{"jsonrpc":"2.0","error":{"code":1,"message":"Division by zero"},"id":1}')
     t.post_ok('/', form={'a': 'x', 'b': '2', 'method': 'add'}).status_is(200)
     t.text_is('#result.alert-danger', 'Invalid params (-32602): /a: Expected number - got string.')
-    t.text_is('#request', '{"id":1,"jsonrpc":"2.0","method":"add","params":["x",2]}')
+    t.text_is('#request', '{"jsonrpc":"2.0","method":"add","params":["x",2],"id":1}')
     t.post_ok('/', form={'a': '1', 'b': '2', 'method': 'power'}).status_is(200)
     t.text_is('#result.alert-danger', 'Method not found (-32601)').element_exists('input[value=add][checked]')
 

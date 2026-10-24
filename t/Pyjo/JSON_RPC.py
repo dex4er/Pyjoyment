@@ -213,7 +213,7 @@ with subtest('Error'):
     is_ok(e.code, -32000, 'right code')
     is_ok(e.message, 'Not enough credit', 'right message')
     is_deeply_ok(e.data, {'balance': 3}, 'right data')
-    is_ok(Pyjo.JSON.to_json(e), '{"code":-32000,"data":{"balance":3},"message":"Not enough credit"}', 'right JSON')
+    is_ok(Pyjo.JSON.to_json(e), '{"code":-32000,"message":"Not enough credit","data":{"balance":3}}', 'right JSON')
     e = Pyjo.JSON.RPC.Error.new()
     is_deeply_ok(e.__json__(), {'code': -32603, 'message': 'Internal error'}, 'internal error')
     e = Pyjo.JSON.RPC.Error.new(-32099)

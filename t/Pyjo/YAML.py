@@ -453,6 +453,13 @@ with subtest('Dump anchors'):
     data = load(dump({'b': mapping, 'c': [mapping]}))
     ok(data['b'] is data['c'][0], 'same object')
 
+with subtest('Dump the order of the keys'):
+    value = {'b': 1, 'a': {'d': [{'z': 1, 'y': 2}], 'c': 3}}
+    is_ok(dump(value), "b: 1\na:\n  d:\n    - z: 1\n      'y': 2\n  c: 3\n", 'order of the dict')
+    is_ok(dump(value, sort_keys=True), "a:\n  c: 3\n  d:\n    - 'y': 2\n      z: 1\nb: 1\n", 'keys sorted')
+    is_ok(dump_all([{'b': 1, 'a': 2}, {'d': 3, 'c': 4}], sort_keys=True), 'a: 2\nb: 1\n---\nc: 4\nd: 3\n', 'documents')
+    is_ok(dump({2: 'two', 1: 'one'}, sort_keys=True), '1: one\n2: two\n', 'keys that are not strings')
+
 with subtest('Dump round trip'):
     data = {
         'name': 'Pyjoyment',

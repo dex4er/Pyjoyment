@@ -156,10 +156,12 @@ def dump(
     explicit_start: bool = False,
     version: Literal['1.1', '1.2'] = '1.1',
     anchors: bool = True,
+    sort_keys: bool = False,
 ) -> str:
     """::
 
         string = dump(value)
+        string = dump(value, sort_keys=True)
         string = dump(value, indent=4, indent_sequences=False, quote='"')
 
     Dump a value to a YAML string of one document, with the options:
@@ -191,7 +193,9 @@ def dump(
       key of the collection, or of the sequence of the item, with the
       characters that are not ``A-Z``, ``a-z``, ``0-9``, ``_`` and ``-`` as
       ``_``, ``id`` without a key, and a number from ``2`` for another
-      anchor of the same name. ::
+      anchor of the same name.
+    * ``sort_keys``, whether the keys of a mapping are sorted, ``False`` by
+      default, for the order of the :class:`dict`. ::
 
         # 'foo:\\n- "bar"\\n'
         dump({'foo': ['bar']}, indent_sequences=False, quote='"')
@@ -206,6 +210,7 @@ def dump(
         explicit_start=explicit_start,
         version=version,
         anchors=anchors,
+        sort_keys=sort_keys,
     )
 
 
@@ -220,6 +225,7 @@ def dump_all(
     explicit_start: bool = False,
     version: Literal['1.1', '1.2'] = '1.1',
     anchors: bool = True,
+    sort_keys: bool = False,
 ) -> str:
     """::
 
@@ -232,7 +238,7 @@ def dump_all(
         # '--- first\\n--- second\\n'
         dump_all(['first', 'second'])
     """
-    dumper = _Dumper(indent, indent_sequences, quote, quote_keys, multiline, version, anchors)
+    dumper = _Dumper(indent, indent_sequences, quote, quote_keys, multiline, version, anchors, sort_keys)
     lines: list[str] = []
     for i, value in enumerate(values):
         lines += dumper.document(value, explicit_start or i > 0)
@@ -945,6 +951,7 @@ class _Dumper:
         multiline: bool,
         version: str,
         anchors: bool,
+        sort_keys: bool = False,
     ) -> None:
         if indent < 1:
             raise ValueError(f'indent must be 1 or more, not {indent}')
@@ -954,6 +961,7 @@ class _Dumper:
         if version not in ('1.1', '1.2'):
             raise ValueError(f"version must be '1.1' or '1.2', not {version!r}")
         self.anchors = anchors
+        self.sort_keys = sort_keys
         self.counts: dict[int, int] = {}
         self.indent = indent
         self.indent_sequences = indent_sequences
@@ -1031,7 +1039,10 @@ class _Dumper:
 
     def mapping(self, mapping: dict[Any, Any], column: int) -> list[str]:
         lines: list[str] = []
-        for key, value in mapping.items():
+        items = list(mapping.items())
+        if self.sort_keys:
+            items.sort(key=lambda item: str(item[0]))
+        for key, value in items:
             prefix = ' ' * column + (text := self.key(key)) + ':'
             name = key if isinstance(key, str) else text
             value = _data(value)

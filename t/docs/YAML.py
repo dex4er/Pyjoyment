@@ -57,6 +57,8 @@ with subtest('dump'):
     value = {'foo': ['bar']}
     string = dump(value)
     is_ok(string, 'foo:\n  - bar\n', 'string')
+    string = dump({'foo': ['bar'], 'baz': 1}, sort_keys=True)
+    is_ok(string, 'baz: 1\nfoo:\n  - bar\n', 'sorted')
     string = dump(value, indent=4, indent_sequences=False, quote='"')
     is_ok(string, 'foo:\n- "bar"\n', 'options')
 

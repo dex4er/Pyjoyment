@@ -19,6 +19,12 @@ told apart by their types. ::
     [1, -2, 3]     -> [1, -2, 3]
     {"foo": "bar"} -> {'foo': 'bar'}
 
+The keys of an object keep the order of the :class:`dict`, or are sorted with
+``sort_keys``. ::
+
+    {'b': 1, 'a': 2} -> {"b":1,"a":2}
+    {'b': 1, 'a': 2} -> {"a":2,"b":1}  # sort_keys=True
+
 Literal names will be translated to and from the native Python values, which
 the constants :data:`true` and :data:`false` hold too. ::
 
@@ -130,14 +136,17 @@ def default(value: object) -> Any:
     return None
 
 
-def encode_json(value: object) -> bytes:
+def encode_json(value: object, *, sort_keys: bool = False) -> bytes:
     """::
 
         data = encode_json({'i': '♥ pyjoyment'})
+        data = encode_json({'i': '♥ pyjoyment'}, sort_keys=True)
 
-    Encode Python value to JSON.
+    Encode Python value to JSON, with the keys of an object in the order of
+    the :class:`dict`, or sorted with ``sort_keys``.
     """
-    return encode('UTF-8', to_json(value))
+    # Unlike Mojolicious: the keys in the order of the dict, which Mojo sorts, as a hash of Perl has no order
+    return encode('UTF-8', to_json(value, sort_keys=sort_keys))
 
 
 false = False
@@ -165,44 +174,49 @@ def from_json(chars: str) -> Any:
 
 
 @overload
-def j(value: list[Any] | tuple[Any, ...] | dict[Any, Any]) -> bytes: ...
+def j(value: list[Any] | tuple[Any, ...] | dict[Any, Any], *, sort_keys: bool = False) -> bytes: ...
 
 
 @overload
-def j(value: bytes | bytearray | str) -> Any: ...
+def j(value: bytes | bytearray | str, *, sort_keys: bool = False) -> Any: ...
 
 
-def j(value: list[Any] | tuple[Any, ...] | dict[Any, Any] | bytes | bytearray | str) -> Any:
+def j(value: list[Any] | tuple[Any, ...] | dict[Any, Any] | bytes | bytearray | str, *, sort_keys: bool = False) -> Any:
     """::
 
         data = j([1, 2, 3])
         data = j({'i': '♥ pyjoyment'})
+        data = j({'i': '♥ pyjoyment'}, sort_keys=True)
         value = j(data)
 
     Encode Python data structure (which may only be a :class:`list`, a
     :class:`tuple` or a :class:`dict`) or decode JSON, a ``None`` return value
-    indicates a bare ``null`` or that decoding failed.
+    indicates a bare ``null`` or that decoding failed. ``sort_keys`` sorts the
+    keys of the objects of the JSON that it encodes.
     """
     if isinstance(value, (list, tuple, dict)):
-        return encode_json(value)
+        return encode_json(value, sort_keys=sort_keys)
     try:
         return decode_json(value)
     except ValueError:
         return None
 
 
-def to_json(value: object) -> str:
+def to_json(value: object, *, sort_keys: bool = False) -> str:
     """::
 
         chars = to_json({'i': '♥ pyjoyment'})
+        chars = to_json({'i': '♥ pyjoyment'}, sort_keys=True)
 
-    Encode Python value to JSON text without ``UTF-8`` encoding it.
+    Encode Python value to JSON text without ``UTF-8`` encoding it, with the
+    keys of an object in the order of the :class:`dict`, or sorted with
+    ``sort_keys``.
     """
     # Not in Mojolicious: the json module of the standard library
     if JSON_STDLIB:
-        return _stdlib_encode(value)
+        return _stdlib_encode(value, sort_keys)
 
-    return _encode_value(value)
+    return _encode_value(value, sort_keys)
 
 
 true = True
@@ -435,8 +449,8 @@ class _Decoder:
         raise ValueError(context)
 
 
-def _encode_array(array: list[Any] | tuple[Any, ...]) -> str:
-    return '[' + ','.join(_encode_value(v) for v in array) + ']'
+def _encode_array(array: list[Any] | tuple[Any, ...], sort_keys: bool) -> str:
+    return '[' + ','.join(_encode_value(v, sort_keys) for v in array) + ']'
 
 
 def _encode_key(key: object) -> str:
@@ -445,7 +459,7 @@ def _encode_key(key: object) -> str:
     if isinstance(key, str):
         return key
     if key is None or isinstance(key, bool):
-        return _encode_value(key)
+        return _encode_value(key, False)
     if isinstance(key, (int, float)):
         return _encode_number(key)
     return str(key)
@@ -464,16 +478,19 @@ def _encode_number(number: int | float) -> str:
     return f'{number:.15g}'
 
 
-def _encode_object(object: dict[Any, Any]) -> str:
-    pairs = sorted(((_encode_key(k), v) for k, v in object.items()), key=lambda pair: pair[0])
-    return '{' + ','.join(_encode_string(k) + ':' + _encode_value(v) for k, v in pairs) + '}'
+def _encode_object(object: dict[Any, Any], sort_keys: bool) -> str:
+    # Unlike Mojolicious: the keys in the order of the dict, or sorted with sort_keys, as Mojo sorts them
+    pairs = [(_encode_key(k), v) for k, v in object.items()]
+    if sort_keys:
+        pairs.sort(key=lambda pair: pair[0])
+    return '{' + ','.join(_encode_string(k) + ':' + _encode_value(v, sort_keys) for k, v in pairs) + '}'
 
 
 def _encode_string(string: str) -> str:
     return '"' + string.translate(_TRANSLATE) + '"'
 
 
-def _encode_value(value: object) -> str:
+def _encode_value(value: object, sort_keys: bool = False) -> str:
     # Null
     if value is None:
         return 'null'
@@ -492,14 +509,14 @@ def _encode_value(value: object) -> str:
 
     # Object
     if isinstance(value, dict):
-        return _encode_object(cast(dict[Any, Any], value))
+        return _encode_object(cast(dict[Any, Any], value), sort_keys)
 
     # Array
     if isinstance(value, (list, tuple)):
-        return _encode_array(cast(list[Any] | tuple[Any, ...], value))
+        return _encode_array(cast(list[Any] | tuple[Any, ...], value), sort_keys)
 
     # Everything else
-    return _encode_value(default(value))
+    return _encode_value(default(value), sort_keys)
 
 
 # Not in Mojolicious: the json module of the standard library, set up as Mojo
@@ -519,19 +536,19 @@ def _stdlib_decode(data: bytes | bytearray | str, chars: bool = False) -> Any:
         raise ValueError(f'Malformed JSON: {e}') from None
 
 
-def _stdlib_dumps(value: object) -> str:
+def _stdlib_dumps(value: object, sort_keys: bool) -> str:
     return json.dumps(
-        value, default=default, ensure_ascii=False, allow_nan=False, separators=(',', ':'), sort_keys=True
+        value, default=default, ensure_ascii=False, allow_nan=False, separators=(',', ':'), sort_keys=sort_keys
     ).replace('/', '\\/')
 
 
-def _stdlib_encode(value: object) -> str:
+def _stdlib_encode(value: object, sort_keys: bool = False) -> str:
     try:
-        return _stdlib_dumps(value)
+        return _stdlib_dumps(value, sort_keys)
 
-    # "inf" and "nan", or keys that cannot be sorted
+    # "inf" and "nan", or keys that are not strings, numbers, booleans or None, or that cannot be sorted
     except (TypeError, ValueError):
-        return _stdlib_dumps(_stdlib_plain(value))
+        return _stdlib_dumps(_stdlib_plain(value), sort_keys)
 
 
 def _stdlib_plain(value: object) -> Any:
