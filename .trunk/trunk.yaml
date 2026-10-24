@@ -56,7 +56,7 @@ lint:
     - prettier@3.9.10
     - pyright@1.1.414
     # The format command of ruff is disabled in the plugin by default
-    - ruff@0.17.1:
+    - ruff@0.17.2:
         commands:
           - lint
           - format
