@@ -183,6 +183,25 @@ lock matches with `uv lock --check`.
 version, run `mise lock` so every platform in `mise.lock` is refreshed; CI
 installs with `--locked` and fails on a tool that is not in the lock.
 
+`pyjo-reload` (`Pyjo.Server.Reload`) runs the application in a worker that is
+an `os.fork` of its manager, and forks a new one when a file that it watches
+changes: the script of the application, and `lib` and `templates` by default,
+or the paths of `-w` in their place. Before the first fork, the manager imports
+`Pyjo.Server.Reload` and starts the daemon whose listen sockets it keeps, which
+loads most of the toolkit, as `Pyjo.JSON`, `Pyjo.IOLoop`, `Pyjo.UserAgent` and
+`Pyjo.Server.Daemon`, and a worker inherits these modules as they were then.
+Only the script of the application, and what it imports that the manager has
+not loaded, as `Pyjoyment` and the package of a distribution, as `Pyjo.MCP`,
+is loaded anew in each worker. So a change of a module of the toolkit, by an
+edit of the checkout or by `uv sync` of a newer Pyjoyment, needs a restart of
+`pyjo-reload` itself, not a change of a file that it watches, and so does a
+change of an installed package, which it does not watch. The modules that the
+manager loads are listed with:
+
+```sh
+PYTHONPATH=. mise exec -- python -c "import sys, Pyjo.Server.Reload as R; r = R.new(); r.daemon.listen = ['http://127.0.0.1:0']; r.daemon.start().stop(); print(sorted(m for m in sys.modules if m.startswith('Pyjo')))"
+```
+
 ## Tests
 
 The tests are scripts that print [TAP](https://testanything.org/), written
