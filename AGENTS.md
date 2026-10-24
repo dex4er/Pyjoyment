@@ -630,6 +630,11 @@ the server with the event loop of its thread and the duplicates of the listen
 sockets of the manager, or the sockets themselves on Windows, where `accept` of
 a duplicate can block when another one accepts the connection, as Thrall is Starlight with threads, and its command,
 a subclass of the one of `prefork`),
+`Pyjoyment.Plugin.AllowedHosts` (the validation of `Host` and `Origin`
+against DNS rebinding, which the transport of MCP over HTTP requires of a
+server on localhost, as the middleware of the MCP SDK and the hosts of
+Django have it, in a hook of `before_dispatch` or the helper `allowed_hosts`
+of `under`, as a condition of a route that fails lets the next route match),
 `Pyjoyment.Plugin.PyRenderer` (the renderer of template strings, inspired by
 `Mojolicious::Plugin::EPLRenderer`), `Pyjoyment.Plugin.TOMLConfig` (inspired
 by `Mojolicious::Plugin::NotYAMLConfig`, for the format of configuration of

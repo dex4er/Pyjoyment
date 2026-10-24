@@ -23,6 +23,9 @@ Plugins
 The following plugins are included in the :mod:`Pyjoyment` distribution as
 examples.
 
+:mod:`Pyjoyment.Plugin.AllowedHosts`
+    Validation of ``Host`` and ``Origin`` against DNS rebinding.
+
 :mod:`Pyjoyment.Plugin.Config`
     Python-ish configuration files.
 

@@ -165,6 +165,20 @@ def wsgi(application, path):
     return status, headers, body
 
 
+with subtest('Hosts and origins'):
+    with cookbook('hosts') as t:
+        t.get_ok('/', {'Host': 'example.com'}).status_is(200).content_is('Hello World!')
+        t.get_ok('/', {'Host': 'www.example.com', 'Origin': 'https://example.com'}).status_is(200)
+        t.get_ok('/', {'Host': 'localhost:3000'}).status_is(200)
+        t.get_ok('/', {'Host': 'evil.com'}).status_is(421).content_is('Host not allowed')
+        t.get_ok('/', {'Origin': 'https://evil.com'}).status_is(403).content_is('Origin not allowed')
+        t.get_ok('/', {'Origin': 'http://localhost:5173'}).status_is(403)
+    with cookbook('hosts_under') as t:
+        t.get_ok('/', {'Host': 'evil.com'}).status_is(200).content_is('Hello World!')
+        t.post_ok('/mcp').status_is(200).json_is({'jsonrpc': '2.0', 'id': 1, 'result': {}})
+        t.post_ok('/mcp', {'Host': 'evil.com', 'Origin': 'http://evil.com'}).status_is(421)
+        t.post_ok('/mcp', {'Origin': 'http://evil.com'}).status_is(403)
+
 with subtest('Pre-forking'):
     with cookbook('worker') as t, t.app.log.capture('info') as logs:
         t.get_ok('/').status_is(200).content_is('Hello World!')
