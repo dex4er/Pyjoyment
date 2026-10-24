@@ -29,4 +29,6 @@ made with Pyjoyment: a route of an application of :mod:`Pyjoyment` and the user
 agent of :mod:`Pyjo.UserAgent`.
 
 - `Pyjo.MCP - Model Context Protocol for Pyjoyment
-  <https://pyjoyment.readthedocs.io/projects/pyjo-mcp/en/latest/>`_
+  <https://pyjoyment.readthedocs.io/projects/pyjo-mcp/en/latest/>`_,
+  with a `tutorial of its servers
+  <https://pyjoyment.readthedocs.io/projects/pyjo-mcp/en/latest/guides/tutorial.html>`_
