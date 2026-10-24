@@ -6,6 +6,7 @@ import Pyjo.String.Bytes
 
 from Pyjo.Test import *
 
+import gc
 import os
 import signal
 import sys
@@ -272,6 +273,17 @@ with subtest('The child of a fork leaves the processes of its parent'):
     is_ok(os.waitstatus_to_exitcode(status), 0, 'no events, output, process id or signal in the child of the fork')
     is_deeply_ok(events, [('spawn',), ('exit', 0, None), ('close', 0, None)], 'the events in the parent')
     is_ok(b''.join(chunks).strip(), b'parent', 'the output in the parent')
+
+with subtest('The child of a fork closes the pipes of a process whose event loop is gone'):
+    loop = Pyjo.IOLoop.new()
+    child = loop.spawn([PYTHON, '-c', 'pass'])
+    del loop
+    gc.collect()
+    pid = os.fork()
+    if pid == 0:
+        os._exit(0 if all(stream.handle is None for stream in (child.stdin, child.stdout, child.stderr)) else 1)
+    _, status = os.waitpid(pid, 0)
+    is_ok(os.waitstatus_to_exitcode(status), 0, 'no pipes in the child of the fork')
 
 with subtest('Event loop'):
     loop = Pyjo.IOLoop.new()

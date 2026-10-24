@@ -434,7 +434,9 @@ class Pyjo_IOLoop_ChildProcess(Pyjo.EventEmitter.object):
             process.poll()
         if (timer := self._timer) is not None:
             self._timer = None
-            self.reactor.remove(timer)
+            # The reactor of an event loop that is gone has no timer to remove, and the pipes are closed all the same
+            if self._reactor is not None and (reactor := self._reactor()) is not None:
+                reactor.remove(timer)
         for stream in (self._stdin, self._stdout, self._stderr):
             if stream is not None:
                 stream.close()
