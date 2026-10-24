@@ -1464,7 +1464,10 @@ pyright rejects the method of a subclass as an incompatible override. A
 ported module that uses one that is not ported yet gets annotations on the
 signatures it uses, while the module itself stays off the strict list. Where
 Mojo-style magic cannot be typed, `Any` is fine, with a comment that says why.
-`Pyjo/py.typed` (PEP 561) tells type checkers that the package is typed.
+`Pyjo/py.typed` and `Pyjoyment/py.typed` (PEP 561) tell type checkers that the
+packages are typed, so that pyright in strict mode takes the annotations of a
+module of Pyjoyment that a distribution of its own uses, as a controller,
+instead of failing on a library without stubs.
 
 ## Session and Temporary Files
 
