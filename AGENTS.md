@@ -643,6 +643,11 @@ the standard library), `Pyjo.TOML` (the dumper of TOML, which the standard libra
 from a builder inspired by zod, and its validation, written from the
 specification, whose tests compare the schemas with the ones of pydantic and
 of zod, and run the official test suite of JSON Schema on the validation),
+`Pyjo.JSON.RPC` (JSON-RPC 2.0, its server and its client, without a
+transport, written from the specification, whose first consumer is the
+distribution of MCP, and whose `to_action` makes an action of a route of
+Pyjoyment, which takes the controller from the route, as `Pyjo` does not import
+`Pyjoyment`),
 `Pyjo.Test.pytest_plugin` (the plugin of pytest, which runs the test scripts
 as `Pyjo.Prove` does and the functions of `Pyjo.Test` in the tests of pytest),
 `Pyjo.YAML` (the subset of YAML of `CPAN::Meta::YAML`,

@@ -32,6 +32,7 @@ web framework:
 - HTML/XML parser with CSS selector support.
 - JSON with JSON Pointers and JSON Schema, from type hints and validated,
   YAML and TOML, all loaded and dumped.
+- JSON-RPC 2.0, its server and its client, over HTTP or any other transport.
 - Command line options with `Pyjo.GetOpt`, in the way of Getopt::Long,
   argparse and Cobra, also from environment variables.
 - Python-ish templates and template strings, with automatic escaping.
