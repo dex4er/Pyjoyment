@@ -543,6 +543,29 @@ messages by subscribing to events such as ``json`` of
 For more information about real-time web features see also
 :ref:`the real-time web in the cookbook <cookbook-real-time-web>`.
 
+JSON-RPC
+--------
+
+:mod:`Pyjo.JSON.RPC` is a server and a client of JSON-RPC 2.0. A method is a
+function, whose parameters the schema of its type hints validates with
+``schema=True``, and :meth:`~Pyjo.JSON.RPC.Pyjo_JSON_RPC.to_action` makes the
+server the action of a route. A client calls the methods with promises, here
+through the user agent of the application, in an ``async`` action.
+
+.. literalinclude:: tutorial/json_rpc.py
+    :language: python
+
+You can call the methods from the command line with
+:mod:`Pyjoyment.Command.get`, through the server or through the client.
+
+.. code-block:: console
+
+    $ ./myapp.py get -M POST -c '{"jsonrpc":"2.0","method":"divide","params":[7,2],"id":1}' /rpc
+    $ ./myapp.py get /divide/7/2
+
+A calculator with Bootstrap, which is a client of its own server too, is on
+the page of :doc:`examples <../examples>`.
+
 Mode
 ----
 

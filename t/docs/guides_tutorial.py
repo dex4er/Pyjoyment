@@ -262,6 +262,22 @@ with subtest('WebSockets'):
     t.websocket_ok('/echo').send_ok({'json': {'msg': 'I ♥ Pyjoyment!'}}).message_ok()
     t.json_message_is({'msg': 'echo: I ♥ Pyjoyment!'}).finish_ok()
 
+with subtest('JSON-RPC'):
+    t = tutorial('json_rpc')
+
+    # The first application of Pyjoyment.Lite in a process is the one of the servers of the user agents, as in Mojo
+    t.app.ua.server.app = t.app
+    request = {'jsonrpc': '2.0', 'method': 'divide', 'params': [7, 2], 'id': 1}
+    t.post_ok('/rpc', json=request).status_is(200).json_is({'jsonrpc': '2.0', 'result': 3.5, 'id': 1})
+    t.get_ok('/divide/7/2').status_is(200).json_is({'result': 3.5})
+    t.get_ok('/divide/1/0').status_is(400).json_is({'error': 'Division by zero', 'code': 1})
+    t.get_ok('/divide/x/0').status_is(404)
+    message = '{"jsonrpc":"2.0","method":"divide","params":[7,2],"id":1}'
+    result = command('json_rpc', 'get', '-M', 'POST', '-c', message, '/rpc')
+    is_ok(result.stdout, '{"id":1,"jsonrpc":"2.0","result":3.5}', 'server from the command line')
+    result = command('json_rpc', 'get', '/divide/7/2')
+    is_ok(result.stdout, '{"result":3.5}', 'client from the command line')
+
 with subtest('Mode'):
     t = tutorial('mode')
     t.get_ok('/').status_is(200).content_is('Development!')
