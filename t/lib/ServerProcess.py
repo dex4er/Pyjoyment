@@ -69,8 +69,20 @@ class Server:
     def request(self, method, path, body=None, headers=None, chunked=False, timeout=10):
         conn = http.client.HTTPConnection('127.0.0.1', self.port, timeout=timeout)
         try:
-            conn.request(method, path, body=body, headers=headers or {}, encode_chunked=chunked)
-            res = conn.getresponse()
+            if chunked:
+                # The request with the chunks of its body in one write, as a server that does not read them, as uWSGI
+                # with --http-socket, closes the connection after its response, where the write of the next chunk of
+                # http.client would fail with a broken pipe
+                lines = [f'{method} {path} HTTP/1.1', f'Host: 127.0.0.1:{self.port}', 'Transfer-Encoding: chunked']
+                lines += [f'{name}: {value}' for name, value in (headers or {}).items()]
+                data = b''.join(b'%x\r\n%s\r\n' % (len(chunk), chunk) for chunk in body or () if chunk)
+                conn.connect()
+                conn.sock.sendall('\r\n'.join([*lines, '', '']).encode('latin-1') + data + b'0\r\n\r\n')
+                res = http.client.HTTPResponse(conn.sock, method=method)
+                res.begin()
+            else:
+                conn.request(method, path, body=body, headers=headers or {})
+                res = conn.getresponse()
             return res.status, res.headers, res.read()
         finally:
             conn.close()
