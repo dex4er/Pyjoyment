@@ -629,6 +629,25 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
 
             # Port currently used for processing relative URLs non-blocking
             print(ua.server.nb_url().port)
+
+        The server runs on :attr:`ioloop`, the event loop of the blocking
+        requests, not on the one of the :mod:`Pyjo.IOLoop` singleton, which an
+        application uses for a :mod:`Pyjo.Promise`, a coroutine or a timer of
+        :mod:`Pyjo.IOLoop` by default. A blocking request to an application
+        whose action waits for one of them gets no response until its
+        ``request_timeout``, or never without it, as nothing runs the event loop
+        of the singleton then. On :mod:`Pyjo.Reactor.Asyncio`, whose reactor of
+        the singleton can follow the event loop of asyncio that runs, such a
+        request may get its response, which nothing guarantees. The blocking
+        requests of such an application run on the singleton, as those of
+        :mod:`Pyjo.Test.Pyjo` do. ::
+
+            # An application whose action settles a promise
+            app = Pyjoyment.new()
+            app.routes.get('/later', lambda c: Pyjo.Promise.timer(0.1, 'Later!').then(lambda text: c.render(text=text)))
+            ua = Pyjo.UserAgent.new(ioloop=Pyjo.IOLoop.singleton)
+            ua.server.app = app
+            text = ua.get('/later').result.text
         """
         if self._server is None:
             self._server = Pyjo.UserAgent.Server.new(ioloop=self.ioloop)
