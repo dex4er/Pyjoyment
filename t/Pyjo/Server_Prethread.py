@@ -22,9 +22,15 @@ import time
 # which ports() gives, and has a process id file of its own
 
 
+# The manager and the workers log from their threads, which run at the same time on the free-threaded build, where +=
+# of the string loses the line of a thread that another thread writes in between
+lock = threading.Lock()
+
+
 def message(log_, level, *lines):
     global log
-    log += lines[-1]
+    with lock:
+        log += lines[-1]
 
 
 def finish(prethread, graceful_):
