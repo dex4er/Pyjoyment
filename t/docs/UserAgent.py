@@ -381,6 +381,25 @@ with subtest('server'):
         print(ua.server.nb_url().port)
     like_ok(stdout.getvalue(), r'^\d+\n$', 'print(...)')
 
+    import Pyjo.Promise
+
+    # An application whose action settles a promise
+    app = Pyjoyment.new()
+    app.log.level = 'fatal'
+    app.routes.get('/later', lambda c: Pyjo.Promise.timer(0.1, 'Later!').then(lambda text: c.render(text=text)))
+    ua = Pyjo.UserAgent.new(ioloop=Pyjo.IOLoop.singleton)
+    ua.server.app = app
+    text = ua.get('/later').result.text
+    is_ok(text, 'Later!', 'blocking request on the event loop of the singleton')
+
+    # The event loop of the singleton, which a blocking request on an event loop of its own does not run, as a reactor of
+    # poll shows, where the one of asyncio can follow the loop that runs
+    if type(Pyjo.IOLoop.singleton.reactor).__module__ == 'Pyjo.Reactor.Poll':
+        other = Pyjo.UserAgent.new(request_timeout=0.5)
+        other.server.app = app
+        is_ok(other.get('/later').error, {'message': 'Request timeout'}, 'no response on an event loop of its own')
+        other.close()
+
 with subtest('source_address'):
     address = ua.source_address
     is_ok(address, None, 'address')
