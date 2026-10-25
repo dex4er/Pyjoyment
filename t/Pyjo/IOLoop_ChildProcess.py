@@ -11,6 +11,7 @@ import os
 import signal
 import sys
 import time
+import warnings
 
 
 # Not in Mojolicious: child processes, inspired by child_process of Node.js
@@ -295,5 +296,32 @@ with subtest('Event loop'):
     loop.start()
     loop.remove(timer)
     is_ok(b''.join(chunks).strip(), b'loop', 'right output')
+
+with subtest('Process reaped before the end of its output, without a reference'):
+    events = []
+
+    # A process that ends at once, whose own child keeps its output and its error open a little longer
+    def spawn():
+        child = Pyjo.IOLoop.spawn(
+            [
+                PYTHON,
+                '-c',
+                'import subprocess, sys; subprocess.Popen([sys.executable, "-c", "import time; time.sleep(0.5)"])',
+            ]
+        )
+        child.on('exit', lambda child, code, signal: events.append('exit'))
+        child.on('close', lambda child, code, signal: (events.append('close'), Pyjo.IOLoop.stop()))
+
+    spawn()
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter('always', ResourceWarning)
+        Pyjo.IOLoop.timer(10, lambda loop: Pyjo.IOLoop.stop())
+        while 'exit' not in events:
+            Pyjo.IOLoop.one_tick()
+        gc.collect()
+        Pyjo.IOLoop.start()
+        gc.collect()
+    is_deeply_ok(events, ['exit', 'close'], 'closed once its output has ended')
+    is_deeply_ok([str(warning.message) for warning in caught], [], 'no pipe left to the garbage collector')
 
 done_testing()

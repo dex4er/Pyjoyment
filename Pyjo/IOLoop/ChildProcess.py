@@ -131,8 +131,11 @@ from collections.abc import Mapping, Sequence
 from typing import Any, Self
 
 
-# The child processes that have not been reaped yet, with the process that started them, which the end of the
-# interpreter kills and reaps, with their pipes, as Python warns of a process that still runs when it frees its object
+# The child processes that have not closed yet, with the process that started them, which the end of the interpreter
+# kills and reaps, with their pipes, as Python warns of a process that still runs when it frees its object. A process
+# stays until it closes, also after it has been reaped, as its output and its error, which a process that it has
+# started can keep open, are read until their end, and nothing else may refer to it, as an application that is done
+# with its output
 _running: dict['Pyjo_IOLoop_ChildProcess', int] = {}
 
 # The delay of the next check for the end of a process, which grows to the longest one
@@ -442,6 +445,7 @@ class Pyjo_IOLoop_ChildProcess(Pyjo.EventEmitter.object):
                 stream.close()
 
     def _emit_close(self) -> None:
+        _running.pop(self, None)
         self.emit('close', self._exit_code, self._signal_code)
 
     def _later(self, name: str, *args: Any) -> Self:
@@ -462,7 +466,6 @@ class Pyjo_IOLoop_ChildProcess(Pyjo.EventEmitter.object):
         if (code := process.poll()) is None:
             self._check = min(self._check + 1, len(_DELAYS) - 1)
             return self._wait(_DELAYS[self._check])
-        _running.pop(self, None)
 
         # The input that the process can read no more
         if (stdin := self._stdin) is not None:
