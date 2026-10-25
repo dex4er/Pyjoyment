@@ -278,6 +278,7 @@ strict = [
   "Pyjo/IOLoop/ChildProcess.py",
   "Pyjo/IOLoop/Datagram.py",
   "Pyjo/IOLoop/Server.py",
+  "Pyjo/IOLoop/Stdio.py",
   "Pyjo/IOLoop/Stream.py",
   "Pyjo/IOLoop/Subprocess.py",
   "Pyjo/IOLoop/TLS.py",
