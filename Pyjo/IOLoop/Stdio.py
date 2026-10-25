@@ -196,6 +196,21 @@ class Pyjo_IOLoop_Stdio(Pyjo.IOLoop.Stream.object):
         self._output.close()
         super().close()
 
+    def end(self) -> None:
+        """::
+
+            stdio.end()
+
+        End the standard input before its end, as at its end: stop reading it
+        and emit the event ``end``, or close the stream gracefully without a
+        subscriber, so that a server stops as when its peer ends. ::
+
+            # Stop gracefully on a signal
+            signal.signal(signal.SIGTERM, lambda signum, frame: stdio.reactor.next_tick(lambda reactor: stdio.end()))
+        """
+        if self._handle is not None and not self._ended:
+            self._end()
+
     @property
     def is_writing(self) -> bool:
         if self._handle is None:
