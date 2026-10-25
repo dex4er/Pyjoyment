@@ -1,3 +1,4 @@
+import Pyjo.DOM
 import Pyjo.Prove
 
 from Pyjo.Test import *
@@ -104,6 +105,17 @@ SCRIPTS = {
         ok(True)
         done_testing()
     """,
+    'subtest.py': """
+        from Pyjo.Test import *
+        import sys
+        ok(True, 'fine')
+        is_ok(1, 2, 'one is <two>')
+        with subtest('Nested | pipe'):
+            ok(True, 'deep')
+            ok(False, 'deeper')
+        print('warning \\x1b[31mred\\x1b[0m', file=sys.stderr)
+        done_testing()
+    """,
     'child.py': """
         from Pyjo.Test import *
         import subprocess, sys
@@ -120,6 +132,12 @@ def prove(*args, scripts=SCRIPTS, env=None):
 
 
 def prove_stderr(*args, scripts=SCRIPTS, env=None):
+    out, err, code, files = prove_files(*args, scripts=scripts, env=env)
+    return out, err, code
+
+
+# The output, the error, the exit status, and the files that the harness writes
+def prove_files(*args, scripts=SCRIPTS, env=None, files=()):
     with tempfile.TemporaryDirectory() as tmp:
         for name, code in scripts.items():
             path = os.path.join(tmp, *name.split('/'))
@@ -129,9 +147,15 @@ def prove_stderr(*args, scripts=SCRIPTS, env=None):
         # Not the options of a harness that runs this test
         env = {k: v for k, v in os.environ.items() if k != 'PYJO_PROVE_OPTS'} | {'PYTHONPATH': ROOT} | (env or {})
         p = subprocess.run([sys.executable, '-m', 'Pyjo.Prove', *args], cwd=tmp, env=env, capture_output=True)
+        written = {}
+        for name in files:
+            if os.path.exists(path := os.path.join(tmp, name)):
+                # As written, without the newlines of the text mode, which the reports do not have
+                with open(path, encoding='utf-8', newline='') as f:
+                    written[name] = f.read()
     # Bytes, as the universal newlines of text would turn the carriage returns of the count into newlines; only the CRLF
     # of the text mode of Windows is a newline
-    return p.stdout.decode().replace('\r\n', '\n'), p.stderr.decode().replace('\r\n', '\n'), p.returncode
+    return p.stdout.decode().replace('\r\n', '\n'), p.stderr.decode().replace('\r\n', '\n'), p.returncode, written
 
 
 def prove_tty(*args, env=None, scripts=SCRIPTS):
@@ -257,6 +281,98 @@ with subtest('Parse errors'):
     r = Pyjo.Prove.Result('test.py', tests=1, exit_status=-9, timed_out=0.5)
     Pyjo.Prove.finish(r)
     is_ok(r.errors, ['Timed out after 0.5 seconds'], 'timed out')
+
+with subtest('Parse test points'):
+    r = Pyjo.Prove.Result('test.py')
+    for at, line in enumerate(
+        [
+            'ok 1 - first',
+            '# Subtest: Nested',
+            '    ok 1 - deep',
+            '    not ok 2 - deeper',
+            '    1..2',
+            'not ok 2 - Nested',
+            '# a comment after it',
+            'ok 3 - a \\# b # SKIP why',
+            'not ok 4 # TODO later',
+            '1..4',
+        ]
+    ):
+        Pyjo.Prove.parse(r, line, at=float(at))
+    is_deeply_ok(
+        [(p.number, p.name, p.ok, p.directive, p.reason) for p in r.points],
+        [
+            (1, 'first', True, None, ''),
+            (2, 'Nested', False, None, ''),
+            (3, 'a # b', True, 'skip', 'why'),
+            (4, '', False, 'todo', 'later'),
+        ],
+        'test points',
+    )
+    is_deeply_ok([p.time for p in r.points], [0.0, 5.0, 2.0, 1.0], 'time since the line before the test point')
+    is_deeply_ok(
+        r.points[1].diagnostics,
+        ['# Subtest: Nested', '    ok 1 - deep', '    not ok 2 - deeper', '    1..2', '# a comment after it'],
+        'subtest and comment of a failure',
+    )
+    is_deeply_ok([p.diagnostics for p in (r.points[0], r.points[2])], [[], []], 'no diagnostics of the others')
+    is_deeply_ok(
+        [(p.failed, p.skipped) for p in r.points],
+        [(False, False), (True, False), (False, True), (False, True)],
+        'states',
+    )
+
+with subtest('Diagnostics of the standard error'):
+    r = result("""
+        not ok 1 - one
+        # Subtest: Two
+            not ok 1 - inner
+            1..1
+        not ok 2 - Two
+        ok 3
+        1..3
+    """)
+    r = Pyjo.Prove.Result(
+        'test.py',
+        stderr=[
+            "#   Failed test 'one'",
+            '#   at t/test.py line 3.',
+            '#          got: 1',
+            "    #   Failed test 'inner'",
+            '    #   at t/test.py line 6.',
+            "#   Failed test 'Two'",
+            '#   at t/test.py line 5.',
+            'a warning',
+            '# Looks like you failed 2 tests of 3.',
+        ],
+    )
+    for line in [
+        'not ok 1 - one',
+        '# Subtest: Two',
+        '    not ok 1 - inner',
+        '    1..1',
+        'not ok 2 - Two',
+        'ok 3',
+        '1..3',
+    ]:
+        Pyjo.Prove.parse(r, line)
+    Pyjo.Prove.finish(r)
+    is_deeply_ok(
+        r.points[0].diagnostics, ["#   Failed test 'one'", '#   at t/test.py line 3.', '#          got: 1'], 'first'
+    )
+    is_deeply_ok(
+        r.points[1].diagnostics,
+        [
+            '# Subtest: Two',
+            '    not ok 1 - inner',
+            '    1..1',
+            "    #   Failed test 'inner'",
+            '    #   at t/test.py line 6.',
+            "#   Failed test 'Two'",
+            '#   at t/test.py line 5.',
+        ],
+        'subtest, with its diagnostics before the ones of the test point',
+    )
 
 with subtest('Find scripts'):
     with tempfile.TemporaryDirectory() as tmp:
@@ -605,5 +721,157 @@ with subtest('Verbose'):
     like_ok(err, r'PYJO_HARNESS_IS_VERBOSE=1$', 'PYJO_HARNESS_IS_VERBOSE for the test scripts')
     out, err, code = prove_stderr('verbose.py', env={'PYJO_HARNESS_IS_VERBOSE': ''})
     like_ok(err, r'PYJO_HARNESS_IS_VERBOSE=\n', 'no PYJO_HARNESS_IS_VERBOSE without -v')
+
+with subtest('JUnit XML'):
+    out, err, code, files = prove_files(
+        '--capture-stderr',
+        '--formatter',
+        'junit=report.xml',
+        'pass.py',
+        'subtest.py',
+        'skip.py',
+        'directives.py',
+        'die.py',
+        files=['report.xml'],
+    )
+    is_ok(code, 1, 'right exit status')
+    like_ok(out, r'(?m)^Result: FAIL$', 'usual output')
+    xml = files['report.xml']
+    like_ok(xml, r'^<\?xml version="1\.0" encoding="UTF-8"\?>\n<testsuites ', 'declaration')
+    unlike_ok(xml, r'\x1b', 'no escapes of the terminal')
+    report = Pyjo.DOM.new(xml)
+    ok(report.xml, 'XML')
+    suites = report.at('testsuites')
+    is_deeply_ok(
+        {k: suites.attr(k) for k in ('name', 'tests', 'failures', 'errors', 'skipped')},
+        {'name': 'Pyjo.Prove', 'tests': '12', 'failures': '2', 'errors': '1', 'skipped': '3'},
+        'totals',
+    )
+    is_deeply_ok(
+        report.find('testsuite').map(lambda e: e.attr('name')).to_list(),
+        ['pass.py', 'subtest.py', 'skip.py', 'directives.py', 'die.py'],
+        'a test suite for each script',
+    )
+    suite = report.at('testsuite[name="subtest.py"]')
+    is_deeply_ok(
+        {k: suite.attr(k) for k in ('tests', 'failures', 'errors', 'skipped')},
+        {'tests': '3', 'failures': '2', 'errors': '0', 'skipped': '0'},
+        'no error of the exit status of the failures',
+    )
+    is_deeply_ok(
+        suite.find('testcase').map(lambda e: e.attr('name')).to_list(),
+        ['1 - fine', '2 - one is <two>', '3 - Nested | pipe'],
+        'a test case for each test point',
+    )
+    case = suite.at('testcase[name="2 - one is <two>"]')
+    is_ok(case.attr('classname'), 'subtest.py', 'class name')
+    is_ok(case.attr('file'), 'subtest.py', 'file')
+    is_ok(case.attr('line'), '5', 'line of the assertion')
+    like_ok(case.attr('time'), r'^\d+\.\d{3}$', 'time')
+    is_ok(case.at('failure').attr('message'), 'not ok 2 - one is <two>', 'message of the failure')
+    like_ok(
+        case.at('failure').text,
+        r"^#   Failed test 'one is <two>'\n#   at .*subtest\.py line 5\.\n#          got: 1",
+        'diagnostics',
+    )
+    case = suite.at('testcase[name="3 - Nested | pipe"]')
+    is_ok(case.attr('line'), '8', 'line of the assertion of the subtest')
+    like_ok(case.at('failure').text, r'^# Subtest: Nested \| pipe\n    ok 1 - deep\n    not ok 2 - deeper', 'subtest')
+    ok(suite.at('testcase[name="1 - fine"] > *') is None, 'passed')
+    like_ok(suite.at('system-out').text, r'^ok 1 - fine\nnot ok 2', 'TAP output of a script that failed')
+    like_ok(suite.at('system-err').text, r'(?m)^warning red$', 'standard error')
+    ok(report.at('testsuite[name="pass.py"] system-out') is None, 'no TAP output of a script that passed')
+    is_ok(report.at('testsuite[name="skip.py"] testcase').attr('name'), 'skip.py', 'test case of the script')
+    is_ok(report.at('testsuite[name="skip.py"] skipped').attr('message'), 'not now', 'skipped script')
+    is_deeply_ok(
+        report.find('testsuite[name="directives.py"] testcase')
+        .map(lambda e: e.at('skipped') and e.at('skipped').attr('message'))
+        .to_list(),
+        [None, 'later', None, 'why'],
+        'TODO test and skipped test',
+    )
+    error = report.at('testsuite[name="die.py"] testcase[name="die.py"] error')
+    is_ok(error.attr('message'), 'No plan found in TAP output', 'error of the script')
+    is_ok(error.text, 'No plan found in TAP output\nNon-zero exit status: 255', 'errors of the script')
+
+with subtest('Summary in Markdown'):
+    out, err, code, files = prove_files(
+        '--capture-stderr',
+        '--formatter=markdown=summary.md',
+        'pass.py',
+        'subtest.py',
+        'skip.py',
+        'die.py',
+        files=['summary.md'],
+    )
+    md = files['summary.md']
+    like_ok(md, r'^### Pyjo\.Prove\n\n\| Files \| Tests \| Passed ✅ \| Skipped ⚠️ \| Failed ❌ \| Time ⏱️ \|\n', 'table')
+    like_ok(md, r'(?m)^\| 4 \| 8 \| 4 \| 1 \| 3 \| \d+s \|$', 'numbers')
+    like_ok(md, r'(?m)^Result: \*\*FAIL\*\*$', 'result')
+    like_ok(md, r'(?m)^\| subtest\.py 2 - one is &lt;two&gt; \| ❌ failed \|$', 'failed test point')
+    like_ok(md, r'(?m)^\| subtest\.py 3 - Nested \\\| pipe \| ❌ failed \|$', 'pipe of a cell')
+    like_ok(md, r'(?m)^\| die\.py \| ❌ No plan found in TAP output \|$', 'error of a script')
+    unlike_ok(md, r'subtest\.py \| ❌ Non-zero exit status', 'no error of the exit status of the failures')
+    like_ok(md, r"<details><summary>subtest\.py</summary>\n\n````text\n#   Failed test 'one is <two>'\n", 'diagnostics')
+    like_ok(md, r'(?m)^warning red$', 'standard error, without its escapes')
+    like_ok(md, r'(?m)^RuntimeError: boom$', 'traceback')
+    unlike_ok(md, r'pass\.py', 'nothing of a script that passed')
+
+    out, err, code, files = prove_files('--formatter', 'markdown=summary.md', 'pass.py', files=['summary.md'])
+    is_ok(
+        files['summary.md'],
+        '### Pyjo.Prove\n\n| Files | Tests | Passed ✅ | Skipped ⚠️ | Failed ❌ | Time ⏱️ |\n'
+        '| ---: | ---: | ---: | ---: | ---: | ---: |\n| 1 | 2 | 2 | 0 | 0 | 0s |\n\nResult: **PASS**\n',
+        'summary of a run that passed',
+    )
+
+    with tempfile.TemporaryDirectory() as tmp:
+        summary = os.path.join(tmp, 'summary.md')
+        with open(summary, 'w') as f:
+            f.write('Before\n')
+        prove('--formatter', f'markdown={summary}', 'pass.py')
+        with open(summary) as f:
+            like_ok(f.read(), r'^### Pyjo\.Prove\n', 'written over')
+
+with subtest('Formatters'):
+    out, err, code, files = prove_files(
+        '--formatter',
+        'junit=report.xml',
+        '--formatter',
+        'markdown=summary.md',
+        'pass.py',
+        files=['report.xml', 'summary.md'],
+    )
+    like_ok(out, r'^pass\.py \.+ ok\nAll tests successful\.\n', 'usual output')
+    like_ok(files['report.xml'], r'^<\?xml ', 'JUnit XML')
+    like_ok(files['summary.md'], r'^### Pyjo\.Prove\n', 'summary')
+
+    out, code = prove('--formatter', 'junit', 'pass.py')
+    like_ok(
+        out,
+        r'(?s)^<\?xml version="1\.0" encoding="UTF-8"\?>\n<testsuites .*</testsuites>\n\Z',
+        'JUnit XML in the place of the output',
+    )
+    unlike_ok(out, r'Result: PASS', 'no usual output')
+    is_ok(code, 0, 'right exit status')
+
+    out, code = prove('--formatter', 'markdown', '--formatter', 'junit=report.xml', 'fail.py')
+    like_ok(out, r'^### Pyjo\.Prove\n', 'summary in the place of the output')
+    is_ok(code, 1, 'right exit status')
+
+    out, err, code, files = prove_files(
+        '--formatter', 'console=console.txt', '--formatter', 'markdown', 'pass.py', files=['console.txt']
+    )
+    like_ok(out, r'^### Pyjo\.Prove\n', 'summary in the place of the output')
+    like_ok(files['console.txt'], r'^pass\.py \.+ ok\nAll tests successful\.\n', 'usual output to a file')
+
+    out, err, code = prove_stderr('--formatter', 'junit', '--formatter', 'markdown', 'pass.py')
+    like_ok(
+        err, r'--formatter: one formatter writes in the place of the output, not more', 'two in the place of the output'
+    )
+    is_ok(code, 2, 'right exit status')
+    out, err, code = prove_stderr('--formatter', 'xml', 'pass.py')
+    like_ok(err, r"--formatter: unknown formatter 'xml', one of console, junit, markdown", 'unknown formatter')
+    is_ok(code, 2, 'right exit status')
 
 done_testing()

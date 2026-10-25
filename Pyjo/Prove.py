@@ -120,6 +120,32 @@ Options
     so is ``NOTESTS``. With ``--capture-stderr``, the standard error of a
     test script is red.
 
+``--formatter NAME[=FILE]``
+    Write the results as the formatter ``NAME`` to the file, or in the place
+    of the usual output without one, which only one formatter can do. Can be
+    repeated. The formatters are:
+
+    ``console``
+        The usual output, a line for each test script and the summary, which
+        goes to the standard output unless another formatter writes there.
+    ``junit``
+        The JUnit XML of the results, which the reporters of CI systems read,
+        as :func:`junit` makes it.
+    ``markdown``
+        The summary of the results in Markdown, as the one of a job of GitHub
+        Actions, with a table of what failed and the diagnostics of each test
+        script that did not pass, as :func:`markdown` makes it.
+
+    The diagnostics of the failures come from the standard error of the test
+    scripts, which ``--capture-stderr`` captures. ::
+
+        $ python -m Pyjo.Prove --formatter junit -r t > report.xml
+        $ python -m Pyjo.Prove --capture-stderr --formatter junit=report.xml \\
+            --formatter "markdown=$GITHUB_STEP_SUMMARY" -r t
+
+    ``prove`` takes the class of one formatter, which writes in the place of
+    the usual output, as ``TAP::Formatter::JUnit``.
+
 Environment
 -----------
 
@@ -145,6 +171,7 @@ Functions
 import argparse
 import asyncio
 import collections
+import contextlib
 import operator
 import os
 import re
@@ -156,10 +183,14 @@ import tomllib
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from typing import TextIO
+from typing import TYPE_CHECKING, TextIO
 
 
-__all__ = ['Result', 'find_scripts', 'finish', 'main', 'parse', 'run', 'run_script']
+if TYPE_CHECKING:
+    import Pyjo.DOM
+
+
+__all__ = ['Point', 'Result', 'find_scripts', 'finish', 'junit', 'main', 'markdown', 'parse', 'run', 'run_script']
 
 
 RE_VERSION = re.compile(r'TAP version (\d+)\s*$')
@@ -171,7 +202,48 @@ RE_TEST = re.compile(
 RE_BAIL_OUT = re.compile(r'Bail out!\s*(.*?)\s*$')
 RE_SKIP = re.compile(r'skip\b\s*(.*)', re.IGNORECASE)
 RE_METADATA = re.compile(r'(?m)^# /// (?P<type>[a-zA-Z0-9-]+)$\s(?P<content>(^#(| .*)$\s)+)^# ///$')
+RE_FAILED = re.compile(r'#\s+Failed (?:\(TODO\) )?test\b')
+RE_AT = re.compile(r'\bat (.+?) line (\d+)\.?$')
+RE_ANSI = re.compile(r'\x1b\[[0-9;?]*[A-Za-z]')
+RE_NOT_XML = re.compile(r'[^\t\n\r\x20-\ud7ff\ue000-\ufffd\U00010000-\U0010ffff]')
 RE_SPECIFIER = re.compile(r'\s*(~=|===|==|!=|<=|>=|<|>)\s*v?(\d+(?:\.\d+)*)(\.\*)?\s*')
+
+
+@dataclass
+class Point:
+    """
+    A test point of the TAP output of a test script, with the lines of its
+    subtest and the diagnostics after it when it fails.
+    """
+
+    number: int
+    name: str = ''
+    ok: bool = True
+    directive: str | None = None
+    reason: str = ''
+    time: float = 0.0
+    diagnostics: list[str] = field(default_factory=lambda: [])
+
+    @property
+    def failed(self) -> bool:
+        """::
+
+            failed = point.failed
+
+        True if the test point failed, and is not a ``TODO`` test.
+        """
+        return not self.ok and self.directive != 'todo'
+
+    @property
+    def skipped(self) -> bool:
+        """::
+
+            skipped = point.skipped
+
+        True if the test point was skipped, or is a ``TODO`` test that failed,
+        as expected.
+        """
+        return self.directive == 'skip' or (not self.ok and self.directive == 'todo')
 
 
 @dataclass
@@ -194,6 +266,10 @@ class Result:
     output: list[str] = field(default_factory=lambda: [])
     stderr: list[str] = field(default_factory=lambda: [])
     stderr_left_out: int = 0
+    points: list[Point] = field(default_factory=lambda: [])
+    time: float = 0.0
+    pending: list[str] = field(default_factory=lambda: [])
+    mark: float | None = None
 
     @property
     def passed(self) -> bool:
@@ -206,23 +282,47 @@ class Result:
         return not self.failed and not self.errors and self.bail_out is None
 
 
-def parse(result: Result, line: str) -> None:
+def parse(result: Result, line: str, at: float | None = None) -> None:
     """::
 
         result = Result('t/test.py')
         for line in output.splitlines():
             parse(result, line)
+        parse(result, line, at=time.monotonic())
 
-    Parse a line of TAP output into the result.
+    Parse a line of TAP output into the result, which came at the time ``at``,
+    of :func:`time.monotonic`, for the time of its test point.
     """
     result.output.append(line)
 
-    if not line or line[0].isspace():
+    # The lines of a subtest, and its name, belong to the test point that follows them, and a comment to the one before
+    # it, as the diagnostics of a failure come after it
+    if not line or line[0].isspace() or line.startswith('# Subtest'):
+        if line:
+            result.pending.append(line)
+        return
+    if line.startswith('#'):
+        if result.points and not result.points[-1].ok:
+            result.points[-1].diagnostics.append(line)
         return
 
     if m := RE_TEST.match(line):
-        not_ok, number, _, directive, _ = m.groups()
+        not_ok, number, name, directive, reason = m.groups()
         result.tests += 1
+        point = Point(
+            result.tests,
+            re.sub(r'\\(.)', r'\1', name or ''),
+            not not_ok,
+            (directive or '').lower() or None,
+            reason or '',
+        )
+        if at is not None:
+            point.time = max(at - (result.mark if result.mark is not None else at), 0.0)
+            result.mark = at
+        if not_ok:
+            point.diagnostics = result.pending
+        result.pending = []
+        result.points.append(point)
         if number is not None and int(number) != result.tests:
             result.errors.append(f'Tests out of sequence.  Found ({number}) but expected ({result.tests})')
         directive = (directive or '').lower()
@@ -257,8 +357,12 @@ def finish(result: Result) -> None:
         finish(result)
 
     Check the result once the test script has exited: the plan, the number of
-    tests and the exit status.
+    tests and the exit status. The diagnostics of the failures in the standard
+    error that was captured, as :mod:`Pyjo.Test` and ``Test::More`` write them,
+    go to the test points that failed, in their order, with the diagnostics of
+    the subtest before each of them.
     """
+    _diagnostics(result)
     if result.bail_out is not None:
         return
     if result.timed_out is not None:
@@ -338,6 +442,7 @@ async def run_script(
         return result
     job = _job(process.pid)
     assert process.stdout is not None
+    started = result.mark = time.monotonic()
     if progress is not None:
         progress(result)
     stderr = (
@@ -348,7 +453,7 @@ async def run_script(
             while raw := await process.stdout.readline():
                 line = raw.decode('utf-8', 'replace').rstrip('\r\n')
                 tests = result.tests
-                parse(result, line)
+                parse(result, line, at=time.monotonic())
                 if progress is not None and result.tests != tests:
                     progress(result)
                 if verbose and stream:
@@ -371,6 +476,7 @@ async def run_script(
                 await asyncio.wait_for(stderr, 5)
             except TimeoutError:
                 pass
+    result.time = time.monotonic() - started
     finish(result)
     return result
 
@@ -413,6 +519,7 @@ async def run(
     stderr_lines: int | None = None,
     color: bool | None = None,
     count: bool | None = None,
+    console: bool = True,
 ) -> list[Result]:
     """::
 
@@ -423,6 +530,7 @@ async def run(
         results = asyncio.run(run(['t/a.py', 't/b.py'], jobs=2, capture_stderr=True, stderr_lines=1000))
         results = asyncio.run(run(['t/a.py', 't/b.py'], color=False))
         results = asyncio.run(run(['t/a.py', 't/b.py'], count=False))
+        results = asyncio.run(run(['t/a.py', 't/b.py'], console=False))
 
     Run the test scripts, up to ``jobs`` of them at the same time, or with
     ``0`` as many as the processors that the process may use, print a line
@@ -432,7 +540,9 @@ async def run(
     scripts that have finished. The output is colored with ``color``, and the
     tests of the test scripts are counted while they run with ``count``, both
     by default when the output goes to a terminal, the count without
-    ``verbose`` only.
+    ``verbose`` only. Without ``console``, nothing goes to the standard output,
+    as when another formatter writes there, and the standard error that was
+    captured still goes to the standard error.
     """
     command = list(command or [sys.executable])
     env = dict(os.environ if env is None else env)
@@ -451,7 +561,9 @@ async def run(
     out_color = _color_default(sys.stdout) if color is None else color
     err_color = _color_default(sys.stderr) if color is None else color
     counter = (
-        _Count(width, jobs > 1, out_color) if not verbose and (_tty(sys.stdout) if count is None else count) else None
+        _Count(width, jobs > 1, out_color)
+        if console and not verbose and (_tty(sys.stdout) if count is None else count)
+        else None
     )
 
     finished: dict[int, Result] = {}
@@ -462,13 +574,13 @@ async def run(
             if bailed_out.is_set():
                 return
             stream = jobs <= 1
-            if stream and verbose:
+            if stream and verbose and console:
                 print(f'{path} ..', flush=True)
             result = await run_script(
                 path,
                 command,
                 env,
-                verbose=verbose,
+                verbose=verbose and console,
                 stream=stream,
                 timeout=timeout,
                 capture_stderr=capture_stderr,
@@ -478,9 +590,10 @@ async def run(
             )
             if counter is not None:
                 counter.finish(result)
-            if verbose and not stream:
+            if verbose and not stream and console:
                 print(f'{path} ..', *(_tap_line(line, out_color) for line in result.output), sep='\n', flush=True)
-            print(_status_line(result, width, out_color), flush=True)
+            if console:
+                print(_status_line(result, width, out_color), flush=True)
             lines = [f'{path}: {line}' for line in result.stderr]
             if result.stderr_left_out:
                 lines.insert(_head(stderr_lines or 0), f'{path}: [{result.stderr_left_out} lines left out]')
@@ -505,11 +618,149 @@ async def run(
         interrupted = True
         if counter is not None:
             counter.clear()
-        print(flush=True)
+        if console:
+            print(flush=True)
 
     done = [finished[i] for i in sorted(finished)]
-    _summary(done, time.monotonic() - started, interrupted, color=out_color, err_color=err_color)
+    if console:
+        _summary(done, time.monotonic() - started, interrupted, color=out_color, err_color=err_color)
     return done
+
+
+def junit(results: Sequence[Result]) -> 'Pyjo.DOM.object':
+    """::
+
+        report = junit(results)
+        Path('report.xml').write_text(str(report))
+
+    The JUnit XML of the results, as the reporters of CI systems read it, as a
+    :mod:`Pyjo.DOM` object: a ``testsuite`` for each test script, with a
+    ``testcase`` for each of its test points, whose ``failure`` has the
+    diagnostics of a test point that failed, the lines of its subtest and the
+    comments after it, and whose ``skipped`` has the reason of a test point
+    that was skipped, or is a ``TODO`` test that failed. A ``testcase`` named
+    after the script stands for what the script did wrong as a whole, as an
+    ``error``, as dying, a bad plan or a timeout, or for all its tests that it
+    skipped. A test case has the ``line`` of the first ``at FILE line N`` of
+    its diagnostics, which :mod:`Pyjo.Test` writes, where the reporters
+    annotate the failure. The TAP output of a script that did not pass, and
+    the standard error that was captured, are its ``system-out`` and
+    ``system-err``.
+    """
+    import Pyjo.DOM
+
+    report = Pyjo.DOM.new('<?xml version="1.0" encoding="UTF-8"?>\n<testsuites/>')
+    root = report.at('testsuites')
+    assert root is not None
+    totals: collections.Counter[str] = collections.Counter()
+    for result in results:
+        counts: collections.Counter[str] = collections.Counter()
+        cases: list[Pyjo.DOM.object] = []
+        for point in result.points:
+            name = _point_name(point)
+            case = report.new_tag(
+                'testcase', classname=result.path, name=_xml(name), file=result.path, time=f'{point.time:.3f}'
+            )
+            if point.failed:
+                counts['failures'] += 1
+                _junit_line(case, point.diagnostics)
+                _junit_child(case, 'failure', '\n'.join(point.diagnostics), message=f'not ok {name}', type='TAP')
+            elif point.skipped:
+                counts['skipped'] += 1
+                reason = point.reason or ('TODO' if point.directive == 'todo' else 'skipped')
+                _junit_child(case, 'skipped', None, message=reason)
+            cases.append(case)
+        problems = _problems(result)
+        if problems or result.skip_all is not None:
+            case = report.new_tag('testcase', classname=result.path, name=result.path, file=result.path, time='0.000')
+            if problems:
+                counts['errors'] += 1
+                _junit_child(case, 'error', '\n'.join([*problems, *result.pending]), message=problems[0], type='TAP')
+            else:
+                counts['skipped'] += 1
+                _junit_child(case, 'skipped', None, message=result.skip_all or 'skipped')
+            cases.append(case)
+        suite = report.new_tag(
+            'testsuite',
+            name=result.path,
+            tests=str(len(cases)),
+            failures=str(counts['failures']),
+            errors=str(counts['errors']),
+            skipped=str(counts['skipped']),
+            time=f'{result.time:.3f}',
+            file=result.path,
+        )
+        tag = suite.at('testsuite')
+        assert tag is not None
+        for case in cases:
+            tag.append_content(case)
+        if not result.passed:
+            _junit_child(suite, 'system-out', '\n'.join(result.output))
+        if result.stderr:
+            stderr = list(result.stderr)
+            if result.stderr_left_out:
+                stderr.insert(_head(len(stderr)), f'[{result.stderr_left_out} lines left out]')
+            _junit_child(suite, 'system-err', '\n'.join(stderr))
+        root.append_content(suite).append_content('\n')
+        totals.update(counts, tests=len(cases))
+    root.attr(
+        name='Pyjo.Prove',
+        tests=str(totals['tests']),
+        failures=str(totals['failures']),
+        errors=str(totals['errors']),
+        skipped=str(totals['skipped']),
+        time=f'{sum(result.time for result in results):.3f}',
+    )
+    return report
+
+
+def markdown(results: Sequence[Result], elapsed: float, title: str = 'Pyjo.Prove') -> str:
+    """::
+
+        summary = markdown(results, 37.2)
+        summary = markdown(results, 37.2, title='Tests of Pyjo')
+
+    The summary of the results in Markdown, as GitHub Actions shows it as the
+    summary of a job: the numbers of the files and of the tests that passed,
+    were skipped and failed, as the test cases of :func:`junit` count them,
+    with a test script that skipped all its tests or failed as a whole as one
+    of them, the time, and the result, ``PASS``,
+    ``FAIL`` or ``NOTESTS``, with a table of what failed, and the diagnostics
+    and the standard error of each test script that did not pass, folded.
+    """
+    points = [point for result in results for point in result.points]
+    failed = [result for result in results if not result.passed]
+    failures = sum(point.failed for point in points) + sum(bool(_problems(result)) for result in results)
+    skipped = sum(point.skipped for point in points) + sum(r.skip_all is not None for r in results)
+    passed = sum(not point.failed and not point.skipped for point in points)
+    status = 'FAIL' if failed else 'PASS' if points else 'NOTESTS'
+    lines = [
+        f'### {title}',
+        '',
+        '| Files | Tests | Passed ✅ | Skipped ⚠️ | Failed ❌ | Time ⏱️ |',
+        '| ---: | ---: | ---: | ---: | ---: | ---: |',
+        f'| {len(results)} | {passed + skipped + failures} | {passed} | {skipped} | {failures} | {elapsed:.0f}s |',
+        '',
+        f'Result: **{status}**',
+    ]
+    if failed:
+        lines += ['', '| Test | Result |', '| :--- | :--- |']
+        for result in failed:
+            path = _cell(result.path)
+            lines += [f'| {path} {_cell(_point_name(point))} | ❌ failed |' for point in result.points if point.failed]
+            lines += [f'| {path} | ❌ {_cell(problem)} |' for problem in _problems(result)]
+        for result in failed:
+            # The diagnostics of the failures, and the standard error but them, as warnings and tracebacks
+            details = [line for point in result.points if point.failed for line in point.diagnostics]
+            details += [*result.pending, *(line for line in result.stderr if not line.lstrip().startswith('#'))]
+            details = [RE_ANSI.sub('', line) for line in details]
+            if len(details) > _DETAILS:
+                details[_DETAILS // 2 : -_DETAILS // 2] = [f'[{len(details) - _DETAILS} lines left out]']
+            if details:
+                fence = '`' * max([4, *(len(m) + 1 for m in re.findall(r'`{3,}', '\n'.join(details)))])
+                lines += ['', f'<details><summary>{_html(result.path)}</summary>', '', f'{fence}text', *details]
+                lines += [fence, '', '</details>']
+    return '\n'.join(lines) + '\n'
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -559,6 +810,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     # Both forms, which Getopt::Long of prove accepts for its --nocolor
     parser.add_argument('--no-color', '--nocolor', dest='color', action='store_const', const=False, help='do not color')
+    # Unlike prove: a formatter writes to a file too, so that there are several, as the one of --formatter of prove,
+    # which is a class, writes in the place of the output
+    parser.add_argument(
+        '--formatter',
+        action='append',
+        default=[],
+        metavar='NAME[=FILE]',
+        help='write the results as console, junit or markdown, to FILE or in the place of the output',
+    )
     parser.add_argument('paths', nargs='*', default=['t'], help='test scripts and directories, t by default')
     # Not in prove: PYJO_PROVE_OPTS, where prove reads .proverc
     try:
@@ -566,6 +826,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     except ValueError as e:
         parser.error(f'PYJO_PROVE_OPTS: {e}')
     args = parser.parse_args([*opts, *(sys.argv[1:] if argv is None else argv)])
+    formatters: list[tuple[str, str | None]] = []
+    for value in args.formatter:
+        name, _, file = value.partition('=')
+        if name not in _FORMATTERS:
+            parser.error(f'--formatter: unknown formatter {name!r}, one of {", ".join(_FORMATTERS)}')
+        formatters.append((name, file or None))
+    names, files = [name for name, _ in formatters], [file for _, file in formatters]
+    if files.count(None) > 1:
+        parser.error('--formatter: one formatter writes in the place of the output, not more')
+    # The console in the place of the output, unless another formatter writes there
+    if None not in files and 'console' not in names:
+        formatters.insert(0, ('console', None))
 
     ext = args.ext if args.ext.startswith('.') else f'.{args.ext}'
     scripts = find_scripts(args.paths, ext, args.recurse)
@@ -579,28 +851,54 @@ def main(argv: Sequence[str] | None = None) -> int:
         env['PYTHONPATH'] = os.pathsep.join([*args.include, *filter(None, [env.get('PYTHONPATH')])])
 
     command = _split(args.command) if args.command else [sys.executable]
-    try:
-        results = asyncio.run(
-            run(
-                scripts,
-                command,
-                env,
-                jobs=args.jobs,
-                verbose=args.verbose,
-                timeout=args.timeout,
-                trap=args.trap,
-                capture_stderr=args.capture_stderr,
-                stderr_lines=args.stderr_lines,
-                color=args.color,
-                count=args.count,
+    console = [file for name, file in formatters if name == 'console']
+    started = time.monotonic()
+    with contextlib.ExitStack() as stack:
+        if console and console[0] is not None:
+            stack.enter_context(contextlib.redirect_stdout(stack.enter_context(_open(console[0]))))
+        try:
+            results = asyncio.run(
+                run(
+                    scripts,
+                    command,
+                    env,
+                    jobs=args.jobs,
+                    verbose=args.verbose,
+                    timeout=args.timeout,
+                    trap=args.trap,
+                    capture_stderr=args.capture_stderr,
+                    stderr_lines=args.stderr_lines,
+                    color=args.color,
+                    count=args.count,
+                    console=bool(console),
+                )
             )
-        )
-    except KeyboardInterrupt:
-        # Die of the signal, as a process that does not handle it does, without a traceback
-        signal.signal(signal.SIGINT, signal.SIG_DFL)
-        os.kill(os.getpid(), signal.SIGINT)
-        raise
+        except KeyboardInterrupt:
+            # Die of the signal, as a process that does not handle it does, without a traceback
+            signal.signal(signal.SIGINT, signal.SIG_DFL)
+            os.kill(os.getpid(), signal.SIGINT)
+            raise
+    elapsed = time.monotonic() - started
+    for name, file in formatters:
+        if name == 'console':
+            continue
+        report = f'{junit(results)}\n' if name == 'junit' else markdown(results, elapsed)
+        if file is None:
+            sys.stdout.write(report)
+            sys.stdout.flush()
+        else:
+            with _open(file) as output:
+                output.write(report)
     return 0 if len(results) == len(scripts) and all(r.passed for r in results) else 1
+
+
+# The formatters of --formatter, the console, which writes the usual output, first
+_FORMATTERS = ('console', 'junit', 'markdown')
+
+
+# The file of a formatter, whose lines end with LF on every system, where the text mode of Windows writes CRLF
+def _open(path: str) -> TextIO:
+    return open(path, 'w', encoding='utf-8', newline='\n')
 
 
 # The version of the Python that a command runs, asked once for a command other than this Python
@@ -901,6 +1199,74 @@ def _kill(process: asyncio.subprocess.Process, job: int | None) -> None:
             process.kill()
     except ProcessLookupError:
         pass
+
+
+# The diagnostics of the failures in the standard error, which go to the test points that failed, as Pyjo.Test writes
+# them apart from the TAP output, with the ones of a subtest before the one of the test point of the subtest
+def _diagnostics(result: Result) -> None:
+    failed = iter([point for point in result.points if point.failed])
+    nested: list[str] = []
+    current: list[str] | None = None
+    for line in result.stderr:
+        if RE_FAILED.match(line):
+            current = point.diagnostics if (point := next(failed, None)) is not None else None
+            if current is not None:
+                current += [*nested, line]
+            nested = []
+        elif line[:1].isspace():
+            nested.append(line)
+            current = None
+        elif current is not None and line.startswith('#') and not line.startswith('# Looks like'):
+            current.append(line)
+        else:
+            current = None
+
+
+# The lines of the diagnostics and of the standard error of a test script in the summary in Markdown, at most
+_DETAILS = 200
+
+
+def _cell(text: str) -> str:
+    # The text of a cell of a table of Markdown, with its pipes escaped
+    return _html(text).replace('|', '\\|')
+
+
+def _html(text: str) -> str:
+    return text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+
+
+def _junit_child(parent: 'Pyjo.DOM.object', name: str, text: str | None, **attrs: str) -> None:
+    # An element in the element of a fragment that new_tag has made
+    tag = parent.children().first()
+    assert tag is not None
+    values = {key: _xml(value) for key, value in attrs.items()}
+    tag.append_content(parent.new_tag(name, _xml(text), **values) if text else parent.new_tag(name, **values))
+
+
+def _junit_line(case: 'Pyjo.DOM.object', diagnostics: list[str]) -> None:
+    # The line of the first place of the diagnostics, which is the one of the assertion that failed in a subtest
+    for line in diagnostics:
+        if m := RE_AT.search(line):
+            if (tag := case.children().first()) is not None:
+                tag.attr(line=m.group(2))
+            return
+
+
+# What a test script did wrong as a whole, without the exit status of the number of its failures, which Pyjo.Test and
+# Test::More exit with, up to 254
+def _problems(result: Result) -> list[str]:
+    problems = [f'Bail out!  {result.bail_out}'] if result.bail_out is not None else []
+    status = f'Non-zero exit status: {min(len(result.failed), 254)}' if result.failed else None
+    return problems + [error for error in result.errors if error != status]
+
+
+def _point_name(point: Point) -> str:
+    return f'{point.number} - {point.name}' if point.name else str(point.number)
+
+
+def _xml(text: str | None) -> str | None:
+    # Text without the escapes of the terminal and the characters that XML 1.0 does not allow
+    return RE_NOT_XML.sub('', RE_ANSI.sub('', text)) if text is not None else None
 
 
 def _summary(
