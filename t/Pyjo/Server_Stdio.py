@@ -17,7 +17,7 @@ PYTHON = sys.executable
 ENV = {**os.environ, 'PYTHONPATH': os.pathsep.join([curfile().dirname().dirname().dirname().to_str(), *sys.path])}
 
 # An application with a protocol of lines in capitals, which prints that it starts and what it gets, answers "slow" a second later, also
-# after the end of the input, and logs its errors and its end
+# after the end of the input, which it prints, and logs its errors and its end
 APP = """
 import Pyjo.IOLoop.Messages
 import Pyjo.Server.Stdio
@@ -52,6 +52,7 @@ def stdio(server, app):
 
             @messages.on('end')
             def end(messages):
+                print('ended')
                 ended.append(True)
                 if not slow:
                     messages.close_gracefully()
@@ -92,8 +93,8 @@ def run(input=b'', env=ENV, args=(script, 'stdio')):
 
 
 # The exit code, the output and the error of the command, whose input is written and left open, and which is acted on
-# once it has got the slow line
-def talk(input, action):
+# once it has got the slow line, and once its input has ended
+def talk(input, action, ended=None):
     child = Pyjo.IOLoop.ChildProcess.new()
     out, err, result = bytearray(), bytearray(), []
     child.on('close', lambda child, code, signal: (result.append(code), Pyjo.IOLoop.stop()))
@@ -101,10 +102,11 @@ def talk(input, action):
     child.stdout.on('read', lambda stream, chunk: out.extend(chunk))
 
     def errors(stream, chunk):
-        got = b'got slow' in err
+        before = bytes(err)
         err.extend(chunk)
-        if not got and b'got slow' in err:
-            action(child)
+        for line, cb in ((b'got slow', action), (b'ended', ended)):
+            if cb is not None and line not in before and line in err:
+                cb(child)
 
     child.stderr.on('read', errors)
     child.stdin.write(input)
@@ -125,13 +127,15 @@ with subtest('Lines'):
     code, out, err = run(b'hello\nworld\r\n')
     is_ok(code, 0, 'right exit code')
     is_ok(out, b'HELLO\nWORLD\n', 'right output')
-    like_ok(err, re.compile(r'^starting\ngot hello\ngot world\n.*\[info\] Stopped\n$'), 'print and log on stderr')
+    like_ok(
+        err, re.compile(r'^starting\ngot hello\ngot world\nended\n.*\[info\] Stopped\n$'), 'print and log on stderr'
+    )
 
 with subtest('End of input'):
     code, out, err = run()
     is_ok(code, 0, 'right exit code')
     is_ok(out, b'', 'no output')
-    like_ok(err, re.compile(r'^starting\n.*\[info\] Stopped\n$'), 'stopped')
+    like_ok(err, re.compile(r'^starting\nended\n.*\[info\] Stopped\n$'), 'stopped')
 
 with subtest('Responses after the end of input'):
     code, out, err = run(b'slow\nhello\n')
@@ -151,11 +155,9 @@ with subtest('Graceful stop'):
     like_ok(err, re.compile(r'\[info\] Stopped\n$'), 'stopped')
 
     # The input after the end of the input that the server has ended
-    def stop(child):
-        child.kill(signal.SIGINT)
-        child.stdin.write(b'hello\n')
-
-    code, out, err = talk(b'slow\n', stop)
+    code, out, err = talk(
+        b'slow\n', lambda child: child.kill(signal.SIGINT), lambda child: child.stdin.write(b'hello\n')
+    )
     is_ok(code, 0, 'right exit code')
     is_ok(out, b'SLOW\n', 'response of the request in progress only')
     like_ok(err, re.compile(r'\[info\] Stopped\n$'), 'stopped')
