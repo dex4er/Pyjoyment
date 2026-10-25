@@ -181,6 +181,11 @@ class Pyjo_Reactor(Pyjo.EventEmitter.object):
         super().__init__()
         # Not in Mojolicious: the thread that made the reactor, where it runs
         self._thread = threading.get_ident()
+
+        # Not in Mojolicious: the coroutines that run_coroutine runs, which wait for promises, and which only these
+        # promises refer to otherwise, through the objects that they wait for, which the reactor refers to weakly, in a
+        # cycle that the garbage collector would free, as the reactor of asyncio keeps its tasks
+        self._coroutines: set[Coroutine[Any, Any, Any]] = set()
         _ALL.add(self)
 
     def again(self, id: str, after: float | None = None) -> None:
@@ -221,22 +226,29 @@ class Pyjo_Reactor(Pyjo.EventEmitter.object):
         ``reject`` with the exception it raises. The base class runs it at
         once, until it waits for a promise, as Mojo runs an ``async sub``,
         and continues it when the promise is fulfilled or rejected, so that it
-        can await the promises of Pyjoyment without asyncio. A reactor of an
+        can await the promises of Pyjoyment without asyncio, and keeps it
+        until it ends, as the reactor of asyncio keeps its tasks. A reactor of an
         event loop runs it as a task of its loop, where it can await anything
         of that loop.
         """
+
+        coroutines = self._coroutines
+        coroutines.add(coro)
 
         def step() -> None:
             try:
                 waiting = coro.send(None)
             except StopIteration as e:
+                coroutines.discard(coro)
                 resolve(e.value)
                 return
             except Exception as e:
+                coroutines.discard(coro)
                 reject(e)
                 return
             then = getattr(waiting, 'then', None)
             if not callable(then):
+                coroutines.discard(coro)
                 coro.close()
                 reject(TypeError(f'{_name(type(self))} cannot wait for {waiting!r}'))
                 return
