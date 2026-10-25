@@ -4,6 +4,10 @@ the JUnit XML that each job uploads as an artifact named "junit-" and the name
 of the job, which download-artifact puts in a directory of the same name:
 
     PYTHONPATH=. python .github/scripts/test-report.py reports > report.md
+    PYTHONPATH=. python .github/scripts/test-report.py reports jobs.tsv > report.md
+
+The file of the jobs has the name and the URL of each job of the run, separated
+by a tab, as the API of the jobs of a run gives them, which link the jobs.
 
 A row for each job, with its tests that passed, were skipped and failed, the
 totals, and the tests that failed, with the name of their job. It starts with a
@@ -25,7 +29,17 @@ MARKER = '<!-- pyjo-prove-report -->'
 FAILED = 50
 
 
-def main(directory: str) -> None:
+def main(directory: str, links: str | None = None) -> None:
+    urls: dict[str, str] = {}
+    if links is not None:
+        with open(links, encoding='utf-8') as f:
+            for line in f:
+                name, _, url = line.rstrip('\n').partition('\t')
+                urls[name] = url
+
+    def link(job: str, text: str) -> str:
+        return f'[{text}]({url})' if (url := urls.get(job)) else text
+
     jobs = []
     for name in sorted(os.listdir(directory)):
         path = os.path.join(directory, name)
@@ -57,8 +71,8 @@ def main(directory: str) -> None:
         lines.append('No reports of the jobs.')
     else:
         lines += [
-            '| Job | Tests | Passed ✅ | Skipped ⚠️ | Failed ❌ | |',
-            '| :--- | ---: | ---: | ---: | ---: | :---: |',
+            '| Job | Tests | Passed ✅ | Skipped ⚠️ | Failed ❌ | | Log |',
+            '| :--- | ---: | ---: | ---: | ---: | :---: | :--- |',
         ]
         totals = {'tests': 0, 'passed': 0, 'skipped': 0, 'failed': 0}
         for job, counts, _ in jobs:
@@ -72,18 +86,22 @@ def main(directory: str) -> None:
                 totals[key] += row[key]
             status = '❌' if row['failed'] else '✅'
             lines.append(
-                f'| {_cell(job)} | {row["tests"]} | {row["passed"]} | {row["skipped"]} | {row["failed"]} | {status} |'
+                f'| {_cell(job)} | {row["tests"]} | {row["passed"]} | {row["skipped"]} | {row["failed"]} | {status} '
+                f'| {link(job, "job") if job in urls else ""} |'
             )
         status = '❌' if totals['failed'] else '✅'
         lines.append(
             f'| **All** | **{totals["tests"]}** | **{totals["passed"]}** | **{totals["skipped"]}** '
-            f'| **{totals["failed"]}** | {status} |'
+            f'| **{totals["failed"]}** | {status} | |'
         )
 
         failed = [(job, *failure) for job, counts, failures in jobs for failure in failures]
         if failed:
             lines += ['', '| Job | Script | Test | Message |', '| :--- | :--- | :--- | :--- |']
-            lines += [f'| {" | ".join(_cell(value) for value in row)} |' for row in failed[:FAILED]]
+            lines += [
+                f'| {link(job, _cell(job))} | {" | ".join(_cell(value) for value in row)} |'
+                for job, *row in failed[:FAILED]
+            ]
             if len(failed) > FAILED:
                 lines += ['', f'And {len(failed) - FAILED} more.']
 
@@ -100,4 +118,4 @@ def _cell(text: str) -> str:
 
 
 if __name__ == '__main__':
-    main(sys.argv[1] if len(sys.argv) > 1 else 'reports')
+    main(*sys.argv[1:3])

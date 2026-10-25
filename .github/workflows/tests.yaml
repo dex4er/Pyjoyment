@@ -403,6 +403,7 @@ jobs:
     runs-on: ubuntu-26.04-arm
     timeout-minutes: 5
     permissions:
+      actions: read
       contents: read
       pull-requests: write
 
@@ -421,12 +422,16 @@ jobs:
           pattern: junit-*
           path: reports
 
+      # The names and the URLs of the jobs of the run, of its latest attempt,
+      # which link the jobs of the summary
       - name: Summary of the reports
         shell: bash
         env:
+          GH_TOKEN: ${{ github.token }}
           PYTHONPATH: .
         run: |-
-          python .github/scripts/test-report.py reports > report.md
+          gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs" --jq '.jobs[] | [.name, .html_url] | @tsv' > jobs.tsv
+          python .github/scripts/test-report.py reports jobs.tsv > report.md
           cat report.md >> "$GITHUB_STEP_SUMMARY"
 
       # The comment that starts with the marker of the report, edited, or a new one
