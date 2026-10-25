@@ -108,10 +108,14 @@ import struct
 import sys
 import weakref
 
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 from types import TracebackType
-from typing import Any, Self
+from typing import TYPE_CHECKING, Any, Self
+
+
+if TYPE_CHECKING:
+    import Pyjo.Promise
 
 
 # The address of a peer: a tuple as recvfrom gives it, or the path of a UNIX domain socket
@@ -135,6 +139,7 @@ class _Datagram:
 
     data: bytes
     cb: SendCallback | None
+    failed: Callable[[Any], Anything] | None = None
     family: int = 0
     sockaddr: Any = None
     resolver: Any = None
@@ -161,6 +166,7 @@ class Pyjo_IOLoop_Datagram(Pyjo.EventEmitter.object):
         self._connecting: Any = None
         self._graceful = False
         self._handle = handle
+        self._ended = False
         self._paused = False
         self._queue: collections.deque[_Datagram] = collections.deque()
         self._reactor: weakref.ref[Pyjo.Reactor.object] | None = None
@@ -187,6 +193,16 @@ class Pyjo_IOLoop_Datagram(Pyjo.EventEmitter.object):
         self, type: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None
     ) -> None:
         self.close()
+
+    def __aiter__(self) -> AsyncIterator[tuple[bytes, Any]]:
+        """::
+
+            async for data, peer in datagram:
+                ...
+
+        Same as :meth:`iterate`.
+        """
+        return self.iterate()
 
     @property
     def reactor(self) -> Pyjo.Reactor.object:
@@ -361,6 +377,7 @@ class Pyjo_IOLoop_Datagram(Pyjo.EventEmitter.object):
             return
         reactor.remove(handle)
         handle.close()
+        self._ended = True
         self.emit('close')
 
     def close_gracefully(self) -> None:
@@ -374,6 +391,26 @@ class Pyjo_IOLoop_Datagram(Pyjo.EventEmitter.object):
             self._graceful = True
         else:
             self.close()
+
+    def close_gracefully_p(self) -> 'Pyjo.Promise.object':
+        """::
+
+            promise = datagram.close_gracefully_p()
+
+        Same as :meth:`close_gracefully`, but returns a :mod:`Pyjo.Promise`
+        object, which is fulfilled once the socket has been closed, also when it
+        is closed already, or has never been opened. ::
+
+            await datagram.send_p(b'Bye!')
+            await datagram.close_gracefully_p()
+        """
+        import Pyjo.Promise
+
+        if self._handle is None:
+            return Pyjo.Promise.resolve()
+        promise = self.once_p('close')
+        self.close_gracefully()
+        return promise
 
     def connect(self, **options: Any) -> Self:
         """::
@@ -494,6 +531,95 @@ class Pyjo_IOLoop_Datagram(Pyjo.EventEmitter.object):
             return None
         return handle.getsockname()[1]
 
+    def connect_p(self, **options: Any) -> 'Pyjo.Promise.object':
+        """::
+
+            promise = datagram.connect_p(address='127.0.0.1', port=9999)
+
+        Same as :meth:`connect`, but returns a :mod:`Pyjo.Promise` object,
+        which is fulfilled with the socket once it is connected, and rejected
+        with the error of the event ``error`` if it cannot be. The socket keeps
+        what arrives for :meth:`recv_p` from then on, also the refusal of the
+        peer, as a coroutine that awaits the promise goes on later. ::
+
+            datagram = await Pyjo.IOLoop.Datagram.new().connect_p(address='127.0.0.1', port=9999)
+            await datagram.send_p(b'Hello!')
+        """
+
+        def connected(*args: Any) -> Self:
+            self._messages()
+            return self
+
+        promise = self.once_p('connect').then(connected)
+        self.connect(**options)
+        return promise
+
+    def iterate(self) -> AsyncIterator[tuple[bytes, Any]]:
+        """::
+
+            async for data, peer in datagram.iterate():
+                ...
+
+        The datagrams that arrive as an asynchronous iterator, with the address
+        of their sender, until the socket is closed, which :meth:`recv_p`
+        takes. ::
+
+            # Echo server, one datagram after another
+            async for data, peer in datagram:
+                await datagram.send_p(b'Echo: ' + data, peer)
+        """
+        return self._messages().iterate()
+
+    def once_p(self, name: str) -> 'Pyjo.Promise.object':
+        """::
+
+            promise = datagram.once_p('close')
+
+        Same as :meth:`~Pyjo.EventEmitter.Pyjo_EventEmitter.once_p` of
+        :mod:`Pyjo.EventEmitter`, but fulfilled at once for the event
+        ``close`` of a socket that is closed already, as it comes no more.
+        """
+        import Pyjo.Promise
+
+        if name == 'close' and self._ended:
+            return Pyjo.Promise.resolve()
+        return super().once_p(name)
+
+    def recv_p(self, timeout: float | None = None) -> 'Pyjo.Promise.object':
+        """::
+
+            promise = datagram.recv_p()
+            promise = datagram.recv_p(timeout=5)
+
+        Return a :mod:`Pyjo.Promise` object, which is fulfilled with the next
+        datagram and the address of its sender, as the event ``message`` gives
+        them, or ``None`` once the socket is closed, also when it is closed
+        already, and rejected with the error of the event ``error``, after
+        which the socket stays open and the next promise waits again, or a
+        :class:`TimeoutError` when no datagram has arrived for ``timeout``
+        seconds. The socket reads only while a promise waits, and the datagrams
+        that arrive before wait in the socket, as the streams do. ::
+
+            if (received := await datagram.recv_p()) is not None:
+                data, peer = received
+                print(f'{data!r} from {peer}')
+        """
+        pull = self._messages()
+        promise = pull.next_p()
+        if timeout is not None and promise in pull.waiting:
+            reactor = self.reactor
+
+            def expired(reactor: Any) -> None:
+                pull.cancel(promise, TimeoutError('Receive timeout'))
+
+            timer = reactor.timer(timeout, expired)
+
+            def settled(*args: Any) -> None:
+                reactor.remove(timer)
+
+            promise.then(settled, settled)
+        return promise
+
     def send(self, data: bytes, peer: Peer | None = None, cb: SendCallback | None = None) -> Self:
         """::
 
@@ -507,24 +633,43 @@ class Pyjo_IOLoop_Datagram(Pyjo.EventEmitter.object):
         connected, whose name is resolved without blocking. The optional callback will be executed once the
         datagram has been sent.
         """
-        d = _Datagram(data, cb)
-        self._queue.append(d)
+        return self._send(data, peer, cb)
 
-        if peer is not None:
-            ref = weakref.ref(self)
+    def send_p(self, data: bytes, peer: Peer | None = None) -> 'Pyjo.Promise.object':
+        """::
 
-            def resolved(family: int, sockaddr: Any, err: str | None) -> None:
-                d.resolver, d.family, d.sockaddr, d.error = None, family, sockaddr, err
-                if (datagram := ref()) is not None:
-                    datagram._flush()
+            promise = datagram.send_p(b'Hello!')
+            promise = datagram.send_p(b'Hello!', ('127.0.0.1', 9999))
 
-            if isinstance(peer, str):
-                d.resolver = self._resolve(peer, 0, resolved, unix=True)
-            else:
-                d.resolver = self._resolve(str(peer[0]), int(peer[1]), resolved, sockaddr=peer)
+        Same as :meth:`send`, but returns a :mod:`Pyjo.Promise` object, which
+        is fulfilled once the datagram has been sent, and rejected with the
+        error of the datagram, in the place of the event ``error``, or if the
+        socket is closed before, or is closed already. ::
 
-        self._flush()
-        return self
+            await datagram.send_p(b'Hello!', ('127.0.0.1', 9999))
+        """
+        import Pyjo.Exception
+        import Pyjo.Promise
+
+        if self._ended:
+            return Pyjo.Promise.reject(Pyjo.Exception.new('Socket closed before the datagram has been sent'))
+        promise = Pyjo.Promise.new()
+
+        def closed(datagram: Any) -> None:
+            promise.reject(Pyjo.Exception.new('Socket closed before the datagram has been sent'))
+
+        wrapper = self.once('close', closed)
+
+        def sent(datagram: Any) -> None:
+            self.unsubscribe('close', wrapper)
+            promise.resolve()
+
+        def failed(err: Any) -> None:
+            self.unsubscribe('close', wrapper)
+            promise.reject(err)
+
+        self._send(data, peer, sent, failed)
+        return self._hold(promise)
 
     def start(self) -> None:
         """::
@@ -606,6 +751,13 @@ class Pyjo_IOLoop_Datagram(Pyjo.EventEmitter.object):
         self.start()
         self.emit('connect')._flush()
 
+    # The error of a datagram, which its promise gets, or the event error
+    def _failed(self, d: '_Datagram', err: Any) -> None:
+        if d.failed is not None:
+            d.failed(err)
+        else:
+            self.emit('error', err)
+
     def _flush(self) -> None:
         queue = self._queue
         while queue:
@@ -617,7 +769,7 @@ class Pyjo_IOLoop_Datagram(Pyjo.EventEmitter.object):
 
             if d.error is not None:
                 queue.popleft()
-                self.emit('error', d.error)
+                self._failed(d, d.error)
                 continue
 
             # A socket that is not bound yet is bound to a random port
@@ -629,9 +781,7 @@ class Pyjo_IOLoop_Datagram(Pyjo.EventEmitter.object):
             # An address of another family than the socket, which the socket cannot send to
             if d.family and d.family != handle.family:
                 queue.popleft()
-                self.emit(
-                    'error', OSError(errno.EAFNOSUPPORT, f'Address {d.sockaddr} is not of the family of the socket')
-                )
+                self._failed(d, OSError(errno.EAFNOSUPPORT, f'Address {d.sockaddr} is not of the family of the socket'))
                 continue
 
             try:
@@ -644,7 +794,7 @@ class Pyjo_IOLoop_Datagram(Pyjo.EventEmitter.object):
                 return
             except OSError as e:
                 queue.popleft()
-                self.emit('error', _refused(e))
+                self._failed(d, _refused(e))
                 if self._closed():
                     return
                 continue
@@ -658,6 +808,13 @@ class Pyjo_IOLoop_Datagram(Pyjo.EventEmitter.object):
         self._watch()
         if self._graceful:
             self.close()
+
+    # The pull of the datagrams, whose errors leave the socket open, and which a socket that is closed already has ended
+    def _messages(self) -> Any:
+        pull = self._pull('message', True, value=False, fatal=False)
+        if self._ended:
+            pull.end()
+        return pull
 
     def _membership(self, group: str, interface: str | int | None, add: bool) -> None:
         handle = self._socket()
@@ -759,6 +916,28 @@ class Pyjo_IOLoop_Datagram(Pyjo.EventEmitter.object):
             if info[0] == self._handle.family:
                 return info[0], info[4], None
         return 0, None, "Can't resolve: no address of the family of the socket"
+
+    def _send(
+        self, data: bytes, peer: Peer | None, cb: SendCallback | None, failed: Callable[[Any], Anything] | None = None
+    ) -> Self:
+        d = _Datagram(data, cb, failed)
+        self._queue.append(d)
+
+        if peer is not None:
+            ref = weakref.ref(self)
+
+            def resolved(family: int, sockaddr: Any, err: str | None) -> None:
+                d.resolver, d.family, d.sockaddr, d.error = None, family, sockaddr, err
+                if (datagram := ref()) is not None:
+                    datagram._flush()
+
+            if isinstance(peer, str):
+                d.resolver = self._resolve(peer, 0, resolved, unix=True)
+            else:
+                d.resolver = self._resolve(str(peer[0]), int(peer[1]), resolved, sockaddr=peer)
+
+        self._flush()
+        return self
 
     def _socket(self) -> socket.socket:
         if (handle := self._handle) is None:

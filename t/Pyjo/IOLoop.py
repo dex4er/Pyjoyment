@@ -542,6 +542,49 @@ with subtest('Errors of the promises of a stream'):
     like_ok(errors[-1], r'^Stream closed before all data has been written', 'write rejected')
     reader.close()
 
+with subtest('Promises of streams that only a coroutine refers to'):
+    import gc
+
+    got = []
+
+    # The reactor refers to the streams weakly, so only the coroutine and the promises that it waits for keep them
+    @Pyjo.Promise.coroutine
+    async def read():
+        reader, writer = stream_pair()
+        first = reader.read_p()
+        Pyjo.IOLoop.timer(0.1, lambda loop: writer.write(b'late'))
+        got.append(await first)
+        reader.close()
+        writer.close()
+
+    promise = read()
+    gc.collect()
+    Pyjo.IOLoop.timer(0.05, lambda loop: gc.collect())
+    promise.wait()
+    is_deeply_ok(got, [b'late'], 'not freed while the coroutine waits')
+
+with subtest('Stream of a connection as a promise'):
+    # A server that greets at once, before the coroutine that connects goes on
+    id = Pyjo.IOLoop.server(lambda loop, stream, id: stream.write(b'220 hello'), address='127.0.0.1')
+    port = Pyjo.IOLoop.acceptor(id).port
+    got = []
+
+    @Pyjo.Promise.coroutine
+    async def greeted():
+        stream = await Pyjo.IOLoop.client_p(address='127.0.0.1', port=port)
+        await Pyjo.Promise.timer(0.1)
+        got.append(await stream.read_p())
+        stream.close()
+
+    greeted().wait()
+    is_deeply_ok(got, [b'220 hello'], 'the greeting kept for the promise')
+    Pyjo.IOLoop.remove(id)
+
+    # The port of the server, which listens no more
+    errors = []
+    Pyjo.IOLoop.client_p(address='127.0.0.1', port=port).catch(lambda err: errors.append(err)).wait()
+    ok(errors, 'connection refused')
+
 with subtest('Promises of a stream that is closed already'):
     reader, writer = stream_pair()
     reader.close()

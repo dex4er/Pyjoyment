@@ -587,7 +587,7 @@ class Pyjo_IOLoop_Messages(Pyjo.EventEmitter.object):
             promise.resolve()
 
         self.send(message, drained)
-        return promise
+        return self._hold(promise)
 
     def start(self) -> None:
         """::
