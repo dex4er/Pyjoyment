@@ -670,7 +670,7 @@ of zod, and run the official test suite of JSON Schema on the validation),
 transport, written from the specification, whose first consumer is the
 distribution of MCP, and whose `to_action` makes an action of a route of
 Pyjoyment, which takes the controller from the route, as `Pyjo` does not import
-`Pyjoyment`),
+`Pyjoyment`, and whose `serve` serves a stream of messages in both directions),
 `Pyjo.Test.pytest_plugin` (the plugin of pytest, which runs the test scripts
 as `Pyjo.Prove` does and the functions of `Pyjo.Test` in the tests of pytest),
 `Pyjo.YAML` (the subset of YAML of `CPAN::Meta::YAML`,
@@ -1355,7 +1355,16 @@ A framing of `Pyjo.IOLoop.Messages` decodes one message at a time, so that a
 message over the maximum size, which closes the stream, does not lose the
 messages before it in the same read, and `Lines` remembers how far it has
 searched, so that a long line that comes in many reads is not searched from
-its beginning each time.
+its beginning each time. With the input and the output of a child process,
+`close_gracefully` closes the output only, the standard input of the child,
+which is how a server of the standard input and output learns that no request
+comes anymore, and the input is read until the child ends it, so that the
+responses of the requests in progress still come in.
+
+`serve` of `Pyjo.JSON.RPC` makes both peers of a stream servers and clients,
+so it drops a response to no call of its client, as answering it with an
+error, as a server answers what is not a request, would send the error back
+and forth between two peers that serve each other.
 
 ## Distributions of Their Own
 
