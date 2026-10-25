@@ -472,9 +472,14 @@ the standard error is around the whole line, so `ResourceWarning:` is still
 in it. It writes the JUnit XML of the results with `--formatter junit=FILE`,
 which the action `mikepenz/action-junit-report` turns into the annotations of
 the failed tests, and the summary of the job with `--formatter markdown=FILE`,
-whose diagnostics of the failures
-come from the standard error that `--capture-stderr` captures, as `Pyjo.Test`
-writes them there and not into the TAP output, as `Test::More` does.
+whose diagnostics of the failures come from the standard error that
+`--capture-stderr` captures, as `Pyjo.Test` writes them there and not into the
+TAP output, as `Test::More` does.
+Each job of the tests uploads its JUnit XML, also the one of pytest, as an
+artifact named `junit-` and the name of the job, from which the job `report`
+makes the summary of the summaries of all the jobs, with
+`.github/scripts/test-report.py`, as its summary and as a comment of the pull
+request, which each run edits, found by the marker it starts with.
 `--stderr-lines 1000` keeps the first and the last lines of the
 standard error of a script, as a script that fails in a loop, like an I/O
 watcher of `Pyjo.Reactor.Poll` that raises each time the reactor calls it, can
