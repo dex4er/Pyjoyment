@@ -577,7 +577,7 @@ class Pyjo_IOLoop_Stream(Pyjo.EventEmitter.object):
             promise.resolve()
 
         self.write(chunk, drained)
-        return promise
+        return self._hold(promise)
 
     # Not in Mojolicious: the pull of the chunks, which a stream that is closed already has ended
     def _chunks(self) -> Any:

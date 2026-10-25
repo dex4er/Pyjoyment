@@ -100,6 +100,11 @@ type Callback = Callable[..., Any]
 
 DEBUG = bool(os.environ.get('PYJO_EVENTEMITTER_DEBUG'))
 
+# Not in Mojolicious: the emitters whose promises wait, with how many of them, by the id of the emitter. The promise of an
+# emitter, as a socket that a coroutine waits for, may be the only way to it, as the reactor refers to the socket weakly,
+# in a cycle that the garbage collector would free with the promise, as Perl keeps such a cycle
+_holding: dict[int, list[Any]] = {}
+
 
 class Pyjo_EventEmitter(Pyjo.Base.object):
     """
@@ -252,7 +257,7 @@ class Pyjo_EventEmitter(Pyjo.Base.object):
                 promise.reject(err)
 
             failed = self.once('error', error)
-        return promise
+        return self._hold(promise)
 
     @overload
     def once(self, name: Callback, cb: None = None) -> Callback: ...
@@ -306,16 +311,35 @@ class Pyjo_EventEmitter(Pyjo.Base.object):
         """
         return self._events.setdefault(name, [])
 
+    # Not in Mojolicious: the emitter kept while the promise waits, as nothing else may refer to it, which leaves the promise
+    # as handled as it was, so that a rejection that nothing handles is still reported
+    def _hold(self, promise: 'Pyjo.Promise.object') -> 'Pyjo.Promise.object':
+        key = id(self)
+        entry = _holding.setdefault(key, [self, 0])
+        entry[1] += 1
+
+        def release(*args: Any) -> None:
+            entry[1] -= 1
+            if entry[1] <= 0 and _holding.get(key) is entry:
+                del _holding[key]
+
+        handled = promise._handled  # pyright: ignore[reportPrivateUsage]
+        promise.then(release, release)
+        promise._handled = handled  # pyright: ignore[reportPrivateUsage]
+        return promise
+
     # Not in Mojolicious: the values of an event of a subclass that are pulled with promises, one pull for each event, so
     # that the promises and the iterators of a stream take its chunks in order, and with flow, the start and the stop of
     # the reading of a stream, which reads only while a promise waits, and the TimeoutError of its event timeout
-    def _pull(self, name: str, flow: bool = False) -> '_Pull':
+    # A value is the first argument of the event, or all of them as a tuple, and an error of the event error, which ends
+    # the pull, or only rejects the promises that wait, where the emitter goes on after it, as a datagram socket
+    def _pull(self, name: str, flow: bool = False, *, value: bool = True, fatal: bool = True) -> '_Pull':
         pulls: dict[str, _Pull] = self.__dict__.setdefault('_pulls', {})
         if (pull := pulls.get(name)) is None:
             # The methods of a stream, which the subclass has
             stream = cast(Any, self)
             start, stop = (stream.start, stream.stop) if flow else (None, None)
-            pull = pulls[name] = _Pull(self, name, True, start, stop)
+            pull = pulls[name] = _Pull(self, name, value, start, stop, fatal)
             if flow:
                 pull.subscribed.append(('timeout', self.on('timeout', pull.timeout)))
         return pull
@@ -365,12 +389,16 @@ class _Pull:
         value: bool,
         start: Callable[[], Any] | None = None,
         stop: Callable[[], Any] | None = None,
+        fatal: bool = True,
     ) -> None:
-        self.emitter, self.value, self.start, self.stop = emitter, value, start, stop
+        self.emitter, self.value, self.start, self.stop, self.fatal = emitter, value, start, stop, fatal
         self.queue: collections.deque[Any] = collections.deque()
         self.waiting: collections.deque[Pyjo.Promise.object] = collections.deque()
         self.done = False
         self.error: Any = None
+
+        # An error that is not fatal, which came while no promise waited, for the next one
+        self.missed: Any = None
         self.subscribed: list[tuple[str, Callback]] = [
             (name, emitter.on(name, self._push)),
             ('error', emitter.on('error', self._fail)),
@@ -380,6 +408,14 @@ class _Pull:
 
     def iterate(self, size: int | None = None) -> '_Iterator':
         return _Iterator(self, size)
+
+    # A promise that waits no more, as one whose time is up, which is rejected
+    def cancel(self, promise: Any, err: Any) -> None:
+        if promise in self.waiting:
+            self.waiting.remove(promise)
+            promise.reject(err)
+            if not self.waiting and self.stop is not None:
+                self.stop()
 
     # The end of an emitter that has ended before, as a stream that is closed
     def end(self) -> None:
@@ -402,10 +438,14 @@ class _Pull:
             return Pyjo.Promise.resolve(self._split(item, size) if size is not None else item)
         if self.error is not None:
             return Pyjo.Promise.reject(self.error)
+        if (missed := self.missed) is not None:
+            self.missed = None
+            return Pyjo.Promise.reject(missed)
         if self.done:
             return Pyjo.Promise.resolve(None)
         promise = Pyjo.Promise.new()
         self.waiting.append(promise)
+        self.emitter._hold(promise)  # pyright: ignore[reportPrivateUsage]
         if size is not None:
 
             def split(item: Any = None) -> Any:
@@ -423,10 +463,15 @@ class _Pull:
             self.waiting.popleft().resolve(None)
 
     def _fail(self, emitter: Any, err: Any) -> None:
-        self.error = err
-        self.close()
+        if self.fatal:
+            self.error = err
+            self.close()
+        elif not self.waiting:
+            self.missed = err
         while self.waiting:
             self.waiting.popleft().reject(err)
+        if not self.fatal and self.stop is not None:
+            self.stop()
 
     def _push(self, emitter: Any, *args: Any) -> None:
         item = args[0] if self.value else args
