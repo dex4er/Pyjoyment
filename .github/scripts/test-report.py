@@ -87,7 +87,7 @@ def main(directory: str, links: str | None = None) -> None:
             status = '❌' if row['failed'] else '✅'
             lines.append(
                 f'| {_cell(job)} | {row["tests"]} | {row["passed"]} | {row["skipped"]} | {row["failed"]} | {status} '
-                f'| {link(job, "job") if job in urls else ""} |'
+                f'| {link(job, urls[job].rstrip("/").rpartition("/")[2]) if job in urls else ""} |'
             )
         status = '❌' if totals['failed'] else '✅'
         lines.append(
