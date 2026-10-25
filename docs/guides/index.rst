@@ -242,8 +242,12 @@ This is the class hierarchy of the :mod:`Pyjoyment` distribution.
     - :mod:`Pyjo.IOLoop.ChildProcess`
     - :mod:`Pyjo.IOLoop.Client`
     - :mod:`Pyjo.IOLoop.Datagram`
+    - :mod:`Pyjo.IOLoop.Messages`
     - :mod:`Pyjo.IOLoop.Server`
     - :mod:`Pyjo.IOLoop.Stream`
+
+      - :mod:`Pyjo.IOLoop.Stdio`
+
     - :mod:`Pyjo.IOLoop.Subprocess`
     - :mod:`Pyjo.IOLoop.TLS`
     - :mod:`Pyjo.JSON.RPC`
