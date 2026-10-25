@@ -337,11 +337,14 @@ class Pyjo_JSON_RPC(Pyjo.EventEmitter.object):
         """
         return list(self._methods)
 
-    def serve(self, peer: Any, context: Any = None) -> 'Client':
+    def serve(
+        self, peer: Any, context: Any = None, *, dispatch_p: Callable[[Any, 'Client'], Any] | None = None
+    ) -> 'Client':
         """::
 
             client = rpc.serve(messages)
             client = rpc.serve(messages, context=app)
+            client = rpc.serve(messages, dispatch_p=lambda message, client: rpc.dispatch_p(message, {'client': client}))
 
         Serve the methods to a peer on a stream of messages in both directions,
         as a :mod:`Pyjo.IOLoop.Messages` object, a
@@ -361,7 +364,18 @@ class Pyjo_JSON_RPC(Pyjo.EventEmitter.object):
         The event ``end`` of the peer, the end of its input, rejects the calls
         of the client, which get no response anymore, and closes the peer
         gracefully once the requests in progress have their responses, and the
-        events ``close`` and ``finish`` reject them too. ::
+        events ``close`` and ``finish`` reject them too.
+
+        ``dispatch_p`` is a function that dispatches each message in the place
+        of :meth:`dispatch_p` with ``context``, which the function chooses
+        itself, so it is an error to give both. It gets the message, as
+        :mod:`Pyjo.JSON` decodes it, which is not a response, and the client,
+        and returns the response, a :mod:`Pyjo.Promise` of it, or a coroutine,
+        or ``None`` for a notification, so that a protocol on JSON-RPC gives
+        each request a context of its own or rules of its own. A function that
+        raises, or whose promise is rejected, gives ``-32603``, ``Internal
+        error``, to the requests of the message that have an ``id``, and the
+        event ``exception``, with the client as the context. ::
 
             # Standard input and output, whose method asks the client
             @rpc.method(context=True)
@@ -374,7 +388,17 @@ class Pyjo_JSON_RPC(Pyjo.EventEmitter.object):
 
             # A WebSocket of Pyjoyment.Lite
             websocket('/rpc', lambda c: rpc.serve(c))
+
+            # A context of its own for each request, and no batches
+            def dispatch_p(message, client):
+                if isinstance(message, list):
+                    return {'jsonrpc': '2.0', 'error': {'code': -32600, 'message': 'No batches'}, 'id': None}
+                return rpc.dispatch_p(message, {'client': client})
+
+            rpc.serve(messages, dispatch_p=dispatch_p)
         """
+        if context is not None and dispatch_p is not None:
+            raise Pyjo.Exception.new('The context of serve is the one of its dispatch_p, not both')
         client = Client()
         if context is None:
             context = client
@@ -395,6 +419,11 @@ class Pyjo_JSON_RPC(Pyjo.EventEmitter.object):
             if ended and not pending:
                 peer.close_gracefully()
 
+        def dispatch(message: Any, client: Client) -> Any:
+            if isinstance(message, list):
+                return self._dispatch_p(message, context, exception)
+            return self._request_p(message, context, exception)
+
         def message(peer: Any, message: Any) -> None:
             nonlocal pending
             try:
@@ -405,10 +434,21 @@ class Pyjo_JSON_RPC(Pyjo.EventEmitter.object):
             if not isinstance(decoded, str) and client.receive(decoded) or _is_response(decoded):
                 return
             pending += 1
-            if isinstance(decoded, list):
-                self._dispatch_p(decoded, context, exception).then(respond)
-            else:
-                self._request_p(decoded, context, exception).then(respond)
+
+            # A function that fails answers the requests with an id, which wait for their responses
+            def failed(e: Any = None) -> None:
+                exception(e if isinstance(e, Exception) else Pyjo.Exception.new(e))
+                respond(_internal_errors(decoded))
+
+            try:
+                response = (dispatch_p or dispatch)(decoded, client)
+                if inspect.iscoroutine(response):
+                    response = Pyjo.Promise.new(response)
+            except Exception as e:
+                response = Pyjo.Promise.reject(e)
+            if not isinstance(response, Pyjo.Promise.object):
+                response = Pyjo.Promise.resolve(response)
+            response.then(respond, failed)
 
         def end(peer: Any) -> None:
             nonlocal ended
@@ -666,6 +706,19 @@ class Client(Pyjo.Base.object):
         if self.send is None:
             raise Pyjo.Exception.new('No function to send the request')
         return self.send(request)
+
+
+def _internal_errors(message: Anything) -> Any:
+    # The responses of -32603 of the requests of a message with an id, in an array for a batch
+    requests: list[Any] = cast(list[Any], message) if isinstance(message, list) else [message]
+    responses = [
+        _response(request['id'], error=Error(INTERNAL_ERROR))
+        for request in requests
+        if _is_request(request) and 'id' in request
+    ]
+    if isinstance(message, list):
+        return responses or None
+    return responses[0] if responses else None
 
 
 def _is_id(id: Anything) -> bool:

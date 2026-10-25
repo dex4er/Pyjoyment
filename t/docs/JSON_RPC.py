@@ -1,6 +1,7 @@
 import Pyjo.IOLoop
 import Pyjo.IOLoop.ChildProcess
 import Pyjo.IOLoop.Messages
+import Pyjo.IOLoop.Stream
 import Pyjo.Promise
 import Pyjo.Test.Pyjo
 import Pyjoyment
@@ -15,6 +16,7 @@ import contextlib
 import io
 import os
 import re
+import socket
 import sys
 
 
@@ -225,6 +227,48 @@ messages.stream.reactor.start()
 
     t.websocket_ok('/rpc').send_ok({'json': {'jsonrpc': '2.0', 'method': 'subtract', 'params': [42, 23], 'id': 1}})
     t.message_ok().json_message_is({'jsonrpc': '2.0', 'result': 19, 'id': 1}).finish_ok()
+
+    # A context of its own for each request, and no batches, on a pair of sockets
+    a, b = socket.socketpair()
+    a.setblocking(False)
+    b.setblocking(False)
+    messages, peer = (Pyjo.IOLoop.Messages.new(Pyjo.IOLoop.Stream.new(handle)) for handle in (a, b))
+    for stream in (messages, peer):
+        stream.start()
+    contexts = []
+
+    @rpc.method('context', context=True)
+    def context_method(context):
+        contexts.append(context)
+        return 'ok'
+
+    def dispatch_p(message, client):
+        if isinstance(message, list):
+            return {'jsonrpc': '2.0', 'error': {'code': -32600, 'message': 'No batches'}, 'id': None}
+        return rpc.dispatch_p(message, {'client': client})
+
+    client = rpc.serve(messages, dispatch_p=dispatch_p)
+    received = []
+    peer.on('message', lambda peer, message: (received.append(message), len(received) == 3 and Pyjo.IOLoop.stop()))
+    peer.send('{"jsonrpc": "2.0", "method": "context", "id": 1}')
+    peer.send('{"jsonrpc": "2.0", "method": "context", "id": 2}')
+    peer.send('[{"jsonrpc": "2.0", "method": "context", "id": 3}]')
+    timer = Pyjo.IOLoop.timer(10, lambda loop: Pyjo.IOLoop.stop())
+    Pyjo.IOLoop.start()
+    Pyjo.IOLoop.remove(timer)
+    is_deeply_ok(
+        received,
+        [
+            b'{"jsonrpc":"2.0","result":"ok","id":1}',
+            b'{"jsonrpc":"2.0","result":"ok","id":2}',
+            b'{"jsonrpc":"2.0","error":{"code":-32600,"message":"No batches"},"id":null}',
+        ],
+        'responses',
+    )
+    is_deeply_ok(contexts, [{'client': client}, {'client': client}], 'contexts')
+    ok(contexts[0] is not contexts[1], 'a context of its own')
+    messages.close()
+    peer.close()
 
 with subtest('to_action'):
     action = rpc.to_action()
