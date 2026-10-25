@@ -5,6 +5,7 @@ from Pyjo.Loader import load_class
 from Pyjo.Test import *
 
 import os
+import signal
 import socket
 import time
 
@@ -454,5 +455,25 @@ err = eval_(lambda: base.timer(0, lambda reactor: None))
 like_ok(str(err), r'Method "timer" not implemented by subclass', 'right error')
 err = eval_(lambda: base.watch(0, True, True))
 like_ok(str(err), r'Method "watch" not implemented by subclass', 'right error')
+
+# Not in Mojolicious: a callback of next_tick from a signal handler, which Python runs in the middle of what the reactor
+# does, as the servers stop gracefully, with enough timers that the handler interrupts the reactor that looks for the
+# first of them
+if hasattr(signal, 'setitimer'):
+    reactor = Pyjo.Reactor.Poll.new()
+    for _ in range(100000):
+        reactor.timer(10, lambda reactor: None)
+    ticks = []
+    handler = signal.signal(signal.SIGALRM, lambda signum, frame: reactor.next_tick(lambda reactor: ticks.append(1)))
+    signal.setitimer(signal.ITIMER_REAL, 0.001, 0.001)
+    reactor.timer(0.3, lambda reactor: reactor.stop())
+    try:
+        err = eval_(lambda: reactor.start())
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, handler)
+    is_ok(err, None, 'no error')
+    ok(ticks, 'callbacks of the signal handler')
+    reactor.reset()
 
 done_testing()
