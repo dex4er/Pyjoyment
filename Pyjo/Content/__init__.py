@@ -184,7 +184,7 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
         # The state of the parser and of the generator, as the keys of Mojo's hash
         self._body = False
         self._body_buffer: bytes | None = None
-        self._buffer = b''
+        self._buffer = bytearray()
         self._chunk_len = 0
         self._chunk_state: str | None = None
         self._chunked = False
@@ -197,7 +197,7 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
         self._header_size: int | None = None
         self._limit = False
         self._post_buffer = b''
-        self._pre_buffer = b''
+        self._pre_buffer = bytearray()
         self._raw_size = 0
         self._real_size: int | None = None
         self._size = 0
@@ -466,7 +466,7 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
 
         Get leftover data from content parser.
         """
-        return self._buffer
+        return bytes(self._buffer)
 
     def parse(self, chunk: bytes | None = None) -> 'Pyjo_Content':
         r"""::
@@ -498,7 +498,7 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
             limit = self.is_finished and len(self._buffer) > self.max_leftover_size
             if not limit:
                 self._buffer += self._pre_buffer
-            self._pre_buffer = b''
+            self._pre_buffer = bytearray()
 
         # No content
         if self.skip_body:
@@ -515,9 +515,9 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
 
         # Chunked or relaxed content
         if self.is_chunked or self.relaxed:
-            self._decompress(self._buffer)
+            self._decompress(bytes(self._buffer))
             self._size += len(self._buffer)
-            self._buffer = b''
+            self._buffer = bytearray()
             return self
 
         # Normal content
@@ -525,7 +525,8 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
         if (need := size - self._size) > 0:
             have = len(self._buffer)
             take = int(need) if need < have else have
-            chunk, self._buffer = self._buffer[:take], self._buffer[take:]
+            chunk = bytes(self._buffer[:take])
+            del self._buffer[:take]
             self._decompress(chunk)
             self._size += len(chunk)
         if size <= self.progress:
@@ -694,8 +695,8 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
             if not self._chunk_len:
                 if not (m := re.match(rb'(?:\x0d?\x0a)?([0-9a-fA-F]+).*\x0a', self._pre_buffer)):
                     break
-                self._pre_buffer = self._pre_buffer[m.end() :]
-                self._chunk_len = int(m[1], 16)
+                end, self._chunk_len = m.end(), int(m[1], 16)
+                del self._pre_buffer[:end]
                 if self._chunk_len:
                     continue
 
@@ -707,7 +708,7 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
             if self._chunk_len < length:
                 length = self._chunk_len
             self._buffer += self._pre_buffer[:length]
-            self._pre_buffer = self._pre_buffer[length:]
+            del self._pre_buffer[:length]
             self._real_size = (self._real_size or 0) + length
             self._chunk_len -= length
 
@@ -721,7 +722,7 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
 
     def _parse_chunked_trailing_headers(self) -> None:
         headers = self.headers.parse(self._pre_buffer)
-        self._pre_buffer = b''
+        self._pre_buffer = bytearray()
         if not headers.is_finished:
             return
         self._chunk_state = 'finished'
@@ -734,13 +735,14 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
 
     def _parse_headers(self) -> None:
         headers = self.headers.parse(self._pre_buffer)
-        self._pre_buffer = b''
+        self._pre_buffer = bytearray()
         if not headers.is_finished:
             return
         self._state = 'body'
 
         # Take care of leftovers
-        leftovers = self._pre_buffer = headers.leftovers()
+        leftovers = headers.leftovers()
+        self._pre_buffer = bytearray(leftovers)
         self._header_size = self._raw_size - len(leftovers)
 
     def _parse_sse(self) -> None:
@@ -750,10 +752,8 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
         self._sse = True
 
         # Parse SSE
-        buffer = bytearray(self._pre_buffer)
-        while event := parse_event(buffer):
+        while event := parse_event(self._pre_buffer):
             self.emit('sse', event)
-        self._pre_buffer = bytes(buffer)
 
         # Check buffer size
         if len(self._pre_buffer) > self.max_buffer_size:

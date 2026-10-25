@@ -532,7 +532,8 @@ class _Input(Pyjo.IOLoop.Stream.object):
             except OSError:
                 return self.close()
             self._written += written
-            chunk, self._buffer = self._buffer[:written], self._buffer[written:]
+            chunk = bytes(self._buffer[:written])
+            del self._buffer[:written]
             self.emit('write', chunk)._again()
 
         if not len(self._buffer):
