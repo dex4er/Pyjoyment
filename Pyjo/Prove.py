@@ -838,11 +838,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         signal.signal(signal.SIGINT, signal.SIG_DFL)
         os.kill(os.getpid(), signal.SIGINT)
         raise
+    # The reports end their lines with LF on every system, where the text mode of Windows writes CRLF
     if args.junit:
-        with open(args.junit, 'w', encoding='utf-8') as file:
+        with open(args.junit, 'w', encoding='utf-8', newline='\n') as file:
             file.write(str(junit(results)))
     if args.summary:
-        with open(args.summary, 'a', encoding='utf-8') as file:
+        with open(args.summary, 'a', encoding='utf-8', newline='\n') as file:
             file.write(markdown(results, time.monotonic() - started))
     return 0 if len(results) == len(scripts) and all(r.passed for r in results) else 1
 

@@ -150,7 +150,8 @@ def prove_files(*args, scripts=SCRIPTS, env=None, files=()):
         written = {}
         for name in files:
             if os.path.exists(path := os.path.join(tmp, name)):
-                with open(path, encoding='utf-8') as f:
+                # As written, without the newlines of the text mode, which the reports do not have
+                with open(path, encoding='utf-8', newline='') as f:
                     written[name] = f.read()
     # Bytes, as the universal newlines of text would turn the carriage returns of the count into newlines; only the CRLF
     # of the text mode of Windows is a newline
