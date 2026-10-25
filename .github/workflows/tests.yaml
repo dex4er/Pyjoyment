@@ -69,8 +69,20 @@ jobs:
           TEST_ONLINE: "1"
         run: |
           python --version
-          python -m Pyjo.Prove -l --color -j 4 --timeout 60 --capture-stderr --stderr-lines 1000 -r t 2>&1 | tee prove.log
+          python -m Pyjo.Prove -l --color -j 4 --timeout 60 --capture-stderr --stderr-lines 1000 --junit prove-report.xml --summary "$GITHUB_STEP_SUMMARY" -r t 2>&1 | tee prove.log
           if grep -n 'ResourceWarning:' prove.log; then exit 1; fi
+
+      # The JUnit XML of the harness, as the annotations of the failed tests,
+      # without a check of its own, as for pytest below, and without the summary
+      # of the job, which the harness writes itself with --summary
+      - name: Publish the report of the tests
+        if: ${{ !cancelled() }}
+        uses: mikepenz/action-junit-report@v6
+        with:
+          report_paths: prove-report.xml
+          annotate_only: true
+          job_summary: false
+          include_skipped: false
 
   # Windows, with the version of mise.toml, on both reactors, as above: the
   # reactor without asyncio uses select.select there, in the place of
@@ -108,8 +120,18 @@ jobs:
           TEST_ONLINE: "1"
         run: |
           python --version
-          python -m Pyjo.Prove -l --color -j 4 --timeout 60 --capture-stderr --stderr-lines 1000 -r t 2>&1 | tee prove.log
+          python -m Pyjo.Prove -l --color -j 4 --timeout 60 --capture-stderr --stderr-lines 1000 --junit prove-report.xml --summary "$GITHUB_STEP_SUMMARY" -r t 2>&1 | tee prove.log
           if grep -n 'ResourceWarning:' prove.log; then exit 1; fi
+
+      # As above.
+      - name: Publish the report of the tests
+        if: ${{ !cancelled() }}
+        uses: mikepenz/action-junit-report@v6
+        with:
+          report_paths: prove-report.xml
+          annotate_only: true
+          job_summary: false
+          include_skipped: false
 
   # The other supported versions, from setup-python. PyPy is supported on a
   # best-effort basis.
@@ -155,8 +177,18 @@ jobs:
           TEST_ONLINE: "1"
         run: |-
           python --version
-          python -m Pyjo.Prove -l --color -j 4 --timeout 60 --capture-stderr --stderr-lines 1000 -r t 2>&1 | tee prove.log
+          python -m Pyjo.Prove -l --color -j 4 --timeout 60 --capture-stderr --stderr-lines 1000 --junit prove-report.xml --summary "$GITHUB_STEP_SUMMARY" -r t 2>&1 | tee prove.log
           if grep -n 'ResourceWarning:' prove.log; then exit 1; fi
+
+      # As above.
+      - name: Publish the report of the tests
+        if: ${{ !cancelled() }}
+        uses: mikepenz/action-junit-report@v6
+        with:
+          report_paths: prove-report.xml
+          annotate_only: true
+          job_summary: false
+          include_skipped: false
 
   # The tests of Pyjo.Server.ASGI, Pyjo.Server.WSGI and Pyjo.Server.CGI with
   # real servers, from the dependency group "servers", which uv installs, on
@@ -214,8 +246,18 @@ jobs:
           PYJO_ASYNCIO_SLOW_CALLBACK: "5"
           PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
         run: |-
-          uv run --python "$(command -v python)" --only-group servers python -m Pyjo.Prove -l --color --timeout 120 -r t/servers 2>&1 | tee prove.log
+          uv run --python "$(command -v python)" --only-group servers python -m Pyjo.Prove -l --color --timeout 120 --junit prove-report.xml --summary "$GITHUB_STEP_SUMMARY" -r t/servers 2>&1 | tee prove.log
           if grep -n 'ResourceWarning:' prove.log; then exit 1; fi
+
+      # As above.
+      - name: Publish the report of the tests
+        if: ${{ !cancelled() }}
+        uses: mikepenz/action-junit-report@v6
+        with:
+          report_paths: prove-report.xml
+          annotate_only: true
+          job_summary: false
+          include_skipped: false
 
   # The plugin of pytest, with pytest of the dependency group "pytest", which uv
   # installs with the project, so that pytest loads the plugin of its entry
