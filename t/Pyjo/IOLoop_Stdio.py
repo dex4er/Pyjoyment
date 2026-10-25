@@ -100,6 +100,40 @@ stdio.reactor.start()
 """
     is_deeply_ok(run(code, b'late'), (0, b'LATE', ''), 'written after the end of input')
 
+with subtest('Promises of the chunks and of the messages'):
+    code = """
+import Pyjo.IOLoop.Stdio, Pyjo.Promise
+
+stdio = Pyjo.IOLoop.Stdio.new()
+
+@Pyjo.Promise.coroutine
+async def main():
+    async for chunk in stdio:
+        await stdio.write_p(chunk.upper())
+    await stdio.write_p(b'|end')
+    stdio.close()
+
+main().wait()
+"""
+    is_deeply_ok(run(code, b'hello'), (0, b'HELLO|end', ''), 'chunks until the end of the input, then a write')
+    code = """
+import Pyjo.IOLoop.Messages, Pyjo.IOLoop.Stdio, Pyjo.Promise
+
+messages = Pyjo.IOLoop.Messages.new(Pyjo.IOLoop.Stdio.new())
+
+@Pyjo.Promise.coroutine
+async def main():
+    count = 0
+    async for message in messages:
+        count += 1
+        await messages.send_p(message.upper())
+    await messages.send_p(f'{count} messages')
+    messages.close_gracefully()
+
+main().wait()
+"""
+    is_deeply_ok(run(code, b'one\ntwo\n'), (0, b'ONE\nTWO\n2 messages\n', ''), 'messages until the end')
+
 with subtest('Drain callback'):
     code = """
 import Pyjo.IOLoop.Stdio, sys

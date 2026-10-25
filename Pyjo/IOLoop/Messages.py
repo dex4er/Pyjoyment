@@ -143,12 +143,13 @@ import Pyjo.Base
 import Pyjo.EventEmitter
 import Pyjo.Exception
 import Pyjo.IOLoop.Stream
+import Pyjo.Promise
 
 import os
 import re
 import sys
 
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 from typing import Any, Literal, Protocol, Self
 
 
@@ -400,6 +401,16 @@ class Pyjo_IOLoop_Messages(Pyjo.EventEmitter.object):
             self._subscribe(handle, 'close', close)
             self._subscribe(handle, 'error', error)
 
+    def __aiter__(self) -> AsyncIterator[bytes]:
+        """::
+
+            async for message in messages:
+                ...
+
+        Same as :meth:`iterate`.
+        """
+        return self.iterate()
+
     def close(self) -> None:
         """::
 
@@ -425,6 +436,21 @@ class Pyjo_IOLoop_Messages(Pyjo.EventEmitter.object):
         """
         self.output.close_gracefully()
 
+    def iterate(self) -> AsyncIterator[bytes]:
+        """::
+
+            async for message in messages.iterate():
+                ...
+
+        The messages as an asynchronous iterator, until the end of the stream,
+        which :meth:`message_p` takes. ::
+
+            # Echo in capitals, one message after another
+            async for message in messages:
+                await messages.send_p(message.upper())
+        """
+        return self._pull('message', True).iterate()
+
     @property
     def max_message_size(self) -> int:
         """::
@@ -446,6 +472,26 @@ class Pyjo_IOLoop_Messages(Pyjo.EventEmitter.object):
     def max_message_size(self, value: int) -> None:
         self._max_message_size = value
 
+    def message_p(self) -> Pyjo.Promise.object:
+        """::
+
+            promise = messages.message_p()
+
+        Return a :mod:`Pyjo.Promise` object, which is fulfilled with the next
+        message, or ``None`` at the end of the stream, the event ``close`` or
+        ``end``, and rejected with the error of the event ``error``. The stream
+        reads only while a promise waits, as :meth:`~Pyjo.IOLoop.Stream.Pyjo_IOLoop_Stream.read_p`
+        of :mod:`Pyjo.IOLoop.Stream` does, and the subscribers of the event
+        ``message`` get the messages that it reads then. A loop of them handles
+        the messages one after another, where the events handle them at the
+        same time, as :meth:`~Pyjo.JSON.RPC.Pyjo_JSON_RPC.serve` of
+        :mod:`Pyjo.JSON.RPC` does. ::
+
+            while (message := await messages.message_p()) is not None:
+                print(message)
+        """
+        return self._pull('message', True).next_p()
+
     def send(self, message: bytes | str, cb: Callable[[Self], Any] | None = None) -> Self:
         """::
 
@@ -462,6 +508,31 @@ class Pyjo_IOLoop_Messages(Pyjo.EventEmitter.object):
         frame = self.framing.encode(message)
         self.output.write(frame, (lambda stream: cb(self)) if cb is not None else None)
         return self
+
+    def send_p(self, message: bytes | str) -> Pyjo.Promise.object:
+        """::
+
+            promise = messages.send_p(b'Hello')
+
+        Same as :meth:`send`, but returns a :mod:`Pyjo.Promise` object, which
+        is fulfilled once all data has been written, and rejected if the stream
+        closes before. ::
+
+            await messages.send_p('Hello')
+        """
+        promise = Pyjo.Promise.new()
+
+        def closed(messages: Any) -> None:
+            promise.reject(Pyjo.Exception.new('Stream closed before all data has been written'))
+
+        wrapper = self.once('close', closed)
+
+        def drained(messages: Any) -> None:
+            self.unsubscribe('close', wrapper)
+            promise.resolve()
+
+        self.send(message, drained)
+        return promise
 
     def start(self) -> None:
         """::

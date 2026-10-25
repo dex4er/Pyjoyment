@@ -3,6 +3,7 @@ import Pyjo.IOLoop
 import Pyjo.IOLoop.ChildProcess
 import Pyjo.IOLoop.Messages
 import Pyjo.IOLoop.Stream
+import Pyjo.Promise
 
 from Pyjo.File import curfile
 from Pyjo.Test import *
@@ -116,6 +117,51 @@ with subtest('close_gracefully'):
 
     loop()
     is_deeply_ok(got, [request.upper().encode()], 'response after the end of the output')
+
+with subtest('__aiter__, iterate, message_p and send_p'):
+    stream, peer = pair()
+    messages = Pyjo.IOLoop.Messages.new(stream)
+    other = Pyjo.IOLoop.Messages.new(peer)
+    got = []
+
+    # Echo in capitals, one message after another
+    @Pyjo.Promise.coroutine
+    async def echo(iterator):
+        async for message in iterator:
+            await messages.send_p(message.upper())
+
+    echoed = echo(aiter(messages))
+
+    @Pyjo.Promise.coroutine
+    async def talk():
+        first = other.message_p()
+        promise = other.send_p(b'Hello')
+        await promise
+        await other.send_p('Hello')
+        got.append(await first)
+        got.append(await other.message_p())
+        peer.close_gracefully()
+
+    talk().wait()
+    echoed.wait()
+    is_deeply_ok(got, [b'HELLO', b'HELLO'], 'echoed')
+    is_ok(messages.message_p().wait(), None, 'end')
+
+    stream, peer = pair()
+    messages = Pyjo.IOLoop.Messages.new(stream)
+    printed = []
+
+    @Pyjo.Promise.coroutine
+    async def read(iterator):
+        async for message in iterator:
+            printed.append(message)
+        while (message := await messages.message_p()) is not None:
+            printed.append(message)
+
+    promise = read(messages.iterate())
+    peer.write(b'one\ntwo\n').close_gracefully()
+    promise.wait()
+    is_deeply_ok(printed, [b'one', b'two'], 'until the end')
 
 with subtest('Framing of its own'):
     # Messages of netstrings, as 3:abc,

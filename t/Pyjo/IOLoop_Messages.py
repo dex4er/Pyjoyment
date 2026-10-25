@@ -2,6 +2,7 @@ import Pyjo.IOLoop
 import Pyjo.IOLoop.ChildProcess
 import Pyjo.IOLoop.Messages
 import Pyjo.IOLoop.Stream
+import Pyjo.Promise
 
 from Pyjo.Test import *
 
@@ -191,6 +192,45 @@ with subtest('Framing of its own'):
     run()
     is_deeply_ok(got, [b'cba'], 'right message')
     a.close()
+    b.close()
+
+with subtest('Promises of the messages'):
+    a, b = pair()
+    server = Pyjo.IOLoop.Messages.new(a)
+    client = Pyjo.IOLoop.Messages.new(b)
+    got = []
+
+    # The iterator before the messages, as the reactor of asyncio runs a coroutine later
+    @Pyjo.Promise.coroutine
+    async def echo(messages):
+        async for message in messages:
+            await server.send_p(message.upper())
+        got.append('end')
+
+    echoed = echo(aiter(server))
+
+    @Pyjo.Promise.coroutine
+    async def talk():
+        first = client.message_p()
+        await client.send_p('one')
+        got.append(await first)
+        await client.send_p(b'two')
+        got.append(await client.message_p())
+        b.close_gracefully()
+
+    talk().wait()
+    echoed.wait()
+    is_deeply_ok(got, [b'ONE', b'TWO', 'end'], 'messages, then the end')
+    is_ok(server.message_p().wait(), None, 'no more messages')
+
+    errors = []
+    a, b = pair()
+    messages = Pyjo.IOLoop.Messages.new(a)
+    a.high_water_mark = 1
+    promise = messages.send_p(b'x' * 10000000).catch(lambda err: errors.append(str(err)))
+    messages.close()
+    promise.wait()
+    like_ok(errors[0], r'^Stream closed before all data has been written', 'send rejected')
     b.close()
 
 if os.name != 'nt':
