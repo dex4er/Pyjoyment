@@ -973,6 +973,13 @@ sub {...}` is `get('/foo', cb)` or the decorator `@get('/foo')`, as a route
   input makes long does not make the loop that empties it grow with its
   square. A queue that a limit keeps short, as the connections that
   `max_connections` keeps, stays a `list`.
+- The four arguments of `substr` that cut the front of a buffer, as
+  `substr $buffer, 0, $n, ''`, are `del buffer[:n]` of a `bytearray`, which
+  CPython does without moving the rest, as Perl moves the start of the string,
+  not a slice `buffer[n:]`, which copies the rest, and the buffer grows with
+  `+=` of a `bytearray`, as `+=` of `bytes` copies the whole buffer too, so that
+  a buffer of many pieces does not take the square of its length. A buffer that
+  goes out, as `leftovers` of `Pyjo.Content`, is `bytes` of it.
 - Perl's `split` is `Pyjo.String.Unicode.split`, not `str.split` or
   `re.split`: its pattern is a regular expression, a match of no length at
   the beginning makes no field, and the empty fields at the end are left out.
