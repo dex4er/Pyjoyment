@@ -1386,9 +1386,26 @@ write at once, and fulfills `once_p('close')` and `close_gracefully_p`, as its
 event `close` comes no more; `close_gracefully_p` subscribes the event before
 the close, which comes at once when nothing waits to be written. The
 inactivity timeout of a stream rejects its promises with `TimeoutError`, so
-that it is not taken for the end of the stream. The methods of
+that it is not taken for the end of the stream. `client_p` of `Pyjo.IOLoop`
+and `connect_p` of `Pyjo.IOLoop.Datagram` make the pull before they fulfill
+their promise, so that what a peer sends at once, as a greeting or the
+refusal of a datagram, waits for the coroutine. An error of a datagram socket
+leaves it open, so it rejects only the promises that wait, or the next one, and
+the error of a datagram that `send_p` sends rejects its promise in the place of
+the event `error`. The methods of
 `Pyjo.EventEmitter` are `once_p` and `events`, as `iterate` of a stream takes a
 size.
+
+A reactor refers to its sockets weakly, so a coroutine that waits for the
+promise of a socket that only it refers to, or that nothing refers to, as in
+`await Pyjo.IOLoop.Datagram.new().connect_p(...)`, is in a cycle of the socket,
+its subscribers and the promise, which the garbage collector frees, where Perl
+keeps it. So `run_coroutine` of the base reactor keeps its coroutines until
+they end, as the reactor of asyncio keeps its tasks, and an event emitter is
+kept while a promise of it waits, by `_hold` of `Pyjo.EventEmitter`, which
+`once_p`, the pulls and `write_p` and `send_p` call. A promise that never
+settles keeps its emitter, as a task of asyncio that never ends. A test of it
+calls `gc.collect()` while the coroutine waits, which frees the cycle at once.
 
 `serve` of `Pyjo.JSON.RPC` makes both peers of a stream servers and clients,
 so it drops a response to no call of its client, as answering it with an
