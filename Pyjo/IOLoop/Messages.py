@@ -87,8 +87,8 @@ close
 
     messages.on('close', lambda messages: ...)
 
-Emitted once the stream has been closed, or one of the streams, when the input
-and the output are two.
+Emitted once the stream has been closed, or the input, when the input and the
+output are two, as the peer ends its output when it has no more to send.
 
 end
 ~~~
@@ -415,10 +415,14 @@ class Pyjo_IOLoop_Messages(Pyjo.EventEmitter.object):
 
             messages.close_gracefully()
 
-        Close the stream gracefully, once all messages have been written.
+        Close the stream gracefully, once all messages have been written, or,
+        when the input and the output are two, as the standard input and output
+        of a child process, the output, and the input is read until the peer
+        ends it, so that the responses of the peer still come in. ::
+
+            # The last request of a server of the standard input and output, and its response
+            messages.send(request).close_gracefully()
         """
-        if self.output is not self.stream:
-            self.stream.close()
         self.output.close_gracefully()
 
     @property
@@ -478,14 +482,15 @@ class Pyjo_IOLoop_Messages(Pyjo.EventEmitter.object):
         self.stream.stop()
 
     def _close(self, stream: Pyjo.IOLoop.Stream.object) -> None:
-        if self._closed:
+        # An output of its own that is closed, while the input is still read until the peer ends it
+        if self._closed or stream is not self.stream:
             return
         self._closed = True
         for emitter, name, cb in self._subscribed:
             emitter.unsubscribe(name, cb)
         self._subscribed = []
         if self.output is not self.stream:
-            (self.output if stream is self.stream else self.stream).close_gracefully()
+            self.output.close_gracefully()
         self.emit('close')
 
     def _end(self) -> None:

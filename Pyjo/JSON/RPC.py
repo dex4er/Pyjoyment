@@ -35,8 +35,10 @@ the responses and the batches of a server, which calls the methods that it
 has, and of a client. It knows the messages, not how they travel: a message
 is a value as :mod:`Pyjo.JSON` decodes it, or the JSON of one, and a server
 or a client carries it over HTTP, as :meth:`~Pyjo_JSON_RPC.to_action` does
-for a route of :mod:`Pyjoyment`, over standard input and output, or over a
-WebSocket.
+for a route of :mod:`Pyjoyment`, or over a stream of messages in both
+directions, as :meth:`~Pyjo_JSON_RPC.serve` does for the standard input and
+output of :mod:`Pyjo.IOLoop.Stdio` or a WebSocket, where both peers are
+servers and clients.
 
 A method gets the ``params`` of a request, the members of an array as its
 positional arguments and those of an object as its keyword arguments, and
@@ -335,6 +337,96 @@ class Pyjo_JSON_RPC(Pyjo.EventEmitter.object):
         """
         return list(self._methods)
 
+    def serve(self, peer: Any, context: Any = None) -> 'Client':
+        """::
+
+            client = rpc.serve(messages)
+            client = rpc.serve(messages, context=app)
+
+        Serve the methods to a peer on a stream of messages in both directions,
+        as a :mod:`Pyjo.IOLoop.Messages` object, a
+        :mod:`Pyjo.Transaction.WebSocket` object or the controller of a
+        WebSocket, anything with the event ``message`` and the method
+        ``send``, and return the :class:`Client` of the peer, whose requests
+        go on the same stream, so that both peers are servers and clients.
+
+        A message that is a response to a call of the client settles it, and a
+        response to no call is dropped, as an error of it would go back and
+        forth between two peers. Any other message is dispatched, with
+        ``context``, the client by default, so that a method that asks for it
+        calls the peer back, and its response is sent once it is there: the
+        requests are served at the same time, and their responses may go out
+        in another order.
+
+        The event ``end`` of the peer, the end of its input, rejects the calls
+        of the client, which get no response anymore, and closes the peer
+        gracefully once the requests in progress have their responses, and the
+        events ``close`` and ``finish`` reject them too. ::
+
+            # Standard input and output, whose method asks the client
+            @rpc.method(context=True)
+            def greet(client, name):
+                return client.call_p('confirm', f'Greet {name}?').then(lambda yes: f'Hello, {name}!' if yes else 'Bye')
+
+            messages = Pyjo.IOLoop.Messages.new(Pyjo.IOLoop.Stdio.new())
+            rpc.serve(messages)
+            messages.start()
+
+            # A WebSocket of Pyjoyment.Lite
+            websocket('/rpc', lambda c: rpc.serve(c))
+        """
+        client = Client()
+        if context is None:
+            context = client
+        pending = 0
+        ended = False
+
+        def send(message: Any) -> None:
+            peer.send(Pyjo.JSON.to_json(message))
+
+        def exception(e: Exception) -> None:
+            self.emit('exception', e, context)
+
+        def respond(response: Any = None) -> None:
+            nonlocal pending
+            pending -= 1
+            if response is not None:
+                send(response)
+            if ended and not pending:
+                peer.close_gracefully()
+
+        def message(peer: Any, message: Any) -> None:
+            nonlocal pending
+            try:
+                decoded = Pyjo.JSON.decode_json(message)
+            except ValueError:
+                send(_response(None, error=Error(PARSE_ERROR)))
+                return
+            if not isinstance(decoded, str) and client.receive(decoded) or _is_response(decoded):
+                return
+            pending += 1
+            if isinstance(decoded, list):
+                self._dispatch_p(decoded, context, exception).then(respond)
+            else:
+                self._request_p(decoded, context, exception).then(respond)
+
+        def end(peer: Any) -> None:
+            nonlocal ended
+            ended = True
+            client.fail(Pyjo.Exception.new('End of input'))
+            if not pending:
+                peer.close_gracefully()
+
+        def close(peer: Any, *args: Any) -> None:
+            client.fail(Pyjo.Exception.new('Connection closed'))
+
+        client.send = send
+        peer.on('message', message)
+        peer.on('end', end)
+        peer.on('close', close)
+        peer.on('finish', close)
+        return client
+
     def to_action(self) -> Callable[['Pyjoyment.Controller.object'], Pyjo.Promise.object]:
         """::
 
@@ -515,6 +607,18 @@ class Client(Pyjo.Base.object):
             received(response)
         return promise
 
+    def fail(self, e: Any) -> None:
+        """::
+
+            client.fail(Pyjo.Exception.new('Connection closed'))
+
+        Reject the calls that wait for their responses, as the transport does
+        when no response can come anymore, as at its end.
+        """
+        pending, self._pending = self._pending, {}
+        for promise in pending.values():
+            promise.reject(e)
+
     def notify(self, method: str, *args: Any, **kwargs: Any) -> Any:
         """::
 
@@ -578,6 +682,14 @@ def _is_request(request: Anything) -> bool:
         and isinstance(request_.get('params', []), list | dict)
         and _is_id(request_.get('id'))
     )
+
+
+def _is_response(message: Anything) -> bool:
+    # A response, or a batch of them, which a server does not answer
+    if isinstance(message, list):
+        responses = cast(list[Any], message)
+        return bool(responses) and all(_is_response(response) for response in responses)
+    return isinstance(message, dict) and 'method' not in message and ('result' in message or 'error' in message)
 
 
 def _member(message: Anything, name: str) -> Any:

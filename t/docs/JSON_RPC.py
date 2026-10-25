@@ -1,7 +1,11 @@
+import Pyjo.IOLoop
+import Pyjo.IOLoop.ChildProcess
+import Pyjo.IOLoop.Messages
 import Pyjo.Promise
 import Pyjo.Test.Pyjo
 import Pyjoyment
 
+from Pyjo.File import curfile
 from Pyjo.Test import *
 
 # The examples have a route of an application of Pyjoyment.Lite, which the user agent of the test requests
@@ -9,7 +13,9 @@ from Pyjoyment.Lite import app, post, websocket
 
 import contextlib
 import io
+import os
 import re
+import sys
 
 
 app.log.level = 'fatal'
@@ -175,6 +181,51 @@ with subtest('methods'):
     names = rpc.methods
     is_deeply_ok(names, ['subtract', 'math.add'], 'names')
 
+with subtest('serve'):
+    if os.name != 'nt':
+        # Standard input and output, whose method asks the client, in a process of its own, which the test calls
+        code = """
+import Pyjo.IOLoop.Messages, Pyjo.IOLoop.Stdio, Pyjo.JSON.RPC
+
+rpc = Pyjo.JSON.RPC.new()
+
+@rpc.method(context=True)
+def greet(client, name):
+    return client.call_p('confirm', f'Greet {name}?').then(lambda yes: f'Hello, {name}!' if yes else 'Bye')
+
+messages = Pyjo.IOLoop.Messages.new(Pyjo.IOLoop.Stdio.new())
+rpc.serve(messages)
+messages.start()
+
+messages.on('close', lambda messages: messages.stream.reactor.stop())
+messages.stream.reactor.start()
+"""
+        env = {
+            **os.environ,
+            'PYTHONPATH': os.pathsep.join([curfile().dirname().dirname().dirname().to_str(), *sys.path]),
+        }
+        child = Pyjo.IOLoop.ChildProcess.new().spawn([sys.executable, '-c', code], env=env)
+        peer = Pyjo.JSON.RPC.new()
+        questions = []
+        peer.method('confirm', lambda question: (questions.append(question), True)[1])
+        messages = Pyjo.IOLoop.Messages.new(child.stdout, output=child.stdin)
+        client = peer.serve(messages)
+        got = []
+        client.call_p('greet', 'Pyjo').then(got.append).lastly(messages.close_gracefully)
+        child.on('close', lambda child, code, signal: Pyjo.IOLoop.stop())
+        timer = Pyjo.IOLoop.timer(10, lambda loop: Pyjo.IOLoop.stop())
+        Pyjo.IOLoop.start()
+        Pyjo.IOLoop.remove(timer)
+        is_deeply_ok(questions, ['Greet Pyjo?'], 'the client asked')
+        is_deeply_ok(got, ['Hello, Pyjo!'], 'result')
+        is_ok(child.exit_code, 0, 'ended with its input')
+
+    # A WebSocket of Pyjoyment.Lite
+    websocket('/rpc', lambda c: rpc.serve(c))
+
+    t.websocket_ok('/rpc').send_ok({'json': {'jsonrpc': '2.0', 'method': 'subtract', 'params': [42, 23], 'id': 1}})
+    t.message_ok().json_message_is({'jsonrpc': '2.0', 'result': 19, 'id': 1}).finish_ok()
+
 with subtest('to_action'):
     action = rpc.to_action()
     ok(callable(action), 'action')
@@ -250,6 +301,14 @@ with subtest('Client.call_p'):
         client.call_p('subtract', 42, 23).then(print).catch(lambda e: print(f'{e.code}: {e.message}')).wait()
         client.call_p('subtract', 42).then(print).catch(lambda e: print(f'{e.code}: {e.message}')).wait()
     is_ok(stdout.getvalue(), '19\n-32602: Invalid params\n', 'printed')
+
+with subtest('Client.fail'):
+    client = Pyjo.JSON.RPC.Client.new(lambda request: None)
+    got = []
+    client.call_p('subtract', 42, 23).catch(lambda e: got.append(str(e)))
+    client.fail(Pyjo.Exception.new('Connection closed'))
+    Pyjo.IOLoop.one_tick()
+    like_ok(got[0], r'^Connection closed', 'rejected')
 
 with subtest('Client.notify'):
     sent = []
