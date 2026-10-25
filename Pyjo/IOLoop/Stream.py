@@ -111,9 +111,13 @@ import ssl
 import sys
 import weakref
 
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 from types import TracebackType
-from typing import Any, Self
+from typing import TYPE_CHECKING, Any, Self
+
+
+if TYPE_CHECKING:
+    import Pyjo.Promise
 
 
 type Anything = builtins.object
@@ -175,6 +179,17 @@ class Pyjo_IOLoop_Stream(Pyjo.EventEmitter.object):
         self, type: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None
     ) -> None:
         self.close()
+
+    # Not in Mojolicious: an asynchronous iterator of the chunks, as the one of the streams of Node.js
+    def __aiter__(self) -> AsyncIterator[bytes]:
+        """::
+
+            async for chunk in stream:
+                ...
+
+        Same as :meth:`iterate`.
+        """
+        return self.iterate()
 
     @property
     def reactor(self) -> Pyjo.Reactor.object:
@@ -311,6 +326,77 @@ class Pyjo_IOLoop_Stream(Pyjo.EventEmitter.object):
             return False
         return bool(len(self._buffer)) or self.has_subscribers('drain')
 
+    # Not in Mojolicious: the chunks as an asynchronous iterator, as iterate of promise-readable
+    def iterate(self, size: int | None = None) -> AsyncIterator[bytes]:
+        """::
+
+            async for chunk in stream.iterate():
+                ...
+            async for chunk in stream.iterate(1024):
+                ...
+
+        The chunks as an asynchronous iterator, at most ``size`` bytes each,
+        until the end of the stream, which :meth:`read_p` takes. ::
+
+            # Echo in capitals
+            async for chunk in stream:
+                await stream.write_p(chunk.upper())
+        """
+        return self._pull('read', True).iterate(size)
+
+    # Not in Mojolicious: everything until the end, as readAll of promise-readable
+    def read_all_p(self) -> 'Pyjo.Promise.object':
+        """::
+
+            promise = stream.read_all_p()
+
+        Return a :mod:`Pyjo.Promise` object, which is fulfilled with all the
+        data of the stream until its end as a :mod:`Pyjo.String.Bytes`
+        object, as :meth:`read_p` takes it. ::
+
+            data = await stream.read_all_p()
+        """
+        # Imported here, as Pyjo.Promise uses Pyjo.IOLoop
+        import Pyjo.Promise
+        import Pyjo.String.Bytes
+
+        # The first chunk is asked for at once, as the reactor of asyncio runs a coroutine later, when the stream may have
+        # read it already
+        first = self.read_p()
+
+        async def read() -> Pyjo.String.Bytes.object:
+            chunks: list[bytes] = []
+            chunk = await first
+            while chunk is not None:
+                chunks.append(chunk)
+                chunk = await self.read_p()
+            return Pyjo.String.Bytes.new(b''.join(chunks))
+
+        return Pyjo.Promise.new(read())
+
+    # Not in Mojolicious: the next chunk, as read of promise-readable, which the stream reads only while a promise waits
+    def read_p(self, size: int | None = None) -> 'Pyjo.Promise.object':
+        """::
+
+            promise = stream.read_p()
+            promise = stream.read_p(1024)
+
+        Return a :mod:`Pyjo.Promise` object, which is fulfilled with the next
+        chunk of the stream, at most ``size`` bytes, or ``None`` at its end,
+        the event ``close``, or ``end`` of :mod:`Pyjo.IOLoop.Stdio`, and
+        rejected with the error of the event ``error``. The stream reads only
+        while a promise waits, and stops in between, so that a chunk that
+        comes before is kept for the next promise, and a stream that is read
+        no more stops reading, as the streams of Node.js in their paused mode.
+        The subscribers of the event ``read`` get the chunks that the stream
+        reads then. ::
+
+            # Read until the end
+            while (chunk := await stream.read_p()) is not None:
+                print(chunk)
+        """
+        return self._pull('read', True).next_p(size)
+
     def start(self) -> None:
         """::
 
@@ -414,6 +500,35 @@ class Pyjo_IOLoop_Stream(Pyjo.EventEmitter.object):
             self.reactor.watch(self._handle, not self._paused, True)
 
         return self
+
+    # Not in Mojolicious: the end of a write, as write of promise-writable
+    def write_p(self, chunk: bytes) -> 'Pyjo.Promise.object':
+        """::
+
+            promise = stream.write_p(chunk)
+
+        Same as :meth:`write`, but returns a :mod:`Pyjo.Promise` object, which
+        is fulfilled once all data has been written, and rejected if the stream
+        closes before. ::
+
+            await stream.write_p(b'Hello World!')
+        """
+        import Pyjo.Exception
+        import Pyjo.Promise
+
+        promise = Pyjo.Promise.new()
+
+        def closed(stream: Any) -> None:
+            promise.reject(Pyjo.Exception.new('Stream closed before all data has been written'))
+
+        wrapper = self.once('close', closed)
+
+        def drained(stream: Any) -> None:
+            self.unsubscribe('close', wrapper)
+            promise.resolve()
+
+        self.write(chunk, drained)
+        return promise
 
     def _again(self) -> None:
         if self._timer is not None:

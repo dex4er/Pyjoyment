@@ -3,6 +3,7 @@ import Pyjo.IOLoop.Client
 import Pyjo.IOLoop.Server
 import Pyjo.IOLoop.Stream
 import Pyjo.Promise
+import Pyjo.String.Bytes
 
 from Pyjo.Test import *
 
@@ -462,5 +463,104 @@ with subtest('Defaults'):
     is_ok(Pyjo.IOLoop.Client.new().reactor, Pyjo.IOLoop.singleton.reactor, 'right default')
     is_ok(Pyjo.IOLoop.Server.new().reactor, Pyjo.IOLoop.singleton.reactor, 'right default')
     is_ok(Pyjo.IOLoop.Stream.new(None).reactor, Pyjo.IOLoop.singleton.reactor, 'right default')
+
+
+# Not in Mojolicious: the promises of the chunks of a stream, as promise-readable and promise-writable of Node.js
+def stream_pair():
+    a, b = socket.socketpair()
+    a.setblocking(False)
+    b.setblocking(False)
+    streams = Pyjo.IOLoop.Stream.new(a), Pyjo.IOLoop.Stream.new(b)
+    for stream in streams:
+        stream.start()
+    return streams
+
+
+with subtest('Promises of the chunks of a stream'):
+    reader, writer = stream_pair()
+    got = []
+
+    @Pyjo.Promise.coroutine
+    async def read():
+        first = reader.read_p(5)
+        await writer.write_p(b'hello world')
+        got.append(await first)
+        got.append(await reader.read_p())
+
+        # Nothing reads, so the stream stops, and what comes waits for the next promise
+        read = reader.bytes_read
+        await writer.write_p(b'more')
+        await Pyjo.Promise.timer(0.1)
+        got.append(reader.bytes_read - read)
+        got.append(await reader.read_p())
+
+        writer.write(b'last').close_gracefully()
+        got.append(await reader.read_all_p())
+        got.append(await reader.read_p())
+
+    read().wait()
+    is_deeply_ok(got, [b'hello', b' world', 0, b'more', b'last', None], 'chunks, then the end')
+    isa_ok(got[4], Pyjo.String.Bytes.object, 'everything as bytes')
+
+with subtest('Chunks of a stream as an asynchronous iterator'):
+    reader, writer = stream_pair()
+    got = []
+
+    @Pyjo.Promise.coroutine
+    async def iterate(chunks):
+        async for chunk in chunks:
+            got.append(chunk)
+
+    promise = iterate(reader.iterate(3))
+    writer.write(b'abcdefg').close_gracefully()
+    promise.wait()
+    is_deeply_ok(got, [b'abc', b'def', b'g'], 'at most 3 bytes each')
+
+    reader, writer = stream_pair()
+    got = []
+    promise = iterate(reader)
+    writer.write(b'abcdefg').close_gracefully()
+    promise.wait()
+    is_ok(b''.join(got), b'abcdefg', 'the stream itself')
+
+with subtest('Errors of the promises of a stream'):
+    reader, writer = stream_pair()
+    errors = []
+    promise = reader.read_p().catch(lambda err: errors.append(err))
+    reader.emit('error', OSError('broken'))
+    promise.wait()
+    is_ok(str(errors[0]), 'broken', 'read rejected with the error')
+    reader.read_p().catch(lambda err: errors.append(err)).wait()
+    is_ok(len(errors), 2, 'the next read too')
+
+    writer.high_water_mark = 1
+    promise = writer.write_p(b'x' * 10000000).catch(lambda err: errors.append(str(err)))
+    writer.close()
+    promise.wait()
+    like_ok(errors[-1], r'^Stream closed before all data has been written', 'write rejected')
+    reader.close()
+
+if os.name != 'nt':
+    with subtest('Promises of the pipes of a child process'):
+        import Pyjo.IOLoop.ChildProcess
+        import sys
+
+        child = Pyjo.IOLoop.ChildProcess.new().spawn(
+            [sys.executable, '-c', 'import sys; sys.stdout.write(sys.stdin.read().upper())']
+        )
+        # The promises before the events, as the reactor of asyncio runs a coroutine later
+        output = child.stdout.read_all_p()
+        closed = child.once_p('close')
+        got = []
+
+        @Pyjo.Promise.coroutine
+        async def run():
+            await child.stdin.write_p(b'hello')
+            child.stdin.close_gracefully()
+            got.append(await output)
+            got.append(await closed)
+
+        run().wait()
+        is_deeply_ok(got, [b'HELLO', (0, None)], 'output and the end of the process')
 
 done_testing()
