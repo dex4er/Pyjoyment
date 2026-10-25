@@ -632,6 +632,10 @@ a write fails, as a stream handles an error of a write only when it reads, as
 Mojo does, so that a pipe that is only written would be watched for ever after
 the program closes it, and a reactor of poll reports its hang-up when it
 watches for nothing),
+`Pyjo.IOLoop.Stdio` (the standard input and output of the process as one
+stream, inspired by `process.stdin` and `process.stdout` of Node.js),
+`Pyjo.IOLoop.Messages` (a stream of messages on a stream of bytes, with the
+framings of the transport stdio of MCP, of LSP and of Native Messaging),
 `Pyjo.Server.Lambda`
 and `Pyjoyment.Command.lambda` (the server and the command of the event
 functions of AWS Lambda, inspired by `Pyjo.Server.WSGI` and its command, and
@@ -1316,6 +1320,42 @@ pattern.match_partial(path)`.
   lint or format any of them, so that a newer version replaces them as they
   are. The links of the pages are those of Pyjoyment. A bundled template has
   its markers as comments of the template, as `%# Renamed from Mojolicious:`.
+
+## Standard Input and Output
+
+`Pyjo.IOLoop.Stdio` serves a protocol on the standard input and output, as the
+transport stdio of MCP or LSP, where a single stray byte on the standard
+output breaks the protocol, so it takes them for itself: it reads and writes
+duplicates of the file descriptors `0` and `1`, the descriptor `0` reads
+`/dev/null`, and the descriptor `1` and `sys.stdout` write to the standard
+error, so that a `print`, a library or a process that inherits them writes
+there; `close` gives them back. A test runs it in a process of its own, as
+`t/Pyjo/IOLoop_Stdio.py` does, as it changes the descriptors of its process.
+
+- `O_NONBLOCK` belongs to the open file description, which the process shares
+  with its parent and the other processes of a pipeline, so the stream sets
+  it only on pipes and sockets and gives back the mode that it had, and a
+  terminal, whose description the shell shares, stays blocking.
+- A reactor watches pipes, sockets and terminals, but epoll watches no file
+  and no `/dev/null` (`EPERM`) and kqueue no `/dev/null` (`EINVAL`), so a file
+  is read with a timer of no time and written at once, as its reads and writes
+  do not block.
+- A peer that writes requests without reading the responses fills the pipe of
+  the output, and then the buffer of the stream grows without a limit; a
+  server that has much to write waits for `drain`, with the callback of
+  `write` or `send`, or stops reading while `can_write` is false. A blocking
+  write in its place would deadlock both sides once both pipes are full.
+- The end of the input is the event `end`, not `close`, as the responses of
+  the requests in progress are still to be written: without a subscriber, the
+  stream closes gracefully, as a connection of TCP that the peer closes.
+- Windows has no pipes that the event loop watches, so the constructor
+  raises there, as `Pyjo.IOLoop.ChildProcess` emits `error`.
+
+A framing of `Pyjo.IOLoop.Messages` decodes one message at a time, so that a
+message over the maximum size, which closes the stream, does not lose the
+messages before it in the same read, and `Lines` remembers how far it has
+searched, so that a long line that comes in many reads is not searched from
+its beginning each time.
 
 ## Distributions of Their Own
 
