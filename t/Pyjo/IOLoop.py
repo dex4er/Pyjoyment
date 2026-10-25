@@ -1,4 +1,5 @@
 import Pyjo.IOLoop
+import Pyjo.IOLoop.ChildProcess
 import Pyjo.IOLoop.Client
 import Pyjo.IOLoop.Server
 import Pyjo.IOLoop.Stream
@@ -12,6 +13,7 @@ import io
 import os
 import re
 import socket
+import sys
 import time
 
 
@@ -542,9 +544,6 @@ with subtest('Errors of the promises of a stream'):
 
 if os.name != 'nt':
     with subtest('Promises of the pipes of a child process'):
-        import Pyjo.IOLoop.ChildProcess
-        import sys
-
         child = Pyjo.IOLoop.ChildProcess.new().spawn(
             [sys.executable, '-c', 'import sys; sys.stdout.write(sys.stdin.read().upper())']
         )

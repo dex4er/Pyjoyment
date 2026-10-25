@@ -88,7 +88,7 @@ import os
 import weakref
 
 from collections.abc import AsyncIterator, Callable
-from typing import TYPE_CHECKING, Any, Self, overload
+from typing import TYPE_CHECKING, Any, Self, cast, overload
 
 
 if TYPE_CHECKING:
@@ -312,7 +312,9 @@ class Pyjo_EventEmitter(Pyjo.Base.object):
     def _pull(self, name: str, flow: bool = False) -> '_Pull':
         pulls: dict[str, _Pull] = self.__dict__.setdefault('_pulls', {})
         if (pull := pulls.get(name)) is None:
-            start, stop = (getattr(self, 'start'), getattr(self, 'stop')) if flow else (None, None)
+            # The methods of a stream, which the subclass has
+            stream = cast(Any, self)
+            start, stop = (stream.start, stream.stop) if flow else (None, None)
             pull = pulls[name] = _Pull(self, name, True, start, stop)
         return pull
 
