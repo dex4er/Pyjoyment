@@ -599,6 +599,145 @@ with subtest('Calls of a closed peer'):
     loop()
     is_deeply_ok(errors, ['Connection closed'], 'rejected')
 
+with subtest('A context of its own for each request'):
+    a, b = peers()
+    rpc = Pyjo.JSON.RPC.new()
+    contexts = []
+
+    @rpc.method(context=True)
+    def wait(context, after, name):
+        context['name'] = name
+        contexts.append(context)
+        return later(after, None).then(lambda value: context['name'])
+
+    served = rpc.serve(a, dispatch_p=lambda message, client: rpc.dispatch_p(message, {'client': client}))
+    client = Pyjo.JSON.RPC.new().serve(b)
+    results = []
+    Pyjo.Promise.all(
+        client.call_p('wait', 0.3, 'first').then(results.append),
+        client.call_p('wait', 0.1, 'second').then(results.append),
+    ).then(lambda *args: Pyjo.IOLoop.stop())
+    loop()
+    is_deeply_ok(results, ['second', 'first'], 'responses in reverse order, each of its own context')
+    is_ok(len(contexts), 2, 'two contexts')
+    ok(contexts[0] is not contexts[1], 'a context for each request')
+    ok(all(context['client'] is served for context in contexts), 'with the client of the peer')
+    a.close()
+    b.close()
+
+with subtest('A function that rejects batches'):
+    a, b = peers()
+    rpc = Pyjo.JSON.RPC.new()
+    rpc.method('echo', lambda value: value)
+    dispatched = []
+
+    def no_batches(message, client):
+        dispatched.append(message)
+        if isinstance(message, list):
+            return {'jsonrpc': '2.0', 'error': {'code': -32600, 'message': 'No batches'}, 'id': None}
+        return rpc.dispatch_p(message)
+
+    rpc.serve(a, dispatch_p=no_batches)
+    b.send('[{"jsonrpc": "2.0", "method": "echo", "params": [1], "id": 1}]')
+    b.send('{"jsonrpc": "2.0", "method": "echo", "params": [2], "id": 2}')
+    b.send('{"jsonrpc": "2.0", "result": 3, "id": 3}')
+    Pyjo.IOLoop.timer(0.3, lambda loop: Pyjo.IOLoop.stop())
+    loop()
+    is_deeply_ok(
+        [Pyjo.JSON.decode_json(message) for message in b.received],
+        [
+            {'jsonrpc': '2.0', 'error': {'code': -32600, 'message': 'No batches'}, 'id': None},
+            {'jsonrpc': '2.0', 'result': 2, 'id': 2},
+        ],
+        'batch rejected, request answered',
+    )
+    is_ok(len(dispatched), 2, 'response to no call not dispatched')
+    a.close()
+    b.close()
+
+with subtest('A function that fails'):
+    a, b = peers()
+    rpc = Pyjo.JSON.RPC.new()
+    rpc.method('echo', lambda value: value)
+    exceptions = []
+    rpc.on('exception', lambda rpc, e, context: exceptions.append((str(e), context)))
+
+    def failing(message, client):
+        method = message[0]['method'] if isinstance(message, list) else message['method']
+        if method == 'raise':
+            raise Exception('Raised')
+        if method == 'reject':
+            return Pyjo.Promise.reject(Exception('Rejected'))
+        return rpc.dispatch_p(message)
+
+    served = rpc.serve(a, dispatch_p=failing)
+    b.send('{"jsonrpc": "2.0", "method": "raise", "id": 1}')
+    b.send('{"jsonrpc": "2.0", "method": "reject", "id": 2}')
+    b.send('{"jsonrpc": "2.0", "method": "raise"}')
+    b.send('[{"jsonrpc": "2.0", "method": "reject", "id": 3}, {"jsonrpc": "2.0", "method": "echo", "id": 4}]')
+    b.send('{"jsonrpc": "2.0", "method": "echo", "params": [5], "id": 5}')
+    Pyjo.IOLoop.timer(0.3, lambda loop: Pyjo.IOLoop.stop())
+    loop()
+    error = {'code': -32603, 'message': 'Internal error'}
+    is_deeply_ok(
+        [Pyjo.JSON.decode_json(message) for message in b.received],
+        [
+            {'jsonrpc': '2.0', 'error': error, 'id': 1},
+            {'jsonrpc': '2.0', 'error': error, 'id': 2},
+            [{'jsonrpc': '2.0', 'error': error, 'id': 3}, {'jsonrpc': '2.0', 'error': error, 'id': 4}],
+            {'jsonrpc': '2.0', 'result': 5, 'id': 5},
+        ],
+        'internal errors of the requests with an id, and the stream still served',
+    )
+    is_deeply_ok(
+        [message for message, context in exceptions], ['Raised', 'Rejected', 'Raised', 'Rejected'], 'exceptions'
+    )
+    ok(all(context is served for message, context in exceptions), 'with the client as the context')
+    a.close()
+    b.close()
+
+with subtest('A notification of a function'):
+    a, b = peers()
+    rpc = Pyjo.JSON.RPC.new()
+    logged = []
+    rpc.method('log', lambda message: logged.append(message))
+    rpc.serve(a, dispatch_p=lambda message, client: rpc.dispatch_p(message, client))
+    b.send('{"jsonrpc": "2.0", "method": "log", "params": ["notified"]}')
+    Pyjo.IOLoop.timer(0.3, lambda loop: Pyjo.IOLoop.stop())
+    loop()
+    is_deeply_ok(logged, ['notified'], 'notified')
+    is_deeply_ok(b.received, [], 'no response')
+    a.close()
+    b.close()
+
+with subtest('A coroutine of a function'):
+    a, b = peers()
+    rpc = Pyjo.JSON.RPC.new()
+    rpc.method('echo', lambda value: value)
+
+    async def dispatch_p(message, client):
+        response = await rpc.dispatch_p(message)
+        response['result'] *= 2
+        return response
+
+    rpc.serve(a, dispatch_p=dispatch_p)
+    b.on('message', lambda b, message: Pyjo.IOLoop.stop())
+    b.send('{"jsonrpc": "2.0", "method": "echo", "params": [21], "id": 1}')
+    loop()
+    is_deeply_ok(Pyjo.JSON.decode_json(b.received[0]), {'jsonrpc': '2.0', 'result': 42, 'id': 1}, 'response')
+    a.close()
+    b.close()
+
+with subtest('A context and a function'):
+    a, b = peers()
+    throws_ok(
+        lambda: Pyjo.JSON.RPC.new().serve(a, 'context', dispatch_p=lambda message, client: None),
+        re.compile(r'^The context of serve is the one of its dispatch_p, not both'),
+        'not both',
+    )
+    a.close()
+    b.close()
+
 if os.name != 'nt':
     with subtest('End of the input of a server of the standard input and output'):
         code = """
@@ -635,6 +774,39 @@ Pyjo.IOLoop.start()
         child.on('close', lambda child, code, signal: Pyjo.IOLoop.stop())
         loop()
         is_deeply_ok(sorted(results), ['failed: End of input', 'slow'], 'responses after the end of input')
+        is_ok(child.exit_code, 0, 'right exit code')
+        is_ok(b''.join(errors), b'closed\n', 'closed once the responses were sent')
+
+    with subtest('End of the input with a function that dispatches'):
+        code = """
+import Pyjo.IOLoop, Pyjo.IOLoop.Messages, Pyjo.IOLoop.Stdio, Pyjo.JSON.RPC, Pyjo.Promise, sys
+
+rpc = Pyjo.JSON.RPC.new()
+rpc.method('slow', lambda: Pyjo.Promise.timer(0.3, 'slow'))
+
+def dispatch_p(message, client):
+    if message['method'] == 'raise':
+        raise Exception('Raised')
+    return rpc.dispatch_p(message, {'client': client})
+
+messages = Pyjo.IOLoop.Messages.new(Pyjo.IOLoop.Stdio.new())
+rpc.serve(messages, dispatch_p=dispatch_p)
+messages.on('close', lambda messages: (print('closed', file=sys.stderr), Pyjo.IOLoop.stop()))
+messages.start()
+Pyjo.IOLoop.start()
+"""
+        child = Pyjo.IOLoop.ChildProcess.new().spawn([sys.executable, '-c', code], env=env)
+        errors = []
+        child.stderr.on('read', lambda stream, chunk: errors.append(chunk))
+        messages = Pyjo.IOLoop.Messages.new(child.stdout, output=child.stdin)
+        client = Pyjo.JSON.RPC.new().serve(messages)
+        results = []
+        client.call_p('slow').then(results.append)
+        client.call_p('raise').catch(lambda e: results.append(e.code))
+        messages.close_gracefully()
+        child.on('close', lambda child, code, signal: Pyjo.IOLoop.stop())
+        loop()
+        is_deeply_ok(sorted(results, key=str), [-32603, 'slow'], 'responses after the end of input')
         is_ok(child.exit_code, 0, 'right exit code')
         is_ok(b''.join(errors), b'closed\n', 'closed once the responses were sent')
 

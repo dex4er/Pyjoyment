@@ -1432,7 +1432,15 @@ the responses in progress.
 `serve` of `Pyjo.JSON.RPC` makes both peers of a stream servers and clients,
 so it drops a response to no call of its client, as answering it with an
 error, as a server answers what is not a request, would send the error back
-and forth between two peers that serve each other.
+and forth between two peers that serve each other. Its `context` is one object
+for all the requests, so a protocol on JSON-RPC that keeps the state of a
+request in its context, as the server of MCP does, or has rules of its own, as
+no batches, gives `serve` a function `dispatch_p` in its place, which gets each
+message with the client and calls a dispatcher of its own: a protocol holds a
+dispatcher rather than subclassing it, and `serve` keeps what the stream needs,
+the responses to the client, the requests in progress and the end of the
+input, so a function that fails answers its requests with `-32603` instead of
+leaving the count of them, and the end of the stream, waiting.
 
 ## Distributions of Their Own
 
