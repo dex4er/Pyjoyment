@@ -8,7 +8,6 @@ from Pyjo.File import curfile
 from Pyjo.Test import *
 
 import os
-import pty
 import re
 import select
 import subprocess
@@ -169,6 +168,9 @@ with subtest('Files'):
         is_ok(dir.child('output').slurp(), b'HELLO\nWORLD\nafter (True, True) True (True, True)\n', 'file of output')
 
 with subtest('Terminal'):
+    # Imported here, as pty imports termios, which Windows does not have
+    import pty
+
     main, sub = pty.openpty()
     process = subprocess.Popen([PYTHON, '-c', SERVER], stdin=sub, stdout=sub, stderr=subprocess.PIPE, env=ENV)
     os.close(sub)
