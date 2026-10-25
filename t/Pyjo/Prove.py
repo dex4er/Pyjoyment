@@ -725,8 +725,8 @@ with subtest('Verbose'):
 with subtest('JUnit XML'):
     out, err, code, files = prove_files(
         '--capture-stderr',
-        '--junit',
-        'report.xml',
+        '--formatter',
+        'junit=report.xml',
         'pass.py',
         'subtest.py',
         'skip.py',
@@ -797,8 +797,7 @@ with subtest('JUnit XML'):
 with subtest('Summary in Markdown'):
     out, err, code, files = prove_files(
         '--capture-stderr',
-        '--summary',
-        'summary.md',
+        '--formatter=markdown=summary.md',
         'pass.py',
         'subtest.py',
         'skip.py',
@@ -818,7 +817,7 @@ with subtest('Summary in Markdown'):
     like_ok(md, r'(?m)^RuntimeError: boom$', 'traceback')
     unlike_ok(md, r'pass\.py', 'nothing of a script that passed')
 
-    out, err, code, files = prove_files('--summary', 'summary.md', 'pass.py', files=['summary.md'])
+    out, err, code, files = prove_files('--formatter', 'markdown=summary.md', 'pass.py', files=['summary.md'])
     is_ok(
         files['summary.md'],
         '### Pyjo.Prove\n\n| Files | Tests | Passed ✅ | Skipped ⚠️ | Failed ❌ | Time ⏱️ |\n'
@@ -830,8 +829,49 @@ with subtest('Summary in Markdown'):
         summary = os.path.join(tmp, 'summary.md')
         with open(summary, 'w') as f:
             f.write('Before\n')
-        prove('--summary', summary, 'pass.py')
+        prove('--formatter', f'markdown={summary}', 'pass.py')
         with open(summary) as f:
-            like_ok(f.read(), r'^Before\n### Pyjo\.Prove\n', 'appended')
+            like_ok(f.read(), r'^### Pyjo\.Prove\n', 'written over')
+
+with subtest('Formatters'):
+    out, err, code, files = prove_files(
+        '--formatter',
+        'junit=report.xml',
+        '--formatter',
+        'markdown=summary.md',
+        'pass.py',
+        files=['report.xml', 'summary.md'],
+    )
+    like_ok(out, r'^pass\.py \.+ ok\nAll tests successful\.\n', 'usual output')
+    like_ok(files['report.xml'], r'^<\?xml ', 'JUnit XML')
+    like_ok(files['summary.md'], r'^### Pyjo\.Prove\n', 'summary')
+
+    out, code = prove('--formatter', 'junit', 'pass.py')
+    like_ok(
+        out,
+        r'(?s)^<\?xml version="1\.0" encoding="UTF-8"\?>\n<testsuites .*</testsuites>\n\Z',
+        'JUnit XML in the place of the output',
+    )
+    unlike_ok(out, r'Result: PASS', 'no usual output')
+    is_ok(code, 0, 'right exit status')
+
+    out, code = prove('--formatter', 'markdown', '--formatter', 'junit=report.xml', 'fail.py')
+    like_ok(out, r'^### Pyjo\.Prove\n', 'summary in the place of the output')
+    is_ok(code, 1, 'right exit status')
+
+    out, err, code, files = prove_files(
+        '--formatter', 'console=console.txt', '--formatter', 'markdown', 'pass.py', files=['console.txt']
+    )
+    like_ok(out, r'^### Pyjo\.Prove\n', 'summary in the place of the output')
+    like_ok(files['console.txt'], r'^pass\.py \.+ ok\nAll tests successful\.\n', 'usual output to a file')
+
+    out, err, code = prove_stderr('--formatter', 'junit', '--formatter', 'markdown', 'pass.py')
+    like_ok(
+        err, r'--formatter: one formatter writes in the place of the output, not more', 'two in the place of the output'
+    )
+    is_ok(code, 2, 'right exit status')
+    out, err, code = prove_stderr('--formatter', 'xml', 'pass.py')
+    like_ok(err, r"--formatter: unknown formatter 'xml', one of console, junit, markdown", 'unknown formatter')
+    is_ok(code, 2, 'right exit status')
 
 done_testing()

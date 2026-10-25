@@ -120,23 +120,31 @@ Options
     so is ``NOTESTS``. With ``--capture-stderr``, the standard error of a
     test script is red.
 
-``--junit FILE``
-    Write the JUnit XML of the results to the file, as the reporters of CI
-    systems read it, next to the usual output. ::
+``--formatter NAME[=FILE]``
+    Write the results as the formatter ``NAME`` to the file, or in the place
+    of the usual output without one, which only one formatter can do. Can be
+    repeated. The formatters are:
 
-        $ python -m Pyjo.Prove --junit report.xml -r t
+    ``console``
+        The usual output, a line for each test script and the summary, which
+        goes to the standard output unless another formatter writes there.
+    ``junit``
+        The JUnit XML of the results, which the reporters of CI systems read,
+        as :func:`junit` makes it.
+    ``markdown``
+        The summary of the results in Markdown, as the one of a job of GitHub
+        Actions, with a table of what failed and the diagnostics of each test
+        script that did not pass, as :func:`markdown` makes it.
 
-    ``prove`` writes it with ``--formatter TAP::Formatter::JUnit`` in the
-    place of its output.
+    The diagnostics of the failures come from the standard error of the test
+    scripts, which ``--capture-stderr`` captures. ::
 
-``--summary FILE``
-    Append the summary of the results in Markdown to the file, as the one of
-    a job of GitHub Actions, with a table of what failed and the diagnostics
-    of each test script that did not pass. ::
+        $ python -m Pyjo.Prove --formatter junit -r t > report.xml
+        $ python -m Pyjo.Prove --capture-stderr --formatter junit=report.xml \\
+            --formatter "markdown=$GITHUB_STEP_SUMMARY" -r t
 
-        $ python -m Pyjo.Prove --summary "$GITHUB_STEP_SUMMARY" -r t
-
-    ``prove`` has no such option.
+    ``prove`` takes the class of one formatter, which writes in the place of
+    the usual output, as ``TAP::Formatter::JUnit``.
 
 Environment
 -----------
@@ -163,6 +171,7 @@ Functions
 import argparse
 import asyncio
 import collections
+import contextlib
 import operator
 import os
 import re
@@ -510,6 +519,7 @@ async def run(
     stderr_lines: int | None = None,
     color: bool | None = None,
     count: bool | None = None,
+    console: bool = True,
 ) -> list[Result]:
     """::
 
@@ -520,6 +530,7 @@ async def run(
         results = asyncio.run(run(['t/a.py', 't/b.py'], jobs=2, capture_stderr=True, stderr_lines=1000))
         results = asyncio.run(run(['t/a.py', 't/b.py'], color=False))
         results = asyncio.run(run(['t/a.py', 't/b.py'], count=False))
+        results = asyncio.run(run(['t/a.py', 't/b.py'], console=False))
 
     Run the test scripts, up to ``jobs`` of them at the same time, or with
     ``0`` as many as the processors that the process may use, print a line
@@ -529,7 +540,9 @@ async def run(
     scripts that have finished. The output is colored with ``color``, and the
     tests of the test scripts are counted while they run with ``count``, both
     by default when the output goes to a terminal, the count without
-    ``verbose`` only.
+    ``verbose`` only. Without ``console``, nothing goes to the standard output,
+    as when another formatter writes there, and the standard error that was
+    captured still goes to the standard error.
     """
     command = list(command or [sys.executable])
     env = dict(os.environ if env is None else env)
@@ -548,7 +561,9 @@ async def run(
     out_color = _color_default(sys.stdout) if color is None else color
     err_color = _color_default(sys.stderr) if color is None else color
     counter = (
-        _Count(width, jobs > 1, out_color) if not verbose and (_tty(sys.stdout) if count is None else count) else None
+        _Count(width, jobs > 1, out_color)
+        if console and not verbose and (_tty(sys.stdout) if count is None else count)
+        else None
     )
 
     finished: dict[int, Result] = {}
@@ -559,13 +574,13 @@ async def run(
             if bailed_out.is_set():
                 return
             stream = jobs <= 1
-            if stream and verbose:
+            if stream and verbose and console:
                 print(f'{path} ..', flush=True)
             result = await run_script(
                 path,
                 command,
                 env,
-                verbose=verbose,
+                verbose=verbose and console,
                 stream=stream,
                 timeout=timeout,
                 capture_stderr=capture_stderr,
@@ -575,9 +590,10 @@ async def run(
             )
             if counter is not None:
                 counter.finish(result)
-            if verbose and not stream:
+            if verbose and not stream and console:
                 print(f'{path} ..', *(_tap_line(line, out_color) for line in result.output), sep='\n', flush=True)
-            print(_status_line(result, width, out_color), flush=True)
+            if console:
+                print(_status_line(result, width, out_color), flush=True)
             lines = [f'{path}: {line}' for line in result.stderr]
             if result.stderr_left_out:
                 lines.insert(_head(stderr_lines or 0), f'{path}: [{result.stderr_left_out} lines left out]')
@@ -602,10 +618,12 @@ async def run(
         interrupted = True
         if counter is not None:
             counter.clear()
-        print(flush=True)
+        if console:
+            print(flush=True)
 
     done = [finished[i] for i in sorted(finished)]
-    _summary(done, time.monotonic() - started, interrupted, color=out_color, err_color=err_color)
+    if console:
+        _summary(done, time.monotonic() - started, interrupted, color=out_color, err_color=err_color)
     return done
 
 
@@ -792,10 +810,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     # Both forms, which Getopt::Long of prove accepts for its --nocolor
     parser.add_argument('--no-color', '--nocolor', dest='color', action='store_const', const=False, help='do not color')
-    # Not in prove: --junit, next to the output, where TAP::Formatter::JUnit of prove writes JUnit XML in its place
-    parser.add_argument('--junit', metavar='FILE', help='write the JUnit XML of the results to FILE')
-    # Not in prove: --summary, the summary of a job of GitHub Actions
-    parser.add_argument('--summary', metavar='FILE', help='append the summary of the results in Markdown to FILE')
+    # Unlike prove: a formatter writes to a file too, so that there are several, as the one of --formatter of prove,
+    # which is a class, writes in the place of the output
+    parser.add_argument(
+        '--formatter',
+        action='append',
+        default=[],
+        metavar='NAME[=FILE]',
+        help='write the results as console, junit or markdown, to FILE or in the place of the output',
+    )
     parser.add_argument('paths', nargs='*', default=['t'], help='test scripts and directories, t by default')
     # Not in prove: PYJO_PROVE_OPTS, where prove reads .proverc
     try:
@@ -803,6 +826,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     except ValueError as e:
         parser.error(f'PYJO_PROVE_OPTS: {e}')
     args = parser.parse_args([*opts, *(sys.argv[1:] if argv is None else argv)])
+    formatters: list[tuple[str, str | None]] = []
+    for value in args.formatter:
+        name, _, file = value.partition('=')
+        if name not in _FORMATTERS:
+            parser.error(f'--formatter: unknown formatter {name!r}, one of {", ".join(_FORMATTERS)}')
+        formatters.append((name, file or None))
+    names, files = [name for name, _ in formatters], [file for _, file in formatters]
+    if files.count(None) > 1:
+        parser.error('--formatter: one formatter writes in the place of the output, not more')
+    # The console in the place of the output, unless another formatter writes there
+    if None not in files and 'console' not in names:
+        formatters.insert(0, ('console', None))
 
     ext = args.ext if args.ext.startswith('.') else f'.{args.ext}'
     scripts = find_scripts(args.paths, ext, args.recurse)
@@ -816,36 +851,54 @@ def main(argv: Sequence[str] | None = None) -> int:
         env['PYTHONPATH'] = os.pathsep.join([*args.include, *filter(None, [env.get('PYTHONPATH')])])
 
     command = _split(args.command) if args.command else [sys.executable]
+    console = [file for name, file in formatters if name == 'console']
     started = time.monotonic()
-    try:
-        results = asyncio.run(
-            run(
-                scripts,
-                command,
-                env,
-                jobs=args.jobs,
-                verbose=args.verbose,
-                timeout=args.timeout,
-                trap=args.trap,
-                capture_stderr=args.capture_stderr,
-                stderr_lines=args.stderr_lines,
-                color=args.color,
-                count=args.count,
+    with contextlib.ExitStack() as stack:
+        if console and console[0] is not None:
+            stack.enter_context(contextlib.redirect_stdout(stack.enter_context(_open(console[0]))))
+        try:
+            results = asyncio.run(
+                run(
+                    scripts,
+                    command,
+                    env,
+                    jobs=args.jobs,
+                    verbose=args.verbose,
+                    timeout=args.timeout,
+                    trap=args.trap,
+                    capture_stderr=args.capture_stderr,
+                    stderr_lines=args.stderr_lines,
+                    color=args.color,
+                    count=args.count,
+                    console=bool(console),
+                )
             )
-        )
-    except KeyboardInterrupt:
-        # Die of the signal, as a process that does not handle it does, without a traceback
-        signal.signal(signal.SIGINT, signal.SIG_DFL)
-        os.kill(os.getpid(), signal.SIGINT)
-        raise
-    # The reports end their lines with LF on every system, where the text mode of Windows writes CRLF
-    if args.junit:
-        with open(args.junit, 'w', encoding='utf-8', newline='\n') as file:
-            file.write(str(junit(results)))
-    if args.summary:
-        with open(args.summary, 'a', encoding='utf-8', newline='\n') as file:
-            file.write(markdown(results, time.monotonic() - started))
+        except KeyboardInterrupt:
+            # Die of the signal, as a process that does not handle it does, without a traceback
+            signal.signal(signal.SIGINT, signal.SIG_DFL)
+            os.kill(os.getpid(), signal.SIGINT)
+            raise
+    elapsed = time.monotonic() - started
+    for name, file in formatters:
+        if name == 'console':
+            continue
+        report = f'{junit(results)}\n' if name == 'junit' else markdown(results, elapsed)
+        if file is None:
+            sys.stdout.write(report)
+            sys.stdout.flush()
+        else:
+            with _open(file) as output:
+                output.write(report)
     return 0 if len(results) == len(scripts) and all(r.passed for r in results) else 1
+
+
+# The formatters of --formatter, the console, which writes the usual output, first
+_FORMATTERS = ('console', 'junit', 'markdown')
+
+
+# The file of a formatter, whose lines end with LF on every system, where the text mode of Windows writes CRLF
+def _open(path: str) -> TextIO:
+    return open(path, 'w', encoding='utf-8', newline='\n')
 
 
 # The version of the Python that a command runs, asked once for a command other than this Python

@@ -99,16 +99,23 @@ with subtest('Options'):
 with subtest('Options of the reports'):
     with tempfile.TemporaryDirectory() as tmp:
         scripts(tmp)
-        out, code = shell('python -m Pyjo.Prove --junit report.xml -r t', tmp)
-        like_ok(out, r'(?m)^Files=5, Tests=5, ', 'python -m Pyjo.Prove --junit report.xml -r t')
+        out, code = shell('python -m Pyjo.Prove --formatter junit -r t > report.xml', tmp)
+        is_ok(out, '', 'python -m Pyjo.Prove --formatter junit -r t > report.xml')
         like_ok(Path(tmp, 'report.xml').read_text(), r'<testsuites errors="0" failures="0" name="Pyjo.Prove"', 'report')
 
         # A variable in the command is of a shell of POSIX, which the cmd.exe of Windows is not
         if sys.platform == 'win32':
-            skip('no shell of POSIX on Windows', 1)
+            skip('no shell of POSIX on Windows', 3)
         else:
             summary = os.path.join(tmp, 'summary.md')
-            shell('python -m Pyjo.Prove --summary "$GITHUB_STEP_SUMMARY" -r t', tmp, GITHUB_STEP_SUMMARY=summary)
+            out, code = shell(
+                'python -m Pyjo.Prove --capture-stderr --formatter junit=report.xml \\\n'
+                '    --formatter "markdown=$GITHUB_STEP_SUMMARY" -r t',
+                tmp,
+                GITHUB_STEP_SUMMARY=summary,
+            )
+            like_ok(out, r'(?m)^Files=5, Tests=5, ', 'usual output')
+            like_ok(Path(tmp, 'report.xml').read_text(), r'<testsuites ', 'report')
             like_ok(Path(summary).read_text(), r'(?m)^Result: \*\*PASS\*\*$', 'summary')
 
 with subtest('Environment'):

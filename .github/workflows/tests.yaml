@@ -69,12 +69,12 @@ jobs:
           TEST_ONLINE: "1"
         run: |
           python --version
-          python -m Pyjo.Prove -l --color -j 4 --timeout 60 --capture-stderr --stderr-lines 1000 --junit prove-report.xml --summary "$GITHUB_STEP_SUMMARY" -r t 2>&1 | tee prove.log
+          python -m Pyjo.Prove -l --color -j 4 --timeout 60 --capture-stderr --stderr-lines 1000 --formatter junit=prove-report.xml --formatter "markdown=$GITHUB_STEP_SUMMARY" -r t 2>&1 | tee prove.log
           if grep -n 'ResourceWarning:' prove.log; then exit 1; fi
 
       # The JUnit XML of the harness, as the annotations of the failed tests,
       # without a check of its own, as for pytest below, and without the summary
-      # of the job, which the harness writes itself with --summary
+      # of the job, which the harness writes itself with its formatter markdown
       - name: Publish the report of the tests
         if: ${{ !cancelled() }}
         uses: mikepenz/action-junit-report@v6
@@ -120,7 +120,7 @@ jobs:
           TEST_ONLINE: "1"
         run: |
           python --version
-          python -m Pyjo.Prove -l --color -j 4 --timeout 60 --capture-stderr --stderr-lines 1000 --junit prove-report.xml --summary "$GITHUB_STEP_SUMMARY" -r t 2>&1 | tee prove.log
+          python -m Pyjo.Prove -l --color -j 4 --timeout 60 --capture-stderr --stderr-lines 1000 --formatter junit=prove-report.xml --formatter "markdown=$GITHUB_STEP_SUMMARY" -r t 2>&1 | tee prove.log
           if grep -n 'ResourceWarning:' prove.log; then exit 1; fi
 
       # As above.
@@ -177,7 +177,7 @@ jobs:
           TEST_ONLINE: "1"
         run: |-
           python --version
-          python -m Pyjo.Prove -l --color -j 4 --timeout 60 --capture-stderr --stderr-lines 1000 --junit prove-report.xml --summary "$GITHUB_STEP_SUMMARY" -r t 2>&1 | tee prove.log
+          python -m Pyjo.Prove -l --color -j 4 --timeout 60 --capture-stderr --stderr-lines 1000 --formatter junit=prove-report.xml --formatter "markdown=$GITHUB_STEP_SUMMARY" -r t 2>&1 | tee prove.log
           if grep -n 'ResourceWarning:' prove.log; then exit 1; fi
 
       # As above.
@@ -246,7 +246,7 @@ jobs:
           PYJO_ASYNCIO_SLOW_CALLBACK: "5"
           PYTHONWARNINGS: error::SyntaxWarning,error::DeprecationWarning
         run: |-
-          uv run --python "$(command -v python)" --only-group servers python -m Pyjo.Prove -l --color --timeout 120 --junit prove-report.xml --summary "$GITHUB_STEP_SUMMARY" -r t/servers 2>&1 | tee prove.log
+          uv run --python "$(command -v python)" --only-group servers python -m Pyjo.Prove -l --color --timeout 120 --formatter junit=prove-report.xml --formatter "markdown=$GITHUB_STEP_SUMMARY" -r t/servers 2>&1 | tee prove.log
           if grep -n 'ResourceWarning:' prove.log; then exit 1; fi
 
       # As above.

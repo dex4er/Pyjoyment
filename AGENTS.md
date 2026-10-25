@@ -469,9 +469,10 @@ result, each line after the name of the script, which tells the script that
 leaked. It passes `--color` too, as the log of GitHub Actions shows colors
 while the output goes to a pipe, not to a terminal; the color of a line of
 the standard error is around the whole line, so `ResourceWarning:` is still
-in it. It writes the JUnit XML of the results with `--junit`, which the action
-`mikepenz/action-junit-report` turns into the annotations of the failed tests,
-and the summary of the job with `--summary`, whose diagnostics of the failures
+in it. It writes the JUnit XML of the results with `--formatter junit=FILE`,
+which the action `mikepenz/action-junit-report` turns into the annotations of
+the failed tests, and the summary of the job with `--formatter markdown=FILE`,
+whose diagnostics of the failures
 come from the standard error that `--capture-stderr` captures, as `Pyjo.Test`
 writes them there and not into the TAP output, as `Test::More` does.
 `--stderr-lines 1000` keeps the first and the last lines of the

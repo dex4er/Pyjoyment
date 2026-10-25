@@ -434,14 +434,15 @@ minute:
 
     $ pyjo-prove -l -r -j 0 --timeout 60 t
 
-In CI, ``--junit`` writes the JUnit XML of the results, which the reporters of
-CI systems read, and ``--summary`` appends a summary in Markdown to a file, as
-the one of a job of GitHub Actions. The diagnostics of the failures in them come
-from the standard error of the scripts, which ``--capture-stderr`` captures:
+In CI, the formatter ``junit`` writes the JUnit XML of the results, which the
+reporters of CI systems read, and ``markdown`` a summary, as the one of a job
+of GitHub Actions, to the file after ``=``, next to the usual output. The
+diagnostics of the failures in them come from the standard error of the
+scripts, which ``--capture-stderr`` captures:
 
 .. code-block:: console
 
-    $ pyjo-prove -l -r --capture-stderr --junit report.xml --summary "$GITHUB_STEP_SUMMARY" t
+    $ pyjo-prove -l -r --capture-stderr --formatter junit=report.xml --formatter "markdown=$GITHUB_STEP_SUMMARY" t
 
 Perl's ``prove`` runs them as well:
 

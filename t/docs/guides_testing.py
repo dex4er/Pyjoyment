@@ -323,10 +323,10 @@ with subtest('pyjo-prove'):
         '-l',
         '-r',
         '--capture-stderr',
-        '--junit',
-        'report.xml',
-        '--summary',
-        summary,
+        '--formatter',
+        'junit=report.xml',
+        '--formatter',
+        f'markdown={summary}',
         't',
     )
     like_ok(
