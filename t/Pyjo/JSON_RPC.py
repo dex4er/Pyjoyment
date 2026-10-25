@@ -1,12 +1,20 @@
+import Pyjo.IOLoop
+import Pyjo.IOLoop.ChildProcess
+import Pyjo.IOLoop.Messages
+import Pyjo.IOLoop.Stream
 import Pyjo.JSON
 import Pyjo.JSON.RPC
 import Pyjo.Promise
 import Pyjo.Test.Pyjo
 import Pyjoyment
 
+from Pyjo.File import curfile
 from Pyjo.Test import *
 
+import os
 import re
+import socket
+import sys
 
 
 # Not in Mojolicious: JSON-RPC 2.0, with the examples of the specification
@@ -442,5 +450,192 @@ with subtest('to_action'):
     client.call_p('foobar').catch(lambda e: results.append(e.code)).wait()
     is_deeply_ok(results, ['client', -32601], 'client through HTTP')
     t.ua.close()
+
+
+# Two streams of messages on a pair of sockets, with what each one gets
+def peers():
+    a, b = socket.socketpair()
+    a.setblocking(False)
+    b.setblocking(False)
+    pair = []
+    for handle in (a, b):
+        stream = Pyjo.IOLoop.Stream.new(handle)
+        stream.start()
+        messages = Pyjo.IOLoop.Messages.new(stream)
+        messages.received = []
+        messages.on('message', lambda messages, message: messages.received.append(message))
+        pair.append(messages)
+    return pair
+
+
+def loop(timeout=10):
+    timer = Pyjo.IOLoop.timer(timeout, lambda loop: Pyjo.IOLoop.stop())
+    Pyjo.IOLoop.start()
+    Pyjo.IOLoop.remove(timer)
+
+
+def later(after, value):
+    promise = Pyjo.Promise.new()
+    Pyjo.IOLoop.timer(after, lambda loop: promise.resolve(value))
+    return promise
+
+
+with subtest('Requests of both peers on one stream'):
+    a, b = peers()
+    first, second = Pyjo.JSON.RPC.new(), Pyjo.JSON.RPC.new()
+    logged = []
+
+    @first.method
+    def add(x, y):
+        return x + y
+
+    @first.method
+    def log(message):
+        logged.append(message)
+
+    @second.method(context=True)
+    def ask(client, x):
+        # A request of the server to the client in the middle of a request of the client
+        return client.call_p('add', x, 1).then(lambda y: y * 10)
+
+    @second.method
+    def slow():
+        return later(0.2, 'slow')
+
+    @second.method
+    def fast():
+        return 'fast'
+
+    from_first = first.serve(a)
+    from_second = second.serve(b)
+    results = []
+    Pyjo.Promise.all(
+        from_first.call_p('slow').then(lambda value: results.append(value)),
+        from_first.call_p('fast').then(lambda value: results.append(value)),
+        from_first.call_p('ask', 4).then(lambda value: results.append(value)),
+        from_second.call_p('add', 2, 3).then(lambda value: results.append(value)),
+    ).then(lambda *args: Pyjo.IOLoop.stop())
+    from_second.notify('log', 'notified')
+    loop()
+    is_deeply_ok(sorted(results, key=str), [5, 50, 'fast', 'slow'], 'results of both sides')
+    is_ok(results[-1], 'slow', 'slow response last')
+    is_deeply_ok(logged, ['notified'], 'notification')
+    responses = [Pyjo.JSON.decode_json(message) for message in b.received]
+    is_deeply_ok([r for r in responses if r.get('id') is None], [], 'no response to the notification')
+    a.close()
+    b.close()
+
+with subtest('Messages that are not requests'):
+    a, b = peers()
+    rpc_a = Pyjo.JSON.RPC.new()
+    rpc_a.serve(a)
+    b.send('{"jsonrpc": "2.0", "method": "foobar, "params": "bar", "baz]')
+    b.send('{"jsonrpc": "2.0", "result": 19, "id": 99}')
+    b.send('[{"jsonrpc": "2.0", "error": {"code": -32601, "message": "Method not found"}, "id": 98}]')
+    b.send('"abc"')
+    b.send('[{"jsonrpc": "2.0", "method": "foobar", "id": 1}, {"jsonrpc": "2.0", "method": "foobar"}]')
+    Pyjo.IOLoop.timer(0.3, lambda loop: Pyjo.IOLoop.stop())
+    loop()
+    is_deeply_ok(
+        [Pyjo.JSON.decode_json(message) for message in b.received],
+        [
+            {'jsonrpc': '2.0', 'error': {'code': -32700, 'message': 'Parse error'}, 'id': None},
+            {'jsonrpc': '2.0', 'error': {'code': -32600, 'message': 'Invalid Request'}, 'id': None},
+            [{'jsonrpc': '2.0', 'error': {'code': -32601, 'message': 'Method not found'}, 'id': 1}],
+        ],
+        'errors, without an answer to the responses to no call',
+    )
+
+    # The errors of the server, which a client of no call drops too, so that they do not go back and forth
+    rpc_b = Pyjo.JSON.RPC.new()
+    rpc_b.serve(b)
+    a.received.clear()
+    b.received.clear()
+    b.send('{"jsonrpc": "2.0", "method": "foobar", "id": 2}')
+    Pyjo.IOLoop.timer(0.3, lambda loop: Pyjo.IOLoop.stop())
+    loop()
+    is_deeply_ok(
+        [Pyjo.JSON.decode_json(message) for message in b.received],
+        [{'jsonrpc': '2.0', 'error': {'code': -32601, 'message': 'Method not found'}, 'id': 2}],
+        'one error, which goes nowhere else',
+    )
+    is_ok(len(a.received), 1, 'no answer to it')
+    a.close()
+    b.close()
+
+with subtest('Requests of both peers on a WebSocket'):
+    app = Pyjoyment.new()
+    app.log.level = 'fatal'
+    server = Pyjo.JSON.RPC.new()
+
+    @server.method(context=True)
+    def greet(client, name):
+        return client.call_p('confirm', name).then(lambda yes: f'Hello, {name}!' if yes else 'Bye')
+
+    app.routes.websocket('/rpc').to(cb=lambda c: server.serve(c))
+    t = Pyjo.Test.Pyjo.new(app)
+    peer = Pyjo.JSON.RPC.new()
+    peer.method('confirm', lambda name: name == 'Pyjo')
+    results = []
+
+    def connected(ws):
+        client = peer.serve(ws)
+        return (
+            Pyjo.Promise.all(client.call_p('greet', 'Pyjo'), client.call_p('greet', 'Mojo'))
+            .then(lambda pyjo, mojo: results.extend([pyjo[0], mojo[0]]))
+            .lastly(ws.finish)
+        )
+
+    t.ua.websocket_p('/rpc').then(connected).wait()
+    is_deeply_ok(results, ['Hello, Pyjo!', 'Bye'], 'requests of the server to the client')
+    t.ua.close()
+
+with subtest('Calls of a closed peer'):
+    a, b = peers()
+    client = Pyjo.JSON.RPC.new().serve(a)
+    errors = []
+    client.call_p('nothing').catch(lambda e: (errors.append(e.message), Pyjo.IOLoop.stop()))
+    b.close()
+    loop()
+    is_deeply_ok(errors, ['Connection closed'], 'rejected')
+
+if os.name != 'nt':
+    with subtest('End of the input of a server of the standard input and output'):
+        code = """
+import Pyjo.IOLoop, Pyjo.IOLoop.Messages, Pyjo.IOLoop.Stdio, Pyjo.JSON.RPC, Pyjo.Promise, sys
+
+rpc = Pyjo.JSON.RPC.new()
+rpc.method('slow', lambda: Pyjo.Promise.timer(0.3, 'slow'))
+
+@rpc.method(context=True)
+def ask(client):
+    return client.call_p('never').catch(lambda e: f'failed: {e.message}')
+
+messages = Pyjo.IOLoop.Messages.new(Pyjo.IOLoop.Stdio.new())
+rpc.serve(messages)
+messages.on('close', lambda messages: (print('closed', file=sys.stderr), Pyjo.IOLoop.stop()))
+messages.start()
+Pyjo.IOLoop.start()
+"""
+        env = {
+            **os.environ,
+            'PYTHONPATH': os.pathsep.join([curfile().dirname().dirname().dirname().to_str(), *sys.path]),
+        }
+        child = Pyjo.IOLoop.ChildProcess.new().spawn([sys.executable, '-c', code], env=env)
+        errors = []
+        child.stderr.on('read', lambda stream, chunk: errors.append(chunk))
+        messages = Pyjo.IOLoop.Messages.new(child.stdout, output=child.stdin)
+        peer = Pyjo.JSON.RPC.new()
+        peer.method('never', lambda: Pyjo.Promise.new())
+        client = peer.serve(messages)
+        results = []
+        client.call_p('slow').then(results.append)
+        client.call_p('ask').then(results.append)
+        messages.close_gracefully()
+        child.on('close', lambda child, code, signal: Pyjo.IOLoop.stop())
+        loop()
+        is_deeply_ok(sorted(results), ['failed: End of input', 'slow'], 'responses after the end of input')
+        is_ok(child.exit_code, 0, 'right exit code')
+        is_ok(b''.join(errors), b'closed\n', 'closed once the responses were sent')
 
 done_testing()
