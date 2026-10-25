@@ -94,6 +94,35 @@ with subtest('emit'):
     e = e.emit('foo', 123)
     is_deeply_ok(got, [(), (123,)], 'arguments')
 
+with subtest('events'):
+    import Pyjo.Promise
+
+    e = Pyjo.EventEmitter.new()
+    got = []
+
+    @Pyjo.Promise.coroutine
+    async def foo(events):
+        async for args in events:
+            got.append(args)
+
+    promise = foo(e.events('foo'))
+    e.emit('foo', 1).emit('close')
+    promise.wait()
+    is_deeply_ok(got, [(1,)], 'arguments of the events')
+
+    ws = Pyjo.EventEmitter.new()
+
+    @Pyjo.Promise.coroutine
+    async def messages(events):
+        async for (message,) in events:
+            print(f'Message: {message}')
+
+    with contextlib.redirect_stdout(io.StringIO()) as stdout:
+        promise = messages(ws.events('message'))
+        ws.emit('message', 'hi').emit('close')
+        promise.wait()
+    is_ok(stdout.getvalue(), 'Message: hi\n', 'printed')
+
 with subtest('has_subscribers'):
     e = Pyjo.EventEmitter.new()
     boolean = e.has_subscribers('foo')
@@ -123,6 +152,26 @@ with subtest('once'):
     e.once('foo', lambda e, *args: ...)
     e.emit('foo')
     ok(not e.has_subscribers('foo'), 'unsubscribed')
+
+with subtest('once_p'):
+    e = Pyjo.EventEmitter.new()
+    promise = e.once_p('foo')
+    e.emit('foo', 'bar')
+    got = []
+    promise.then(got.append).wait()
+    is_deeply_ok(got, ['bar'], 'promise')
+
+    child = Pyjo.EventEmitter.new()
+    closed = child.once_p('close')
+
+    @Pyjo.Promise.coroutine
+    async def wait():
+        code, signal = await closed
+        got.append((code, signal))
+
+    child.emit('close', 0, None)
+    wait().wait()
+    is_deeply_ok(got[-1], (0, None), 'code and signal')
 
 with subtest('subscribers'):
     e = Pyjo.EventEmitter.new()

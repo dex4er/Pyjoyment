@@ -83,11 +83,16 @@ import Pyjo.Exception
 
 from Pyjo.Util import warn
 
+import collections
 import os
 import weakref
 
-from collections.abc import Callable
-from typing import Any, Self, overload
+from collections.abc import AsyncIterator, Callable
+from typing import TYPE_CHECKING, Any, Self, overload
+
+
+if TYPE_CHECKING:
+    import Pyjo.Promise
 
 
 # A subscriber gets the emitter and the arguments of the event
@@ -146,6 +151,23 @@ class Pyjo_EventEmitter(Pyjo.Base.object):
 
         return self
 
+    # Not in Mojolicious: the events as an asynchronous iterator, as events.on of Node.js
+    def events(self, name: str) -> AsyncIterator[tuple[Any, ...]]:
+        """::
+
+            async for args in e.events('foo'):
+                ...
+
+        The arguments of the events as an asynchronous iterator, as a tuple
+        for each event, which are queued until they are taken, and which ends
+        at the event ``close`` or ``end``, and raises the error of the event
+        ``error``. ::
+
+            async for message, in ws.events('message'):
+                print(f'Message: {message}')
+        """
+        return _Pull(self, name, False).iterate()
+
     def has_subscribers(self, name: str) -> bool:
         """::
 
@@ -199,6 +221,39 @@ class Pyjo_EventEmitter(Pyjo.Base.object):
         self._events.setdefault(name, []).append(cb)
         return cb
 
+    # Not in Mojolicious: a promise of the event, as events.once of Node.js
+    def once_p(self, name: str) -> 'Pyjo.Promise.object':
+        """::
+
+            promise = e.once_p('foo')
+
+        Same as :meth:`once`, but returns a :mod:`Pyjo.Promise` object, which
+        is fulfilled with the arguments of the event, and rejected with the
+        error of the event ``error``, which comes first. ::
+
+            code, signal = await child.once_p('close')
+        """
+        # Imported here, as Pyjo.Promise uses Pyjo.IOLoop, whose classes are event emitters
+        import Pyjo.Promise
+
+        promise = Pyjo.Promise.new()
+        failed: Callback | None = None
+
+        def done(e: Any, *args: Any) -> None:
+            if failed is not None:
+                self.unsubscribe('error', failed)
+            promise.resolve(*args)
+
+        wrapper = self.once(name, done)
+        if name != 'error':
+
+            def error(e: Any, err: Any) -> None:
+                self.unsubscribe(name, wrapper)
+                promise.reject(err)
+
+            failed = self.once('error', error)
+        return promise
+
     @overload
     def once(self, name: Callback, cb: None = None) -> Callback: ...
 
@@ -251,6 +306,16 @@ class Pyjo_EventEmitter(Pyjo.Base.object):
         """
         return self._events.setdefault(name, [])
 
+    # Not in Mojolicious: the values of an event of a subclass that are pulled with promises, one pull for each event, so
+    # that the promises and the iterators of a stream take its chunks in order, and with flow, the start and the stop of
+    # the reading of a stream, which reads only while a promise waits
+    def _pull(self, name: str, flow: bool = False) -> '_Pull':
+        pulls: dict[str, _Pull] = self.__dict__.setdefault('_pulls', {})
+        if (pull := pulls.get(name)) is None:
+            start, stop = (getattr(self, 'start'), getattr(self, 'stop')) if flow else (None, None)
+            pull = pulls[name] = _Pull(self, name, True, start, stop)
+        return pull
+
     def unsubscribe(self, name: str, cb: Callback | None = None) -> Self:
         """::
 
@@ -283,6 +348,106 @@ class _Once:
     def __call__(self, *args: Any) -> Any:
         self.emitter.unsubscribe(self.event, self)
         return self.cb(*args)
+
+
+# Not in Mojolicious: the events of an emitter, which are pulled with promises, as the streams of Node.js in their paused
+# mode, and queued until they are, until the event close or end, or the error of the event error. With start and stop, the
+# emitter is a stream, which reads only while a promise waits, so that it reads no more than it is asked for
+class _Pull:
+    def __init__(
+        self,
+        emitter: Pyjo_EventEmitter,
+        name: str,
+        value: bool,
+        start: Callable[[], Any] | None = None,
+        stop: Callable[[], Any] | None = None,
+    ) -> None:
+        self.emitter, self.value, self.start, self.stop = emitter, value, start, stop
+        self.queue: collections.deque[Any] = collections.deque()
+        self.waiting: collections.deque[Pyjo.Promise.object] = collections.deque()
+        self.done = False
+        self.error: Any = None
+        self.subscribed = [
+            (name, emitter.on(name, self._push)),
+            ('error', emitter.on('error', self._fail)),
+            ('close', emitter.on('close', self._end)),
+            ('end', emitter.on('end', self._end)),
+        ]
+
+    def iterate(self, size: int | None = None) -> '_Iterator':
+        return _Iterator(self, size)
+
+    def close(self) -> None:
+        for name, cb in self.subscribed:
+            self.emitter.unsubscribe(name, cb)
+        self.subscribed = []
+
+    def next_p(self, size: int | None = None) -> 'Pyjo.Promise.object':
+        import Pyjo.Promise
+
+        if self.queue:
+            item = self.queue.popleft()
+            return Pyjo.Promise.resolve(self._split(item, size) if size is not None else item)
+        if self.error is not None:
+            return Pyjo.Promise.reject(self.error)
+        if self.done:
+            return Pyjo.Promise.resolve(None)
+        promise = Pyjo.Promise.new()
+        self.waiting.append(promise)
+        if size is not None:
+
+            def split(item: Any = None) -> Any:
+                return self._split(item, size)
+
+            promise = promise.then(split)
+        if self.start is not None:
+            self.start()
+        return promise
+
+    def _end(self, emitter: Any, *args: Any) -> None:
+        self.done = True
+        self.close()
+        while self.waiting:
+            self.waiting.popleft().resolve(None)
+
+    def _fail(self, emitter: Any, err: Any) -> None:
+        self.error = err
+        self.close()
+        while self.waiting:
+            self.waiting.popleft().reject(err)
+
+    def _push(self, emitter: Any, *args: Any) -> None:
+        item = args[0] if self.value else args
+        if self.waiting:
+            self.waiting.popleft().resolve(item)
+        else:
+            self.queue.append(item)
+        if not self.waiting and self.stop is not None:
+            self.stop()
+
+    # A chunk that is longer than what is asked for, whose rest is the next one
+    def _split(self, item: Any, size: int) -> Any:
+        if isinstance(item, bytes | bytearray) and len(item) > size:
+            self.queue.appendleft(item[size:])
+            return bytes(item[:size])
+        return item
+
+
+# Not in Mojolicious: an asynchronous iterator of the items of a pull, until None
+class _Iterator:
+    def __init__(self, pull: _Pull, size: int | None = None) -> None:
+        self.pull, self.size = pull, size
+
+    def __aiter__(self) -> Self:
+        return self
+
+    async def __anext__(self) -> Any:
+        if (item := await self.pull.next_p(self.size)) is None:
+            raise StopAsyncIteration
+        return item
+
+    async def aclose(self) -> None:
+        self.pull.close()
 
 
 # The name of a class, as Perl's blessed gives the name of a package

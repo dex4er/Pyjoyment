@@ -1,4 +1,5 @@
 import Pyjo.EventEmitter
+import Pyjo.Promise
 
 from Pyjo.Test import *
 
@@ -197,5 +198,66 @@ with subtest('Pass by reference and assignment to $_'):
     is_ok(buffer.getvalue(), 'abctwo123twoabcthree123threedef', 'right result')
     e.emit('one', buffer, 'x')
     is_ok(buffer.getvalue(), 'abctwo123twoabcthree123threedefabcx123x', 'right result')
+
+# Not in Mojolicious: a promise of an event, as events.once of Node.js
+with subtest('Promise of an event'):
+    e = Pyjo.EventEmitter.new()
+    promise = e.once_p('foo')
+    ok(e.has_subscribers('foo'), 'subscribed')
+    ok(e.has_subscribers('error'), 'subscribed to errors')
+    e.emit('foo', 1, 2)
+    got = []
+    promise.then(lambda *args: got.append(args)).wait()
+    is_deeply_ok(got, [(1, 2)], 'arguments of the event')
+    ok(not e.has_subscribers('foo'), 'unsubscribed')
+    ok(not e.has_subscribers('error'), 'unsubscribed from errors')
+    promise = e.once_p('foo')
+    e.emit('error', 'boom')
+    promise.catch(lambda err: got.append(err)).wait()
+    is_deeply_ok(got, [(1, 2), 'boom'], 'rejected with the error')
+    ok(not e.has_subscribers('foo'), 'unsubscribed after the error')
+    promise = e.once_p('error')
+    e.emit('error', 'once more')
+    promise.then(lambda err: got.append(err)).wait()
+    is_deeply_ok(got[-1], 'once more', 'the event error itself')
+
+# Not in Mojolicious: the events as an asynchronous iterator, as events.on of Node.js
+with subtest('Events as an asynchronous iterator'):
+    e = Pyjo.EventEmitter.new()
+    got = []
+
+    # The iterator subscribes when it is made, before the events, as the reactor of asyncio runs a coroutine later
+    @Pyjo.Promise.coroutine
+    async def collect(events):
+        async for args in events:
+            got.append(args)
+
+    promise = collect(e.events('foo'))
+    e.emit('foo', 1)
+    e.emit('foo', 2, 3)
+    e.emit('bar')
+    e.emit('close')
+    promise.wait()
+    is_deeply_ok(got, [(1,), (2, 3)], 'events until close')
+    ok(not e.has_subscribers('foo'), 'unsubscribed at the end')
+
+    iterator = e.events('foo')
+    e.emit('foo', 'queued')
+    e.emit('end')
+    got = []
+
+    @Pyjo.Promise.coroutine
+    async def queued():
+        async for (value,) in iterator:
+            got.append(value)
+
+    queued().wait()
+    is_deeply_ok(got, ['queued'], 'queued before, until end')
+
+    errors = []
+    promise = collect(e.events('foo')).catch(lambda err: errors.append(str(err)))
+    e.emit('error', 'boom')
+    promise.wait()
+    like_ok(errors[0], r'^boom', 'error raised')
 
 done_testing()
