@@ -84,6 +84,17 @@ jobs:
           job_summary: false
           include_skipped: false
 
+      # The JUnit XML for the summary of the summaries of all the jobs, which
+      # the job report makes
+      - name: Upload the report of the tests
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: junit-prove (python mise, ${{ matrix.reactor }})
+          path: prove-report.xml
+          if-no-files-found: ignore
+          retention-days: 7
+
   # Windows, with the version of mise.toml, on both reactors, as above: the
   # reactor without asyncio uses select.select there, in the place of
   # select.poll.
@@ -132,6 +143,16 @@ jobs:
           annotate_only: true
           job_summary: false
           include_skipped: false
+
+      # As above.
+      - name: Upload the report of the tests
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: junit-prove (python mise, ${{ matrix.reactor }}, Windows)
+          path: prove-report.xml
+          if-no-files-found: ignore
+          retention-days: 7
 
   # The other supported versions, from setup-python. PyPy is supported on a
   # best-effort basis.
@@ -189,6 +210,16 @@ jobs:
           annotate_only: true
           job_summary: false
           include_skipped: false
+
+      # As above.
+      - name: Upload the report of the tests
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: junit-prove (python ${{ matrix.python }}, ${{ matrix.reactor }})
+          path: prove-report.xml
+          if-no-files-found: ignore
+          retention-days: 7
 
   # The tests of Pyjo.Server.ASGI, Pyjo.Server.WSGI and Pyjo.Server.CGI with
   # real servers, from the dependency group "servers", which uv installs, on
@@ -258,6 +289,16 @@ jobs:
           annotate_only: true
           job_summary: false
           include_skipped: false
+
+      # As above.
+      - name: Upload the report of the tests
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: junit-servers (python ${{ matrix.python }})
+          path: prove-report.xml
+          if-no-files-found: ignore
+          retention-days: 7
 
   # The plugin of pytest, with pytest of the dependency group "pytest", which uv
   # installs with the project, so that pytest loads the plugin of its entry
@@ -334,3 +375,72 @@ jobs:
           annotate_only: true
           detailed_summary: true
           include_skipped: false
+
+      # As above.
+      - name: Upload the report of the tests
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: junit-pytest (python ${{ matrix.python }}, ${{ matrix.os }})
+          path: pytest-report.xml
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # The summary of the summaries of the jobs of the tests, from the JUnit XML
+  # that they upload, as the summary of this job, which the check of the job
+  # in the pull request links to, and as a comment of the pull request, which
+  # each run edits, as the job summary of each job is apart. A pull request of
+  # a fork has a token that cannot comment.
+  report:
+    name: report
+    needs:
+      - prove-mise
+      - prove-windows
+      - prove
+      - servers
+      - pytest
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-26.04-arm
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.15"
+
+      - name: Download the reports of the tests
+        uses: actions/download-artifact@v8
+        with:
+          pattern: junit-*
+          path: reports
+
+      - name: Summary of the reports
+        shell: bash
+        env:
+          PYTHONPATH: .
+        run: |-
+          python .github/scripts/test-report.py reports > report.md
+          cat report.md >> "$GITHUB_STEP_SUMMARY"
+
+      # The comment that starts with the marker of the report, edited, or a new one
+      - name: Comment on the pull request
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name ==
+          github.repository }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |-
+          id="$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --jq '.[] | select(.body | startswith("<!-- pyjo-prove-report -->")) | .id' | head -n 1)"
+          if [ -n "$id" ]; then
+            gh api --method PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -F body=@report.md > /dev/null
+          else
+            gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR/comments" -F body=@report.md > /dev/null
+          fi
