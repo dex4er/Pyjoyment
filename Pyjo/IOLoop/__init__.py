@@ -132,6 +132,7 @@ from typing import TYPE_CHECKING, Any, Concatenate, Self, overload
 if TYPE_CHECKING:
     import Pyjo.IOLoop.ChildProcess
     import Pyjo.IOLoop.Subprocess
+    import Pyjo.Promise
 
     from Pyjo.IOLoop.Subprocess import Child, Parent
 
@@ -344,6 +345,40 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
         client.connect(**options)
 
         return id
+
+    # Not in Mojolicious: the stream of a connection as a promise, as connect of promise-socket
+    def client_p(self, **options: Any) -> 'Pyjo.Promise.object':
+        """::
+
+            promise = Pyjo.IOLoop.client_p(address='127.0.0.1', port=3000)
+            promise = loop.client_p(address='127.0.0.1', port=3000)
+
+        Same as :meth:`client`, but returns a :mod:`Pyjo.Promise` object, which
+        is fulfilled with the stream object of the connection, and rejected
+        with its error. The stream keeps what arrives for its promises, as
+        :meth:`~Pyjo.IOLoop.Stream.Pyjo_IOLoop_Stream.read_p`, from the
+        connection on, as a coroutine that awaits the promise goes on later,
+        when a peer may have sent something already. ::
+
+            stream = await Pyjo.IOLoop.client_p(address='127.0.0.1', port=3000)
+            await stream.write_p(b'Hello!')
+            reply = await stream.read_p()
+        """
+        # Imported here, as Pyjo.Promise uses Pyjo.IOLoop
+        import Pyjo.Promise
+
+        promise = Pyjo.Promise.new()
+        promise.ioloop = self
+
+        def connected(loop: Any, err: Any, stream: Any) -> None:
+            if err is not None:
+                promise.reject(err)
+                return
+            stream._chunks()  # pyright: ignore[reportPrivateUsage]
+            promise.resolve(stream)
+
+        self.client(connected, **options)
+        return promise
 
     # Not in Mojolicious: datagram sockets
     @overload
@@ -929,6 +964,7 @@ def _shortcut[**P, R](method: Callable[Concatenate[Pyjo_IOLoop, P], R]) -> Calla
 
 acceptor = _shortcut(Pyjo_IOLoop.acceptor)
 client = _shortcut(Pyjo_IOLoop.client)
+client_p = _shortcut(Pyjo_IOLoop.client_p)
 datagram = _shortcut(Pyjo_IOLoop.datagram)
 next_tick = _shortcut(Pyjo_IOLoop.next_tick)
 one_tick = _shortcut(Pyjo_IOLoop.one_tick)

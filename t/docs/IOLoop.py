@@ -164,6 +164,38 @@ with subtest('client and server'):
     loop.start()
     isa_ok(id2, str, 'decorator')
 
+with subtest('client_p'):
+    import Pyjo.Promise
+
+    # An echo server on the singleton, as the module function uses it
+    id = Pyjo.IOLoop.server(
+        lambda loop, stream, id: stream.on('read', lambda stream, chunk: stream.write(chunk)), address='127.0.0.1'
+    )
+    port = Pyjo.IOLoop.acceptor(id).port
+    promise = Pyjo.IOLoop.client_p(address='127.0.0.1', port=port)
+    got = []
+    promise.then(lambda stream: (got.append(stream), stream.close())).wait()
+    isa_ok(got[0], Pyjo.IOLoop.Stream.object, 'stream')
+
+    loop = Pyjo.IOLoop.new()
+    loop_id = loop.server(lambda loop, stream, id: None, address='127.0.0.1')
+    promise = loop.client_p(address='127.0.0.1', port=loop.acceptor(loop_id).port)
+    promise.then(lambda stream: (got.append('loop'), stream.close(), loop.stop()))
+    loop.start()
+    is_ok(got[-1], 'loop', 'promise of the loop')
+
+    @Pyjo.Promise.coroutine
+    async def hello():
+        stream = await Pyjo.IOLoop.client_p(address='127.0.0.1', port=port)
+        await stream.write_p(b'Hello!')
+        reply = await stream.read_p()
+        stream.close()
+        return reply
+
+    hello().then(got.append).wait()
+    is_ok(got[-1], b'Hello!', 'reply')
+    Pyjo.IOLoop.remove(id)
+
 with subtest('datagram'):
     loop = Pyjo.IOLoop.new()
     got = []
