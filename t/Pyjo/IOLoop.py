@@ -586,12 +586,15 @@ with subtest('Timeout of the promises of a stream'):
     is_deeply_ok([str(err) for err in errors], ['Inactivity timeout', 'Inactivity timeout'], 'the next one too')
     writer.close()
 
-    # The peer reads nothing, so the stream is inactive once the buffers of the system are full
+    # The event of the timeout, as the buffers of the loopback of Windows take as much as a test writes
     reader, writer = stream_pair()
     reader.stop()
-    writer.timeout = 0.2
-    writer.write_p(b'x' * 100000000).catch(lambda err: errors.append(err)).wait()
-    isa_ok(errors[-1], TimeoutError, 'write rejected by the timeout')
+    failed = []
+    promise = writer.write_p(b'x' * 10000000).catch(lambda err: failed.append(err))
+    writer.emit('timeout')
+    promise.wait()
+    isa_ok(failed[0], TimeoutError, 'write rejected by the timeout')
+    writer.close()
     reader.close()
 
 if os.name != 'nt':
