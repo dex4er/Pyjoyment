@@ -208,6 +208,18 @@ if os.name != 'nt':
         is_deeply_ok(got, [b'HELLO', 'close'], 'right messages')
         is_ok(child.exit_code, 0, 'child process has ended')
 
+    with subtest('Output of a child process closed before its responses'):
+        code = 'import sys, time\nlines = list(sys.stdin)\ntime.sleep(0.2)\nprint("".join(lines).upper(), end="")\n'
+        child = Pyjo.IOLoop.ChildProcess.new().spawn([PYTHON, '-c', code])
+        messages = Pyjo.IOLoop.Messages.new(child.stdout, output=child.stdin)
+        got = []
+        messages.on('message', lambda messages, message: got.append(message))
+        messages.on('close', lambda messages: got.append('close'))
+        child.on('close', lambda child, code, signal: Pyjo.IOLoop.stop())
+        messages.send('one').send('two').close_gracefully()
+        run()
+        is_deeply_ok(got, [b'ONE', b'TWO', 'close'], 'responses after the end of the requests')
+
     with subtest('End of the output of a child process'):
         child = Pyjo.IOLoop.ChildProcess.new().spawn([PYTHON, '-c', 'print("one")'])
         messages = Pyjo.IOLoop.Messages.new(child.stdout, output=child.stdin)

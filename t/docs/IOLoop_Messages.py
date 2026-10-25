@@ -103,6 +103,20 @@ if not messages.stream.reactor.is_running:
     loop()
     is_deeply_ok(got, [b'{"JSONRPC": "2.0", "METHOD": "UPDATE", "PARAMS": [1]}'], 'message of the server')
 
+with subtest('close_gracefully'):
+    child = Pyjo.IOLoop.ChildProcess.new().spawn(SERVER)
+    messages = Pyjo.IOLoop.Messages.new(child.stdout, output=child.stdin)
+    request = '{"jsonrpc": "2.0", "method": "update", "params": [1], "id": 1}'
+    got = []
+    messages.on('message', lambda messages, message: got.append(message))
+    child.on('close', lambda child, code, signal: Pyjo.IOLoop.stop())
+
+    # The last request of a server of the standard input and output, and its response
+    messages.send(request).close_gracefully()
+
+    loop()
+    is_deeply_ok(got, [request.upper().encode()], 'response after the end of the output')
+
 with subtest('Framing of its own'):
     # Messages of netstrings, as 3:abc,
     class Netstrings:
