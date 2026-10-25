@@ -194,6 +194,11 @@ def application(cgi, prefix='/prefix'):
     return app
 
 
+# The inactivity timeout of a program that writes its PID file and sleeps, which counts from the start of the program,
+# so that a shell that starts slowly on a busy machine writes the file before the program is killed
+INACTIVE = 2
+
+
 # The process of a program, once the event loop has reaped it
 def gone(pid_file, timeout=5):
     deadline = time.monotonic() + timeout
@@ -398,7 +403,7 @@ with subtest('Errors'):
 
     # Inactive, which kills the process
     pid_file = tmp.child('inactive.pid').to_str()
-    with Pyjo.App.CGI.new(script=f'{root}/sleep.cgi', env={'PID_FILE': pid_file}, inactivity_timeout=0.5) as cgi:
+    with Pyjo.App.CGI.new(script=f'{root}/sleep.cgi', env={'PID_FILE': pid_file}, inactivity_timeout=INACTIVE) as cgi:
         t = Pyjo.Test.Pyjo.new(application(cgi))
         with cgi.log.capture('error') as messages:
             t.get_ok('/prefix').status_is(502)
@@ -408,7 +413,7 @@ with subtest('Errors'):
 
     # Inactive after the start of the response, which closes the connection of the client
     pid_file = tmp.child('started.pid').to_str()
-    with Pyjo.App.CGI.new(script=f'{root}/sleep.cgi', env={'PID_FILE': pid_file}, inactivity_timeout=0.5) as cgi:
+    with Pyjo.App.CGI.new(script=f'{root}/sleep.cgi', env={'PID_FILE': pid_file}, inactivity_timeout=INACTIVE) as cgi:
         t = Pyjo.Test.Pyjo.new(application(cgi))
         is_deeply_ok(raw(t, 'GET', '/prefix?started'), (200, None, 'chunked', None), 'incomplete response')
         ok(gone(pid_file), 'process killed')
