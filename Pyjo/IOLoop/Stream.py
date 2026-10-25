@@ -151,7 +151,8 @@ class Pyjo_IOLoop_Stream(Pyjo.EventEmitter.object):
         is false, defaults to ``1048576`` (1MiB).
         """
 
-        self._buffer = b''
+        # A bytearray, whose front is cut without copying the rest, as substr of Perl does
+        self._buffer = bytearray()
         self._graceful = False
         self._handle: Any = handle
         self._paused = False
@@ -616,14 +617,16 @@ class Pyjo_IOLoop_Stream(Pyjo.EventEmitter.object):
         # Handle errors only when reading (to avoid timing problems)
         handle = self._handle
         if len(self._buffer):
+            # A copy of the front of the buffer, as the socket of TLS of PyPy keeps the data that it sends exported, so
+            # that the buffer cannot change its size, and at most as much as a read, so that a write copies no more
+            data = bytes(self._buffer[:131072])
             try:
-                written = (
-                    handle.send(self._buffer) if hasattr(handle, 'send') else os.write(handle.fileno(), self._buffer)
-                )
+                written = handle.send(data) if hasattr(handle, 'send') else os.write(handle.fileno(), data)
             except OSError:
                 return
             self._written += written
-            chunk, self._buffer = self._buffer[:written], self._buffer[written:]
+            chunk = data[:written]
+            del self._buffer[:written]
             self.emit('write', chunk)._again()
 
         if not len(self._buffer):

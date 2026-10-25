@@ -389,7 +389,8 @@ class _Output(Pyjo.IOLoop.Stream.object):
                 self.emit('hangup')
                 return
             self._written += written
-            chunk, self._buffer = self._buffer[:written], self._buffer[written:]
+            chunk = bytes(self._buffer[:written])
+            del self._buffer[:written]
             self.emit('write', chunk)._again()
 
         if not len(self._buffer):
