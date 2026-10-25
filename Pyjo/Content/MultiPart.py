@@ -95,7 +95,7 @@ class Pyjo_Content_MultiPart(Pyjo.Content.object):
         self._last_len = 0
         self._last_part = 0
         self._multi_state: str | None = None
-        self._multipart = b''
+        self._multipart = bytearray()
         self._offset: int | None = None
         self.on('read', Pyjo_Content_MultiPart._read)
 
@@ -275,12 +275,14 @@ class Pyjo_Content_MultiPart(Pyjo.Content.object):
                 return False
 
             # Store chunk
-            chunk, self._multipart = self._multipart[:length], self._multipart[length:]
+            chunk = bytes(self._multipart[:length])
+            del self._multipart[:length]
             self.parts[-1] = self.parts[-1].parse(chunk)
             return False
 
         # Store chunk
-        chunk, self._multipart = self._multipart[:pos], self._multipart[pos:]
+        chunk = bytes(self._multipart[:pos])
+        del self._multipart[:pos]
         self.parts[-1] = self.parts[-1].parse(chunk)
         self._multi_state = 'multipart_boundary'
         return True
@@ -288,7 +290,7 @@ class Pyjo_Content_MultiPart(Pyjo.Content.object):
     def _parse_multipart_boundary(self, boundary: bytes) -> bool:
         # Boundary begins
         if self._multipart.startswith(b'\x0d\x0a--' + boundary + b'\x0d\x0a'):
-            self._multipart = self._multipart[len(boundary) + 6 :]
+            del self._multipart[: len(boundary) + 6]
 
             # New part
             part = Pyjo.Content.Single.new(relaxed=True)
@@ -300,7 +302,7 @@ class Pyjo_Content_MultiPart(Pyjo.Content.object):
         # Boundary ends
         end = b'\x0d\x0a--' + boundary + b'--'
         if self._multipart.startswith(end):
-            self._multipart = self._multipart[len(end) :]
+            del self._multipart[: len(end)]
             self._multi_state = 'finished'
 
         return False
@@ -311,7 +313,7 @@ class Pyjo_Content_MultiPart(Pyjo.Content.object):
             return False
 
         # Replace preamble with carriage return and line feed
-        self._multipart = b'\x0d\x0a' + self._multipart[pos:]
+        self._multipart[:pos] = b'\x0d\x0a'
 
         # Parse boundary
         self._multi_state = 'multipart_boundary'
