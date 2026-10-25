@@ -218,4 +218,67 @@ with subtest('ttl'):
     is_ok(server.ttl, 64, 'set')
     server.close()
 
+with subtest('__aiter__, iterate, recv_p and send_p'):
+    import Pyjo.IOLoop.Datagram
+    import Pyjo.Promise
+
+    server = Pyjo.IOLoop.Datagram.new()
+    server.bind(address='127.0.0.1', port=free_port())
+
+    # Echo server, one datagram after another
+    @Pyjo.Promise.coroutine
+    async def echo(datagrams):
+        async for data, peer in datagrams:
+            await server.send_p(b'Echo: ' + data, peer)
+
+    echoed = echo(aiter(server))
+    printed = []
+
+    @Pyjo.Promise.coroutine
+    async def client():
+        datagram = await Pyjo.IOLoop.Datagram.new().connect_p(address='127.0.0.1', port=server.port)
+        promise = datagram.send_p(b'Hello!')
+        await promise
+        if (received := await datagram.recv_p()) is not None:
+            data, peer = received
+            printed.append(f'{data!r} from {peer[0]}')
+        promise = datagram.recv_p(timeout=0.1)
+        try:
+            await promise
+        except TimeoutError:
+            printed.append('timeout')
+        other = Pyjo.IOLoop.Datagram.new()
+        received = other.recv_p()
+        await other.send_p(b'Hello!', ('127.0.0.1', server.port))
+        printed.append((await received)[0])
+        await datagram.send_p(b'Bye!')
+        await datagram.close_gracefully_p()
+        promise = datagram.close_gracefully_p()
+        await promise
+        promise = datagram.once_p('close')
+        await promise
+        other.close()
+
+    client().wait()
+    is_deeply_ok(printed, ["b'Echo: Hello!' from 127.0.0.1", 'timeout', b'Echo: Hello!'], 'datagrams')
+    server.close()
+    echoed.wait()
+
+    got = []
+    server = Pyjo.IOLoop.Datagram.new().bind(address='127.0.0.1')
+
+    @Pyjo.Promise.coroutine
+    async def collect(datagrams):
+        async for data, _peer in datagrams:
+            got.append(data)
+
+    promise = collect(server.iterate())
+    sender = Pyjo.IOLoop.Datagram.new()
+    sender.send_p(b'one', ('127.0.0.1', server.port)).wait()
+    Pyjo.Promise.timer(0.1).wait()
+    server.close()
+    sender.close()
+    promise.wait()
+    is_deeply_ok(got, [b'one'], 'until the close')
+
 done_testing()

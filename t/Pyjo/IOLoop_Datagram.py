@@ -1,5 +1,6 @@
 import Pyjo.IOLoop
 import Pyjo.IOLoop.Datagram
+import Pyjo.Promise
 
 from Pyjo.File import curfile
 from Pyjo.Test import *
@@ -375,5 +376,114 @@ with subtest('Event loop'):
     is_ok(loop.stream(id), None, 'gone')
     loop.reset()
     is_ok(loop.stream(client), None, 'reset')
+
+with subtest('Promises of datagrams'):
+    server = Pyjo.IOLoop.Datagram.new().bind(address='127.0.0.1')
+    got = []
+
+    @Pyjo.Promise.coroutine
+    async def talk():
+        client = await Pyjo.IOLoop.Datagram.new().connect_p(address='127.0.0.1', port=server.port)
+        got.append(isinstance(client, Pyjo.IOLoop.Datagram.object))
+        received = server.recv_p()
+        await client.send_p(b'one')
+        data, peer = await received
+        got.append(data)
+        await server.send_p(data.upper(), peer)
+        got.append((await client.recv_p())[0])
+        try:
+            await client.recv_p(timeout=0.2)
+        except TimeoutError as e:
+            got.append(str(e))
+        client.close()
+
+    talk().wait()
+    is_deeply_ok(got, [True, b'one', b'ONE', 'Receive timeout'], 'sent, received, and the timeout')
+
+    got = []
+
+    @Pyjo.Promise.coroutine
+    async def collect(datagrams):
+        async for data, _peer in datagrams:
+            got.append(data)
+
+    promise = collect(aiter(server))
+    client = Pyjo.IOLoop.Datagram.new()
+    client.send_p(b'a', ('127.0.0.1', server.port)).wait()
+    client.send_p(b'b', ('127.0.0.1', server.port)).wait()
+    Pyjo.Promise.timer(0.2).wait()
+    server.close()
+    promise.wait()
+    is_deeply_ok(got, [b'a', b'b'], 'datagrams until the close')
+    client.close()
+
+with subtest('Promises of a datagram socket that nothing else refers to'):
+    import gc
+
+    server = Pyjo.IOLoop.Datagram.new().bind(address='127.0.0.1')
+    got = []
+
+    # Only the promise of the connection leads to the socket, which the reactor refers to weakly
+    @Pyjo.Promise.coroutine
+    async def connect():
+        client = await Pyjo.IOLoop.Datagram.new().connect_p(address='127.0.0.1', port=server.port)
+        got.append(client.handle is not None)
+        client.close()
+
+    promise = connect()
+    gc.collect()
+    promise.wait()
+    is_deeply_ok(got, [True], 'not freed while the coroutine waits')
+    server.close()
+
+with subtest('Promises of a datagram socket that is closed already'):
+    datagram = Pyjo.IOLoop.Datagram.new().bind(address='127.0.0.1')
+    datagram.close()
+    got = []
+    datagram.recv_p().then(got.append).wait()
+    datagram.once_p('close').then(lambda *args: got.append('close')).wait()
+    datagram.close_gracefully_p().then(lambda *args: got.append('closed')).wait()
+    datagram.send_p(b'x', ('127.0.0.1', 9)).catch(lambda err: got.append(err.message)).wait()
+    is_deeply_ok(got, [None, 'close', 'closed', 'Socket closed before the datagram has been sent'], 'the end at once')
+
+    datagram = Pyjo.IOLoop.Datagram.new().bind(address='127.0.0.1')
+    peer = Pyjo.IOLoop.Datagram.new().bind(address='127.0.0.1')
+    received = peer.recv_p()
+    datagram.send(b'bye', ('127.0.0.1', peer.port))
+    datagram.close_gracefully_p().then(lambda *args: got.append('closed gracefully')).wait()
+    received.then(lambda received: got.append(received[0])).wait()
+    is_deeply_ok(got[-2:], ['closed gracefully', b'bye'], 'closed once sent')
+    peer.close()
+
+with subtest('Errors of the promises of datagrams'):
+    # A port that nothing listens on, below the ephemeral ones, as above
+    port = ServerStart.port()
+    errors = []
+
+    @Pyjo.Promise.coroutine
+    async def refused():
+        client = await Pyjo.IOLoop.Datagram.new().connect_p(address='127.0.0.1', port=port)
+        await client.send_p(b'nobody')
+        try:
+            await client.recv_p(timeout=5)
+        except OSError as e:
+            errors.append(e)
+        ok(client.handle, 'still open')
+        try:
+            await client.recv_p(timeout=0.2)
+        except TimeoutError:
+            errors.append('waits again')
+        client.close()
+
+    refused().wait()
+    isa_ok(errors[0], ConnectionRefusedError, 'refused')
+    is_ok(errors[1], 'waits again', 'the socket goes on')
+
+    datagram = Pyjo.IOLoop.Datagram.new().bind(address='127.0.0.1')
+    datagram.send_p(b'IPv6', ('::1', 53)).catch(lambda err: errors.append(err)).wait()
+    # The resolver of the socket of IPv4 finds no address of IPv4, or the address is of another family
+    like_ok(str(errors[-1]), r"Can't resolve|not of the family", 'the error of the datagram, in the place of the event')
+    ok(not datagram.has_subscribers('error'), 'no event error')
+    datagram.close()
 
 done_testing()
