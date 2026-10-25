@@ -1,13 +1,20 @@
 import Pyjo.IOLoop
 import Pyjo.IOLoop.Datagram
 
+from Pyjo.File import curfile
 from Pyjo.Test import *
 
 import errno
+import importlib
 import os
 import re
 import socket
+import sys
 import tempfile
+
+
+sys.path.insert(0, curfile().dirname().sibling('lib').to_str())
+ServerStart = importlib.import_module('ServerStart')
 
 
 def ipv6():
@@ -317,10 +324,9 @@ with subtest('Multicast'):
 with subtest('Errors of a connected socket'):
     loop = Pyjo.IOLoop.new()
 
-    # A port that nothing listens on
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-        s.bind(('127.0.0.1', 0))
-        port = s.getsockname()[1]
+    # A port that nothing listens on, below the ephemeral ones, as the client that connects to an ephemeral port that is
+    # freed can get it as its own, once in about 28000 times on Linux, and then gets its own datagram without an error
+    port = ServerStart.port()
     client = Pyjo.IOLoop.Datagram.new()
     client.reactor = loop.reactor
     errors = []
