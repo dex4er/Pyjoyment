@@ -90,6 +90,7 @@ import Pyjoyment.Command.fastcgi  # noqa: E402
 import Pyjoyment.Command.get  # noqa: E402
 import Pyjoyment.Command.prefork  # noqa: E402
 import Pyjoyment.Command.routes  # noqa: E402
+import Pyjoyment.Command.stdio  # noqa: E402
 import Pyjoyment.Command.version  # noqa: E402
 import Pyjoyment.Command.wsgi  # noqa: E402
 
@@ -552,6 +553,17 @@ buffer = io.StringIO()
 with contextlib.redirect_stderr(buffer):
     throws_ok(lambda: routes.run('--unknown'), re.compile(r'Usage: APPLICATION routes'), 'unknown option')
 like_ok(buffer.getvalue(), r'Unknown option: unknown', 'right output')
+
+# stdio
+# Not in Mojolicious: the command stdio, for a protocol on the standard input and output
+stdio = Pyjoyment.Command.stdio.new()
+ok(stdio.description, 'has a description')
+like_ok(stdio.usage, r'stdio', 'has usage information')
+buffer = io.StringIO()
+with contextlib.redirect_stderr(buffer):
+    throws_ok(lambda: stdio.run('--unknown'), re.compile(r'Usage: APPLICATION stdio'), 'unknown option')
+like_ok(buffer.getvalue(), r'Unknown option: unknown', 'right output')
+throws_ok(lambda: stdio.run('foo'), re.compile(r'Usage: APPLICATION stdio'), 'no arguments')
 
 # version
 version = Pyjoyment.Command.version.new()

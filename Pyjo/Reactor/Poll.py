@@ -196,7 +196,8 @@ class Pyjo_Reactor_Poll(Pyjo.Reactor.object):
                     return self.stop()
 
                 # Calculate ideal timeout based on timers and round up to next millisecond
-                first = min((t['time'] for t in self._timers.values()), default=None)
+                # Not in Mojolicious: a copy of the timers, as a signal handler that calls next_tick adds one in the middle
+                first = min((t['time'] for t in list(self._timers.values())), default=None)
                 timeout = first - time.monotonic() if first is not None else 0.5
                 timeout = 0 if timeout <= 0 else int(timeout * 1000) + 1
 

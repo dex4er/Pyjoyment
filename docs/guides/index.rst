@@ -174,6 +174,10 @@ most prominent ones.
 :mod:`Pyjo.Server.FastCGI`, :mod:`Pyjo.Server.Lambda`
     FastCGI behind a web server, and the event functions of AWS Lambda.
 
+:mod:`Pyjo.Server.Stdio`
+    A protocol on the standard input and output, as the transport stdio of
+    MCP or LSP.
+
 :mod:`Pyjo.IOLoop`
     A minimalistic event loop with support for multiple reactor backends,
     on the event loop of :mod:`asyncio` by default.
@@ -273,6 +277,7 @@ This is the class hierarchy of the :mod:`Pyjoyment` distribution.
           - :mod:`Pyjo.Server.Prethread`
 
       - :mod:`Pyjo.Server.Lambda`
+      - :mod:`Pyjo.Server.Stdio`
       - :mod:`Pyjo.Server.WSGI`
 
     - :mod:`Pyjo.Transaction`
@@ -331,6 +336,7 @@ This is the class hierarchy of the :mod:`Pyjoyment` distribution.
       - :mod:`Pyjoyment.Command.prethread`
 
     - :mod:`Pyjoyment.Command.routes`
+    - :mod:`Pyjoyment.Command.stdio`
     - :mod:`Pyjoyment.Command.version`
     - :mod:`Pyjoyment.Command.wsgi`
     - :mod:`Pyjoyment.Commands`

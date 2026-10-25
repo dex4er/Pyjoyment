@@ -68,4 +68,30 @@ stdio.on('end', lambda stdio: stdio.close_gracefully())
 """
     is_deeply_ok(run(code + START, b'hello'), (0, b'hello', b''), 'closed at the end')
 
+with subtest('end'):
+    code = """
+import Pyjo.IOLoop.Stdio
+
+import signal
+
+stdio = Pyjo.IOLoop.Stdio.new()
+stdio.on('read', lambda stdio, chunk: (stdio.write(chunk), signal.raise_signal(signal.SIGTERM)))
+
+# Stop gracefully on a signal
+signal.signal(signal.SIGTERM, lambda signum, frame: stdio.reactor.next_tick(lambda reactor: stdio.end()))
+"""
+
+    # The input that is left open, which the signal ends
+    child = Pyjo.IOLoop.ChildProcess.new()
+    out, result = bytearray(), []
+    child.on('close', lambda child, code, signal: (result.append(code), Pyjo.IOLoop.stop()))
+    child.spawn([sys.executable, '-c', code + START], env=ENV)
+    child.stdout.on('read', lambda stream, chunk: out.extend(chunk))
+    child.stdin.write(b'hello')
+    timer = Pyjo.IOLoop.timer(10, lambda loop: Pyjo.IOLoop.stop())
+    Pyjo.IOLoop.start()
+    Pyjo.IOLoop.remove(timer)
+    child.stdin.close()
+    is_deeply_ok((result, bytes(out)), ([0], b'hello'), 'ended by the signal')
+
 done_testing()

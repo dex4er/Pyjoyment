@@ -647,6 +647,10 @@ watches for nothing),
 stream, inspired by `process.stdin` and `process.stdout` of Node.js),
 `Pyjo.IOLoop.Messages` (a stream of messages on a stream of bytes, with the
 framings of the transport stdio of MCP, of LSP and of Native Messaging),
+`Pyjo.Server.Stdio` and `Pyjoyment.Command.stdio` (the server and the command
+of a protocol on the standard input and output, which the application gives
+with a subscriber of the event `stream` of the server, inspired by
+`Pyjo.Server.Daemon` and its command),
 `Pyjo.Server.Lambda`
 and `Pyjoyment.Command.lambda` (the server and the command of the event
 functions of AWS Lambda, inspired by `Pyjo.Server.WSGI` and its command, and
@@ -1413,6 +1417,17 @@ kept while a promise of it waits, by `_hold` of `Pyjo.EventEmitter`, which
 `once_p`, the pulls and `write_p` and `send_p` call. A promise that never
 settles keeps its emitter, as a task of asyncio that never ends. A test of it
 calls `gc.collect()` while the coroutine waits, which frees the cycle at once.
+
+`Pyjo.Server.Stdio` serves no HTTP, so the application gives its protocol with
+a subscriber of the event `stream` of the server, in the hook
+`before_server_start`, where a plugin configures the servers, and the framing
+stays with the protocol, not with the command line; the command `stdio` is not
+detected, as a pipe on the standard input is too common to mean it. The server
+takes the standard input and output before it emits the hook, so that what
+the application prints while it starts goes to the standard error, and INT and
+TERM end the standard input with `end` of the stream, as its end does, so
+that a graceful stop is the end of the input of the protocol, which waits for
+the responses in progress.
 
 `serve` of `Pyjo.JSON.RPC` makes both peers of a stream servers and clients,
 so it drops a response to no call of its client, as answering it with an

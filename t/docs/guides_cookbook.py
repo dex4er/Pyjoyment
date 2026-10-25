@@ -138,12 +138,14 @@ def concurrently(*requests):
     return [tx for tx, *_ in results]
 
 
-def command(*args, cwd=None, path=()):
+def command(*args, cwd=None, path=(), input=None):
     # A command in a process of its own, with the directories of its modules in front of sys.path
     env = {**os.environ, 'PYTHONPATH': os.pathsep.join([*path, os.getcwd()])}
     for name in ('PYJO_EXE', 'PYJO_HOME', 'PYJO_LOG_LEVEL', 'PYJO_MODE'):
         env.pop(name, None)
-    return subprocess.run([sys.executable, *args], capture_output=True, text=True, env=env, cwd=cwd, timeout=60)
+    return subprocess.run(
+        [sys.executable, *args], capture_output=True, text=True, env=env, cwd=cwd, timeout=60, input=input
+    )
 
 
 def wsgi(application, path):
@@ -246,6 +248,33 @@ with subtest('AWS Lambda'):
         # The function mounted, live and in the tests
         t = Pyjo.Test.Pyjo.new(lam.child('gateway.py'))
         t.get_ok('/myapp').status_is(200).content_is('Hello Lambda at /myapp!')
+
+with subtest('Standard input and output'):
+    if os.name == 'nt':
+        skip('the standard input and output need pipes that the event loop watches', 7)
+    else:
+        stdio = EXAMPLES.child('stdio').to_str()
+
+        # printf 'hello\nworld\n' | ./lines.py stdio
+        result = command('lines.py', 'stdio', cwd=stdio, input='hello\nworld\n')
+        is_ok(result.stdout, 'HELLO\nWORLD\n', 'lines')
+        like_ok(result.stderr, r'^Got hello\nGot world\n', 'print on stderr')
+
+        # echo '{"jsonrpc":"2.0","method":"divide","params":[7,2],"id":1}' | ./rpc.py stdio
+        request = '{"jsonrpc":"2.0","method":"divide","params":[7,2],"id":1}\n'
+        result = command('rpc.py', 'stdio', cwd=stdio, input=request)
+        is_ok(result.stdout, '{"jsonrpc":"2.0","result":3.5,"id":1}\n', 'JSON-RPC')
+
+        # python client.py
+        result = command('client.py', cwd=stdio)
+        is_ok(result.stdout, '3.5\n', 'client')
+        is_ok(result.returncode, 0, 'server ended')
+
+        # The same server over HTTP
+        t = Pyjo.Test.Pyjo.new(EXAMPLES.child('stdio', 'rpc.py'))
+        t.post_ok('/rpc', json={'jsonrpc': '2.0', 'method': 'divide', 'params': [7, 2], 'id': 1}).json_is(
+            '/result', 3.5
+        )
 
 with subtest('Rewriting'):
     app = Pyjoyment.new()
