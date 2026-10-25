@@ -2,6 +2,7 @@ import Pyjo.IOLoop
 import Pyjo.IOLoop.ChildProcess
 import Pyjo.IOLoop.Messages
 import Pyjo.IOLoop.Stream
+import Pyjo.Promise
 
 from Pyjo.Test import *
 
@@ -191,6 +192,80 @@ with subtest('Framing of its own'):
     run()
     is_deeply_ok(got, [b'cba'], 'right message')
     a.close()
+    b.close()
+
+with subtest('Promises of the messages'):
+    a, b = pair()
+    server = Pyjo.IOLoop.Messages.new(a)
+    client = Pyjo.IOLoop.Messages.new(b)
+    got = []
+
+    # The iterator before the messages, as the reactor of asyncio runs a coroutine later
+    @Pyjo.Promise.coroutine
+    async def echo(messages):
+        async for message in messages:
+            await server.send_p(message.upper())
+        got.append('end')
+
+    echoed = echo(aiter(server))
+
+    @Pyjo.Promise.coroutine
+    async def talk():
+        first = client.message_p()
+        await client.send_p('one')
+        got.append(await first)
+        await client.send_p(b'two')
+        got.append(await client.message_p())
+        b.close_gracefully()
+
+    talk().wait()
+    echoed.wait()
+    is_deeply_ok(got, [b'ONE', b'TWO', 'end'], 'messages, then the end')
+    is_ok(server.message_p().wait(), None, 'no more messages')
+
+    errors = []
+    a, b = pair()
+    messages = Pyjo.IOLoop.Messages.new(a)
+    a.high_water_mark = 1
+    promise = messages.send_p(b'x' * 10000000).catch(lambda err: errors.append(str(err)))
+    messages.close()
+    promise.wait()
+    like_ok(errors[0], r'^Stream closed before all data has been written', 'send rejected')
+    b.close()
+
+with subtest('Promises of messages that are closed already, closed gracefully, and inactive'):
+    a, b = pair()
+    messages = Pyjo.IOLoop.Messages.new(a)
+    messages.close()
+    got = []
+    messages.message_p().then(got.append).wait()
+    messages.once_p('close').then(lambda *args: got.append('close')).wait()
+    messages.close_gracefully_p().then(lambda *args: got.append('closed')).wait()
+    messages.send_p('x').catch(lambda err: got.append(str(err))).wait()
+    is_deeply_ok(got[:3], [None, 'close', 'closed'], 'the end at once')
+    like_ok(got[3], r'^Stream closed before all data has been written', 'send rejected at once')
+    b.close()
+
+    a, b = pair()
+    messages = Pyjo.IOLoop.Messages.new(a)
+    other = Pyjo.IOLoop.Messages.new(b)
+    received = other.message_p()
+    messages.send('bye')
+    messages.close_gracefully_p().then(lambda *args: got.append('closed gracefully')).wait()
+    received.then(got.append).wait()
+    is_deeply_ok(got[-2:], ['closed gracefully', b'bye'], 'closed once written')
+
+    # The peer reads no more, as nothing waits for a message, so it is closed here
+    b.close()
+
+    a, b = pair()
+    a.timeout = 0.2
+    messages = Pyjo.IOLoop.Messages.new(a)
+    timeouts = []
+    messages.on('timeout', lambda messages: timeouts.append('timeout'))
+    messages.message_p().catch(lambda err: got.append(err)).wait()
+    isa_ok(got[-1], TimeoutError, 'rejected by the timeout')
+    is_deeply_ok(timeouts, ['timeout'], 'event timeout')
     b.close()
 
 if os.name != 'nt':

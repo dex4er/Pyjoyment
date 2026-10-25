@@ -1372,6 +1372,24 @@ which is how a server of the standard input and output learns that no request
 comes anymore, and the input is read until the child ends it, so that the
 responses of the requests in progress still come in.
 
+The promises of a stream and of its messages, `read_p` and `message_p`, and
+their iterators, pull them as the streams of Node.js in their paused mode: the
+stream reads only while a promise waits, so that a peer that sends more than
+is asked for waits in the pipe, and what came before the first promise went to
+the subscribers of the event `read` alone, as a stream of Mojo emits what it
+reads at once. The reactor of asyncio runs a coroutine as a task, in the next
+cycle of its loop, where the base reactor runs it at once until it waits, so
+a promise or an iterator is made before the coroutine that awaits it, as
+`read_all_p` asks for its first chunk at once, and `once_p` before the event
+that it waits for. A stream that is closed already gives `None` and rejects a
+write at once, and fulfills `once_p('close')` and `close_gracefully_p`, as its
+event `close` comes no more; `close_gracefully_p` subscribes the event before
+the close, which comes at once when nothing waits to be written. The
+inactivity timeout of a stream rejects its promises with `TimeoutError`, so
+that it is not taken for the end of the stream. The methods of
+`Pyjo.EventEmitter` are `once_p` and `events`, as `iterate` of a stream takes a
+size.
+
 `serve` of `Pyjo.JSON.RPC` makes both peers of a stream servers and clients,
 so it drops a response to no call of its client, as answering it with an
 error, as a server answers what is not a request, would send the error back

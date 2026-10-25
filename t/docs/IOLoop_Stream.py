@@ -1,3 +1,5 @@
+import Pyjo.IOLoop.Stream
+
 from Pyjo.Test import *
 
 import os
@@ -122,5 +124,126 @@ with subtest('close and close_gracefully'):
     is_deeply_ok(closed, [True], 'closed once')
 
 peer.close()
+
+
+# The promises of streams of their own, as the one above is closed
+def pair():
+    a, b = socket.socketpair()
+    streams = Pyjo.IOLoop.Stream.new(a), Pyjo.IOLoop.Stream.new(b)
+    for stream in streams:
+        stream.start()
+    return streams
+
+
+with subtest('__aiter__ and iterate'):
+    import Pyjo.Promise
+
+    stream, peer = pair()
+    got = []
+
+    @Pyjo.Promise.coroutine
+    async def collect(chunks):
+        async for chunk in chunks:
+            got.append(chunk)
+
+    promise = collect(aiter(stream))
+    peer.write(b'abc').close_gracefully()
+    promise.wait()
+    is_deeply_ok(got, [b'abc'], 'async for chunk in stream')
+
+    stream, peer = pair()
+    got = []
+    promise = collect(stream.iterate(1024))
+    peer.write(b'abc').close_gracefully()
+    promise.wait()
+    is_deeply_ok(got, [b'abc'], 'async for chunk in stream.iterate(1024)')
+
+    # Echo in capitals
+    stream, peer = pair()
+    echoed = []
+
+    @Pyjo.Promise.coroutine
+    async def echo(chunks):
+        async for chunk in chunks:
+            await stream.write_p(chunk.upper())
+
+    peer.on('read', lambda peer, chunk: (echoed.append(chunk), peer.close()))
+    promise = echo(aiter(stream))
+    peer.write(b'abc')
+    promise.wait()
+    is_deeply_ok(echoed, [b'ABC'], 'echo')
+
+with subtest('close_gracefully_p and once_p'):
+    stream, peer = pair()
+    data = peer.read_all_p()
+    promise = stream.close_gracefully_p()
+    promise.wait()
+    is_ok(stream.handle, None, 'closed')
+    stream.once_p('close').wait()
+
+    stream, peer = pair()
+    data = peer.read_all_p()
+
+    @Pyjo.Promise.coroutine
+    async def bye():
+        await stream.write_p(b'Bye!')
+        await stream.close_gracefully_p()
+
+    bye().wait()
+    got = []
+    data.then(got.append).wait()
+    is_deeply_ok(got, [b'Bye!'], 'written, then closed')
+
+with subtest('read_all_p'):
+    stream, peer = pair()
+    promise = stream.read_all_p()
+    peer.write(b'abc').close_gracefully()
+
+    @Pyjo.Promise.coroutine
+    async def read_all():
+        data = await promise
+        return data
+
+    data = []
+    read_all().then(data.append).wait()
+    is_deeply_ok(data, [b'abc'], 'data')
+
+with subtest('read_p'):
+    stream, peer = pair()
+    promise = stream.read_p()
+    peer.write(b'abcdef')
+    got = []
+    promise.then(got.append).wait()
+    promise = stream.read_p(3)
+    peer.write(b'ghijkl').close_gracefully()
+    promise.then(got.append).wait()
+    is_deeply_ok(got, [b'abcdef', b'ghi'], 'chunks')
+
+    # Read until the end
+    chunks = []
+
+    @Pyjo.Promise.coroutine
+    async def read():
+        while (chunk := await stream.read_p()) is not None:
+            chunks.append(chunk)
+
+    read().wait()
+    is_ok(b''.join(chunks), b'jkl', 'until the end')
+
+with subtest('write_p'):
+    stream, peer = pair()
+    promise = stream.write_p(b'chunk')
+    got = []
+    promise.then(lambda *args: got.append(stream.bytes_written)).wait()
+    is_deeply_ok(got, [5], 'written')
+
+    @Pyjo.Promise.coroutine
+    async def write():
+        await stream.write_p(b'Hello World!')
+
+    write().wait()
+    is_ok(stream.bytes_written, 17, 'await')
+    stream.close()
+    peer.close()
 
 done_testing()
