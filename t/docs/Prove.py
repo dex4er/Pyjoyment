@@ -12,6 +12,9 @@ import subprocess
 import sys
 import tempfile
 import textwrap
+import time
+
+from pathlib import Path
 
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -34,7 +37,7 @@ def scripts(tmp):
             f.write(code)
 
 
-def shell(command, cwd):
+def shell(command, cwd, **env):
     # A `python` on PATH which is the interpreter running this test, and
     # Pyjoyment importable as if it was installed
     bindir = os.path.join(cwd, 'bin')
@@ -45,6 +48,7 @@ def shell(command, cwd):
         {k: v for k, v in os.environ.items() if k != 'PYJO_PROVE_OPTS'},
         PATH=os.pathsep.join([bindir, os.environ.get('PATH', '')]),
         PYTHONPATH=ROOT,
+        **env,
     )
     p = subprocess.run(command, shell=True, cwd=cwd, capture_output=True, text=True, env=env)
     return p.stdout, p.returncode
@@ -91,6 +95,21 @@ with subtest('Options'):
         out, code = shell('python -m Pyjo.Prove -j 0 -r t', tmp)
         like_ok(out, r'(?m)^Files=5, Tests=5, ', 'python -m Pyjo.Prove -j 0 -r t')
         is_ok(code, 0, 'right exit status')
+
+with subtest('Options of the reports'):
+    with tempfile.TemporaryDirectory() as tmp:
+        scripts(tmp)
+        out, code = shell('python -m Pyjo.Prove --junit report.xml -r t', tmp)
+        like_ok(out, r'(?m)^Files=5, Tests=5, ', 'python -m Pyjo.Prove --junit report.xml -r t')
+        like_ok(Path(tmp, 'report.xml').read_text(), r'<testsuites errors="0" failures="0" name="Pyjo.Prove"', 'report')
+
+        # A variable in the command is of a shell of POSIX, which the cmd.exe of Windows is not
+        if sys.platform == 'win32':
+            skip('no shell of POSIX on Windows', 1)
+        else:
+            summary = os.path.join(tmp, 'summary.md')
+            shell('python -m Pyjo.Prove --summary "$GITHUB_STEP_SUMMARY" -r t', tmp, GITHUB_STEP_SUMMARY=summary)
+            like_ok(Path(summary).read_text(), r'(?m)^Result: \*\*PASS\*\*$', 'summary')
 
 with subtest('Environment'):
     # A variable before the command is of a shell of POSIX, which the cmd.exe of Windows is not
@@ -148,6 +167,62 @@ with tempfile.TemporaryDirectory() as tmp:
             )
             is_ok(names['result'].tests, 2, 'result.tests')
             is_ok(names['result'].failed, [2], 'result.failed')
+
+        with subtest('parse at'):
+            names, _ = run(
+                """
+                result = Result('t/test.py')
+                parse(result, line, at=time.monotonic())
+                """,
+                line='ok 1',
+                time=time,
+            )
+            is_ok(names['result'].points[0].name, '', 'point')
+
+        with subtest('Point.failed'):
+            names, _ = run(
+                """
+                failed = point.failed
+                """,
+                point=Pyjo.Prove.Point(1, ok=False),
+            )
+            is_ok(names['failed'], True, 'failed')
+
+        with subtest('Point.skipped'):
+            names, _ = run(
+                """
+                skipped = point.skipped
+                """,
+                point=Pyjo.Prove.Point(1, ok=False, directive='todo'),
+            )
+            is_ok(names['skipped'], True, 'skipped')
+
+        with subtest('junit'):
+            results = [Pyjo.Prove.Result('t/test.py', planned=1, tests=1, points=[Pyjo.Prove.Point(1, 'works')])]
+            run(
+                """
+                report = junit(results)
+                Path('report.xml').write_text(str(report))
+                """,
+                results=results,
+                Path=Path,
+            )
+            like_ok(
+                Path('report.xml').read_text(),
+                r'<testcase classname="t/test.py" file="t/test.py" name="1 - works"',
+                'report',
+            )
+
+        with subtest('markdown'):
+            names, _ = run(
+                """
+                summary = markdown(results, 37.2)
+                summary = markdown(results, 37.2, title='Tests of Pyjo')
+                """,
+                results=results,
+            )
+            like_ok(names['summary'], r'^### Tests of Pyjo\n', 'title')
+            like_ok(names['summary'], r'(?m)^\| 1 \| 1 \| 1 \| 0 \| 0 \| 37s \|$', 'numbers')
 
         with subtest('finish'):
             result = Pyjo.Prove.Result('t/test.py', planned=2, tests=1, exit_status=255)

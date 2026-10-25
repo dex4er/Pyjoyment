@@ -315,6 +315,26 @@ with subtest('pyjo-prove'):
     )
     result = run(my_app.to_str(), '-m', 'Pyjo.Prove', '-l', '-r', '-j', '0', '--timeout', '60', 't')
     like_ok(result.stdout, re.compile(r'^Result: PASS$', re.M), 'pyjo-prove -l -r -j 0 --timeout 60 t')
+    summary = os.path.join(home, 'summary.md')
+    result = run(
+        my_app.to_str(),
+        '-m',
+        'Pyjo.Prove',
+        '-l',
+        '-r',
+        '--capture-stderr',
+        '--junit',
+        'report.xml',
+        '--summary',
+        summary,
+        't',
+    )
+    like_ok(
+        my_app.child('report.xml').slurp().decode(),
+        re.compile(r'<testsuite errors="0" failures="0" file="t/basic\.py"'),
+        'JUnit XML',
+    )
+    like_ok(Pyjo.File.path(summary).slurp().decode(), re.compile(r'^Result: \*\*PASS\*\*$', re.M), 'summary')
     # A variable before the command is of a shell of POSIX, which the cmd.exe of Windows is not
     if sys.platform == 'win32' or not shutil.which('prove'):
         skip('Perl prove on a system of POSIX is required', 1)
