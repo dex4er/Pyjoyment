@@ -800,6 +800,63 @@ So it is tried live with the built-in web server, and tested with
     t = Pyjo.Test.Pyjo.new('gateway.py')
     t.get_ok('/myapp').status_is(200).content_is('Hello Lambda at /myapp!')
 
+Standard input and output
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+An application serves a protocol on the standard input and output too, with
+the command :mod:`Pyjoyment.Command.stdio`, as a local server of MCP or of
+the Language Server Protocol that another program starts, or a protocol of
+lines that inetd or systemd serves. The application gives the protocol with a
+subscriber of the event ``stream`` of :mod:`Pyjo.Server.Stdio`, in the hook
+``before_server_start``, so that it still serves its routes with the other
+servers, and :mod:`Pyjo.IOLoop.Messages` turns the stream into messages, as
+lines.
+
+.. literalinclude:: cookbook/stdio/lines.py
+    :language: python
+    :caption: lines.py
+
+The standard output belongs to the protocol, so what the application prints
+goes to the standard error, with its log.
+
+.. code-block:: console
+
+    $ printf 'hello\nworld\n' | ./lines.py stdio
+    Got hello
+    Got world
+    HELLO
+    WORLD
+
+The server ends once the standard input has ended and the rest of the output
+is written, or on ``INT`` and ``TERM``, which end the standard input as its
+end does. :meth:`~Pyjo.JSON.RPC.Pyjo_JSON_RPC.serve` of :mod:`Pyjo.JSON.RPC`
+serves JSON-RPC on the messages, with one message on each line, as the
+transport stdio of MCP has them, answers the requests at the same time, and
+ends the stream once the requests in progress have their responses.
+
+.. literalinclude:: cookbook/stdio/rpc.py
+    :language: python
+    :caption: rpc.py
+
+.. code-block:: console
+
+    $ echo '{"jsonrpc":"2.0","method":"divide","params":[7,2],"id":1}' | ./rpc.py stdio
+    {"jsonrpc":"2.0","result":3.5,"id":1}
+
+The client of such a server starts it as a child process with
+:mod:`Pyjo.IOLoop.ChildProcess`, whose standard output and input are a stream
+of messages, which ``serve`` makes a client of, and whose standard input it
+closes to end the server.
+
+.. literalinclude:: cookbook/stdio/client.py
+    :language: python
+    :caption: client.py
+
+.. code-block:: console
+
+    $ python client.py
+    3.5
+
 Rewriting
 ~~~~~~~~~
 

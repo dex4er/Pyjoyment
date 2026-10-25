@@ -214,6 +214,15 @@ routes
 
 Use :mod:`Pyjoyment.Command.routes` to list application routes.
 
+stdio
+~~~~~
+::
+
+    $ ./myapp.py stdio
+
+Use :mod:`Pyjoyment.Command.stdio` to start application on the standard input
+and output, with the protocol that the application or a plugin gives.
+
 version
 ~~~~~~~
 ::
