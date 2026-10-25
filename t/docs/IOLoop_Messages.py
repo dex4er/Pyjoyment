@@ -163,6 +163,26 @@ with subtest('__aiter__, iterate, message_p and send_p'):
     promise.wait()
     is_deeply_ok(printed, [b'one', b'two'], 'until the end')
 
+with subtest('close_gracefully_p and once_p'):
+    stream, peer = pair()
+    messages = Pyjo.IOLoop.Messages.new(stream)
+    other = Pyjo.IOLoop.Messages.new(peer)
+    received = other.message_p()
+
+    @Pyjo.Promise.coroutine
+    async def bye():
+        await messages.send_p('Bye!')
+        await messages.close_gracefully_p()
+
+    bye().wait()
+    promise = messages.close_gracefully_p()
+    promise.wait()
+    messages.once_p('close').wait()
+    got = []
+    received.then(got.append).wait()
+    is_deeply_ok(got, [b'Bye!'], 'sent, then closed')
+    peer.close()
+
 with subtest('Framing of its own'):
     # Messages of netstrings, as 3:abc,
     class Netstrings:

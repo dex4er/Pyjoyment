@@ -308,7 +308,7 @@ class Pyjo_EventEmitter(Pyjo.Base.object):
 
     # Not in Mojolicious: the values of an event of a subclass that are pulled with promises, one pull for each event, so
     # that the promises and the iterators of a stream take its chunks in order, and with flow, the start and the stop of
-    # the reading of a stream, which reads only while a promise waits
+    # the reading of a stream, which reads only while a promise waits, and the TimeoutError of its event timeout
     def _pull(self, name: str, flow: bool = False) -> '_Pull':
         pulls: dict[str, _Pull] = self.__dict__.setdefault('_pulls', {})
         if (pull := pulls.get(name)) is None:
@@ -316,6 +316,8 @@ class Pyjo_EventEmitter(Pyjo.Base.object):
             stream = cast(Any, self)
             start, stop = (stream.start, stream.stop) if flow else (None, None)
             pull = pulls[name] = _Pull(self, name, True, start, stop)
+            if flow:
+                pull.subscribed.append(('timeout', self.on('timeout', pull.timeout)))
         return pull
 
     def unsubscribe(self, name: str, cb: Callback | None = None) -> Self:
@@ -369,7 +371,7 @@ class _Pull:
         self.waiting: collections.deque[Pyjo.Promise.object] = collections.deque()
         self.done = False
         self.error: Any = None
-        self.subscribed = [
+        self.subscribed: list[tuple[str, Callback]] = [
             (name, emitter.on(name, self._push)),
             ('error', emitter.on('error', self._fail)),
             ('close', emitter.on('close', self._end)),
@@ -378,6 +380,14 @@ class _Pull:
 
     def iterate(self, size: int | None = None) -> '_Iterator':
         return _Iterator(self, size)
+
+    # The end of an emitter that has ended before, as a stream that is closed
+    def end(self) -> None:
+        if not self.done and self.error is None:
+            self._end(self.emitter)
+
+    def timeout(self, emitter: Any) -> None:
+        self._fail(emitter, TimeoutError('Inactivity timeout'))
 
     def close(self) -> None:
         for name, cb in self.subscribed:

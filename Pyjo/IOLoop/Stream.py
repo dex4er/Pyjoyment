@@ -289,6 +289,28 @@ class Pyjo_IOLoop_Stream(Pyjo.EventEmitter.object):
         else:
             self.close()
 
+    # Not in Mojolicious: the end of a graceful close, as end of promise-writable, which subscribes the event close before
+    # the close, which comes at once when nothing is waiting to be written
+    def close_gracefully_p(self) -> 'Pyjo.Promise.object':
+        """::
+
+            promise = stream.close_gracefully_p()
+
+        Same as :meth:`close_gracefully`, but returns a :mod:`Pyjo.Promise`
+        object, which is fulfilled once the stream has been closed, also when it
+        is closed already. ::
+
+            await stream.write_p(b'Bye!')
+            await stream.close_gracefully_p()
+        """
+        import Pyjo.Promise
+
+        if self._handle is None:
+            return Pyjo.Promise.resolve()
+        promise = self.once_p('close')
+        self.close_gracefully()
+        return promise
+
     @property
     def handle(self) -> Any:
         """::
@@ -342,7 +364,23 @@ class Pyjo_IOLoop_Stream(Pyjo.EventEmitter.object):
             async for chunk in stream:
                 await stream.write_p(chunk.upper())
         """
-        return self._pull('read', True).iterate(size)
+        return self._chunks().iterate(size)
+
+    # Not in Mojolicious: the event close of a stream that is closed already, as once of promise-writable
+    def once_p(self, name: str) -> 'Pyjo.Promise.object':
+        """::
+
+            promise = stream.once_p('close')
+
+        Same as :meth:`~Pyjo.EventEmitter.Pyjo_EventEmitter.once_p` of
+        :mod:`Pyjo.EventEmitter`, but fulfilled at once for the event
+        ``close`` of a stream that is closed already, as it comes no more.
+        """
+        import Pyjo.Promise
+
+        if name == 'close' and self._handle is None:
+            return Pyjo.Promise.resolve()
+        return super().once_p(name)
 
     # Not in Mojolicious: everything until the end, as readAll of promise-readable
     def read_all_p(self) -> 'Pyjo.Promise.object':
@@ -383,8 +421,10 @@ class Pyjo_IOLoop_Stream(Pyjo.EventEmitter.object):
 
         Return a :mod:`Pyjo.Promise` object, which is fulfilled with the next
         chunk of the stream, at most ``size`` bytes, or ``None`` at its end,
-        the event ``close``, or ``end`` of :mod:`Pyjo.IOLoop.Stdio`, and
-        rejected with the error of the event ``error``. The stream reads only
+        the event ``close``, or ``end`` of :mod:`Pyjo.IOLoop.Stdio`, or when it
+        is closed already, and rejected with the error of the event ``error``,
+        or a :class:`TimeoutError` when the stream has been inactive for too
+        long. The stream reads only
         while a promise waits, and stops in between, so that a chunk that
         comes before is kept for the next promise, and a stream that is read
         no more stops reading, as the streams of Node.js in their paused mode.
@@ -395,7 +435,7 @@ class Pyjo_IOLoop_Stream(Pyjo.EventEmitter.object):
             while (chunk := await stream.read_p()) is not None:
                 print(chunk)
         """
-        return self._pull('read', True).next_p(size)
+        return self._chunks().next_p(size)
 
     def start(self) -> None:
         """::
@@ -509,26 +549,42 @@ class Pyjo_IOLoop_Stream(Pyjo.EventEmitter.object):
 
         Same as :meth:`write`, but returns a :mod:`Pyjo.Promise` object, which
         is fulfilled once all data has been written, and rejected if the stream
-        closes before. ::
+        closes before, or is closed already, or with a :class:`TimeoutError`
+        when it has been inactive for too long. ::
 
             await stream.write_p(b'Hello World!')
         """
         import Pyjo.Exception
         import Pyjo.Promise
 
+        if self._handle is None:
+            return Pyjo.Promise.reject(Pyjo.Exception.new('Stream closed before all data has been written'))
         promise = Pyjo.Promise.new()
 
         def closed(stream: Any) -> None:
+            self.unsubscribe('timeout', inactive)
             promise.reject(Pyjo.Exception.new('Stream closed before all data has been written'))
 
+        def timeout(stream: Any) -> None:
+            self.unsubscribe('close', wrapper)
+            promise.reject(TimeoutError('Inactivity timeout'))
+
         wrapper = self.once('close', closed)
+        inactive = self.once('timeout', timeout)
 
         def drained(stream: Any) -> None:
-            self.unsubscribe('close', wrapper)
+            self.unsubscribe('close', wrapper).unsubscribe('timeout', inactive)
             promise.resolve()
 
         self.write(chunk, drained)
         return promise
+
+    # Not in Mojolicious: the pull of the chunks, which a stream that is closed already has ended
+    def _chunks(self) -> Any:
+        pull = self._pull('read', True)
+        if self._handle is None:
+            pull.end()
+        return pull
 
     def _again(self) -> None:
         if self._timer is not None:

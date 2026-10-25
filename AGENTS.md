@@ -1381,8 +1381,14 @@ reads at once. The reactor of asyncio runs a coroutine as a task, in the next
 cycle of its loop, where the base reactor runs it at once until it waits, so
 a promise or an iterator is made before the coroutine that awaits it, as
 `read_all_p` asks for its first chunk at once, and `once_p` before the event
-that it waits for. The methods of `Pyjo.EventEmitter` are `once_p` and
-`events`, as `iterate` of a stream takes a size.
+that it waits for. A stream that is closed already gives `None` and rejects a
+write at once, and fulfills `once_p('close')` and `close_gracefully_p`, as its
+event `close` comes no more; `close_gracefully_p` subscribes the event before
+the close, which comes at once when nothing waits to be written. The
+inactivity timeout of a stream rejects its promises with `TimeoutError`, so
+that it is not taken for the end of the stream. The methods of
+`Pyjo.EventEmitter` are `once_p` and `events`, as `iterate` of a stream takes a
+size.
 
 `serve` of `Pyjo.JSON.RPC` makes both peers of a stream servers and clients,
 so it drops a response to no call of its client, as answering it with an

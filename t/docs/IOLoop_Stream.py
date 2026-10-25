@@ -173,6 +173,27 @@ with subtest('__aiter__ and iterate'):
     promise.wait()
     is_deeply_ok(echoed, [b'ABC'], 'echo')
 
+with subtest('close_gracefully_p and once_p'):
+    stream, peer = pair()
+    data = peer.read_all_p()
+    promise = stream.close_gracefully_p()
+    promise.wait()
+    is_ok(stream.handle, None, 'closed')
+    stream.once_p('close').wait()
+
+    stream, peer = pair()
+    data = peer.read_all_p()
+
+    @Pyjo.Promise.coroutine
+    async def bye():
+        await stream.write_p(b'Bye!')
+        await stream.close_gracefully_p()
+
+    bye().wait()
+    got = []
+    data.then(got.append).wait()
+    is_deeply_ok(got, [b'Bye!'], 'written, then closed')
+
 with subtest('read_all_p'):
     stream, peer = pair()
     promise = stream.read_all_p()

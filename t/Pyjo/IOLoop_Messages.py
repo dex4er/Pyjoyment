@@ -233,6 +233,41 @@ with subtest('Promises of the messages'):
     like_ok(errors[0], r'^Stream closed before all data has been written', 'send rejected')
     b.close()
 
+with subtest('Promises of messages that are closed already, closed gracefully, and inactive'):
+    a, b = pair()
+    messages = Pyjo.IOLoop.Messages.new(a)
+    messages.close()
+    got = []
+    messages.message_p().then(got.append).wait()
+    messages.once_p('close').then(lambda *args: got.append('close')).wait()
+    messages.close_gracefully_p().then(lambda *args: got.append('closed')).wait()
+    messages.send_p('x').catch(lambda err: got.append(str(err))).wait()
+    is_deeply_ok(got[:3], [None, 'close', 'closed'], 'the end at once')
+    like_ok(got[3], r'^Stream closed before all data has been written', 'send rejected at once')
+    b.close()
+
+    a, b = pair()
+    messages = Pyjo.IOLoop.Messages.new(a)
+    other = Pyjo.IOLoop.Messages.new(b)
+    received = other.message_p()
+    messages.send('bye')
+    messages.close_gracefully_p().then(lambda *args: got.append('closed gracefully')).wait()
+    received.then(got.append).wait()
+    is_deeply_ok(got[-2:], ['closed gracefully', b'bye'], 'closed once written')
+
+    # The peer reads no more, as nothing waits for a message, so it is closed here
+    b.close()
+
+    a, b = pair()
+    a.timeout = 0.2
+    messages = Pyjo.IOLoop.Messages.new(a)
+    timeouts = []
+    messages.on('timeout', lambda messages: timeouts.append('timeout'))
+    messages.message_p().catch(lambda err: got.append(err)).wait()
+    isa_ok(got[-1], TimeoutError, 'rejected by the timeout')
+    is_deeply_ok(timeouts, ['timeout'], 'event timeout')
+    b.close()
+
 if os.name != 'nt':
     with subtest('Standard output and input of a child process'):
         code = 'import sys\nfor line in sys.stdin:\n    print(line.strip().upper(), flush=True)\n'

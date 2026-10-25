@@ -542,6 +542,58 @@ with subtest('Errors of the promises of a stream'):
     like_ok(errors[-1], r'^Stream closed before all data has been written', 'write rejected')
     reader.close()
 
+with subtest('Promises of a stream that is closed already'):
+    reader, writer = stream_pair()
+    reader.close()
+    writer.close()
+    got = []
+    reader.read_p().then(got.append).wait()
+    reader.once_p('close').then(lambda *args: got.append('close')).wait()
+    reader.close_gracefully_p().then(lambda *args: got.append('closed')).wait()
+    writer.write_p(b'x').catch(lambda err: got.append(str(err))).wait()
+    is_deeply_ok(got[:3], [None, 'close', 'closed'], 'the end at once')
+    like_ok(got[3], r'^Stream closed before all data has been written', 'write rejected at once')
+    chunks = []
+
+    @Pyjo.Promise.coroutine
+    async def iterate():
+        async for chunk in reader:
+            chunks.append(chunk)
+
+    iterate().wait()
+    is_deeply_ok(chunks, [], 'no chunks')
+
+with subtest('Graceful close of the promises of a stream'):
+    reader, writer = stream_pair()
+    got = []
+    data = reader.read_all_p()
+    writer.write(b'x' * 1000000)
+    writer.close_gracefully_p().then(lambda *args: got.append('closed')).wait()
+    data.then(lambda chunk: got.append(len(chunk))).wait()
+    is_deeply_ok(got, ['closed', 1000000], 'closed once written')
+    reader, writer = stream_pair()
+    writer.close_gracefully_p().then(lambda *args: got.append('at once')).wait()
+    is_ok(got[-1], 'at once', 'closed with nothing to write')
+    reader.close()
+
+with subtest('Timeout of the promises of a stream'):
+    reader, writer = stream_pair()
+    reader.timeout = 0.2
+    errors = []
+    reader.read_p().catch(lambda err: errors.append(err)).wait()
+    reader.read_p().catch(lambda err: errors.append(err)).wait()
+    ok(all(isinstance(err, TimeoutError) for err in errors), 'read rejected by the timeout')
+    is_deeply_ok([str(err) for err in errors], ['Inactivity timeout', 'Inactivity timeout'], 'the next one too')
+    writer.close()
+
+    # The peer reads nothing, so the stream is inactive once the buffers of the system are full
+    reader, writer = stream_pair()
+    reader.stop()
+    writer.timeout = 0.2
+    writer.write_p(b'x' * 100000000).catch(lambda err: errors.append(err)).wait()
+    isa_ok(errors[-1], TimeoutError, 'write rejected by the timeout')
+    reader.close()
+
 if os.name != 'nt':
     with subtest('Promises of the pipes of a child process'):
         child = Pyjo.IOLoop.ChildProcess.new().spawn(

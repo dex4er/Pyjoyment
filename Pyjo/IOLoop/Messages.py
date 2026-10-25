@@ -125,6 +125,15 @@ Emitted for each message that has arrived, without its framing. ::
 
     messages.on('message', lambda messages, message: print(f'Message: {message!r}'))
 
+timeout
+~~~~~~~
+::
+
+    messages.on('timeout', lambda messages: ...)
+
+Emitted if the stream has been inactive for too long and will get closed
+automatically, as the event ``timeout`` of :mod:`Pyjo.IOLoop.Stream`.
+
 See also
 --------
 
@@ -395,11 +404,15 @@ class Pyjo_IOLoop_Messages(Pyjo.EventEmitter.object):
         def error(stream: Any, e: Exception) -> None:
             self.emit('error', e)
 
+        def timeout(stream: Any) -> None:
+            self.emit('timeout')
+
         self._subscribe(stream, 'read', read)
         self._subscribe(stream, 'end', end)
         for handle in (stream, self.output) if self.output is not stream else (stream,):
             self._subscribe(handle, 'close', close)
             self._subscribe(handle, 'error', error)
+            self._subscribe(handle, 'timeout', timeout)
 
     def __aiter__(self) -> AsyncIterator[bytes]:
         """::
@@ -436,6 +449,24 @@ class Pyjo_IOLoop_Messages(Pyjo.EventEmitter.object):
         """
         self.output.close_gracefully()
 
+    def close_gracefully_p(self) -> Pyjo.Promise.object:
+        """::
+
+            promise = messages.close_gracefully_p()
+
+        Same as :meth:`close_gracefully`, but returns a :mod:`Pyjo.Promise`
+        object, which is fulfilled once the stream has been closed, also when it
+        is closed already. ::
+
+            await messages.send_p('Bye!')
+            await messages.close_gracefully_p()
+        """
+        if self._closed:
+            return Pyjo.Promise.resolve()
+        promise = self.once_p('close')
+        self.close_gracefully()
+        return promise
+
     def iterate(self) -> AsyncIterator[bytes]:
         """::
 
@@ -449,7 +480,7 @@ class Pyjo_IOLoop_Messages(Pyjo.EventEmitter.object):
             async for message in messages:
                 await messages.send_p(message.upper())
         """
-        return self._pull('message', True).iterate()
+        return self._messages().iterate()
 
     @property
     def max_message_size(self) -> int:
@@ -479,7 +510,9 @@ class Pyjo_IOLoop_Messages(Pyjo.EventEmitter.object):
 
         Return a :mod:`Pyjo.Promise` object, which is fulfilled with the next
         message, or ``None`` at the end of the stream, the event ``close`` or
-        ``end``, and rejected with the error of the event ``error``. The stream
+        ``end``, or when it is closed already, and rejected with the error of
+        the event ``error``, or a :class:`TimeoutError` when the stream has been
+        inactive for too long. The stream
         reads only while a promise waits, as :meth:`~Pyjo.IOLoop.Stream.Pyjo_IOLoop_Stream.read_p`
         of :mod:`Pyjo.IOLoop.Stream` does, and the subscribers of the event
         ``message`` get the messages that it reads then. A loop of them handles
@@ -490,7 +523,20 @@ class Pyjo_IOLoop_Messages(Pyjo.EventEmitter.object):
             while (message := await messages.message_p()) is not None:
                 print(message)
         """
-        return self._pull('message', True).next_p()
+        return self._messages().next_p()
+
+    def once_p(self, name: str) -> Pyjo.Promise.object:
+        """::
+
+            promise = messages.once_p('close')
+
+        Same as :meth:`~Pyjo.EventEmitter.Pyjo_EventEmitter.once_p` of
+        :mod:`Pyjo.EventEmitter`, but fulfilled at once for the event
+        ``close`` of a stream that is closed already, as it comes no more.
+        """
+        if name == 'close' and self._closed:
+            return Pyjo.Promise.resolve()
+        return super().once_p(name)
 
     def send(self, message: bytes | str, cb: Callable[[Self], Any] | None = None) -> Self:
         """::
@@ -516,19 +562,28 @@ class Pyjo_IOLoop_Messages(Pyjo.EventEmitter.object):
 
         Same as :meth:`send`, but returns a :mod:`Pyjo.Promise` object, which
         is fulfilled once all data has been written, and rejected if the stream
-        closes before. ::
+        closes before, or is closed already, or with a :class:`TimeoutError`
+        when it has been inactive for too long. ::
 
             await messages.send_p('Hello')
         """
+        if self._closed:
+            return Pyjo.Promise.reject(Pyjo.Exception.new('Stream closed before all data has been written'))
         promise = Pyjo.Promise.new()
 
         def closed(messages: Any) -> None:
+            self.unsubscribe('timeout', inactive)
             promise.reject(Pyjo.Exception.new('Stream closed before all data has been written'))
 
+        def timeout(messages: Any) -> None:
+            self.unsubscribe('close', wrapper)
+            promise.reject(TimeoutError('Inactivity timeout'))
+
         wrapper = self.once('close', closed)
+        inactive = self.once('timeout', timeout)
 
         def drained(messages: Any) -> None:
-            self.unsubscribe('close', wrapper)
+            self.unsubscribe('close', wrapper).unsubscribe('timeout', inactive)
             promise.resolve()
 
         self.send(message, drained)
@@ -551,6 +606,13 @@ class Pyjo_IOLoop_Messages(Pyjo.EventEmitter.object):
         Stop reading messages from the stream.
         """
         self.stream.stop()
+
+    # The pull of the messages, which a stream that is closed already has ended
+    def _messages(self) -> Any:
+        pull = self._pull('message', True)
+        if self._closed:
+            pull.end()
+        return pull
 
     def _close(self, stream: Pyjo.IOLoop.Stream.object) -> None:
         # An output of its own that is closed, while the input is still read until the peer ends it
