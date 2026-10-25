@@ -26,7 +26,7 @@ ATTEMPTS = 3
 
 
 def port():
-    # A port that is free now, which no socket of the system takes by itself, and no other test
+    # A port that is free now, of TCP and of UDP, which no socket of the system takes by itself, and no other test
     global _locks
     if _locks is None:
         _locks = os.open(
@@ -39,8 +39,9 @@ def port():
         except OSError:
             continue
         try:
-            with socket.socket() as sock:
-                sock.bind(('127.0.0.1', port))
+            for kind in (socket.SOCK_STREAM, socket.SOCK_DGRAM):
+                with socket.socket(socket.AF_INET, kind) as sock:
+                    sock.bind(('127.0.0.1', port))
         except OSError:
             continue
         return port
