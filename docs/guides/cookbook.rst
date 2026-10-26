@@ -404,6 +404,121 @@ For more information and many more container deployment options we recommend
 the `Docker <https://docs.docker.com/>`_ and `Kubernetes
 <https://kubernetes.io/docs/>`_ documentation.
 
+Health checks
+~~~~~~~~~~~~~
+
+Orchestrators and load balancers ask an application over HTTP whether it is
+alive and whether it is ready for requests. :mod:`Pyjoyment.Plugin.Health`
+answers them with the endpoints of Kubernetes: ``/livez`` while the server
+answers, ``/healthz`` as its alias, and ``/readyz`` once the checks of the
+application pass.
+
+.. literalinclude:: cookbook/health.py
+    :language: python
+    :caption: myapp.py
+
+A check fails when it raises an exception or returns ``False``, and a
+coroutine function or a promise is waited for, with a timeout, so a check can
+ask a service that the application cannot work without, without blocking the
+server.
+
+.. code-block:: python
+
+    async def search(c):
+        tx = await c.ua().get_p('http://search.internal:9200/_cluster/health')
+        return tx.res.is_success
+
+    app.health.check('search', search, timeout=2)
+
+Readiness lists the checks, which fail with ``503 Service Unavailable``, and
+their reasons go to the log only.
+
+.. code-block:: console
+
+    $ curl -i http://127.0.0.1:3000/readyz
+    HTTP/1.1 503 Service Unavailable
+    ...
+    [+]shutdown ok
+    [-]uploads failed: reason withheld
+    readyz check failed
+
+Liveness has no checks of the application, as an orchestrator restarts a
+container whose liveness fails, and a restart does not bring a database back.
+In Kubernetes, the probes go to the port of the container, and the startup
+probe gives the application time to start before liveness counts.
+
+.. code-block:: yaml
+
+    spec:
+      terminationGracePeriodSeconds: 35
+      containers:
+        - name: myapp
+          image: myapp_image
+          ports:
+            - containerPort: 3000
+          startupProbe:
+            httpGet:
+              path: /livez
+              port: 3000
+            periodSeconds: 1
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: 3000
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 3000
+          lifecycle:
+            preStop:
+              sleep:
+                seconds: 5
+
+Kubernetes sends ``TERM`` to a container that it stops at the same time as it
+takes the pod out of the endpoints of its services, and kube-proxy, an ingress
+controller or the load balancer of a cloud learn it a moment later. The server
+stops accepting connections at ``TERM``, so the requests that they still send
+it would fail. The ``preStop`` hook that sleeps keeps the server serving until
+they know, and ``terminationGracePeriodSeconds`` has room for it and for the
+25 seconds of
+:attr:`~Pyjo.Server.Prefork.Pyjo_Server_Prefork.graceful_timeout`. From the
+moment the server stops gracefully, readiness fails with the check
+``shutdown``, which a load balancer that keeps its connections alive sees with
+its last response. Cloud Run stops sending requests to an instance before it
+stops it, and needs no such hook; its startup probe can wait for readiness, as
+it sends no requests to an instance before it passes.
+
+.. code-block:: yaml
+
+    spec:
+      template:
+        spec:
+          containers:
+            - image: myapp_image
+              startupProbe:
+                httpGet:
+                  path: /readyz
+              livenessProbe:
+                httpGet:
+                  path: /livez
+
+The ``Dockerfile`` of :mod:`Pyjoyment.Command.Author.generate.dockerfile` has a
+``HEALTHCHECK`` that requests the liveness of an application with the plugin,
+which ``docker ps`` shows, and which ``depends_on`` of Docker Compose waits
+for.
+
+.. code-block:: yaml
+
+    services:
+      myapp:
+        build: .
+      worker:
+        build: ./worker
+        depends_on:
+          myapp:
+            condition: service_healthy
+
 Hot deployment
 ~~~~~~~~~~~~~~
 
