@@ -1188,7 +1188,11 @@ pattern.match_partial(path)`.
 - `async sub` of Mojo is an `async def` that the reactor runs as a promise,
   `Pyjo.Promise.coroutine`, and Mojo's `AWAIT_*` methods are `__await__`. A
   reactor without asyncio drives a coroutine that awaits promises of
-  Pyjoyment; the asyncio reactor runs it as a task.
+  Pyjoyment; the asyncio reactor runs it as a task. Each step of it is an
+  event that ends `one_tick`, as a step of an `async sub` is a callback of
+  `next_tick` in Mojo, so that code that waits with `one_tick` for what it
+  does, as a server that waits for the response of an action, does not wait
+  for the next timer.
 - A method that the base class of Mojo leaves to a subclass raises
   `NotImplementedError` with the message of Mojo's croak,
   `Method "x" not implemented by subclass`.
