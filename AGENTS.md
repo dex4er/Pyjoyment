@@ -673,6 +673,14 @@ against DNS rebinding, which the transport of MCP over HTTP requires of a
 server on localhost, as the middleware of the MCP SDK and the hosts of
 Django have it, in a hook of `before_dispatch` or the helper `allowed_hosts`
 of `under`, as a condition of a route that fails lets the next route match),
+`Pyjoyment.Plugin.Health` (the liveness and the readiness of containers and
+orchestrators, with the endpoints of Kubernetes, in a hook of `around_dispatch`,
+as a hook of `before_dispatch`, as the one of `AllowedHosts`, would reject the
+`Host` of the address of a pod, and the readiness of a server that stops
+gracefully from `is_stopping` of `Pyjo.IOLoop.singleton`, the event loop of
+the thread that serves the request, as the hook `before_server_start` comes
+once, in the manager, and a worker of `Pyjo.Server.Prethread` has the loop of
+its thread),
 `Pyjoyment.Plugin.PyRenderer` (the renderer of template strings, inspired by
 `Mojolicious::Plugin::EPLRenderer`), `Pyjoyment.Plugin.TOMLConfig` (inspired
 by `Mojolicious::Plugin::NotYAMLConfig`, for the format of configuration of

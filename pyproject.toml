@@ -372,6 +372,7 @@ strict = [
   "Pyjoyment/Plugin/DefaultHelpers.py",
   "Pyjoyment/Plugin/EPLRenderer.py",
   "Pyjoyment/Plugin/EPRenderer.py",
+  "Pyjoyment/Plugin/Health.py",
   "Pyjoyment/Plugin/HeaderCondition.py",
   "Pyjoyment/Plugin/JSONConfig.py",
   "Pyjoyment/Plugin/Mount.py",
