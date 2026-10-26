@@ -26,6 +26,22 @@ version = release = PROJECT['version']
 # The diagrams of the guides, which mermaid.js renders in the browser
 extensions = ['sphinx.ext.autodoc', 'sphinx.ext.linkcode', 'sphinxcontrib.mermaid']
 
+# The trees of files and processes are treeView-beta, which mermaid.js has since 11.16, newer than the one that
+# sphinxcontrib-mermaid loads by default
+mermaid_version = '11.17.2'
+
+# A tree has the width of its text, as the text of the page, not the width of the page, and a sequence names its
+# participants once, above it
+mermaid_init_config = {
+    'startOnLoad': False,
+    'treeView': {'useMaxWidth': False},
+    'sequence': {'mirrorActors': False},
+}
+
+# A diagram has its own size, where sphinxcontrib-mermaid makes each one 500 pixels high
+html_static_path = ['_static']
+html_css_files = ['mermaid.css']
+
 # The commit that the links to the source point to: the one that Read the Docs builds, or the one of the checkout
 COMMIT = (
     os.environ.get('READTHEDOCS_GIT_COMMIT_HASH')

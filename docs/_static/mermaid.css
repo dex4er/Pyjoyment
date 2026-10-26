@@ -1,0 +1,5 @@
+/* A diagram has its own size, not the height of 500 pixels of sphinxcontrib-mermaid, which scales a small one up */
+div.body pre.mermaid > svg {
+  height: auto;
+  width: auto;
+}

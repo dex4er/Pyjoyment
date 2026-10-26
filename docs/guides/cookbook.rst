@@ -82,18 +82,13 @@ Pyjoyment application (or even using Unix sockets), balancing load across
 multiple instances, or supporting several applications through the same
 IP/port.
 
-.. code-block:: text
+.. mermaid::
 
-                   ..........................................
-                   :                                        :
-   +--------+      :  +-----------+      +---------------+  :
-   |        |-------->|           |      |               |  :
-   | client |      :  |  reverse  |----->|   Pyjoyment   |  :
-   |        |<--------|   proxy   |      |  application  |  :
-   +--------+      :  |           |<-----|               |  :
-                   :  +-----------+      +---------------+  :
-                   :                                        :
-                   .. system boundary (e.g. same host) ......
+    flowchart LR
+        client <--> proxy
+        subgraph boundary [system boundary, e.g. same host]
+            proxy[reverse proxy] <--> app[Pyjoyment application]
+        end
 
 This setup introduces some problems, though: the application will receive
 requests from the reverse proxy instead of the original client; the
@@ -105,17 +100,17 @@ application.
 As an example, compare a sample request from the client and what the
 Pyjoyment application receives:
 
-.. code-block:: text
+.. mermaid::
 
-   client                       reverse proxy                Pyjoyment app
-    __|__              _______________|______________             ____|____
-   /     \            /                              \           /         \
-   1.2.3.4 --HTTPS--> api.example.com      10.20.30.39 --HTTP--> 10.20.30.40
-
-   GET /foo/1 HTTP/1.1                |    GET /foo/1 HTTP/1.1
-   Host: api.example.com              |    Host: 10.20.30.40
-   User-Agent: Firefox                |    User-Agent: ShinyProxy/1.2
-   ...                                |    ...
+    %%{init: {'sequence': {'noteAlign': 'left'}}}%%
+    sequenceDiagram
+        participant client as client<br/>1.2.3.4
+        participant proxy as reverse proxy<br/>api.example.com<br/>10.20.30.39
+        participant app as Pyjoyment app<br/>10.20.30.40
+        client ->> proxy: HTTPS
+        Note over client,proxy: GET /foo/1 HTTP/1.1<br/>Host: api.example.com<br/>User-Agent: Firefox<br/>...
+        proxy ->> app: HTTP
+        Note over proxy,app: GET /foo/1 HTTP/1.1<br/>Host: 10.20.30.40<br/>User-Agent: ShinyProxy/1.2<br/>...
 
 However, now the client address is no longer available (which might be
 useful for analytics, or Geo-IP) and URLs generated via
@@ -252,13 +247,14 @@ pre-forking web server :mod:`Pyjo.Server.Prefork`, which can take advantage
 of multiple CPU cores and copy-on-write memory management to scale up to
 thousands of concurrent client connections.
 
-.. code-block:: text
+.. mermaid::
 
-    Pyjo.Server.Prefork
-    |- Pyjo.Server.Daemon [1]
-    |- Pyjo.Server.Daemon [2]
-    |- Pyjo.Server.Daemon [3]
-    +- Pyjo.Server.Daemon [4]
+    treeView-beta
+        Pyjo.Server.Prefork
+            Pyjo.Server.Daemon [1]
+            Pyjo.Server.Daemon [2]
+            Pyjo.Server.Daemon [3]
+            Pyjo.Server.Daemon [4]
 
 It is based on :mod:`Pyjo.Server.Daemon` and available to every application
 through the command :mod:`Pyjoyment.Command.prefork`.
@@ -312,10 +308,11 @@ Reload
 After reading the :doc:`tutorial`, you should already be familiar with
 :mod:`Pyjo.Server.Reload`.
 
-.. code-block:: text
+.. mermaid::
 
-    Pyjo.Server.Reload
-    +- Pyjo.Server.Daemon
+    treeView-beta
+        Pyjo.Server.Reload
+            Pyjo.Server.Daemon
 
 It is basically a restarter that forks a new :mod:`Pyjo.Server.Daemon` web
 server whenever a file in your project changes, and should therefore only be

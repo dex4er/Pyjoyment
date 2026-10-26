@@ -21,25 +21,33 @@ MVC is a software architectural pattern for graphical user interface
 programming originating in Smalltalk-80, that separates application logic,
 presentation and input.
 
-.. code-block:: text
+.. mermaid::
 
-               +------------+    +-------+    +------+
-      Input -> | Controller | -> | Model | -> | View | -> Output
-               +------------+    +-------+    +------+
+    flowchart LR
+        Input --> Controller --> Model --> View --> Output
+        classDef plain fill:none,stroke:none
+        class Input,Output plain
 
 A slightly modified version of the pattern moving some application logic into
 the *controller* is the foundation of pretty much every web framework these
 days, including :mod:`Pyjoyment`.
 
-.. code-block:: text
+.. mermaid::
 
-                  +----------------+     +-------+
-      Request  -> |                | <-> | Model |
-                  |                |     +-------+
-                  |   Controller   |
-                  |                |     +-------+
-      Response <- |                | <-> | View  |
-                  +----------------+     +-------+
+    %%{init: {'class': {'hideEmptyMembersBox': true}}}%%
+    classDiagram
+        direction LR
+        class Request
+        class Response
+        class Controller
+        class Model
+        class View
+        Request --> Controller
+        Response <-- Controller
+        Controller <--> Model
+        Controller <--> View
+        style Request fill:none,stroke:none
+        style Response fill:none,stroke:none
 
 The *controller* receives a request from a user, passes incoming data to the
 *model* and retrieves data from it, which then gets turned into an actual
@@ -57,36 +65,30 @@ like ``http://mojolicious.org/foo`` with your browser, you are basically
 asking the web server for the HTML *representation* of the
 ``http://mojolicious.org/foo`` *resource*.
 
-.. code-block:: text
+.. mermaid::
 
-      +--------+                                  +--------+
-      |        | -> http://mojolicious.org/foo -> |        |
-      | Client |                                  | Server |
-      |        | <-  <html>Mojo rocks!</html>  <- |        |
-      +--------+                                  +--------+
+    sequenceDiagram
+        participant C as Client
+        participant S as Server
+        C->>S: http://mojolicious.org/foo
+        S-->>C: #lt;html#gt;Mojo rocks!#lt;/html#gt;
 
 The fundamental idea here is that all resources are uniquely addressable with
 URLs and every resource can have different representations such as HTML, RSS
 or JSON. User interface concerns are separated from data storage concerns and
 all session state is kept client-side.
 
-.. code-block:: text
+.. mermaid::
 
-      +---------+                        +------------+
-      |         | ->    PUT /foo      -> |            |
-      |         | ->    Hello World!  -> |            |
-      |         |                        |            |
-      |         | <-    201 CREATED   <- |            |
-      |         |                        |            |
-      |         | ->    GET /foo      -> |            |
-      | Browser |                        | Web Server |
-      |         | <-    200 OK        <- |            |
-      |         | <-    Hello World!  <- |            |
-      |         |                        |            |
-      |         | ->    DELETE /foo   -> |            |
-      |         |                        |            |
-      |         | <-    200 OK        <- |            |
-      +---------+                        +------------+
+    sequenceDiagram
+        participant B as Browser
+        participant S as Web Server
+        B->>S: PUT /foo<br/>Hello World!
+        S-->>B: 201 CREATED
+        B->>S: GET /foo
+        S-->>B: 200 OK<br/>Hello World!
+        B->>S: DELETE /foo
+        S-->>B: 200 OK
 
 While HTTP methods such as ``PUT``, ``GET`` and ``DELETE`` are not directly
 part of REST they go well with it and are commonly used to manipulate
@@ -163,27 +165,28 @@ don't need more than a single file.
 Full :mod:`Pyjoyment` applications on the other hand are much closer to a
 well organized Python project to maximize maintainability.
 
-.. code-block:: text
+.. mermaid::
 
-    my_app                           # Application directory
-    |- MyApp                         # Application package
-    |  |- __init__.py                # Application class
-    |  |- __main__.py                # Application script
-    |  +- Controller                 # Controller package
-    |     +- Example.py              # Controller class
-    |- my_app.yml                    # Configuration file
-    |- pyproject.toml                # Project file with the dependencies
-    |- t                             # Test directory
-    |  +- basic.py                   # Random test
-    |- public                        # Static file directory (served automatically)
-    |  |- assets                     # Static assets created by bundlers
-    |  |  +- *generated assets*
-    |  +- index.html                 # Static HTML file
-    +- templates                     # Template directory
-       |- layouts                    # Template directory for layouts
-       |  +- default.html.ep         # Layout template
-       +- example                    # Template directory for "Example" controller
-          +- welcome.html.ep         # Template for "welcome" action
+    treeView-beta
+        my_app ## Application directory
+            MyApp ## Application package
+                __init__.py ## Application class
+                __main__.py ## Application script
+                Controller ## Controller package
+                    Example.py ## Controller class
+            my_app.yml ## Configuration file
+            pyproject.toml ## Project file with the dependencies
+            t ## Test directory
+                basic.py ## Random test
+            public ## Static file directory (served automatically)
+                assets ## Static assets created by bundlers
+                    *generated assets*
+                index.html ## Static HTML file
+            templates ## Template directory
+                layouts ## Template directory for layouts
+                    default.html.ep ## Layout template
+                example ## Template directory for "Example" controller
+                    welcome.html.ep ## Template for "welcome" action
 
 Both application skeletons can be automatically generated with the commands
 :mod:`Pyjoyment.Command.Author.generate.lite_app` and
@@ -410,15 +413,16 @@ this.
 
 And the directory structure should be looking like this now.
 
-.. code-block:: text
+.. mermaid::
 
-    myapp
-    |- myapp.py
-    |- MyApp
-    |  +- Model
-    |     +- Users.py
-    +- t
-       +- login.py
+    treeView-beta
+        myapp
+            myapp.py
+            MyApp
+                Model
+                    Users.py
+            t
+                login.py
 
 Our templates are using quite a few features of the renderer,
 :doc:`rendering` explains them all in great detail.
@@ -482,21 +486,22 @@ to allow running tests again.
 And the directory structure of our hybrid application should be looking like
 this.
 
-.. code-block:: text
+.. mermaid::
 
-    myapp
-    |- myapp.py
-    |- MyApp
-    |  |- __init__.py
-    |  +- Model
-    |     +- Users.py
-    |- t
-    |  +- login.py
-    +- templates
-       |- layouts
-       |  +- default.html.ep
-       |- index.html.ep
-       +- protected.html.ep
+    treeView-beta
+        myapp
+            myapp.py
+            MyApp
+                __init__.py
+                Model
+                    Users.py
+            t
+                login.py
+            templates
+                layouts
+                    default.html.ep
+                index.html.ep
+                protected.html.ep
 
 Controller class
 ~~~~~~~~~~~~~~~~
@@ -581,24 +586,25 @@ Full :mod:`Pyjoyment` applications are a little easier to test, so
 
 And our final directory structure should be looking like this.
 
-.. code-block:: text
+.. mermaid::
 
-    myapp
-    |- MyApp
-    |  |- __init__.py
-    |  |- __main__.py
-    |  |- Controller
-    |  |  +- Login.py
-    |  +- Model
-    |     +- Users.py
-    |- t
-    |  +- login.py
-    +- templates
-       |- layouts
-       |  +- default.html.ep
-       +- login
-          |- index.html.ep
-          +- protected.html.ep
+    treeView-beta
+        myapp
+            MyApp
+                __init__.py
+                __main__.py
+                Controller
+                    Login.py
+                Model
+                    Users.py
+            t
+                login.py
+            templates
+                layouts
+                    default.html.ep
+                login
+                    index.html.ep
+                    protected.html.ep
 
 Test-driven development takes a little getting used to, but can be a very
 powerful tool.
