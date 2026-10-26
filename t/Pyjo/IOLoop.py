@@ -411,9 +411,15 @@ with subtest('Graceful shutdown (without connection)'):
     loop.on('finish', finish_cb)
     loop.next_tick(lambda loop: loop.stop_gracefully())
     loop.timer(30, failed_cb)
+    # Not in Mojolicious: is_stopping
+    ok(not loop.is_stopping, 'not stopping')
     loop.start()
     ok(not err, 'no error')
     is_ok(finish, 1, 'finish event has been emitted once')
+    # Not in Mojolicious: is_stopping until reset
+    ok(loop.is_stopping, 'stopping')
+    loop.reset()
+    ok(not loop.is_stopping, 'not stopping after reset')
 
 with subtest('Graceful shutdown (max_accepts)'):
     err = None

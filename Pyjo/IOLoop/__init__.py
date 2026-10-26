@@ -437,6 +437,19 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
         """
         return self.reactor.is_running
 
+    # Not in Mojolicious: what readiness answers while the connections are closing, as Mojo keeps the count private
+    @property
+    def is_stopping(self) -> bool:
+        """::
+
+            boolean = Pyjo.IOLoop.is_stopping()
+            boolean = loop.is_stopping
+
+        Check if event loop is stopping gracefully, from :meth:`stop_gracefully`
+        until :meth:`reset`.
+        """
+        return bool(self._stop)
+
     @overload
     def next_tick(self, cb: TimerCallback) -> None: ...
 
@@ -989,3 +1002,14 @@ def is_running() -> bool:
     Check if the :data:`singleton` is running.
     """
     return Pyjo_IOLoop.singleton().is_running
+
+
+# Not in Mojolicious: the counterpart of is_running
+def is_stopping() -> bool:
+    """::
+
+        boolean = Pyjo.IOLoop.is_stopping()
+
+    Check if the :data:`singleton` is stopping gracefully.
+    """
+    return Pyjo_IOLoop.singleton().is_stopping
