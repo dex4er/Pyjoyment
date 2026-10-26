@@ -160,6 +160,27 @@ with subtest('run'):
     response = server.run(event(), 'context')
     is_ok(response['statusCode'], 200, 'response')
 
+with subtest('run_runtime'):
+    # The application of a script as the runtime, until the process ends
+    import Pyjo.File
+
+    import importlib
+
+    tmp = Pyjo.File.tempdir()
+    tmp.child('runtime.py').spew(
+        b'from Pyjoyment.Lite import app, get\n'
+        b'import Pyjo.Server.Lambda\n\n'
+        b"get('/', lambda c: c.render(text='Hello Lambda!'))\n"
+        b"app.log.level = 'fatal'\n"
+        b'server = Pyjo.Server.Lambda.new(app=app)\n'
+        b'server.run_runtime()\n'
+    )
+    request = {'version': '2.0', 'rawPath': '/', 'requestContext': {'http': {'method': 'GET'}}}
+    got, code = importlib.import_module('RuntimeAPI').invoke(
+        [sys.executable, 'runtime.py'], [('b1', request)], 1, tmp.to_str()
+    )
+    is_ok(got[0][3]['body'], 'Hello Lambda!', 'server.run_runtime()')
+
 with subtest('to_lambda_app'):
     handler = server.to_lambda_app()
     ok(callable(handler), 'handler')

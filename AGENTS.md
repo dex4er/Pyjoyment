@@ -891,7 +891,13 @@ copy:
   the command has to be detected. The runtime of AWS Lambda imports the script
   the same way, and `AWS_LAMBDA_RUNTIME_API`, which it sets, detects the
   command `lambda`, whose module has the name of a keyword of Python, which
-  only `importlib` imports.
+  only `importlib` imports. A script that runs as the main program with that
+  variable, as the `bootstrap` of a custom runtime or the command of an image,
+  is the runtime itself: the command finds the module that starts the
+  application in the stack, outside of the frames of `Pyjo` and `Pyjoyment`,
+  and runs the loop of the Runtime API when it is `__main__`, which
+  `python -m MyApp` is too, and returns the handler for a runtime that imports
+  the script otherwise.
 - The generators of the command `generate` write projects for uv, where Mojo
   writes ones for ExtUtils::MakeMaker: `generate makefile` is
   `generate pyproject`, and `cpanify` is left out, as `uv publish` uploads to

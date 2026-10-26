@@ -26,6 +26,16 @@ The script of an application that ends with ``handler = app.start()``, as
 runtime of AWS Lambda, which has the ``AWS_LAMBDA_RUNTIME_API`` environment
 variable, and the command of its arguments otherwise.
 
+The script that runs as the main program with that variable, as the
+``bootstrap`` of a custom runtime or the command of an image, is the runtime
+itself: the command runs the application for the invocations of the Runtime
+API with :meth:`Pyjo.Server.Lambda.Pyjo_Server_Lambda.run_runtime`, until the
+process ends, where a runtime that imports the script takes its handler. ::
+
+    #!/bin/sh
+    # The bootstrap of a custom runtime, as provided.al2023
+    exec python3 "$LAMBDA_TASK_ROOT/myapp.py"
+
 This is a core command, that means it is always enabled and its code a good
 example for learning to build new commands, you're welcome to fork it.
 
@@ -48,6 +58,9 @@ import Pyjo.Server.Lambda
 import Pyjoyment.Command
 
 from Pyjo.Util import extract_usage
+
+import inspect
+import os
 
 from typing import Any
 
@@ -83,7 +96,21 @@ class Pyjoyment_Command_lambda(Pyjoyment.Command.object):
 
         Run this command.
         """
-        return Pyjo.Server.Lambda.new(app=self.app).to_lambda_app()
+        server = Pyjo.Server.Lambda.new(app=self.app)
+
+        # The script of the application as the runtime, where a runtime that imports it takes its handler
+        if os.environ.get('AWS_LAMBDA_RUNTIME_API') and _is_main():
+            return server.run_runtime()
+        return server.to_lambda_app()
+
+
+# The module that starts the application is the main program, outside of the frames of Pyjoyment, where it is a module
+# that a runtime imports otherwise
+def _is_main() -> bool:
+    frame = inspect.currentframe()
+    while frame is not None and str(frame.f_globals.get('__name__', '')).split('.')[0] in ('Pyjo', 'Pyjoyment'):
+        frame = frame.f_back
+    return frame is not None and frame.f_globals.get('__name__') == '__main__'
 
 
 new = Pyjoyment_Command_lambda.new

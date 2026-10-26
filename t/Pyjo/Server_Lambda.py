@@ -433,6 +433,39 @@ with subtest('Runtime client'):
     got, code = runtime('handlers.missing', [], 1, ends=True)
     like_ok(got[0][3]['errorMessage'], r'^Handler "missing" missing on module "handlers"', 'missing handler')
 
+# Not in Mojolicious: the script of an application, or its package, as the runtime itself, which the command lambda
+# detects as the main program
+TMP.child('LambdaApp').make_path()
+TMP.child('lite.py').spew(
+    b'from Pyjoyment.Lite import app, get\n\n'
+    b"get('/', {'text': 'Hello Lite!'})\n"
+    b"app.log.level = 'fatal'\n"
+    b'handler = app.start()\n'
+)
+TMP.child('LambdaApp', '__init__.py').spew(
+    b'import Pyjoyment\n\n\n'
+    b'class LambdaApp(Pyjoyment.object):\n'
+    b'    def startup(self):\n'
+    b"        self.log.level = 'fatal'\n"
+    b"        self.routes.get('/', {'text': 'Hello App!'})\n\n\n"
+    b'new = LambdaApp.new\n'
+    b'object = LambdaApp\n'
+)
+TMP.child('LambdaApp', '__main__.py').spew(b"import Pyjoyment.Commands\n\nPyjoyment.Commands.start_app('LambdaApp')\n")
+
+with subtest('Application as the runtime'):
+    for command, text in (
+        ([sys.executable, 'lite.py'], 'Hello Lite!'),
+        ([sys.executable, '-m', 'LambdaApp'], 'Hello App!'),
+    ):
+        got, code = RuntimeAPI.invoke(command, [('j1', http_api()), ('j2', http_api())], 2, TMP.to_str())
+        is_ok(
+            [(kind, id) for kind, id, *_ in got],
+            [('response', 'j1'), ('response', 'j2')],
+            f'{command[-1]} is the runtime',
+        )
+        is_ok(got[1][3]['body'], text, 'body')
+
 with subtest('Streaming runtime client'):
     # An application of Pyjoyment, whose chunks come as they are written, and the next invocation on a new connection
     env = {'_HANDLER': 'handlers.pyjoyment', 'PYJO_LAMBDA_INVOKE_MODE': 'RESPONSE_STREAM'}

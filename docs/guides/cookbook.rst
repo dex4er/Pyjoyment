@@ -955,14 +955,20 @@ variable, which Lambda sets.
     :language: python
     :caption: myapp.py
 
-On a custom runtime, as ``provided.al2023``, the ``bootstrap`` of the function
-runs it with the runtime client of :mod:`Pyjo.Server.Lambda`, which needs no
-other library.
+On a custom runtime, as ``provided.al2023``, or in an image, the ``bootstrap``
+of the function runs it with the runtime client of :mod:`Pyjo.Server.Lambda`,
+which needs no other library, or runs the script itself, which is the runtime
+when it is the main program, as :mod:`Pyjoyment.Command.lambda` detects.
 
 .. code-block:: sh
 
     #!/bin/sh
     exec python3 -m Pyjo.Server.Lambda
+
+.. code-block:: sh
+
+    #!/bin/sh
+    exec python3 "$LAMBDA_TASK_ROOT/myapp.py"
 
 The same function runs locally, mounted in an application with
 :mod:`Pyjo.App.Lambda`, in a process of its own, which gets its invocations
