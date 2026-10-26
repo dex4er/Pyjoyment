@@ -436,7 +436,12 @@ of `generate dockerfile --graceful-timeout`, whose workers stop with it. Its
 variant `lambda` runs a Lite script that ends with `handler = app.start()` as
 an event function in the image of AWS Lambda for Python, whose emulator of the
 Runtime API it invokes with the events of the payload formats 2.0 and 1.0,
-and its variant `fastcgi` runs a Lite script that listens for FastCGI, with
+its variant `lambda-stream` runs the same script with
+`PYJO_LAMBDA_INVOKE_MODE=RESPONSE_STREAM` through the wrapper of
+`examples/lambda_stream`, which the emulator runs in the place of the runtime
+client of the image, as it has no `AWS_LAMBDA_EXEC_WRAPPER`, and checks the
+format of the stream, as the emulator gives the whole stream at its end, with
+the content type `application/octet-stream`, and its variant `fastcgi` runs a Lite script that listens for FastCGI, with
 `PYJO_LISTEN`, behind Caddy in a container of its own on the same network,
 whose image `Dockerfile.caddy` pins, so that Renovate bumps it, and checks the
 pages through Caddy.

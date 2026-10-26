@@ -6,14 +6,15 @@ script, which shows the same thing in Perl.
 
 ## Layout
 
-| Directory    | What it holds                                                                                          |
-| ------------ | ------------------------------------------------------------------------------------------------------ |
-| `pyjo/`      | the toolkit: objects, events, URLs, the event loop, and TCP clients and servers on it                  |
-| `pyjoyment/` | applications of the framework, `Pyjoyment.Lite`                                                        |
-| `mount/`     | applications of other frameworks, WSGI, ASGI, FastCGI, CGI and AWS Lambda, mounted in `Pyjoyment.Lite` |
-| `servers/`   | applications on the servers of Pyjoyment, on ASGI, WSGI and CGI, and on AWS Lambda                     |
-| `lambda/`    | an application of `Pyjoyment.Lite` as an event function of AWS Lambda, deployed with OpenTofu          |
-| `ua/`        | the user agent: requests, web scraping, and a server and a user agent in one event loop                |
+| Directory        | What it holds                                                                                          |
+| ---------------- | ------------------------------------------------------------------------------------------------------ |
+| `pyjo/`          | the toolkit: objects, events, URLs, the event loop, and TCP clients and servers on it                  |
+| `pyjoyment/`     | applications of the framework, `Pyjoyment.Lite`                                                        |
+| `mount/`         | applications of other frameworks, WSGI, ASGI, FastCGI, CGI and AWS Lambda, mounted in `Pyjoyment.Lite` |
+| `servers/`       | applications on the servers of Pyjoyment, on ASGI, WSGI and CGI, and on AWS Lambda                     |
+| `lambda/`        | an application of `Pyjoyment.Lite` as an event function of AWS Lambda, deployed with OpenTofu          |
+| `lambda_stream/` | the same, with the responses that AWS Lambda streams through a Function URL                            |
+| `ua/`            | the user agent: requests, web scraping, and a server and a user agent in one event loop                |
 
 ## Running
 
@@ -57,7 +58,9 @@ uv run python examples/mount/mount_fastcgi_php.py daemon
 
 The application of `lambda/` runs as an event function of AWS Lambda, which its
 OpenTofu deploys, with what it mounts, as PHP on php-fpm, as
-[`lambda/README.md`](lambda/README.md) says.
+[`lambda/README.md`](lambda/README.md) says, and the one of `lambda_stream/`
+as a function of its own whose responses Lambda streams, as
+[`lambda_stream/README.md`](lambda_stream/README.md) says.
 
 The tests in [`t/examples/`](../t/examples), in the same groups, check some of
 the scripts, and the documentation shows them on its page of examples.

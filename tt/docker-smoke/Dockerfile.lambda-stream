@@ -1,0 +1,16 @@
+# A streaming event function of AWS Lambda: the wheel of the checkout, the
+# script myapp.py, whose handler is myapp.handler, and the wrapper of
+# examples/lambda_stream, which the emulator of the Runtime API of the image
+# runs in the place of the runtime client of the image, as the
+# AWS_LAMBDA_EXEC_WRAPPER of Lambda does, which the emulator does not have
+FROM public.ecr.aws/lambda/python:3.14
+
+ARG WHEEL
+COPY ${WHEEL} ./
+RUN pip install --no-cache-dir --target "${LAMBDA_TASK_ROOT}" "./${WHEEL}"
+COPY myapp.py wrapper.py ${LAMBDA_TASK_ROOT}/
+
+ENV _HANDLER=myapp.handler \
+    PYJO_LAMBDA_INVOKE_MODE=RESPONSE_STREAM \
+    PYTHONPATH=${LAMBDA_TASK_ROOT}
+ENTRYPOINT ["/usr/local/bin/aws-lambda-rie", "/var/task/wrapper.py"]

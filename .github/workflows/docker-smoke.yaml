@@ -4,8 +4,9 @@ name: Docker Smoke Test
 # Lite script with pyproject.toml and a Lite script with the inline metadata
 # of PEP 723, with the wheel of the checkout, and checks that they serve the
 # generated pages and stop gracefully, and runs a Lite script as an event
-# function in the image of AWS Lambda for Python, and a Lite script that
-# speaks FastCGI to Caddy in front of it. The weekly run catches a change of
+# function in the image of AWS Lambda for Python, also streaming its responses
+# with the runtime client of Pyjoyment, and a Lite script that speaks FastCGI
+# to Caddy in front of it. The weekly run catches a change of
 # the images of Python, uv, AWS Lambda and Caddy.
 on:
   push:
@@ -14,6 +15,7 @@ on:
     paths:
       - tt/docker-smoke/**
       - .github/workflows/docker-smoke.yaml
+      - examples/lambda_stream/wrapper.py
       - Pyjo/**
       - Pyjoyment/**
       - mise.lock
@@ -25,6 +27,7 @@ on:
     paths:
       - tt/docker-smoke/**
       - .github/workflows/docker-smoke.yaml
+      - examples/lambda_stream/wrapper.py
       - Pyjo/**
       - Pyjoyment/**
       - mise.lock
@@ -49,6 +52,7 @@ jobs:
           - lite
           - lite-pep723
           - lambda
+          - lambda-stream
           - fastcgi
 
     runs-on: ubuntu-26.04-arm

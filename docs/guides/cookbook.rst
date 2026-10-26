@@ -987,6 +987,27 @@ So it is tried live with the built-in web server, and tested with
     t = Pyjo.Test.Pyjo.new('gateway.py')
     t.get_ok('/myapp').status_is(200).content_is('Hello Lambda at /myapp!')
 
+A Function URL with the invoke mode ``RESPONSE_STREAM``, or a REST API of API
+Gateway with the response transfer mode ``STREAM``, streams the responses of
+the function as they are written, as the tokens of a model or a long download
+need. The runtime of Python of Lambda does not stream, so the runtime client of
+:mod:`Pyjo.Server.Lambda` runs the function: with the ``bootstrap`` of a custom
+runtime above, or on the runtime of Python with a wrapper that
+``AWS_LAMBDA_EXEC_WRAPPER`` names, as ``/var/task/wrapper.py``. The function
+does not learn the invoke mode from its invocations, so
+``PYJO_LAMBDA_INVOKE_MODE=RESPONSE_STREAM`` tells it, the same as the one of the
+Function URL.
+
+.. literalinclude:: ../../examples/lambda_stream/wrapper.py
+    :language: python
+    :caption: wrapper.py
+
+:mod:`Pyjo.App.Lambda` streams the function locally the same way, with
+``PYJO_LAMBDA_INVOKE_MODE`` in its attribute ``env``, and the directory
+`examples/lambda_stream
+<https://github.com/dex4er/Pyjoyment/tree/main/examples/lambda_stream>`_ of the
+repository deploys such a function with OpenTofu.
+
 Standard input and output
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
