@@ -77,6 +77,19 @@ event function is the whole body. ::
     # The handler "myapp.handler" of an event function
     handler = Pyjo.Server.Lambda.new(app=app).to_lambda_app()
 
+With the invoke mode ``RESPONSE_STREAM`` of
+:attr:`~Pyjo.Server.Lambda.Pyjo_Server_Lambda.invoke_mode`, which
+follows the one of the Function URL or the response transfer mode of the
+REST API of API Gateway, the handler returns an iterator of the body as it is
+written instead, which the runtime client below streams: the status and the
+headers as JSON, 8 null bytes, and the chunks of the body as they come, with
+the content type ``application/vnd.awslambda.http-integration-response`` of
+the iterator. The events of Application Load Balancers, which have no
+streaming, get the whole response. ::
+
+    # PYJO_LAMBDA_INVOKE_MODE=RESPONSE_STREAM in the environment of the function
+    handler = Pyjo.Server.Lambda.new(app=app).to_lambda_app()
+
 Events
 ------
 
@@ -85,7 +98,8 @@ Events
 Attributes
 ----------
 
-:mod:`Pyjo.Server.Lambda` inherits all attributes from :mod:`Pyjo.Server`.
+:mod:`Pyjo.Server.Lambda` inherits all attributes from :mod:`Pyjo.Server` and
+implements :attr:`~Pyjo.Server.Lambda.Pyjo_Server_Lambda.invoke_mode`.
 
 Runtime client
 --------------
@@ -105,7 +119,12 @@ Lambda, which runs the handler of an event function, ``module.function`` or
 the one of ``_HANDLER``, as a custom runtime does: it gets the next
 invocation from the API of ``AWS_LAMBDA_RUNTIME_API``, calls the handler with
 its event and a context, and posts the value that the handler returns as
-JSON, or its exception, one invocation after another. An exception of the
+JSON, or its exception, one invocation after another. An iterator of bytes
+that the handler returns is a streaming response, chunked as it is iterated,
+of the ``content_type`` of the iterator or ``application/octet-stream``, with
+an exception in the middle of it in the trailers of the error, as the Runtime
+API takes it, and an exception before its first chunk as the error of the
+invocation. An exception of the
 import of the handler is an error of the initialization, which ends the
 client. The handler can be any handler of an event function, also one of
 another framework, which runs an event loop of its own, as the client runs
@@ -134,12 +153,12 @@ Classes
 -------
 """
 
-import Pyjo.Content.Single
 import Pyjo.IOLoop
 import Pyjo.Parameters
 import Pyjo.Server
 import Pyjo.Transaction
 
+from Pyjo.Server.WSGI import _IO  # pyright: ignore[reportPrivateUsage]
 from Pyjo.Util import die, extract_usage, getopt, url_escape
 
 import base64
@@ -153,13 +172,13 @@ import time
 import traceback
 import wsgiref.util
 
-from collections.abc import Callable, Sequence
-from typing import Any, NoReturn, cast
+from collections.abc import Callable, Iterator, Sequence
+from typing import Any, NoReturn, Self, cast
 
 
 type Event = dict[str, Any]
 type Response = dict[str, Any]
-type Handler = Callable[[Event, Any], Response]
+type Handler = Callable[[Event, Any], Response | Iterator[bytes]]
 
 # The content types of a body that is text, which goes as it is, where other bodies go in Base64
 _RE_TEXT = re.compile(r'(?:text/|application/(?:[\w.-]+\+)?(?:json|xml|javascript|yaml)\b)', re.I)
@@ -167,18 +186,54 @@ _RE_TEXT = re.compile(r'(?:text/|application/(?:[\w.-]+\+)?(?:json|xml|javascrip
 
 class Pyjo_Server_Lambda(Pyjo.Server.object):
     """
-    :mod:`Pyjo.Server.Lambda` inherits all methods from :mod:`Pyjo.Server`
-    and implements the following new ones.
+    :mod:`Pyjo.Server.Lambda` inherits all attributes and methods from
+    :mod:`Pyjo.Server` and implements the following new ones.
     """
+
+    def __init__(self, *, invoke_mode: str | None = None, **kwargs: Any) -> None:
+        """::
+
+            server = Pyjo.Server.Lambda.new()
+            server = Pyjo.Server.Lambda.new(invoke_mode='RESPONSE_STREAM')
+
+        Construct a new :mod:`Pyjo.Server.Lambda` object.
+        """
+        super().__init__(**kwargs)
+        self._invoke_mode = invoke_mode
+
+    @property
+    def invoke_mode(self) -> str:
+        """::
+
+            mode = server.invoke_mode
+            server.invoke_mode = 'RESPONSE_STREAM'
+
+        The mode of the invocations, as the ``InvokeMode`` of the Function
+        URL, or the response transfer mode of API Gateway, of the function,
+        which the function does not learn from its invocations: ``BUFFERED``
+        or ``RESPONSE_STREAM``, defaults to the value of the
+        ``PYJO_LAMBDA_INVOKE_MODE`` environment variable or ``BUFFERED``.
+        """
+        if self._invoke_mode is None:
+            self._invoke_mode = os.environ.get('PYJO_LAMBDA_INVOKE_MODE') or 'BUFFERED'
+        return self._invoke_mode
+
+    @invoke_mode.setter
+    def invoke_mode(self, value: str) -> None:
+        self._invoke_mode = value
 
     # reportIncompatibleMethodOverride "Method "run" overrides class "Pyjo_Server" in an incompatible manner": run takes
     # the event and the context, as the run of Pyjo.Server.WSGI takes the environment
-    def run(self, event: Event, context: Any = None) -> Response:  # pyright: ignore[reportIncompatibleMethodOverride]
+    def run(  # pyright: ignore[reportIncompatibleMethodOverride]
+        self, event: Event, context: Any = None
+    ) -> Response | Iterator[bytes]:
         """::
 
             response = server.run(event, context)
 
-        Run the event of an HTTP request and return its response.
+        Run the event of an HTTP request and return its response, or the
+        iterator of a streaming response with the invoke mode
+        ``RESPONSE_STREAM``.
         """
         request = _Request(event)
         env = request.environ()
@@ -202,36 +257,35 @@ class Pyjo_Server_Lambda(Pyjo.Server.object):
         while not resumed:
             Pyjo.IOLoop.one_tick()
 
-        # The whole body, which can come in chunks
+        # The body, which can come later and in chunks, without their framing
         res = tx.res.fix_headers()
-        body = b''
-        offset = 0
-        while not tx.is_empty:
-            if (chunk := res.get_body_chunk(offset)) is None:
-                Pyjo.IOLoop.one_tick()
-                continue
-            if not len(chunk):
-                break
-            offset += len(chunk)
-            body += chunk
-        if res.content.is_chunked:
-            body = _unchunk(body)
-        tx.closed()
+        body = _IO(tx, tx.is_empty, res.content.is_chunked)
 
-        # The headers without the hop-by-hop ones, as the response is the whole body
+        # The headers without the hop-by-hop ones, as the body is without its framing
         headers = [(name, value) for name, value in res.headers.to_list() if not wsgiref.util.is_hop_by_hop(name)]
         code = res.code or 404
+
+        # The body as it is written, after the status and the headers, where the events of an Application Load Balancer
+        # have no streaming
+        if self.invoke_mode == 'RESPONSE_STREAM' and not request.alb:
+            return _Stream(request.headers({'statusCode': code}, headers), body)
+
+        # The whole body
+        try:
+            content = b''.join(body)
+        finally:
+            body.close()
         response = request.headers({'statusCode': code}, headers)
         if request.alb:
             response['statusDescription'] = f'{code} {res.message or res.default_message(code)}'
 
         # Text as it is, other content in Base64
         content_type = res.headers.content_type or ''
-        if not body or _RE_TEXT.match(content_type) and _is_utf8(body):
-            response['body'] = body.decode()
+        if not content or _RE_TEXT.match(content_type) and _is_utf8(content):
+            response['body'] = content.decode()
             response['isBase64Encoded'] = False
         else:
-            response['body'] = base64.b64encode(body).decode('ascii')
+            response['body'] = base64.b64encode(content).decode('ascii')
             response['isBase64Encoded'] = True
         return response
 
@@ -246,10 +300,32 @@ class Pyjo_Server_Lambda(Pyjo.Server.object):
         # Preload application and wrap it
         self.app.server(self)
 
-        def handler(event: Event, context: Any) -> Response:
+        def handler(event: Event, context: Any) -> Response | Iterator[bytes]:
             return self.run(event, context)
 
         return handler
+
+
+# The streaming response of an HTTP integration of Function URLs and API Gateway: the status and the headers as JSON, 8
+# null bytes and the body as it is written
+class _Stream(Iterator[bytes]):
+    content_type = 'application/vnd.awslambda.http-integration-response'
+
+    def __init__(self, response: Response, body: _IO) -> None:
+        self._prelude: bytes | None = json.dumps(response, separators=(',', ':')).encode() + b'\x00' * 8
+        self._body = body
+
+    def __iter__(self) -> Self:
+        return self
+
+    def __next__(self) -> bytes:
+        if (prelude := self._prelude) is not None:
+            self._prelude = None
+            return prelude
+        return next(self._body)
+
+    def close(self) -> None:
+        self._body.close()
 
 
 # The request of an event, in one of its payload formats
@@ -432,7 +508,11 @@ class _Runtime:
                 os.environ.pop('_X_AMZN_TRACE_ID', None)
             path = f'{self.PREFIX}/invocation/{context.aws_request_id}'
             try:
-                body = json.dumps(handler(event, context)).encode()
+                result = handler(event, context)
+                if isinstance(result, Iterator):
+                    self.stream(path, cast(Iterator[bytes], result))
+                    continue
+                body = json.dumps(result).encode()
             except Exception as e:
                 self.post(f'{path}/error', _error(e), 'Unhandled')
                 continue
@@ -444,6 +524,46 @@ class _Runtime:
             headers['Lambda-Runtime-Function-Error-Type'] = error
         self.connection.request('POST', path, body, headers)
         self.connection.getresponse().read()
+
+    # A streaming response, chunked as it is written, with an exception in the middle of it in the trailers, and the
+    # connection closed after it, as the Runtime API asks
+    def stream(self, path: str, body: Iterator[bytes]) -> None:
+        try:
+            # The first chunk before the request, so that an exception before the response is the error of the
+            # invocation, which the Runtime API takes only before it
+            try:
+                chunk = next(body, b'')
+            except Exception as e:
+                self.post(f'{path}/error', _error(e), 'Unhandled')
+                return
+
+            connection = self.connection
+            connection.putrequest('POST', f'{path}/response', skip_accept_encoding=True)
+            connection.putheader('Content-Type', getattr(body, 'content_type', 'application/octet-stream'))
+            connection.putheader('Lambda-Runtime-Function-Response-Mode', 'streaming')
+            connection.putheader('Transfer-Encoding', 'chunked')
+            connection.putheader('Trailer', 'Lambda-Runtime-Function-Error-Type, Lambda-Runtime-Function-Error-Body')
+            connection.endheaders()
+            trailers = b''
+            try:
+                while True:
+                    if chunk:
+                        connection.send(b'%x\x0d\x0a%s\x0d\x0a' % (len(chunk), chunk))
+                    chunk = next(body)
+            except StopIteration:
+                pass
+            except Exception as e:
+                error = base64.b64encode(_error(e)).decode('ascii')
+                trailers = (
+                    f'Lambda-Runtime-Function-Error-Type: Unhandled\x0d\x0a'
+                    f'Lambda-Runtime-Function-Error-Body: {error}\x0d\x0a'
+                ).encode()
+            connection.send(b'0\x0d\x0a' + trailers + b'\x0d\x0a')
+            connection.getresponse().read()
+            connection.close()
+        finally:
+            if close := getattr(body, 'close', None):
+                close()
 
 
 # The error of an exception, as the Python runtime of Lambda posts it
@@ -485,19 +605,6 @@ def _pairs(values: Any) -> list[tuple[str, str]]:
         for item in cast(list[Any], value) if isinstance(value, list) else [value]:
             pairs.append((name, str(item)))
     return pairs
-
-
-# Chunked content without its framing, as in Pyjo.Server.WSGI
-def _unchunk(body: bytes) -> bytes:
-    chunks: list[bytes] = []
-
-    def read(content: Pyjo.Content.Single.object, chunk: bytes) -> None:
-        chunks.append(chunk)
-
-    parser = Pyjo.Content.Single.new()
-    parser.unsubscribe('read').on('read', read)
-    parser.parse(b'Transfer-Encoding: chunked\x0d\x0a\x0d\x0a' + body)
-    return b''.join(chunks)
 
 
 new = Pyjo_Server_Lambda.new

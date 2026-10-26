@@ -32,9 +32,30 @@ def invoke(command, events, posts, cwd, env=None, ends=False):
         headers.header('Lambda-Runtime-Trace-Id', f'Root=1-{id}')
         c.render(json=event)
 
+    # The chunks of a request with the times they come at
+    reads = {}
+
+    @api.hook('after_build_tx')
+    def build(tx, app):
+        chunks = reads[id(tx.req)] = []
+        tx.req.content.on('read', lambda content, chunk: chunks.append((time.time(), bytes(chunk))))
+
+    # A streaming response as its content type, its body, its chunks and the body of the error in its trailers, which
+    # are headers of the request once it is parsed, and another response as JSON
     def post(kind):
         def action(c):
-            got.append((kind, c.param('id'), c.req.headers.header('Lambda-Runtime-Function-Error-Type'), c.req.json()))
+            headers = c.req.headers
+            chunks = reads.pop(id(c.req), [])
+            if headers.header('Lambda-Runtime-Function-Response-Mode') == 'streaming':
+                body = {
+                    'content_type': headers.content_type,
+                    'body': c.req.body,
+                    'chunks': chunks,
+                    'error_body': headers.header('Lambda-Runtime-Function-Error-Body'),
+                }
+            else:
+                body = c.req.json()
+            got.append((kind, c.param('id'), headers.header('Lambda-Runtime-Function-Error-Type'), body))
             c.render(data=b'', status=202)
 
         return action
@@ -61,8 +82,8 @@ def invoke(command, events, posts, cwd, env=None, ends=False):
 
         waiting = [Pyjo.IOLoop.recurring(0.05, ended), Pyjo.IOLoop.timer(30, lambda loop: loop.stop())]
         Pyjo.IOLoop.start()
-        for id in waiting:
-            Pyjo.IOLoop.remove(id)
+        for timer in waiting:
+            Pyjo.IOLoop.remove(timer)
     finally:
         if not ends:
             process.terminate()

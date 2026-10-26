@@ -69,6 +69,7 @@ with subtest('Synopsis'):
     is_ok(response['isBase64Encoded'], False, 'text')
 
 with subtest('Description'):
+    import Pyjo.JSON
     import Pyjoyment
 
     app = Pyjoyment.new()
@@ -78,6 +79,21 @@ with subtest('Description'):
     # The handler "myapp.handler" of an event function
     handler = Pyjo.Server.Lambda.new(app=app).to_lambda_app()
     is_ok(handler(event(), 'context')['body'], 'context', 'context')
+
+    import os
+
+    os.environ['PYJO_LAMBDA_INVOKE_MODE'] = 'RESPONSE_STREAM'
+    try:
+        # PYJO_LAMBDA_INVOKE_MODE=RESPONSE_STREAM in the environment of the function
+        handler = Pyjo.Server.Lambda.new(app=app).to_lambda_app()
+        response = handler(event(), 'context')
+    finally:
+        del os.environ['PYJO_LAMBDA_INVOKE_MODE']
+    is_ok(response.content_type, 'application/vnd.awslambda.http-integration-response', 'content type')
+    prelude, delimiter, body = b''.join(response).partition(b'\x00' * 8)
+    response.close()
+    is_ok(Pyjo.JSON.decode_json(prelude)['statusCode'], 200, 'status in the prelude')
+    is_ok(body, b'context', 'body after 8 null bytes')
 
 
 # What the runtime client of a command posts for an invocation of a Runtime API of the test, of an application of
@@ -126,6 +142,18 @@ with subtest('Runtime client'):
         bootstrap = f'#!/bin/sh\n# The bootstrap of a custom runtime, as provided.al2023\nexec {sys.executable} -m Pyjo.Server.Lambda\n'
         response = invoke(['sh', '-c', bootstrap], {'_HANDLER': 'myapp.handler'})
         is_ok(response['body'], 'Hello Lambda!', 'bootstrap')
+
+with subtest('new'):
+    server = Pyjo.Server.Lambda.new()
+    is_ok(server.invoke_mode, 'BUFFERED', 'server')
+    server = Pyjo.Server.Lambda.new(invoke_mode='RESPONSE_STREAM')
+    is_ok(server.invoke_mode, 'RESPONSE_STREAM', 'server.invoke_mode')
+
+with subtest('invoke_mode'):
+    mode = server.invoke_mode
+    is_ok(mode, 'RESPONSE_STREAM', 'mode')
+    server.invoke_mode = 'BUFFERED'
+    is_ok(server.invoke_mode, 'BUFFERED', 'server.invoke_mode')
 
 with subtest('run'):
     server = Pyjo.Server.Lambda.new(app=app)
