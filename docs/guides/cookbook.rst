@@ -970,6 +970,14 @@ when it is the main program, as :mod:`Pyjoyment.Command.lambda` detects.
     #!/bin/sh
     exec python3 "$LAMBDA_TASK_ROOT/myapp.py"
 
+An image of the function, of any Python, has the same command, which
+:mod:`Pyjoyment.Command.Author.generate.dockerfile` writes with
+``--target lambda``.
+
+.. code-block:: console
+
+    $ ./myapp.py generate dockerfile --target lambda
+
 The same function runs locally, mounted in an application with
 :mod:`Pyjo.App.Lambda`, in a process of its own, which gets its invocations
 through the Runtime API of Lambda, as on AWS, and with the path of the mount as
