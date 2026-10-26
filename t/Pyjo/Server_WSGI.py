@@ -1,4 +1,5 @@
 import Pyjo.IOLoop
+import Pyjo.Promise
 import Pyjo.Server.WSGI
 import Pyjoyment.Command.wsgi
 
@@ -10,6 +11,7 @@ from Pyjoyment.Lite import app, get, post, under
 import io
 import os
 import sys
+import time
 
 from unittest.mock import patch
 
@@ -58,6 +60,16 @@ def proxy(c):
 def later(c):
     c.render_later()
     Pyjo.IOLoop.timer(0.1, lambda loop: c.render(text='Hello later!'))
+
+
+# Not in Mojolicious: an action that is a coroutine, whose chunks come as it writes them, the first before it waits
+@get('/async')
+async def async_chunks(c):
+    c.res.headers.content_type = 'text/plain'
+    c.write_chunk(b'one, ')
+    await Pyjo.Promise.timer(0.5)
+    c.write_chunk(b'two')
+    c.finish()
 
 
 with subtest('Reverse proxy'):
@@ -337,6 +349,20 @@ with subtest('Trusted proxies (no REMOTE_ADDR)'):
     is_ok(os.environ.pop('PYJO_HELLO', None), 'world', 'finish event has been emitted')
 
 # Not in Mojolicious: a response given later than the request event, which the server waits for
+# Not in Mojolicious: a step of the coroutine of an action ends one_tick of the reactor, so that the server, which waits
+# with it, gives the start of the response before the coroutine waits for its timer
+with subtest('Action that is a coroutine'):
+    env = {'PATH_INFO': '/async', 'REQUEST_METHOD': 'GET', 'SERVER_PROTOCOL': 'HTTP/1.1', 'wsgi.input': io.BytesIO()}
+    start = time.monotonic()
+    status, headers, body = call(Pyjo.Server.WSGI.new(app=app).to_wsgi_app(), env)
+    is_ok(status, '200 OK', 'right status')
+    is_ok(next(body), b'one, ', 'first chunk')
+    ok(time.monotonic() - start < 0.4, 'first chunk before the timer')
+    is_ok(b''.join(body), b'two', 'next chunk')
+    ok(time.monotonic() - start >= 0.4, 'next chunk after the timer')
+    body.close()
+    os.environ.pop('PYJO_HELLO', None)
+
 with subtest('Response given later'):
     env = {
         'CONTENT_LENGTH': '0',

@@ -95,7 +95,7 @@ import sys
 import time
 import weakref
 
-from collections.abc import Awaitable, Callable, Coroutine
+from collections.abc import Awaitable, Callable, Coroutine, Generator
 from types import TracebackType
 from typing import Any, Self, TypedDict
 
@@ -336,9 +336,10 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
         Run a coroutine as a task of :attr:`loop`, where it can await anything
         of the loop, and call ``resolve`` with what it returns or ``reject``
         with the exception it raises. A task that is not done is something to
-        watch, so that :meth:`start` does not stop before it.
+        watch, so that :meth:`start` does not stop before it, and each step of
+        the coroutine is an event, which ends :meth:`one_tick`.
         """
-        task = self.loop.create_task(coro)
+        task = self.loop.create_task(_steps(coro, weakref.WeakMethod(self._step)))
         self._tasks.add(task)
 
         def done(task: asyncio.Task[Any]) -> None:
@@ -678,6 +679,11 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
         if (io := self._io.get(fd)) is not None:
             self._event('I/O watcher', io['cb'], writable)
 
+    # A step of a coroutine, which ends one_tick
+    def _step(self) -> None:
+        if self._one and self.loop.is_running():
+            self.loop.stop()
+
     def _stop(self) -> None:
         if (self._one or self._run) and self.loop.is_running():
             self.loop.stop()
@@ -718,6 +724,48 @@ def _fileno(handle: Handle) -> int:
     if fd < 0:
         Pyjo.Exception.object.throw('Handle is closed')
     return fd
+
+
+# Not in Mojolicious: a step of a coroutine is an event of the reactor, as a step of an async sub of Mojo is a callback of
+# next_tick, so that one_tick returns after it: the step of a task of asyncio is a callback of the loop that ends nothing,
+# so code that waits with one_tick for what the coroutine does, as a server that waits for the response of an action,
+# would wait for the next event of a watcher or a timer
+async def _steps(coro: Coroutine[Any, Any, Any], step: 'weakref.WeakMethod[Callable[[], None]]') -> Any:
+    return await _Steps(coro, step)
+
+
+class _Steps:
+    def __init__(self, coro: Coroutine[Any, Any, Any], step: 'weakref.WeakMethod[Callable[[], None]]') -> None:
+        self._coro = coro
+        self._step = step
+
+    def __await__(self) -> Generator[Any, Any, Any]:
+        coro = self._coro
+        method: Callable[[Any], Any] = coro.send
+        arg: Any = None
+        while True:
+            try:
+                result = method(arg)
+            except StopIteration as e:
+                self._stepped()
+                return e.value
+            except BaseException:
+                self._stepped()
+                raise
+            self._stepped()
+            try:
+                arg = yield result
+                method = coro.send
+            except GeneratorExit:
+                coro.close()
+                raise
+            except BaseException as e:
+                arg = e
+                method = coro.throw
+
+    def _stepped(self) -> None:
+        if (step := self._step()) is not None:
+            step()
 
 
 # Not in Mojolicious: a loop of its own is a SelectorEventLoop on Windows, where the default of asyncio is the

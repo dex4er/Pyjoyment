@@ -8,6 +8,7 @@ from Pyjo.Util import warn
 from Pyjoyment.Lite import *
 
 import gc
+import time
 import warnings
 
 
@@ -15,6 +16,26 @@ import warnings
 
 # Left out from Mojolicious: test_awaitable of Test::Future::AsyncAwait::Awaitable, the API of Future::AsyncAwait is
 # __await__ in Python, which t/stdlib/Promise.py checks with asyncio
+
+# Not in Mojolicious: a step of a coroutine is an event, which ends one_tick on every reactor, as a step of an async sub
+# of Mojo is a callback of next_tick, first, before the event loop has anything else that would end one_tick
+with subtest('One tick for each step of a coroutine'):
+    steps = []
+
+    @Pyjo.Promise.coroutine
+    async def stepping():
+        steps.append('first')
+        await Pyjo.Promise.timer(1.5)
+        steps.append('second')
+
+    start = time.monotonic()
+    promise = stepping()
+    while not steps:
+        Pyjo.IOLoop.one_tick()
+    ok(time.monotonic() - start < 1, 'one tick for the first step, before the timer')
+    promise.wait()
+    is_deeply_ok(steps, ['first', 'second'], 'all steps')
+
 
 # Silence
 app.log.level = 'fatal'
