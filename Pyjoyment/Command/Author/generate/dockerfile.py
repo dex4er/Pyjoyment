@@ -10,11 +10,16 @@ Pyjoyment.Command.Author.generate.dockerfile - Dockerfile generator command
       python -m MyApp generate dockerfile --user app
       python -m MyApp generate dockerfile --port 8080
       python -m MyApp generate dockerfile --graceful-timeout 8
+      python -m MyApp generate dockerfile --healthcheck /
 
     Options:
       -G, --graceful-timeout <seconds>   Graceful timeout of the workers of the
                                          server, defaults to the one of the
                                          server
+      -H, --healthcheck <path>           Path that the HEALTHCHECK of the image
+                                         requests, defaults to the liveness of
+                                         the plugin Health, if the application
+                                         has it
       -h, --help                         Show this summary of available options
       -p, --port <port>                  Port that the server listens on and the
                                          image exposes, defaults to 3000
@@ -51,6 +56,14 @@ Knative, Cloud Run, Render, Koyeb or Heroku sets ``PORT`` for the container,
 and the server listens on its port, as Knative ignores ``EXPOSE`` and sets
 ``PORT`` to the ``containerPort`` of the service, ``8080`` by default.
 
+An application with :mod:`Pyjoyment.Plugin.Health` gets a ``HEALTHCHECK``
+that requests its liveness, ``/livez`` by default, or the path of
+``--healthcheck``, and an empty path leaves it out. Python makes the request
+with :mod:`http.client`, as the image has no ``curl``, and Docker shows the
+health of the container in ``docker ps``, and Docker Compose waits for it with
+``depends_on`` and ``condition: service_healthy``. Kubernetes and Cloud Run
+ignore it and have probes of their own.
+
 This is a core command, that means it is always enabled and its code a good
 example for learning to build new commands, you're welcome to fork it.
 
@@ -82,6 +95,8 @@ import re
 import shutil
 import subprocess
 import sys
+
+from typing import Any
 
 
 class Pyjoyment_Command_Author_generate_dockerfile(Pyjoyment.Command.object):
@@ -118,10 +133,31 @@ class Pyjoyment_Command_Author_generate_dockerfile(Pyjoyment.Command.object):
         """
         # Not in Mojolicious: the options
         arguments = list(args)
-        if not (opts := getopt(arguments, {'G|graceful-timeout=i': None, 'p|port=i': None, 'u|user=s': None})):
+        if not (
+            opts := getopt(
+                arguments, {'G|graceful-timeout=i': None, 'H|healthcheck=s': None, 'p|port=i': None, 'u|user=s': None}
+            )
+        ):
             raise Pyjo.Exception.new(self.usage)
 
         name = self.app.moniker
+
+        # Not in Mojolicious: the HEALTHCHECK of the liveness of Pyjoyment.Plugin.Health, with http.client, as the image
+        # has no curl
+        # Helpers of a plugin are found at run time, so the application is Any
+        app: Any = self.app
+        path: str | None = opts.healthcheck
+        if path is None and app.renderer.get_helper('health.path') is not None:
+            path = app.health.path('livez')
+        port = "int(os.environ['PORT'])"
+        code = f"c = http.client.HTTPConnection('127.0.0.1', {port}, timeout=2); c.request('GET', {path!r})"
+        healthcheck = (
+            json.dumps(
+                ['python', '-c', f'import http.client, os, sys; {code}; sys.exit(c.getresponse().status != 200)']
+            )
+            if path
+            else None
+        )
 
         # Unlike Mojolicious: the script of Pyjoyment.Lite or the package of the application, which python runs, where
         # Mojo runs the script, and the dependencies of the inline metadata of PEP 723 of the script, if it has them and
@@ -134,6 +170,7 @@ class Pyjoyment_Command_Author_generate_dockerfile(Pyjoyment.Command.object):
         values = {
             'cmd': json.dumps([*cmd, 'prefork']),
             'graceful_timeout': opts.graceful_timeout,
+            'healthcheck': healthcheck,
             'lock': lock if os.path.isfile(self.rel_file(lock)) else None,
             'name': name,
             'port': opts.port or 3000,
@@ -200,6 +237,9 @@ ENV PORT=${PORT}
 ENV PYJO_GRACEFUL_TIMEOUT=<%= graceful_timeout %>
 % end
 EXPOSE ${PORT}
+% if healthcheck:
+HEALTHCHECK --timeout=3s --start-period=30s --start-interval=1s CMD <%= healthcheck %>
+% end
 CMD <%= cmd %>
 
 @@ dockerignore

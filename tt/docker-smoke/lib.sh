@@ -73,16 +73,19 @@ build_dockerfile() {
 # the dependencies, the only change of the generated Dockerfile, which exposes
 # its port, serves the pages and stops gracefully on the TERM of docker stop
 #
-#   smoke_dockerfile [--user USER] [--expose PORT] [--port PORT] PAGE...
+#   smoke_dockerfile [--user USER] [--expose PORT] [--port PORT] [--health PATH] PAGE...
 #
 #   --expose PORT   the port of the image, of "generate dockerfile --port"
 #   --port PORT     the port of PORT of the container, as Knative sets it
+#   --health PATH   the path of the HEALTHCHECK of the image, which Docker
+#                   reports healthy
 smoke_dockerfile() {
-  local user='' expose=3000 listen=3000
+  local user='' expose=3000 listen=3000 health=''
   local -a env=()
   while [[ ${1:-} == --* ]]; do
     case $1 in
       --user) user=$2 ;;
+      --health) health=$2 ;;
       --expose)
         expose=$2
         listen=$2
@@ -129,7 +132,29 @@ smoke_dockerfile() {
     echo "ok - user ${config}"
   fi
 
+  healthy "${health}"
+
   stop_gracefully
+}
+
+# The HEALTHCHECK of the image requests the path, and Docker reports the
+# container healthy, or the image has none
+healthy() {
+  local health=$1 test status
+  test=$(docker inspect --format '{{if .Config.Healthcheck}}{{json .Config.Healthcheck.Test}}{{end}}' "${name}")
+  if [[ -z ${health} ]]; then
+    [[ -z ${test} ]] || fail "healthcheck ${test}"
+    echo "ok - no healthcheck"
+    return
+  fi
+  grep -qF "c.request('GET', '${health}')" <<<"${test}" || fail "healthcheck ${test}"
+  for _ in $(seq 60); do
+    status=$(docker inspect --format '{{.State.Health.Status}}' "${name}")
+    [[ ${status} == healthy ]] && break
+    sleep 0.5
+  done
+  [[ ${status} == healthy ]] || fail "health ${status}"
+  echo "ok - healthy with ${health}"
 }
 
 # TERM of docker stop is a graceful shutdown, well before the KILL after 10
