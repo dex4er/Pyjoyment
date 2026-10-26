@@ -5,6 +5,7 @@ from Pyjo.File import curfile
 from Pyjo.Test import *
 
 import os
+import sys
 import time
 
 
@@ -52,5 +53,19 @@ else:
         task_root = ROOT.sibling('examples', 'lambda_stream').to_str()
         with Pyjo.App.Lambda.new(function='app.handler', task_root=task_root, env=env) as function:
             check(Pyjo.Test.Pyjo.new(function), '')
+
+    # The wrapper of AWS_LAMBDA_EXEC_WRAPPER, which leaves out the command of the runtime client of Python that Lambda
+    # passes it, as the runtime client of the function, with the checkout as the layer of the framework
+    with subtest('Wrapper'):
+        wrapper = ROOT.sibling('examples', 'lambda_stream', 'wrapper.py').to_str()
+        command = [sys.executable, wrapper, '/var/lang/bin/python3', '/var/runtime/bootstrap.py']
+        env = {
+            'PYJO_MODE': 'production',
+            'PYJO_LAMBDA_INVOKE_MODE': 'RESPONSE_STREAM',
+            'PYTHONPATH': ROOT.dirname().to_str(),
+        }
+        with Pyjo.App.Lambda.new(function='app.handler', task_root=task_root, command=command, env=env) as function:
+            t = Pyjo.Test.Pyjo.new(function)
+            t.get_ok('/count').status_is(200).content_type_is('text/plain').content_is('1\n2\n3\n4\n5\n')
 
 done_testing()

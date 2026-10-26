@@ -29,8 +29,8 @@ data "archive_file" "function" {
   }
 
   source {
-    content  = file("${path.module}/wrapper.sh")
-    filename = "wrapper.sh"
+    content  = file("${path.module}/wrapper.py")
+    filename = "wrapper.py"
   }
 }
 
@@ -72,7 +72,7 @@ resource "aws_lambda_function" "function" {
   environment {
     variables = {
       # The runtime client of Pyjo.Server.Lambda in the place of the one of the runtime, which does not stream
-      AWS_LAMBDA_EXEC_WRAPPER = "/var/task/wrapper.sh"
+      AWS_LAMBDA_EXEC_WRAPPER = "/var/task/wrapper.py"
 
       # The invoke mode of the Function URL, which the function does not learn from its invocations
       PYJO_LAMBDA_INVOKE_MODE = "RESPONSE_STREAM"

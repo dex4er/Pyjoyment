@@ -993,16 +993,14 @@ the function as they are written, as the tokens of a model or a long download
 need. The runtime of Python of Lambda does not stream, so the runtime client of
 :mod:`Pyjo.Server.Lambda` runs the function: with the ``bootstrap`` of a custom
 runtime above, or on the runtime of Python with a wrapper that
-``AWS_LAMBDA_EXEC_WRAPPER`` names. The function does not learn the invoke mode
-from its invocations, so ``PYJO_LAMBDA_INVOKE_MODE`` tells it, the same as the
-one of the Function URL.
+``AWS_LAMBDA_EXEC_WRAPPER`` names, as ``/var/task/wrapper.py``. The function
+does not learn the invoke mode from its invocations, so
+``PYJO_LAMBDA_INVOKE_MODE=RESPONSE_STREAM`` tells it, the same as the one of the
+Function URL.
 
-.. code-block:: sh
-
-    #!/bin/sh
-    # wrapper.sh, with AWS_LAMBDA_EXEC_WRAPPER=/var/task/wrapper.sh and
-    # PYJO_LAMBDA_INVOKE_MODE=RESPONSE_STREAM in the environment of the function
-    exec python3 -m Pyjo.Server.Lambda
+.. literalinclude:: ../../examples/lambda_stream/wrapper.py
+    :language: python
+    :caption: wrapper.py
 
 :mod:`Pyjo.App.Lambda` streams the function locally the same way, with
 ``PYJO_LAMBDA_INVOKE_MODE`` in its attribute ``env``, and the directory

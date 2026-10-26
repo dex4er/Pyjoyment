@@ -2,12 +2,12 @@
 
 `app.py` is an application of `Pyjoyment.Lite` whose responses AWS Lambda
 streams through a Function URL, as they are written, which the OpenTofu of
-this directory deploys: the function with `app.py` and `wrapper.sh`, and the
+this directory deploys: the function with `app.py` and `wrapper.py`, and the
 framework, `Pyjo` and `Pyjoyment` of the checkout, in a layer of its own, with
 a Function URL of the invoke mode `RESPONSE_STREAM`. `/count` writes a line
 every half a second, which comes to the client as it is written.
 
-The runtime of Python of Lambda does not stream, so `wrapper.sh`, which
+The runtime of Python of Lambda does not stream, so `wrapper.py`, which
 `AWS_LAMBDA_EXEC_WRAPPER` names, runs the runtime client of
 `Pyjo.Server.Lambda` in its place, and `PYJO_LAMBDA_INVOKE_MODE` tells the
 application the invoke mode of the Function URL, which the function does not

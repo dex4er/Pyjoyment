@@ -16,7 +16,7 @@ python -m Pyjoyment generate lite-app >/dev/null
 perl -pi -e 's/^app\.start\(\)$/handler = app.start()/' myapp.py
 grep -q '^handler = app.start()$' myapp.py || fail "handler in myapp.py"
 
-cp "${work}/wheel/${wheel}" "${dir}/Dockerfile.lambda-stream" "${root}/examples/lambda_stream/wrapper.sh" .
+cp "${work}/wheel/${wheel}" "${dir}/Dockerfile.lambda-stream" "${root}/examples/lambda_stream/wrapper.py" .
 docker build --progress plain --file Dockerfile.lambda-stream --build-arg "WHEEL=${wheel}" --tag "${name}" .
 docker run --detach --name "${name}" --publish 127.0.0.1::8080 "${name}" >/dev/null
 port=$(docker port "${name}" 8080/tcp | perl -ne 'print $1 and last if /:(\d+)$/')
