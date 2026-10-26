@@ -23,7 +23,8 @@ author = ', '.join(a['name'] for a in PROJECT['authors'])
 copyright = f'2014-2026, {author}'
 version = release = PROJECT['version']
 
-extensions = ['sphinx.ext.autodoc', 'sphinx.ext.linkcode']
+# The diagrams of the guides, which mermaid.js renders in the browser
+extensions = ['sphinx.ext.autodoc', 'sphinx.ext.linkcode', 'sphinxcontrib.mermaid']
 
 # The commit that the links to the source point to: the one that Read the Docs builds, or the one of the checkout
 COMMIT = (

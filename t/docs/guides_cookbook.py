@@ -186,6 +186,36 @@ with subtest('Pre-forking'):
         t.get_ok('/').status_is(200).content_is('Hello World!')
     like_ok(str(logs), re.compile(rf'Worker {os.getpid()} started'), 'started')
 
+with subtest('Health checks'):
+    uploads = tempfile.mkdtemp()
+    os.environ['MYAPP_UPLOADS'] = uploads
+    try:
+        with cookbook('health') as t:
+            t.get_ok('/').status_is(200).content_is('Hello World!')
+            t.get_ok('/livez').status_is(200).content_is('ok')
+            t.get_ok('/healthz').status_is(200).content_is('ok')
+            t.get_ok('/readyz').status_is(200).content_is('ok')
+            t.get_ok('/readyz?verbose').status_is(200).content_is(
+                '[+]shutdown ok\n[+]uploads ok\nreadyz check passed\n'
+            )
+
+            async def search(c):
+                tx = await c.ua().get_p('http://search.internal:9200/_cluster/health')
+                return tx.res.is_success
+
+            t.app.health.check('search', search, timeout=2)
+            with remote(t.app.ua):
+                t.get_ok('/readyz/search').status_is(200).content_is('ok')
+            os.rmdir(uploads)
+            t.get_ok('/readyz?exclude=search').status_is(503).content_is(
+                '[+]shutdown ok\n[-]uploads failed: reason withheld\n[+]search excluded: ok\nreadyz check failed\n'
+            )
+            t.get_ok('/livez').status_is(200).content_is('ok')
+    finally:
+        del os.environ['MYAPP_UPLOADS']
+        if os.path.isdir(uploads):
+            os.rmdir(uploads)
+
 with subtest('Hot deployment'):
     with cookbook('hot') as t:
         is_deeply_ok(t.app.config('hot'), {'listen': ['http://*:80']}, 'settings')

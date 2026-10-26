@@ -228,6 +228,12 @@ with subtest('is_running'):
     boolean = Pyjo.IOLoop.new().is_running
     ok(not boolean, 'loop')
 
+with subtest('is_stopping'):
+    boolean = Pyjo.IOLoop.is_stopping()
+    ok(not boolean, 'module')
+    boolean = Pyjo.IOLoop.new().is_stopping
+    ok(not boolean, 'loop')
+
 with subtest('next_tick'):
     got = []
     none = Pyjo.IOLoop.next_tick(lambda loop: got.append('module'))

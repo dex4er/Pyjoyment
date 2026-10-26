@@ -39,6 +39,9 @@ examples.
     Renderer for more sophisticated embedded Python templates, loaded
     automatically.
 
+:mod:`Pyjoyment.Plugin.Health`
+    Liveness and readiness of containers and orchestrators.
+
 :mod:`Pyjoyment.Plugin.HeaderCondition`
     Route condition for all kinds of headers, loaded automatically.
 

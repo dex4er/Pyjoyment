@@ -359,6 +359,7 @@ This is the class hierarchy of the :mod:`Pyjoyment` distribution.
 
       - :mod:`Pyjoyment.Plugin.EPRenderer`
 
+    - :mod:`Pyjoyment.Plugin.Health`
     - :mod:`Pyjoyment.Plugin.HeaderCondition`
     - :mod:`Pyjoyment.Plugin.Mount`
     - :mod:`Pyjoyment.Plugin.PyRenderer`

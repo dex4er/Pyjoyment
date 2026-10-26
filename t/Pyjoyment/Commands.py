@@ -418,6 +418,28 @@ with subtest('generate dockerfile'):
         r'(?m)^ENV PORT=\$\{PORT\}\nENV PYJO_GRACEFUL_TIMEOUT=8\nEXPOSE',
         'right graceful timeout',
     )
+    # Not in Mojolicious: the HEALTHCHECK of the liveness of Pyjoyment.Plugin.Health, or of the path of the option
+    unlike_ok(app.rel_file('Dockerfile').slurp().decode(), r'HEALTHCHECK', 'no healthcheck')
+    app.rel_file('Dockerfile').remove()
+    with contextlib.redirect_stdout(io.StringIO()):
+        dockerfile.run('-H', '/')
+    like_ok(
+        app.rel_file('Dockerfile').slurp().decode(),
+        r'(?m)^EXPOSE \$\{PORT\}\nHEALTHCHECK --timeout=3s --start-period=30s --start-interval=1s CMD \["python", "-c", '
+        + r'"import http\.client, .*c\.request\(\'GET\', \'/\'\); sys\.exit\(c\.getresponse\(\)\.status != 200\)"\]\nCMD ',
+        'right healthcheck',
+    )
+    healthcheck = re.search(r'(?m)^HEALTHCHECK .* CMD (.*)$', app.rel_file('Dockerfile').slurp().decode())
+    is_ok(json.loads(healthcheck[1])[:2], ['python', '-c'], 'right command')
+    app.rel_file('Dockerfile').remove()
+    dockerfile.app.plugin('Health')
+    with contextlib.redirect_stdout(io.StringIO()):
+        dockerfile.run()
+    like_ok(app.rel_file('Dockerfile').slurp().decode(), r"c\.request\('GET', '/livez'\)", 'right healthcheck')
+    app.rel_file('Dockerfile').remove()
+    with contextlib.redirect_stdout(io.StringIO()):
+        dockerfile.run('--healthcheck', '')
+    unlike_ok(app.rel_file('Dockerfile').slurp().decode(), r'HEALTHCHECK', 'no healthcheck')
     buffer = io.StringIO()
     with contextlib.redirect_stderr(buffer):
         throws_ok(

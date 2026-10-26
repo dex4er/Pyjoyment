@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # A script of generate lite-app, with the inline metadata of PEP 723 and no
-# pyproject.toml, on the port of PORT of the container, as Knative sets it.
+# pyproject.toml, on the port of PORT of the container, as Knative sets it,
+# with the HEALTHCHECK of --healthcheck.
 
 # shellcheck source=lib.sh
 source "$(dirname "$0")/lib.sh"
@@ -12,5 +13,5 @@ METADATA="# /// script
 $(echo "${sources}" | perl -pe 's/^/# /')
 # ///" perl -0pi -e 's/\A(#!.*\n)/$1$ENV{METADATA}\n/' myapp.py
 lock
-python myapp.py generate dockerfile >/dev/null
-smoke_dockerfile --port 9090 /
+python myapp.py generate dockerfile --healthcheck / >/dev/null
+smoke_dockerfile --port 9090 --health / /
