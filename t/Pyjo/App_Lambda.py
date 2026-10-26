@@ -25,6 +25,7 @@ import json
 import os
 import time
 
+import Pyjo.IOLoop
 import Pyjo.Server.Lambda
 import Pyjoyment
 
@@ -89,6 +90,47 @@ def pid(event, context):
     return {'statusCode': 200, 'body': str(os.getpid())}
 
 
+def generator(event, context):
+    yield b'first'
+    yield b'second'
+
+
+def broken_stream(event, context):
+    yield b'first'
+    raise ValueError('Stream broke')
+
+
+def stalled(event, context):
+    yield b'first'
+    time.sleep(10)
+
+
+# An iterator of the chunks of the response of an HTTP integration, as Pyjo.Server.Lambda streams it
+class Integration:
+    content_type = 'application/vnd.awslambda.http-integration-response'
+
+    def __init__(self, chunks):
+        self.chunks = iter(chunks)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        return next(self.chunks)
+
+
+def split_prelude(event, context):
+    return Integration([b'{"statusCode":201,"head', b'ers":{"x-foo":"bar"}}\\x00\\x00\\x00\\x00', b'\\x00\\x00\\x00\\x00body'])
+
+
+def no_prelude(event, context):
+    return Integration([b'no delimiter'])
+
+
+def bad_prelude(event, context):
+    return Integration([b'not json' + b'\\x00' * 8 + b'body'])
+
+
 app = Pyjoyment.new()
 app.log.level = 'fatal'
 
@@ -98,8 +140,16 @@ def index(c):
                    'body': c.req.body.decode('latin-1'), 'cookie': c.cookie('foo')})
 
 
+def parts(c):
+    c.res.headers.content_type = 'text/plain'
+    c.write_chunk(b'one, ')
+    Pyjo.IOLoop.timer(0.5, lambda loop: c.write_chunk(b'two', lambda c: c.finish()))
+
+
+app.routes.get('/parts').to(cb=parts)
 app.routes.any('/*rest', {'rest': ''}).to(cb=index)
 pyjoyment = Pyjo.Server.Lambda.new(app=app).to_lambda_app()
+streaming = Pyjo.Server.Lambda.new(app=app, invoke_mode='RESPONSE_STREAM').to_lambda_app()
 """
 )
 TMP.child('broken.py').spew(b"raise ImportError('No module named oops')\n")
@@ -229,6 +279,79 @@ with subtest('Responses'):
         with fcn.log.capture('error') as messages:
             t.get_ok('/').status_is(502).content_is('Bad Gateway')
         like_ok(str(messages), r'Lambda function returned no statusCode', 'right error')
+
+with subtest('Streaming responses'):
+    with function('streaming') as fcn:
+        t = Pyjo.Test.Pyjo.new(fcn)
+
+        # The chunks of the response as they come
+        times = []
+
+        @t.ua.once('start')
+        def start(ua, tx):
+            tx.res.content.on('read', lambda content, chunk: times.append((time.time(), bytes(chunk))))
+
+        t.get_ok('/parts').status_is(200).content_type_is('text/plain').content_is('one, two')
+        received, at = b'', {}
+        for when, chunk in times:
+            received += chunk
+            for part in (b'one, ', b'two'):
+                if part in received:
+                    at.setdefault(part, when)
+        ok(at[b'two'] - at[b'one, '] >= 0.4, 'chunks as they come')
+
+        # The headers and the cookies of the prelude, and the next invocation
+        t.get_ok('/foo?q=1', {'Cookie': 'foo=baz'}).status_is(200).json_is('/path', '/foo').json_is('/cookie', 'baz')
+        t.head_ok('/parts').status_is(200).content_is('')
+
+    with function('streaming') as fcn:
+        t = mounted(fcn)
+        t.get_ok('/fn/parts').status_is(200).content_is('one, two')
+
+    # Any stream, of its content type
+    with function('generator') as fcn:
+        t = Pyjo.Test.Pyjo.new(fcn)
+        t.get_ok('/').status_is(200).content_type_is('application/octet-stream').content_is('firstsecond')
+
+    # A prelude in several chunks
+    with function('split_prelude') as fcn:
+        t = Pyjo.Test.Pyjo.new(fcn)
+        t.get_ok('/').status_is(201).header_is('X-Foo', 'bar').content_is('body')
+
+    # A response without its prelude, or with one that is not valid
+    with function('no_prelude') as fcn:
+        t = Pyjo.Test.Pyjo.new(fcn)
+        with fcn.log.capture('error') as messages:
+            t.get_ok('/').status_is(502).content_is('Bad Gateway')
+        like_ok(str(messages), r'Lambda function returned no prelude in its streaming response', 'no prelude')
+    with function('bad_prelude') as fcn:
+        t = Pyjo.Test.Pyjo.new(fcn)
+        with fcn.log.capture('error') as messages:
+            t.get_ok('/').status_is(502)
+        like_ok(str(messages), r'Lambda function returned an invalid prelude', 'invalid prelude')
+
+    # An error in the middle of the stream closes the connection, and the next invocation goes on
+    with function('broken_stream') as fcn:
+        t = Pyjo.Test.Pyjo.new(fcn)
+        with fcn.log.capture('error') as messages:
+            tx = t.ua.get('/')
+        # The user agent takes a response that is cut for one without an error, as Mojolicious does
+        is_ok(tx.res.code, 200, 'status of the stream')
+        is_ok(tx.res.body, b'first', 'body before the error')
+        ok(not tx.res.content.is_finished, 'cut before its last chunk')
+        like_ok(str(messages), r'Lambda function error: ValueError: Stream broke', 'error of the trailers')
+        with fcn.log.capture('error'):
+            tx = t.ua.get('/')
+        is_ok(tx.res.code, 200, 'next invocation')
+
+    # The timeout of the function goes on while it streams
+    with function('stalled', timeout=1) as fcn:
+        t = Pyjo.Test.Pyjo.new(fcn)
+        with fcn.log.capture('error') as messages:
+            tx = t.ua.get('/')
+        is_ok(tx.res.body, b'first', 'body before the timeout')
+        ok(not tx.res.content.is_finished, 'cut before its last chunk')
+        like_ok(str(messages), r'Lambda function timed out after 1 seconds', 'timeout')
 
 with subtest('Output'):
     with function('printing') as fcn:

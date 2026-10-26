@@ -51,6 +51,19 @@ cookies and its body, which can be in Base64, and in the format ``2.0`` a
 value without ``statusCode`` is a response ``200`` of the value as JSON, as API
 Gateway takes it.
 
+A streaming response of the runtime client, as the one of
+:mod:`Pyjo.Server.Lambda` with the invoke mode ``RESPONSE_STREAM``, is
+written as it comes, as a Function URL with the invoke mode
+``RESPONSE_STREAM`` writes it: the status and the headers of its prelude, in
+the content type ``application/vnd.awslambda.http-integration-response``,
+before 8 null bytes, or ``200`` and the content type of the response, and its
+body in chunks. The timeout of the function goes on until its end, and an
+error in its trailers, or the timeout, in the middle of it closes the
+connection, as the response cannot change anymore. ::
+
+    # The streaming responses of an application on Pyjo.Server.Lambda
+    app = Pyjo.App.Lambda.new(function='myapp.handler', env={'PYJO_LAMBDA_INVOKE_MODE': 'RESPONSE_STREAM'})
+
 An error of the function or of its initialization, a response that is not
 valid, a process that ends before its response, and an invocation that takes
 longer than :attr:`timeout`, whose process is killed, as Lambda does, are a
@@ -82,6 +95,7 @@ import Pyjo.Exception
 import Pyjo.IOLoop
 import Pyjo.Server.Daemon
 import Pyjo.Transaction
+import Pyjo.Transaction.HTTP
 
 from Pyjo.Server.Lambda import _RE_TEXT, _is_utf8  # pyright: ignore[reportPrivateUsage]
 
@@ -106,6 +120,12 @@ REGION = 'us-east-1'
 API = 'pyjo'
 
 PREFIX = '/2018-06-01/runtime'
+
+# The streaming response of an HTTP integration: the status and the headers as JSON, in the first 16 KB, before 8 null
+# bytes and the body
+INTEGRATION = 'application/vnd.awslambda.http-integration-response'
+DELIMITER = b'\x00' * 8
+MAX_PRELUDE = 16384
 
 
 class Pyjo_App_Lambda(Pyjo.App.object):
@@ -296,6 +316,13 @@ class _Invocation:
         self.event: dict[str, Any] = {}
         self.waiting: tuple[str, float] | None = None
 
+        # A streaming response: the request of the runtime client that sends it, the prelude that comes before its body,
+        # and whether its status and its headers have been written, with the body chunked
+        self.api: str | None = None
+        self.prelude: bytearray | None = None
+        self.started = False
+        self.chunked = False
+
     def start(self) -> None:
         self.tx.on('finish', self._finish)
         self.event = _event(self.app, self.tx, self.c, self.id)
@@ -312,6 +339,16 @@ class _Invocation:
         if self.done:
             return
         self.app.log.error(message)
+
+        # A streaming response that has started cannot change, so the connection is closed
+        if self.started:
+            self.done = True
+            self._waited()
+            if (connection := self.tx.connection) is not None and (
+                stream := Pyjo.IOLoop.stream(connection)
+            ) is not None:
+                stream.close()
+            return
         self._write(502, [('Content-Type', 'text/plain')], b'Bad Gateway')
 
     # The response of the payload format, or a value as JSON of the format 2.0
@@ -330,15 +367,7 @@ class _Invocation:
 
         try:
             response = cast(dict[str, Any], value)
-            code = int(response['statusCode'])
-
-            # The headers of multiple values take the place of the ones of the same name of one value
-            multi = cast(dict[str, list[Any]], response.get('multiValueHeaders') or {})
-            single = cast(dict[str, Any], response.get('headers') or {})
-            names = {str(name).lower() for name in multi}
-            headers = [(str(name), str(item)) for name, item in single.items() if str(name).lower() not in names]
-            headers += [(str(name), str(item)) for name, items in multi.items() for item in items]
-            headers += [('Set-Cookie', str(cookie)) for cookie in cast(list[Any], response.get('cookies') or [])]
+            code, headers = _status(response)
             content = response.get('body')
             if content is None:
                 data = b''
@@ -350,6 +379,64 @@ class _Invocation:
             return self.fail(f'Lambda function returned an invalid response: {e}')
         self._write(code, headers, data)
 
+    # The start of a streaming response, once the headers of its request have come: with the status and the headers of
+    # the prelude of an HTTP integration, or of the content type of the request
+    def stream(self, api: str | None, content_type: str) -> None:
+        self.api = api
+        if content_type.split(';')[0].strip().lower() == INTEGRATION:
+            self.prelude = bytearray()
+        else:
+            self._start(200, [('Content-Type', content_type or 'application/octet-stream')])
+
+    # A chunk of a streaming response, after its prelude
+    def stream_chunk(self, chunk: bytes) -> None:
+        if self.done:
+            return
+        if (prelude := self.prelude) is not None:
+            prelude += chunk
+            if (end := prelude.find(DELIMITER)) < 0:
+                if len(prelude) > MAX_PRELUDE:
+                    self.fail('Lambda function returned no prelude in the first 16 KB of its streaming response')
+                return
+            self.prelude = None
+            try:
+                value = json.loads(bytes(prelude[:end]))
+                code, headers = _status(cast(dict[str, Any], value) if isinstance(value, dict) else {})
+            except (AttributeError, KeyError, TypeError, ValueError) as e:
+                return self.fail(f'Lambda function returned an invalid prelude: {e}')
+            self._start(code, headers)
+            chunk = bytes(prelude[end + len(DELIMITER) :])
+        if not len(chunk):
+            return
+
+        # The next chunks of the runtime client once the chunk has been written to the client
+        connection = self.api
+
+        def drained(*args: Any) -> None:
+            if connection is not None and (stream := Pyjo.IOLoop.stream(connection)) is not None:
+                stream.start()
+
+        if connection is not None and (stream := Pyjo.IOLoop.stream(connection)) is not None:
+            stream.stop()
+        content = self.tx.res.content
+        (content.write_chunk if self.chunked else content.write)(chunk, drained)
+        self._rendered()
+
+    # The end of a streaming response, with the error of its trailers
+    def stream_end(self, error: str | None, body: str | None) -> None:
+        if error is not None:
+            message = _message(_json(base64.b64decode(body or ''))) if body else error
+            return self.fail(f'Lambda function error: {message}')
+        if self.done:
+            return
+        if self.prelude is not None:
+            return self.fail('Lambda function returned no prelude in its streaming response')
+        self.done = True
+        self._waited()
+        content = self.tx.res.content
+        (content.write_chunk if self.chunked else content.write)(b'')
+        self._rendered()
+
     # The client is gone, or has its response
     def _finish(self, *args: Any) -> None:
         if self.done:
@@ -358,23 +445,45 @@ class _Invocation:
         if (environment := self.environment) is not None:
             environment.cancel(self)
 
-    def _write(self, code: int, headers: list[tuple[str, str]], body: bytes) -> None:
-        self.done = True
-        if (waiting := self.waiting) is not None:
-            self.waiting = None
-            connection, timeout = waiting
-            if (stream := Pyjo.IOLoop.stream(connection)) is not None:
-                stream.timeout = timeout
+    def _headers(self, code: int, headers: list[tuple[str, str]]) -> None:
         res = self.tx.res
         res.code = code
         for name, value in headers:
             if not wsgiref.util.is_hop_by_hop(name) and name.lower() != 'content-length':
                 res.headers.add(name, value)
-        res.body = body
+
+    def _rendered(self) -> None:
         if (c := self.c) is not None:
             c.rendered()
         else:
             self.tx.resume()
+
+    # The status and the headers of a streaming response, which go with its first chunk, as its body is chunked, or ends
+    # with the connection of HTTP/1.0
+    def _start(self, code: int, headers: list[tuple[str, str]]) -> None:
+        self.started = True
+        self._headers(code, headers)
+        self.chunked = self.tx.req.version == '1.1'
+        if self.tx.is_empty:
+            self.done = True
+            self._waited()
+            self.tx.res.content.write(b'')
+            self._rendered()
+
+    # The inactivity timeout of the connection of the client again
+    def _waited(self) -> None:
+        if (waiting := self.waiting) is not None:
+            self.waiting = None
+            connection, timeout = waiting
+            if (stream := Pyjo.IOLoop.stream(connection)) is not None:
+                stream.timeout = timeout
+
+    def _write(self, code: int, headers: list[tuple[str, str]], body: bytes) -> None:
+        self.done = True
+        self._waited()
+        self._headers(code, headers)
+        self.tx.res.body = body
+        self._rendered()
 
 
 # An execution environment of the function: its process, and the Runtime API that it gets its invocations from, one
@@ -523,6 +632,19 @@ class _Environment:
             invocation.respond(body)
         self.dispatch()
 
+    # The start of the streaming response of the current invocation, which stays current until its end, as its timeout
+    # goes on
+    def streaming(self, id: str, api: str | None, content_type: str) -> _Invocation | None:
+        if (invocation := self.current) is None or invocation.id != id:
+            return None
+        invocation.stream(api, content_type)
+        return invocation
+
+    def streamed(self, id: str, error: str | None, body: str | None) -> None:
+        if (invocation := self._take(id)) is not None:
+            invocation.stream_end(error, body)
+        self.dispatch()
+
     def timed_out(self) -> None:
         app = self.app
         self.end(f'Lambda function timed out after {app.timeout} seconds', False)
@@ -577,6 +699,33 @@ class _Lines:
 class _RuntimeAPI(Pyjo.App.object):
     environment: 'weakref.ref[_Environment] | None' = None
 
+    # A streaming response goes to the invocation as it comes, once the headers of its request are there, and its body is
+    # not kept
+    def build_tx(self) -> Pyjo.Transaction.HTTP.object:
+        tx = super().build_tx()
+        req = weakref.ref(tx.req)
+        ref = weakref.ref(tx)
+        environment = self.environment
+
+        def body(content: Any) -> None:
+            if (r := req()) is None or (t := ref()) is None or not _is_streaming(r):
+                return
+            m = re.fullmatch(rf'{PREFIX}/invocation/([^/]+)/response', r.url.path.to_str())
+            env = environment() if environment is not None else None
+            if m is None or env is None or env.ended:
+                return
+            invocation = env.streaming(m.group(1), t.connection, r.headers.content_type or '')
+            if invocation is None:
+                return
+
+            def read(content: Any, chunk: bytes) -> None:
+                invocation.stream_chunk(bytes(chunk))
+
+            content.unsubscribe('read').on('read', read)
+
+        tx.req.content.on('body', body)
+        return tx
+
     def handler(self, tx: Any) -> None:
         environment = self.environment() if self.environment is not None else None
         req = tx.req
@@ -587,6 +736,13 @@ class _RuntimeAPI(Pyjo.App.object):
             if method == 'POST' and (m := re.fullmatch(rf'{PREFIX}/invocation/([^/]+)/(response|error)', path)):
                 id, kind = m.group(1), m.group(2)
                 _reply(tx, 202)
+                if kind == 'response' and _is_streaming(req):
+                    headers = req.headers
+                    return environment.streamed(
+                        id,
+                        headers.header('Lambda-Runtime-Function-Error-Type'),
+                        headers.header('Lambda-Runtime-Function-Error-Body'),
+                    )
                 if kind == 'response':
                     return environment.response(id, req.body)
                 return environment.error(id, _json(req.body))
@@ -741,6 +897,23 @@ def _event(app: Pyjo_App_Lambda, tx: Any, c: Any, id: str) -> dict[str, Any]:
         event['headers'] = {name.lower(): value for name, value in pairs}
         event['queryStringParameters'] = dict(raw)
     return event
+
+
+def _is_streaming(req: Any) -> bool:
+    return req.method == 'POST' and req.headers.header('Lambda-Runtime-Function-Response-Mode') == 'streaming'
+
+
+# The status and the headers of a response, or of the prelude of a streaming one, where the headers of multiple values
+# take the place of the ones of the same name of one value
+def _status(response: dict[str, Any]) -> tuple[int, list[tuple[str, str]]]:
+    code = int(response.get('statusCode', 200))
+    multi = cast(dict[str, list[Any]], response.get('multiValueHeaders') or {})
+    single = cast(dict[str, Any], response.get('headers') or {})
+    names = {str(name).lower() for name in multi}
+    headers = [(str(name), str(item)) for name, item in single.items() if str(name).lower() not in names]
+    headers += [(str(name), str(item)) for name, items in multi.items() for item in items]
+    headers += [('Set-Cookie', str(cookie)) for cookie in cast(list[Any], response.get('cookies') or [])]
+    return code, headers
 
 
 def _json(body: bytes) -> dict[str, Any]:

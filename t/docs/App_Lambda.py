@@ -47,6 +47,11 @@ with subtest('Synopsis'):
         )
         app.close()
 
+with subtest('Description'):
+    # The streaming responses of an application on Pyjo.Server.Lambda
+    app = Pyjo.App.Lambda.new(function='myapp.handler', env={'PYJO_LAMBDA_INVOKE_MODE': 'RESPONSE_STREAM'})
+    is_deeply_ok(app.env, {'PYJO_LAMBDA_INVOKE_MODE': 'RESPONSE_STREAM'}, 'invoke mode of the function')
+
 with subtest('command'):
     app = Pyjo.App.Lambda.new()
     command = app.command
