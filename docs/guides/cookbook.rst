@@ -2386,6 +2386,73 @@ headers.
     headers.accept = 'application/json'
     tx = c.ua().build_tx('PUT', 'https://mojolicious.org', headers.to_dict())
 
+JSONP
+~~~~~
+
+A page of another site reads the JSON of your application with CORS, which a
+new API should use: the header ``Access-Control-Allow-Origin`` names the
+origins that may read the response, and the recipe `Hosts and origins`_ says
+how to check them.
+
+.. code-block:: python
+
+    @get('/headlines')
+    def headlines(c):
+        c.res.headers.access_control_allow_origin = 'https://example.com'
+        c.render(json=HEADLINES)
+
+Some clients cannot use CORS, as a widget on the pages of others that has to
+work with old browsers, or a page opened from ``file://``. They load the data
+with an element ``script``, and the response of JSONP is JavaScript that calls
+a function of the page, whose name comes with the request. :mod:`Pyjoyment`
+has no helper for it, as it takes a few lines, and each of them makes it safe.
+
+.. literalinclude:: cookbook/jsonp.py
+    :language: python
+    :caption: myapp.py
+
+.. code-block:: console
+
+    $ ./myapp.py get '/headlines?callback=show'
+    /**/show({"headlines":["Pyjoyment released","Hello World!"]});
+
+* The name of the callback is put into the code of the response, so it is
+  checked against the names of JavaScript, with dots for the members of an
+  object, as ``App.show``. Anything else, as ``alert(1)//``, would be code that
+  the page runs.
+* The type ``application/javascript`` and ``X-Content-Type-Options: nosniff``
+  keep the browser from taking the response for something else.
+* The comment ``/**/`` in front of the callback keeps a response from starting
+  with bytes that a plugin of a browser takes for another format, as the old
+  attack of Rosetta Flash did.
+* Any site can read a response of JSONP, with the cookies of its user too. So
+  it serves only public data, or data that a token in the URL of the request
+  allows, never the data of a session.
+
+JSON inline
+~~~~~~~~~~~
+
+The data of a page do not need a request of their own, when the page that
+renders them carries them, as the first state of an application of JavaScript
+or the configuration of a widget. An element ``script`` of the type
+``application/json``, which the browser does not run, holds them, and
+``JSON.parse`` reads its text.
+
+.. literalinclude:: cookbook/json_inline.py
+    :language: python
+    :caption: myapp.py
+
+The JSON goes into the template with ``<%==``, as the escaping of HTML of
+``<%=`` would break its quotes. :func:`Pyjo.JSON.to_json` escapes ``/`` and
+``<`` in its strings, so that neither ``</script>`` nor ``<!--<script>`` in
+the data can end the element or keep it from ending, and ``JSON.parse`` gets
+them back as they were. A page with the data of its user is not for a cache
+that other users share.
+
+JSON inline is for the data of the page that renders them, JSONP for a page of
+another site that cannot use CORS, and CORS or a request of the same origin for
+everything else.
+
 Hello World
 ~~~~~~~~~~~
 
