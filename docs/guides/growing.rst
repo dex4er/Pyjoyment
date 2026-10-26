@@ -35,12 +35,12 @@ days, including :mod:`Pyjoyment`.
 .. mermaid::
 
     flowchart LR
-        Request --> Controller
-        Controller --> Response
+        user[ ] -- Request --> Controller
+        Controller -- Response --> user
         Controller <--> Model
         Controller <--> View
         classDef plain fill:none,stroke:none
-        class Request,Response plain
+        class user plain
 
 The *controller* receives a request from a user, passes incoming data to the
 *model* and retrieves data from it, which then gets turned into an actual

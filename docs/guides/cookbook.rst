@@ -86,7 +86,7 @@ IP/port.
 
     flowchart LR
         client <--> proxy
-        subgraph boundary [system boundary, e.g. same host]
+        subgraph boundary [system boundary,<br />e.g. same host]
             proxy[reverse proxy] <--> app[Pyjoyment application]
         end
 
@@ -102,16 +102,15 @@ Pyjoyment application receives:
 
 .. mermaid::
 
-    flowchart LR
-        client["client<br/>1.2.3.4"] -- HTTPS --> proxy["reverse proxy<br/>api.example.com<br/>10.20.30.39"]
-        proxy -- HTTP --> app["Pyjoyment app<br/>10.20.30.40"]
-
-.. code-block:: text
-
-   GET /foo/1 HTTP/1.1                |    GET /foo/1 HTTP/1.1
-   Host: api.example.com              |    Host: 10.20.30.40
-   User-Agent: Firefox                |    User-Agent: ShinyProxy/1.2
-   ...                                |    ...
+    %%{init: {'sequence': {'noteAlign': 'left'}}}%%
+    sequenceDiagram
+        participant client as client<br/>1.2.3.4
+        participant proxy as reverse proxy<br/>api.example.com<br/>10.20.30.39
+        participant app as Pyjoyment app<br/>10.20.30.40
+        client ->> proxy: HTTPS
+        Note over client,proxy: GET /foo/1 HTTP/1.1<br/>Host: api.example.com<br/>User-Agent: Firefox<br/>...
+        proxy ->> app: HTTP
+        Note over proxy,app: GET /foo/1 HTTP/1.1<br/>Host: 10.20.30.40<br/>User-Agent: ShinyProxy/1.2<br/>...
 
 However, now the client address is no longer available (which might be
 useful for analytics, or Geo-IP) and URLs generated via
