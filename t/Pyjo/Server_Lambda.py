@@ -8,6 +8,7 @@ from Pyjoyment.Lite import app, get, post, under
 
 import base64
 import importlib
+import os
 import sys
 
 
@@ -253,6 +254,59 @@ with subtest('Chunked response'):
     is_ok(res['body'], 'one, two', 'body without the framing')
     ok('transfer-encoding' not in res['headers'], 'no hop-by-hop headers')
 
+with subtest('Invoke mode'):
+    is_ok(Pyjo.Server.Lambda.new().invoke_mode, 'BUFFERED', 'default')
+    os.environ['PYJO_LAMBDA_INVOKE_MODE'] = 'RESPONSE_STREAM'
+    try:
+        is_ok(Pyjo.Server.Lambda.new().invoke_mode, 'RESPONSE_STREAM', 'from the environment')
+    finally:
+        del os.environ['PYJO_LAMBDA_INVOKE_MODE']
+    is_ok(Pyjo.Server.Lambda.new(invoke_mode='RESPONSE_STREAM').invoke_mode, 'RESPONSE_STREAM', 'attribute')
+
+
+def streamed(res):
+    # The prelude of the status and the headers, and the chunks of the body
+    try:
+        chunks = list(res)
+    finally:
+        res.close()
+    prelude, delimiter, rest = chunks[0].partition(b'\x00' * 8)
+    is_ok((delimiter, rest), (b'\x00' * 8, b''), 'prelude in a chunk of its own')
+    return decode_json(prelude), chunks[1:]
+
+
+streaming = Pyjo.Server.Lambda.new(app=app, invoke_mode='RESPONSE_STREAM').to_lambda_app()
+
+with subtest('Streaming response'):
+    finished.clear()
+    res = streaming(http_api(path='/stream'), None)
+    is_ok(res.content_type, 'application/vnd.awslambda.http-integration-response', 'content type')
+    prelude, chunks = streamed(res)
+    is_ok(prelude['statusCode'], 200, 'status')
+    is_ok(prelude['headers']['content-type'], 'text/plain', 'content type of the body')
+    ok('transfer-encoding' not in prelude['headers'], 'no hop-by-hop headers')
+    ok('body' not in prelude and 'isBase64Encoded' not in prelude, 'no body in the prelude')
+    is_deeply_ok(chunks, [b'one, ', b'two'], 'chunks without the framing')
+    is_deeply_ok(finished, ['/stream'], 'finished')
+
+    prelude, chunks = streamed(streaming(http_api(path='/cookies'), None))
+    is_deeply_ok(prelude['cookies'], ['foo=bar', 'baz=yada'], 'cookies of the format 2.0')
+    is_ok(b''.join(chunks), b'cookie None', 'body')
+
+    prelude, chunks = streamed(streaming(http_api(path='/binary'), None))
+    is_ok(b''.join(chunks), b'\x89PNG\x00\xff', 'binary body as it is')
+
+    prelude, chunks = streamed(streaming(rest_api(path='/cookies'), None))
+    is_deeply_ok(prelude['multiValueHeaders']['Set-Cookie'], ['foo=bar', 'baz=yada'], 'headers of the format 1.0')
+
+    prelude, chunks = streamed(streaming(http_api(path='/missing'), None))
+    is_ok(prelude['statusCode'], 404, 'not found')
+
+    # An Application Load Balancer, which has no streaming
+    res = streaming(alb(path='/cookies'), None)
+    is_ok(res['statusCode'], 200, 'buffered response')
+    is_ok(res['statusDescription'], '200 OK', 'status description')
+
 
 # The runtime client of a handler, or of _HANDLER, for the events of a Runtime API of the test
 def runtime(handler, events, posts, env=None, ends=False):
@@ -269,6 +323,7 @@ import os
 
 from Pyjoyment.Lite import app, get
 
+import Pyjo.IOLoop
 import Pyjo.Server.Lambda
 
 
@@ -295,6 +350,29 @@ def unserializable(event, context):
 @get('/')
 def index(c):
     c.render(text='Hello Lambda!')
+
+
+@get('/parts')
+def parts(c):
+    c.res.headers.content_type = 'text/plain'
+    c.write_chunk(b'one, ')
+    Pyjo.IOLoop.timer(0.5, lambda loop: c.write_chunk(b'two', lambda c: c.finish()))
+
+
+def generator(event, context):
+    yield b'first'
+    yield b''
+    yield b'second'
+
+
+def broken_stream(event, context):
+    yield b'first'
+    raise ValueError('Stream broke')
+
+
+def broken_start(event, context):
+    raise ValueError('Not started')
+    yield b''
 
 
 app.log.level = 'fatal'
@@ -354,5 +432,51 @@ with subtest('Runtime client'):
     like_ok(got[0][3]['errorMessage'], r'^Bad handler "handlers"', 'bad handler')
     got, code = runtime('handlers.missing', [], 1, ends=True)
     like_ok(got[0][3]['errorMessage'], r'^Handler "missing" missing on module "handlers"', 'missing handler')
+
+with subtest('Streaming runtime client'):
+    # An application of Pyjoyment, whose chunks come as they are written, and the next invocation on a new connection
+    env = {'_HANDLER': 'handlers.pyjoyment', 'PYJO_LAMBDA_INVOKE_MODE': 'RESPONSE_STREAM'}
+    got, code = runtime(None, [('f1', http_api(path='/parts')), ('f2', http_api())], 2, env)
+    kind, id, error, body = got[0]
+    is_ok((kind, id, error), ('response', 'f1', None), 'response')
+    is_ok(body['content_type'], 'application/vnd.awslambda.http-integration-response', 'content type')
+    prelude, _, content = body['body'].partition(b'\x00' * 8)
+    is_ok(decode_json(prelude)['statusCode'], 200, 'status')
+    is_ok(content, b'one, two', 'body')
+    # The times the parts are there, as a read can take several chunks
+    times, received = {}, b''
+    for at, chunk in body['chunks']:
+        received += chunk
+        for part in (b'one, ', b'two'):
+            if part in received:
+                times.setdefault(part, at)
+    ok(times[b'two'] - times[b'one, '] >= 0.4, 'chunks as they are written')
+    is_ok(body['error_body'], None, 'no error')
+    kind, id, error, body = got[1]
+    is_ok((kind, id), ('response', 'f2'), 'next invocation')
+    is_ok(body['body'].partition(b'\x00' * 8)[2], b'Hello Lambda!', 'body of the next invocation')
+
+    # Any handler that returns an iterator, with empty chunks left out
+    got, code = runtime('handlers.generator', [('g1', {})], 1)
+    kind, id, error, body = got[0]
+    is_ok((kind, error), ('response', None), 'response')
+    is_ok(body['content_type'], 'application/octet-stream', 'content type')
+    is_ok(body['body'], b'firstsecond', 'body')
+
+    # An exception in the middle of the stream, in the trailers
+    got, code = runtime('handlers.broken_stream', [('h1', {}), ('h2', {})], 2)
+    kind, id, error, body = got[0]
+    is_ok((kind, id, error), ('response', 'h1', 'Unhandled'), 'error in the trailers')
+    is_ok(body['body'], b'first', 'body before the error')
+    error = decode_json(base64.b64decode(body['error_body']))
+    is_ok(error['errorMessage'], 'Stream broke', 'message')
+    is_ok(error['errorType'], 'ValueError', 'type')
+    is_ok(got[1][:3], ('response', 'h2', 'Unhandled'), 'next invocation')
+
+    # An exception before the first chunk, as the error of the invocation
+    got, code = runtime('handlers.broken_start', [('i1', {})], 1)
+    kind, id, error, body = got[0]
+    is_ok((kind, id, error), ('error', 'i1', 'Unhandled'), 'error of the invocation')
+    is_ok(body['errorMessage'], 'Not started', 'message')
 
 done_testing()
