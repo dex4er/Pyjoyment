@@ -475,6 +475,49 @@ probe gives the application time to start before liveness counts.
               sleep:
                 seconds: 5
 
+Until the startup probe passes, the kubelet runs neither the liveness nor the
+readiness probe, and the pod gets requests only once readiness passes, which
+waits for the checks of the application, as a database that is not up yet.
+The server listens before it forks its workers, and a connection waits for a
+worker in the backlog of the listen socket.
+
+.. mermaid::
+
+    sequenceDiagram
+        participant K as kubelet
+        participant M as prefork manager
+        participant W as worker
+        participant DB as database
+        participant EP as EndpointSlice controller
+        participant LB as kube-proxy, ingress, load balancer
+        K->>M: starts the container
+        Note over M: loads the application
+        loop startupProbe, every second
+            K-xM: GET /livez, connection refused
+        end
+        Note over M: before_server_start,<br/>listens on the port
+        M->>W: forks the workers
+        K->>W: GET /livez
+        W-->>K: 200 ok
+        Note over K: startup passed:<br/>liveness and readiness begin
+        K->>W: GET /readyz
+        W->>DB: check db
+        DB--xW: connection refused
+        W-->>K: 503, [-]db failed
+        Note over EP: endpoint ready: false,<br/>no requests
+        K->>W: GET /readyz
+        W->>DB: check db
+        DB-->>W: ok
+        W-->>K: 200 ok
+        K->>EP: pod Ready, through the API server
+        EP->>LB: endpoint ready: true
+        LB->>W: requests
+        loop livenessProbe, every 10 seconds
+            K->>W: GET /livez
+            W-->>K: 200 ok
+        end
+        Note over K,W: liveness fails 3 times in a row:<br/>the kubelet restarts the container
+
 Kubernetes sends ``TERM`` to a container that it stops at the same time as it
 takes the pod out of the endpoints of its services, and kube-proxy, an ingress
 controller or the load balancer of a cloud learn it a moment later. The server
@@ -485,9 +528,41 @@ they know, and ``terminationGracePeriodSeconds`` has room for it and for the
 :attr:`~Pyjo.Server.Prefork.Pyjo_Server_Prefork.graceful_timeout`. From the
 moment the server stops gracefully, readiness fails with the check
 ``shutdown``, which a load balancer that keeps its connections alive sees with
-its last response. Cloud Run stops sending requests to an instance before it
-stops it, and needs no such hook; its startup probe can wait for readiness, as
-it sends no requests to an instance before it passes.
+its last response.
+
+.. mermaid::
+
+    sequenceDiagram
+        participant API as API server
+        participant EP as EndpointSlice controller
+        participant LB as kube-proxy, ingress, load balancer
+        participant K as kubelet
+        participant M as prefork manager
+        participant W as worker
+        API->>EP: pod deleted
+        API->>K: pod deleted
+        par endpoints
+            EP->>LB: endpoint ready: false, terminating: true
+            Note over LB: learns it a moment later
+        and preStop
+            K->>K: preStop sleep, 5 seconds
+            LB->>W: requests until then
+            W-->>LB: responses
+        end
+        K->>M: TERM
+        M->>W: TERM
+        Note over W: stop_gracefully: no new connections
+        LB->>W: GET /readyz, connection kept alive
+        W-->>LB: 503, [-]shutdown failed, Connection: close
+        Note over W: the requests in progress finish
+        W-->>M: exits, after after_server_stop
+        M-->>K: exits with status 0
+        Note over M,W: after graceful_timeout, 25 seconds,<br/>the manager kills the workers
+        Note over K,M: after<br/>terminationGracePeriodSeconds,<br/>35 seconds,<br/>the kubelet sends KILL
+
+Cloud Run stops sending requests to an instance before it stops it, and needs
+no such hook; its startup probe can wait for readiness, as it sends no
+requests to an instance before it passes.
 
 .. code-block:: yaml
 
