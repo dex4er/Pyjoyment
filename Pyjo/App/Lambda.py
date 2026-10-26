@@ -317,11 +317,15 @@ class _Invocation:
         self.waiting: tuple[str, float] | None = None
 
         # A streaming response: the request of the runtime client that sends it, the prelude that comes before its body,
-        # and whether its status and its headers have been written, with the body chunked
+        # its status and its headers, which go with its first chunk, whether they have gone, with the body chunked, and
+        # the chunks that wait to be written, after which the connection closes when it is closing
         self.api: str | None = None
         self.prelude: bytearray | None = None
+        self.head: tuple[int, list[tuple[str, str]]] | None = None
         self.started = False
         self.chunked = False
+        self.pending = 0
+        self.closing = False
 
     def start(self) -> None:
         self.tx.on('finish', self._finish)
@@ -340,14 +344,15 @@ class _Invocation:
             return
         self.app.log.error(message)
 
-        # A streaming response that has started cannot change, so the connection is closed
+        # A streaming response that has started cannot change, so the connection is closed once the chunks of it that
+        # wait have been written
         if self.started:
             self.done = True
             self._waited()
-            if (connection := self.tx.connection) is not None and (
-                stream := Pyjo.IOLoop.stream(connection)
-            ) is not None:
-                stream.close()
+            if self.pending:
+                self.closing = True
+            else:
+                self._close()
             return
         self._write(502, [('Content-Type', 'text/plain')], b'Bad Gateway')
 
@@ -413,11 +418,16 @@ class _Invocation:
         connection = self.api
 
         def drained(*args: Any) -> None:
+            self.pending -= 1
+            if self.closing and not self.pending:
+                return self._close()
             if connection is not None and (stream := Pyjo.IOLoop.stream(connection)) is not None:
                 stream.start()
 
         if connection is not None and (stream := Pyjo.IOLoop.stream(connection)) is not None:
             stream.stop()
+        self._begin()
+        self.pending += 1
         content = self.tx.res.content
         (content.write_chunk if self.chunked else content.write)(chunk, drained)
         self._rendered()
@@ -433,9 +443,21 @@ class _Invocation:
             return self.fail('Lambda function returned no prelude in its streaming response')
         self.done = True
         self._waited()
+        self._begin()
         content = self.tx.res.content
         (content.write_chunk if self.chunked else content.write)(b'')
         self._rendered()
+
+    # The status and the headers of a streaming response, with its first chunk
+    def _begin(self) -> None:
+        if not self.started and (head := self.head) is not None:
+            self.started = True
+            self._headers(*head)
+
+    # The connection of the client, once what has been written to it is
+    def _close(self) -> None:
+        if (connection := self.tx.connection) is not None and (stream := Pyjo.IOLoop.stream(connection)) is not None:
+            stream.close_gracefully()
 
     # The client is gone, or has its response
     def _finish(self, *args: Any) -> None:
@@ -461,12 +483,12 @@ class _Invocation:
     # The status and the headers of a streaming response, which go with its first chunk, as its body is chunked, or ends
     # with the connection of HTTP/1.0
     def _start(self, code: int, headers: list[tuple[str, str]]) -> None:
-        self.started = True
-        self._headers(code, headers)
+        self.head = (code, headers)
         self.chunked = self.tx.req.version == '1.1'
         if self.tx.is_empty:
             self.done = True
             self._waited()
+            self._begin()
             self.tx.res.content.write(b'')
             self._rendered()
 

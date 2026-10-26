@@ -153,6 +153,38 @@ streaming = Pyjo.Server.Lambda.new(app=app, invoke_mode='RESPONSE_STREAM').to_la
 """
 )
 TMP.child('broken.py').spew(b"raise ImportError('No module named oops')\n")
+
+# A runtime whose streaming response comes in one write, with the error of its trailers after its first chunk
+TMP.child('onewrite.py').spew(
+    b"""import base64
+import http.client
+import json
+import os
+import socket
+
+api = os.environ['AWS_LAMBDA_RUNTIME_API']
+host, port = api.split(':')
+error = base64.b64encode(json.dumps({'errorMessage': 'Stream broke', 'errorType': 'ValueError'}).encode())
+while True:
+    connection = http.client.HTTPConnection(api)
+    connection.request('GET', '/2018-06-01/runtime/invocation/next')
+    res = connection.getresponse()
+    res.read()
+    id = res.headers['Lambda-Runtime-Aws-Request-Id']
+    connection.close()
+    request = (
+        f'POST /2018-06-01/runtime/invocation/{id}/response HTTP/1.1\\r\\nHost: {api}\\r\\n'
+        'Content-Type: application/octet-stream\\r\\nLambda-Runtime-Function-Response-Mode: streaming\\r\\n'
+        'Transfer-Encoding: chunked\\r\\n'
+        'Trailer: Lambda-Runtime-Function-Error-Type, Lambda-Runtime-Function-Error-Body\\r\\n\\r\\n'
+        '5\\r\\nfirst\\r\\n0\\r\\nLambda-Runtime-Function-Error-Type: Unhandled\\r\\n'
+        f'Lambda-Runtime-Function-Error-Body: {error.decode()}\\r\\n\\r\\n'
+    )
+    with socket.create_connection((host, int(port))) as sock:
+        sock.sendall(request.encode())
+        sock.recv(65536)
+"""
+)
 ROOT = TMP.to_str()
 
 
@@ -343,6 +375,20 @@ with subtest('Streaming responses'):
         with fcn.log.capture('error'):
             tx = t.ua.get('/')
         is_ok(tx.res.code, 200, 'next invocation')
+
+    # An error that comes in the same read as the first chunk, which the client gets before the connection closes
+    with Pyjo.App.Lambda.new(command=[sys.executable, 'onewrite.py'], task_root=ROOT) as fcn:
+        fcn.log.level = 'fatal'
+        t = Pyjo.Test.Pyjo.new(fcn)
+        with fcn.log.capture('error') as messages:
+            tx = t.ua.get('/')
+        is_ok(tx.res.code, 200, 'status of the stream')
+        is_ok(tx.res.body, b'first', 'body before the error')
+        ok(not tx.res.content.is_finished, 'cut before its last chunk')
+        like_ok(str(messages), r'Lambda function error: ValueError: Stream broke', 'error of the trailers')
+        with fcn.log.capture('error'):
+            tx = t.ua.get('/')
+        is_ok(tx.res.body, b'first', 'next invocation')
 
     # The timeout of the function goes on while it streams
     with function('stalled', timeout=1) as fcn:
