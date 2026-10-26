@@ -86,8 +86,8 @@ def raw(t, method, path='/'):
             res = connection.getresponse()
             try:
                 body = res.read()
-            except http.client.IncompleteRead:
-                body = None
+            except http.client.IncompleteRead as e:
+                body = ('incomplete', e.partial)
             return res.status, res.getheader('Content-Length'), res.getheader('Transfer-Encoding'), body
         finally:
             connection.close()
@@ -523,7 +523,7 @@ with subtest('Errors'):
         app.log.level = 'fatal'
         t = Pyjo.Test.Pyjo.new(app)
         with app.log.capture('error') as messages:
-            is_deeply_ok(raw(t, 'GET'), (200, None, 'chunked', None), 'incomplete response')
+            is_deeply_ok(raw(t, 'GET'), (200, None, 'chunked', ('incomplete', b'one')), 'incomplete response')
         like_ok(str(messages), r'FastCGI connection closed before the end of the response', 'right error')
     Pyjo.IOLoop.remove(id)
 
@@ -714,7 +714,11 @@ with subtest('Timeouts'):
     url, requests, id = responder(_record(STDOUT, 1, b'Status: 200\r\n\r\none'), close=False)
     app.plugin('Mount', {'/stalled': Pyjo.App.FastCGI.new(url=url, inactivity_timeout=3)})
     start = time.monotonic()
-    is_deeply_ok(raw(Pyjo.URL.new(base), 'GET', '/stalled'), (200, None, 'chunked', None), 'incomplete response')
+    is_deeply_ok(
+        raw(Pyjo.URL.new(base), 'GET', '/stalled'),
+        (200, None, 'chunked', ('incomplete', b'one')),
+        'incomplete response',
+    )
     ok(time.monotonic() - start < 2, 'closed by the inactivity timeout of the server')
     Pyjo.IOLoop.remove(id)
 
