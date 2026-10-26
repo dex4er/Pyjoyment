@@ -30,8 +30,13 @@ extensions = ['sphinx.ext.autodoc', 'sphinx.ext.linkcode', 'sphinxcontrib.mermai
 # sphinxcontrib-mermaid loads by default
 mermaid_version = '11.17.2'
 
-# A tree has the width of its text, as the text of the page, not the width of the page
-mermaid_init_config = {'startOnLoad': False, 'treeView': {'useMaxWidth': False}}
+# A tree has the width of its text, as the text of the page, not the width of the page, and a sequence names its
+# participants once, above it
+mermaid_init_config = {
+    'startOnLoad': False,
+    'treeView': {'useMaxWidth': False},
+    'sequence': {'mirrorActors': False},
+}
 
 # A diagram has its own size, where sphinxcontrib-mermaid makes each one 500 pixels high
 html_static_path = ['_static']

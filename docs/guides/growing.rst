@@ -34,25 +34,20 @@ days, including :mod:`Pyjoyment`.
 
 .. mermaid::
 
-    block-beta
-        columns 5
-        block:left
-            columns 1
-            req["Request"] resp["Response"]
-        end
-        space
-        Controller
-        space
-        block:right
-            columns 1
-            Model View
-        end
-        req --> Controller
-        Controller --> resp
+    %%{init: {'class': {'hideEmptyMembersBox': true}}}%%
+    classDiagram
+        direction LR
+        class Request
+        class Response
+        class Controller
+        class Model
+        class View
+        Request --> Controller
+        Response <-- Controller
         Controller <--> Model
         Controller <--> View
-        classDef plain fill:none,stroke:none
-        class left,right,req,resp plain
+        style Request fill:none,stroke:none
+        style Response fill:none,stroke:none
 
 The *controller* receives a request from a user, passes incoming data to the
 *model* and retrieves data from it, which then gets turned into an actual
