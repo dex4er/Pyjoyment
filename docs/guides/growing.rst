@@ -21,25 +21,26 @@ MVC is a software architectural pattern for graphical user interface
 programming originating in Smalltalk-80, that separates application logic,
 presentation and input.
 
-.. code-block:: text
+.. mermaid::
 
-               +------------+    +-------+    +------+
-      Input -> | Controller | -> | Model | -> | View | -> Output
-               +------------+    +-------+    +------+
+    flowchart LR
+        Input --> Controller --> Model --> View --> Output
+        classDef plain fill:none,stroke:none
+        class Input,Output plain
 
 A slightly modified version of the pattern moving some application logic into
 the *controller* is the foundation of pretty much every web framework these
 days, including :mod:`Pyjoyment`.
 
-.. code-block:: text
+.. mermaid::
 
-                  +----------------+     +-------+
-      Request  -> |                | <-> | Model |
-                  |                |     +-------+
-                  |   Controller   |
-                  |                |     +-------+
-      Response <- |                | <-> | View  |
-                  +----------------+     +-------+
+    flowchart LR
+        Request --> Controller
+        Controller --> Response
+        Controller <--> Model
+        Controller <--> View
+        classDef plain fill:none,stroke:none
+        class Request,Response plain
 
 The *controller* receives a request from a user, passes incoming data to the
 *model* and retrieves data from it, which then gets turned into an actual
@@ -57,36 +58,30 @@ like ``http://mojolicious.org/foo`` with your browser, you are basically
 asking the web server for the HTML *representation* of the
 ``http://mojolicious.org/foo`` *resource*.
 
-.. code-block:: text
+.. mermaid::
 
-      +--------+                                  +--------+
-      |        | -> http://mojolicious.org/foo -> |        |
-      | Client |                                  | Server |
-      |        | <-  <html>Mojo rocks!</html>  <- |        |
-      +--------+                                  +--------+
+    sequenceDiagram
+        participant C as Client
+        participant S as Server
+        C->>S: http://mojolicious.org/foo
+        S-->>C: #lt;html#gt;Mojo rocks!#lt;/html#gt;
 
 The fundamental idea here is that all resources are uniquely addressable with
 URLs and every resource can have different representations such as HTML, RSS
 or JSON. User interface concerns are separated from data storage concerns and
 all session state is kept client-side.
 
-.. code-block:: text
+.. mermaid::
 
-      +---------+                        +------------+
-      |         | ->    PUT /foo      -> |            |
-      |         | ->    Hello World!  -> |            |
-      |         |                        |            |
-      |         | <-    201 CREATED   <- |            |
-      |         |                        |            |
-      |         | ->    GET /foo      -> |            |
-      | Browser |                        | Web Server |
-      |         | <-    200 OK        <- |            |
-      |         | <-    Hello World!  <- |            |
-      |         |                        |            |
-      |         | ->    DELETE /foo   -> |            |
-      |         |                        |            |
-      |         | <-    200 OK        <- |            |
-      +---------+                        +------------+
+    sequenceDiagram
+        participant B as Browser
+        participant S as Web Server
+        B->>S: PUT /foo<br/>Hello World!
+        S-->>B: 201 CREATED
+        B->>S: GET /foo
+        S-->>B: 200 OK<br/>Hello World!
+        B->>S: DELETE /foo
+        S-->>B: 200 OK
 
 While HTTP methods such as ``PUT``, ``GET`` and ``DELETE`` are not directly
 part of REST they go well with it and are commonly used to manipulate

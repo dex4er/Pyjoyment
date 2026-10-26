@@ -82,18 +82,13 @@ Pyjoyment application (or even using Unix sockets), balancing load across
 multiple instances, or supporting several applications through the same
 IP/port.
 
-.. code-block:: text
+.. mermaid::
 
-                   ..........................................
-                   :                                        :
-   +--------+      :  +-----------+      +---------------+  :
-   |        |-------->|           |      |               |  :
-   | client |      :  |  reverse  |----->|   Pyjoyment   |  :
-   |        |<--------|   proxy   |      |  application  |  :
-   +--------+      :  |           |<-----|               |  :
-                   :  +-----------+      +---------------+  :
-                   :                                        :
-                   .. system boundary (e.g. same host) ......
+    flowchart LR
+        client <--> proxy
+        subgraph boundary [system boundary, e.g. same host]
+            proxy[reverse proxy] <--> app[Pyjoyment application]
+        end
 
 This setup introduces some problems, though: the application will receive
 requests from the reverse proxy instead of the original client; the
@@ -105,12 +100,13 @@ application.
 As an example, compare a sample request from the client and what the
 Pyjoyment application receives:
 
-.. code-block:: text
+.. mermaid::
 
-   client                       reverse proxy                Pyjoyment app
-    __|__              _______________|______________             ____|____
-   /     \            /                              \           /         \
-   1.2.3.4 --HTTPS--> api.example.com      10.20.30.39 --HTTP--> 10.20.30.40
+    flowchart LR
+        client["client<br/>1.2.3.4"] -- HTTPS --> proxy["reverse proxy<br/>api.example.com<br/>10.20.30.39"]
+        proxy -- HTTP --> app["Pyjoyment app<br/>10.20.30.40"]
+
+.. code-block:: text
 
    GET /foo/1 HTTP/1.1                |    GET /foo/1 HTTP/1.1
    Host: api.example.com              |    Host: 10.20.30.40
