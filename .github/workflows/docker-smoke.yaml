@@ -5,8 +5,9 @@ name: Docker Smoke Test
 # of PEP 723, with the wheel of the checkout, and checks that they serve the
 # generated pages and stop gracefully, and runs a Lite script as an event
 # function in the image of AWS Lambda for Python, also streaming its responses
-# with the runtime client of Pyjoyment, and a Lite script that speaks FastCGI
-# to Caddy in front of it. The weekly run catches a change of
+# with the runtime client of Pyjoyment, and in an image of "generate dockerfile
+# --target lambda" under the emulator of the Runtime API, and a Lite script that
+# speaks FastCGI to Caddy in front of it. The weekly run catches a change of
 # the images of Python, uv, AWS Lambda and Caddy.
 on:
   push:
@@ -53,6 +54,7 @@ jobs:
           - lite-pep723
           - lambda
           - lambda-stream
+          - lambda-image
           - fastcgi
 
     runs-on: ubuntu-26.04-arm
@@ -70,4 +72,6 @@ jobs:
       - name: Run smoke test
         env:
           VARIANT: ${{ matrix.variant }}
+          # The emulator of the Runtime API of the variant lambda-image, which its image does not have
+          RIE_VERSION: v1.37 # datasource=github-releases depName=aws/aws-lambda-runtime-interface-emulator versioning=loose
         run: tt/docker-smoke/smoke.sh "${VARIANT}"
