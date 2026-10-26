@@ -34,13 +34,25 @@ days, including :mod:`Pyjoyment`.
 
 .. mermaid::
 
-    flowchart LR
-        user[ ] -- Request --> Controller
-        Controller -- Response --> user
+    block-beta
+        columns 5
+        block:left
+            columns 1
+            req["Request"] resp["Response"]
+        end
+        space
+        Controller
+        space
+        block:right
+            columns 1
+            Model View
+        end
+        req --> Controller
+        Controller --> resp
         Controller <--> Model
         Controller <--> View
         classDef plain fill:none,stroke:none
-        class user plain
+        class left,right,req,resp plain
 
 The *controller* receives a request from a user, passes incoming data to the
 *model* and retrieves data from it, which then gets turned into an actual
@@ -158,27 +170,28 @@ don't need more than a single file.
 Full :mod:`Pyjoyment` applications on the other hand are much closer to a
 well organized Python project to maximize maintainability.
 
-.. code-block:: text
+.. mermaid::
 
-    my_app                           # Application directory
-    |- MyApp                         # Application package
-    |  |- __init__.py                # Application class
-    |  |- __main__.py                # Application script
-    |  +- Controller                 # Controller package
-    |     +- Example.py              # Controller class
-    |- my_app.yml                    # Configuration file
-    |- pyproject.toml                # Project file with the dependencies
-    |- t                             # Test directory
-    |  +- basic.py                   # Random test
-    |- public                        # Static file directory (served automatically)
-    |  |- assets                     # Static assets created by bundlers
-    |  |  +- *generated assets*
-    |  +- index.html                 # Static HTML file
-    +- templates                     # Template directory
-       |- layouts                    # Template directory for layouts
-       |  +- default.html.ep         # Layout template
-       +- example                    # Template directory for "Example" controller
-          +- welcome.html.ep         # Template for "welcome" action
+    treeView-beta
+        my_app ## Application directory
+            MyApp ## Application package
+                __init__.py ## Application class
+                __main__.py ## Application script
+                Controller ## Controller package
+                    Example.py ## Controller class
+            my_app.yml ## Configuration file
+            pyproject.toml ## Project file with the dependencies
+            t ## Test directory
+                basic.py ## Random test
+            public ## Static file directory (served automatically)
+                assets ## Static assets created by bundlers
+                    *generated assets*
+                index.html ## Static HTML file
+            templates ## Template directory
+                layouts ## Template directory for layouts
+                    default.html.ep ## Layout template
+                example ## Template directory for "Example" controller
+                    welcome.html.ep ## Template for "welcome" action
 
 Both application skeletons can be automatically generated with the commands
 :mod:`Pyjoyment.Command.Author.generate.lite_app` and
@@ -405,15 +418,16 @@ this.
 
 And the directory structure should be looking like this now.
 
-.. code-block:: text
+.. mermaid::
 
-    myapp
-    |- myapp.py
-    |- MyApp
-    |  +- Model
-    |     +- Users.py
-    +- t
-       +- login.py
+    treeView-beta
+        myapp
+            myapp.py
+            MyApp
+                Model
+                    Users.py
+            t
+                login.py
 
 Our templates are using quite a few features of the renderer,
 :doc:`rendering` explains them all in great detail.
@@ -477,21 +491,22 @@ to allow running tests again.
 And the directory structure of our hybrid application should be looking like
 this.
 
-.. code-block:: text
+.. mermaid::
 
-    myapp
-    |- myapp.py
-    |- MyApp
-    |  |- __init__.py
-    |  +- Model
-    |     +- Users.py
-    |- t
-    |  +- login.py
-    +- templates
-       |- layouts
-       |  +- default.html.ep
-       |- index.html.ep
-       +- protected.html.ep
+    treeView-beta
+        myapp
+            myapp.py
+            MyApp
+                __init__.py
+                Model
+                    Users.py
+            t
+                login.py
+            templates
+                layouts
+                    default.html.ep
+                index.html.ep
+                protected.html.ep
 
 Controller class
 ~~~~~~~~~~~~~~~~
@@ -576,24 +591,25 @@ Full :mod:`Pyjoyment` applications are a little easier to test, so
 
 And our final directory structure should be looking like this.
 
-.. code-block:: text
+.. mermaid::
 
-    myapp
-    |- MyApp
-    |  |- __init__.py
-    |  |- __main__.py
-    |  |- Controller
-    |  |  +- Login.py
-    |  +- Model
-    |     +- Users.py
-    |- t
-    |  +- login.py
-    +- templates
-       |- layouts
-       |  +- default.html.ep
-       +- login
-          |- index.html.ep
-          +- protected.html.ep
+    treeView-beta
+        myapp
+            MyApp
+                __init__.py
+                __main__.py
+                Controller
+                    Login.py
+                Model
+                    Users.py
+            t
+                login.py
+            templates
+                layouts
+                    default.html.ep
+                login
+                    index.html.ep
+                    protected.html.ep
 
 Test-driven development takes a little getting used to, but can be a very
 powerful tool.

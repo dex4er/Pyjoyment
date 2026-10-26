@@ -86,7 +86,7 @@ IP/port.
 
     flowchart LR
         client <--> proxy
-        subgraph boundary [system boundary,<br />e.g. same host]
+        subgraph boundary [system boundary, e.g. same host]
             proxy[reverse proxy] <--> app[Pyjoyment application]
         end
 
@@ -247,13 +247,14 @@ pre-forking web server :mod:`Pyjo.Server.Prefork`, which can take advantage
 of multiple CPU cores and copy-on-write memory management to scale up to
 thousands of concurrent client connections.
 
-.. code-block:: text
+.. mermaid::
 
-    Pyjo.Server.Prefork
-    |- Pyjo.Server.Daemon [1]
-    |- Pyjo.Server.Daemon [2]
-    |- Pyjo.Server.Daemon [3]
-    +- Pyjo.Server.Daemon [4]
+    treeView-beta
+        Pyjo.Server.Prefork
+            Pyjo.Server.Daemon [1]
+            Pyjo.Server.Daemon [2]
+            Pyjo.Server.Daemon [3]
+            Pyjo.Server.Daemon [4]
 
 It is based on :mod:`Pyjo.Server.Daemon` and available to every application
 through the command :mod:`Pyjoyment.Command.prefork`.
@@ -307,10 +308,11 @@ Reload
 After reading the :doc:`tutorial`, you should already be familiar with
 :mod:`Pyjo.Server.Reload`.
 
-.. code-block:: text
+.. mermaid::
 
-    Pyjo.Server.Reload
-    +- Pyjo.Server.Daemon
+    treeView-beta
+        Pyjo.Server.Reload
+            Pyjo.Server.Daemon
 
 It is basically a restarter that forks a new :mod:`Pyjo.Server.Daemon` web
 server whenever a file in your project changes, and should therefore only be
