@@ -441,7 +441,13 @@ its variant `lambda-stream` runs the same script with
 `examples/lambda_stream`, which the emulator runs in the place of the runtime
 client of the image, as it has no `AWS_LAMBDA_EXEC_WRAPPER`, and checks the
 format of the stream, as the emulator gives the whole stream at its end, with
-the content type `application/octet-stream`, and its variant `fastcgi` runs a Lite script that listens for FastCGI, with
+the content type `application/octet-stream`, its variant `lambda-image` runs a
+Lite script with `pyproject.toml` in an image of `generate dockerfile --target
+lambda`, whose command is the runtime of the function itself, under the
+emulator of the Runtime API, which the image has not, so the script mounts the
+binary of its release as the entry point of the container, of `RIE_VERSION` of
+the workflow, which Renovate bumps, or the latest one, and invokes it buffered
+and streaming, and its variant `fastcgi` runs a Lite script that listens for FastCGI, with
 `PYJO_LISTEN`, behind Caddy in a container of its own on the same network,
 whose image `Dockerfile.caddy` pins, so that Renovate bumps it, and checks the
 pages through Caddy.
