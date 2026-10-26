@@ -2,6 +2,7 @@ import Pyjo.Asset.File
 import Pyjo.File
 import Pyjo.IOLoop
 import Pyjo.IOLoop.Server
+import Pyjo.JSON
 import Pyjo.Promise
 import Pyjo.Server
 import Pyjo.Server.Daemon
@@ -1014,6 +1015,42 @@ with subtest('Proxy'):
     with Pyjo.Test.Pyjo.new(app) as t:
         t.put_ok('/', {'Connection': 'close', 'X-Foo': 'bar'}).status_is(200)
         t.json_is('/Accept', 'application/json').json_is('/X-Foo', 'bar').json_hasnt('/Connection')
+
+with subtest('JSONP'):
+    app = Pyjoyment.new()
+    HEADLINES = {'headlines': ['Pyjoyment released', 'Hello World!']}
+
+    @app.routes.get('/headlines')
+    def headlines(c):
+        c.res.headers.access_control_allow_origin = 'https://example.com'
+        c.render(json=HEADLINES)
+
+    with Pyjo.Test.Pyjo.new(app) as t:
+        t.get_ok('/headlines').status_is(200).header_is('Access-Control-Allow-Origin', 'https://example.com')
+        t.json_is('/headlines/0', 'Pyjoyment released')
+
+    with cookbook('jsonp') as t:
+        t.get_ok('/headlines?callback=show').status_is(200)
+        t.content_type_is('application/javascript').header_is('X-Content-Type-Options', 'nosniff')
+        t.content_is('/**/show({"headlines":["Pyjoyment released","Hello World!"]});')
+        t.get_ok('/headlines?callback=App.show').status_is(200).content_like(re.compile(r'^/\*\*/App\.show\('))
+        for callback in ('alert(1)//', 'a b', '', '1a', 'a..b'):
+            t.get_ok('/headlines', form={'callback': callback}).status_is(400).content_is('Invalid callback')
+        t.get_ok('/headlines').status_is(400)
+
+    result = command(EXAMPLES.child('jsonp.py').to_str(), 'get', '/headlines?callback=show')
+    is_ok(result.stdout, '/**/show({"headlines":["Pyjoyment released","Hello World!"]});', 'command')
+
+with subtest('JSON inline'):
+    with cookbook('json_inline') as t:
+        t.get_ok('/').status_is(200).text_is('title', 'Greeting')
+        is_ok(Pyjo.JSON.from_json(t.tx.res.dom().at('script#state').text), {'greeting': 'Hello World!'}, 'state')
+
+        greeting = '</script><!--<script>alert(1)</script>-->'
+        t.get_ok('/', form={'greeting': greeting}).status_is(200).content_unlike(re.compile('<!--'))
+        t.element_exists('script#state + script').element_exists('h1#greeting')
+        is_ok(len(t.tx.res.dom().find('script')), 2, 'two elements')
+        is_ok(Pyjo.JSON.from_json(t.tx.res.dom().at('script#state').text), {'greeting': greeting}, 'state kept whole')
 
 with subtest('Hello World'):
     with cookbook('hello') as t:
