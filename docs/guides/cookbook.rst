@@ -978,6 +978,16 @@ An image of the function, of any Python, has the same command, which
 
     $ ./myapp.py generate dockerfile --target lambda
 
+A ZIP of the function for ``provided.al2023`` brings the Python of its
+``bootstrap`` in a layer, of any version, also the free-threaded build, which
+:mod:`Pyjoyment.Command.Author.generate.lambda_zip` writes with uv to ``dist``:
+``python.zip``, the layer, and ``function.zip``, the application with its
+dependencies and the ``bootstrap`` that runs it with the Python of the layer.
+
+.. code-block:: console
+
+    $ ./myapp.py generate lambda-zip --arch arm64
+
 The same function runs locally, mounted in an application with
 :mod:`Pyjo.App.Lambda`, in a process of its own, which gets its invocations
 through the Runtime API of Lambda, as on AWS, and with the path of the mount as

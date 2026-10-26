@@ -12,6 +12,7 @@ import socket
 import subprocess
 import sys
 import types
+import zipfile
 
 
 # Renamed from Mojolicious: PYJO_WSGI, as WSGI has no environment variable of its own, where Mojo has PLACK_ENV
@@ -79,6 +80,7 @@ import Pyjoyment.Command.asgi  # noqa: E402
 import Pyjoyment.Command.Author.generate  # noqa: E402
 import Pyjoyment.Command.Author.generate.app  # noqa: E402
 import Pyjoyment.Command.Author.generate.dockerfile  # noqa: E402
+import Pyjoyment.Command.Author.generate.lambda_zip  # noqa: E402
 import Pyjoyment.Command.Author.generate.lite_app  # noqa: E402
 import Pyjoyment.Command.Author.generate.plugin  # noqa: E402
 import Pyjoyment.Command.Author.generate.pyproject  # noqa: E402
@@ -469,6 +471,141 @@ with subtest('generate dockerfile'):
     with contextlib.redirect_stderr(buffer):
         throws_ok(
             lambda: dockerfile.run('--unknown'), re.compile(r'Usage: APPLICATION generate dockerfile'), 'unknown option'
+        )
+    like_ok(buffer.getvalue(), r'Unknown option: unknown', 'right output')
+    os.chdir(cwd)
+
+# Not in Mojolicious: generate lambda-zip, with the uv of t/lib/FakeUV.py
+with subtest('generate lambda-zip'):
+    sys.path.insert(0, Pyjo.File.curfile().dirname().sibling('lib').to_str())
+    import FakeUV  # pyright: ignore[reportMissingImports]
+
+    lambda_zip = Pyjoyment.Command.Author.generate.lambda_zip.new()
+    ok(lambda_zip.description, 'has a description')
+    like_ok(lambda_zip.usage, r'lambda-zip', 'has usage information')
+    uv = Pyjo.File.tempdir()
+    _uv = Pyjoyment.Command.Author.generate.lambda_zip._uv
+    Pyjoyment.Command.Author.generate.lambda_zip._uv = FakeUV.command
+    version = f'{sys.version_info.major}.{sys.version_info.minor}'
+
+    def generate(*args, **env):
+        uv.child('log').spew('')
+        with stdout() as buffer, local(FAKE_UV_LOG=uv.child('log').to_str(), **env):
+            lambda_zip.run(*args)
+        return buffer.getvalue().decode(), FakeUV.calls(uv.child('log'))
+
+    def entries(path):
+        with zipfile.ZipFile(app.rel_file(path).to_str()) as archive:
+            return {info.filename: info for info in archive.infolist()}
+
+    dir = Pyjo.File.tempdir()
+    os.chdir(dir)
+    app.rel_file('pyproject.toml').spew('[project]\nname = "my_app"\n')
+    app.rel_file('MyApp').make_path()
+    app.rel_file('MyApp/__init__.py').spew('pass\n')
+    app.rel_file('MyApp/__pycache__').make_path().child('__init__.cpython-0.pyc').spew('')
+    app.rel_file('.git').make_path().child('config').spew('')
+    app.rel_file('.env').spew('SECRET=1\n')
+    with local(PYJO_EXE=None):
+        output, calls = generate()
+    like_ok(output, r'\[write\] .*dist.python\.zip', 'right output')
+    like_ok(output, r'\[write\] .*dist.function\.zip', 'right output')
+    is_ok(calls[0][:3], ['python', 'install', '--no-bin'], 'Python')
+    is_ok(calls[0][-1], f'cpython-{version}-linux-x86_64-gnu', 'right Python')
+    pip = next(call for call in calls if call[:2] == ['pip', 'install'])
+    is_ok(pip[pip.index('--python') + 1], f'{version}+gil', 'Python with the GIL')
+    is_ok(pip[pip.index('--python-platform') + 1], 'x86_64-manylinux_2_34', 'right platform')
+    is_ok(pip[pip.index('-r') + 1], 'pyproject.toml', 'dependencies of the project')
+    ok(not any(call[0] == 'export' for call in calls), 'nothing exported')
+    python = entries('dist/python.zip')
+    is_ok(python[f'bin/python{version}'].external_attr >> 16, 0o100755, 'executable interpreter')
+    ok('bin/python3' not in python, 'no symbolic link')
+    is_ok(python[f'lib/python{version}/os.py'].date_time, (1980, 1, 1, 0, 0, 0), 'fixed time')
+    is_ok(python[f'lib/python{version}/os.py'].external_attr >> 16, 0o100644, 'right mode')
+    ok(
+        any(re.fullmatch(rf'lib/python{version}/__pycache__/os\..*\.pyc', name) for name in python),
+        'standard library compiled',
+    )
+    ok(f'lib/python{version}/lib-dynload/_json.so' in python, 'extension')
+    unlike_ok(' '.join(python), r'idlelib|site-packages|config-|_tkinter|include', 'nothing unused')
+    function = entries('dist/function.zip')
+    is_ok(function['bootstrap'].external_attr >> 16, 0o100755, 'executable bootstrap')
+    with zipfile.ZipFile(app.rel_file('dist/function.zip').to_str()) as archive:
+        bootstrap = archive.read('bootstrap').decode()
+    like_ok(bootstrap, r'^#!/bin/sh\n', 'shell')
+    like_ok(
+        bootstrap, rf'(?m)^exec /opt/python/bin/python{version} -m Pyjoyment\.HelloWorld$', 'package of the application'
+    )
+    ok('MyApp/__init__.py' in function, 'application')
+    ok(any(name.startswith('MyApp/__pycache__/__init__.') for name in function), 'application compiled')
+    ok('MyApp/__pycache__/__init__.cpython-0.pyc' not in function, 'not the bytecode of the machine')
+    ok('foo/__init__.py' in function, 'dependency')
+    unlike_ok(' '.join(function), r'(?:^| )(?:\.git|\.env|\.lock|bin/|dist/|python/)', 'nothing else')
+    zips = app.rel_file('dist/function.zip').slurp(), app.rel_file('dist/python.zip').slurp()
+    with local(PYJO_EXE=None):
+        output, calls = generate()
+    like_ok(output, r'\[write\] .*dist.function\.zip', 'written anew')
+    ok(zips == (app.rel_file('dist/function.zip').slurp(), app.rel_file('dist/python.zip').slurp()), 'same files')
+
+    # The architecture, the free-threaded build and the lock of the project
+    app.rel_file('uv.lock').spew('')
+    with local(PYJO_EXE=None):
+        output, calls = generate('--arch', 'arm64', '-p', '3.15t')
+    is_ok(calls[0][-1], 'cpython-3.15t-linux-aarch64-gnu', 'right Python')
+    export = next(call for call in calls if call[0] == 'export')
+    ok('--frozen' in export and '--no-dev' in export and '--no-emit-project' in export, 'locked dependencies')
+    pip = next(call for call in calls if call[:2] == ['pip', 'install'])
+    is_ok(pip[pip.index('--python') + 1], '3.15t', 'free-threaded Python')
+    is_ok(pip[pip.index('--python-platform') + 1], 'aarch64-manylinux_2_34', 'right platform')
+    is_ok(pip[pip.index('-r') + 1], export[export.index('-o') + 1], 'exported dependencies')
+    ok('bin/python3.15t' in entries('dist/python.zip'), 'free-threaded interpreter')
+
+    # Python in the function, without a layer
+    app.rel_file('dist').remove_tree()
+    with local(PYJO_EXE=None):
+        output, calls = generate('--no-layer')
+    unlike_ok(output, r'python\.zip', 'no layer')
+    ok(not os.path.exists(app.rel_file('dist/python.zip')), 'no layer')
+    function = entries('dist/function.zip')
+    is_ok(function[f'python/bin/python{version}'].external_attr >> 16, 0o100755, 'executable interpreter')
+    ok(f'python/lib/python{version}/os.py' in function, 'standard library')
+    with zipfile.ZipFile(app.rel_file('dist/function.zip').to_str()) as archive:
+        bootstrap = archive.read('bootstrap').decode()
+    like_ok(bootstrap, rf'(?m)^exec "\$LAMBDA_TASK_ROOT/python/bin/python{version}" -m ', 'interpreter of the function')
+    os.chdir(cwd)
+
+    # A Lite script with the inline metadata of PEP 723, and its lock
+    dir = Pyjo.File.tempdir()
+    os.chdir(dir)
+    app.rel_file('my app.py').spew('# /// script\n# dependencies = ["Pyjoyment"]\n# ///\n')
+    with local(PYJO_EXE=app.rel_file('my app.py').to_abs().to_str()):
+        lambda_zip.app.home = Pyjo.File.path().to_abs()
+        output, calls = generate()
+        export = next(call for call in calls if call[0] == 'export')
+        is_ok(export[:3], ['export', '--script', 'my app.py'], 'dependencies of the script')
+        ok('--frozen' not in export, 'not locked')
+        app.rel_file('my app.py.lock').spew('')
+        output, calls = generate()
+        ok('--frozen' in next(call for call in calls if call[0] == 'export'), 'locked')
+    with zipfile.ZipFile(app.rel_file('dist/function.zip').to_str()) as archive:
+        like_ok(archive.read('bootstrap').decode(), r"(?m)^exec /opt/python/bin/python\S+ 'my app\.py'$", 'script')
+
+    # Errors
+    throws_ok(lambda: lambda_zip.run('-a', 'riscv64'), re.compile(r'^Unknown architecture: riscv64'), 'architecture')
+    throws_ok(lambda: lambda_zip.run('-p', 'pypy3.11'), re.compile(r'^Unknown version of Python: pypy3\.11'), 'version')
+    with local(FAKE_UV_LOG=uv.child('log').to_str(), FAKE_UV_FAIL='python'), contextlib.redirect_stdout(io.StringIO()):
+        throws_ok(
+            lambda: lambda_zip.run(),
+            re.compile(r'^Command "uv python install" failed with exit status 2'),
+            'failed command',
+        )
+    Pyjoyment.Command.Author.generate.lambda_zip._uv = _uv
+    with local(PATH=''):
+        throws_ok(lambda: lambda_zip.run(), re.compile(r'^Command "uv" not found'), 'no uv')
+    buffer = io.StringIO()
+    with contextlib.redirect_stderr(buffer):
+        throws_ok(
+            lambda: lambda_zip.run('--unknown'), re.compile(r'Usage: APPLICATION generate lambda-zip'), 'unknown option'
         )
     like_ok(buffer.getvalue(), r'Unknown option: unknown', 'right output')
     os.chdir(cwd)
