@@ -153,6 +153,7 @@ Classes
 -------
 """
 
+import Pyjo.Exception
 import Pyjo.IOLoop
 import Pyjo.Parameters
 import Pyjo.Server
@@ -288,6 +289,27 @@ class Pyjo_Server_Lambda(Pyjo.Server.object):
             response['body'] = base64.b64encode(content).decode('ascii')
             response['isBase64Encoded'] = True
         return response
+
+    def run_runtime(self) -> None:
+        """::
+
+            server.run_runtime()
+
+        Run the application for the invocations of the Runtime API of
+        ``AWS_LAMBDA_RUNTIME_API``, one after another, as the runtime client
+        does with a handler, until the process ends, so that the script of
+        the application is the runtime of a custom runtime itself.
+        """
+        if not (api := os.environ.get('AWS_LAMBDA_RUNTIME_API')):
+            raise Pyjo.Exception.new('AWS_LAMBDA_RUNTIME_API is not set')
+
+        # Preload application
+        self.app.server(self)
+        runtime = _Runtime(api)
+        try:
+            runtime.loop(self.run)
+        finally:
+            runtime.connection.close()
 
     def to_lambda_app(self) -> Handler:
         """::
@@ -497,6 +519,10 @@ class _Runtime:
         except Exception as e:
             self.post(f'{self.PREFIX}/init/error', _error(e, 'Runtime.ImportModuleError'), 'Runtime.ImportModuleError')
             raise SystemExit(1) from None
+        self.loop(handler)
+
+    # The invocations, one after another, for the handler
+    def loop(self, handler: Callable[[Any, Any], Any]) -> None:
         while True:
             self.connection.request('GET', f'{self.PREFIX}/invocation/next')
             res = self.connection.getresponse()
