@@ -296,6 +296,10 @@ class _Response:
         self.started = False
         self.stream: Any = None
 
+        # The chunks that wait to be written to the client, after which its connection closes when it is closing
+        self.writing = 0
+        self.closing = False
+
     # The request of the transaction, or of the controller of a route that embeds the application
     @classmethod
     def run(cls, app: Any, config: dict[str, Any], tx: Any, *args: Any) -> None:
@@ -347,9 +351,10 @@ class _Response:
 
         self._open(params)
 
+    # The connection of the client, once what has been written to it is
     def _close(self) -> None:
         if (connection := self.tx.connection) is not None and (stream := Pyjo.IOLoop.stream(connection)) is not None:
-            stream.close()
+            stream.close_gracefully()
 
     # The variables of the environment of the application before the ones of the attribute env
     def _defaults(self) -> dict[str, str]:
@@ -368,12 +373,16 @@ class _Response:
             return
         self.aborted = True
 
-        # The response has started, so the connection is closed, as the response cannot change
+        # The response has started, so the connection is closed, as the response cannot change, once the chunks that
+        # wait have been written
         if self.started:
             self.done = True
             if not self.closed:
                 self.app.log.error(message)
-                self._close()
+                if self.writing:
+                    self.closing = True
+                else:
+                    self._close()
             return self._stop()
 
         self.done = True
@@ -427,12 +436,16 @@ class _Response:
 
             # The next output once the chunk has been written to the client
             def drained(*args: Any) -> None:
+                self.writing -= 1
+                if self.closing and not self.writing:
+                    return self._close()
                 if (stream := self.stream) is not None and not self.done:
                     stream.start()
 
             if stream is not None and not ended:
                 stream.stop()
             self.sent += len(chunk)
+            self.writing += 1
             (content.write_chunk if self.chunked else content.write)(chunk, drained)
             self._rendered()
         if ended:

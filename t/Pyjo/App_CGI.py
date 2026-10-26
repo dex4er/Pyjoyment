@@ -174,8 +174,8 @@ def raw(t, method, path='/'):
             res = connection.getresponse()
             try:
                 body = res.read()
-            except http.client.IncompleteRead:
-                body = None
+            except http.client.IncompleteRead as e:
+                body = ('incomplete', e.partial)
             return res.status, res.getheader('Content-Length'), res.getheader('Transfer-Encoding'), body
         finally:
             connection.close()
@@ -415,7 +415,9 @@ with subtest('Errors'):
     pid_file = tmp.child('started.pid').to_str()
     with Pyjo.App.CGI.new(script=f'{root}/sleep.cgi', env={'PID_FILE': pid_file}, inactivity_timeout=INACTIVE) as cgi:
         t = Pyjo.Test.Pyjo.new(application(cgi))
-        is_deeply_ok(raw(t, 'GET', '/prefix?started'), (200, None, 'chunked', None), 'incomplete response')
+        is_deeply_ok(
+            raw(t, 'GET', '/prefix?started'), (200, None, 'chunked', ('incomplete', b'started')), 'incomplete response'
+        )
         ok(gone(pid_file), 'process killed')
         ok(gone(f'{pid_file}.child'), 'process that it has started killed')
 
