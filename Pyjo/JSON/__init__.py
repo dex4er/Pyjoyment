@@ -32,9 +32,11 @@ the constants :data:`true` and :data:`false` hold too. ::
     false -> False
     null  -> None
 
-The character ``/`` will always be escaped to prevent XSS attacks. ::
+The characters ``/`` and ``<`` will always be escaped to prevent XSS attacks,
+so that JSON can be put into an element ``script`` of HTML as it is. ::
 
-    "</script>" -> "<\/script>"
+    "</script>"     -> "\u003C\/script>"
+    "<!--<script>"  -> "\u003C!--\u003Cscript>"
 
 For better performance the :mod:`json` module of the standard library will be
 used, set up like the pure-Python implementation, with error messages of its
@@ -77,6 +79,10 @@ _ESCAPE = {'"': '"', '\\': '\\', '/': '/', 'b': '\x08', 'f': '\x0c', 'n': '\x0a'
 _REVERSE = {_ESCAPE[c]: f'\\{c}' for c in _ESCAPE} | {
     chr(c): f'\\u{c:04X}' for c in range(0x20) if chr(c) not in _ESCAPE.values()
 }
+
+# Unlike Mojolicious: "<" is escaped too, where Mojo escapes only "/", as "<!--<script>" in a string of JSON in an
+# element "script" of HTML makes "</script>" of the element end the escape of the parser of HTML, not the element
+_REVERSE['<'] = '\\u003C'
 _TRANSLATE = str.maketrans(_REVERSE)
 
 _RE_ARRAY_END = re.compile(r'[\x20\x09\x0a\x0d]*\]')
@@ -537,9 +543,13 @@ def _stdlib_decode(data: bytes | bytearray | str, chars: bool = False) -> Any:
 
 
 def _stdlib_dumps(value: object, sort_keys: bool) -> str:
-    return json.dumps(
-        value, default=default, ensure_ascii=False, allow_nan=False, separators=(',', ':'), sort_keys=sort_keys
-    ).replace('/', '\\/')
+    return (
+        json.dumps(
+            value, default=default, ensure_ascii=False, allow_nan=False, separators=(',', ':'), sort_keys=sort_keys
+        )
+        .replace('/', '\\/')
+        .replace('<', '\\u003C')
+    )
 
 
 def _stdlib_encode(value: object, sort_keys: bool = False) -> str:

@@ -279,8 +279,13 @@ with subtest('Huge string'):
 
 with subtest('Slash'):
     data = encode_json(['123</script>'])
-    is_ok(data, rb'["123<\/script>"]', 'escaped slash')
+    # Unlike Mojolicious: "<" is escaped too, where Mojo keeps it
+    is_ok(data, rb'["123\u003C\/script>"]', 'escaped slash')
     is_deeply_ok(decode_json(data), ['123</script>'], 'successful roundtrip')
+    # Not in Mojolicious: "<!--<script>", which would keep "</script>" from ending an element "script" of HTML
+    data = encode_json(['<!--<script>'])
+    is_ok(data, rb'["\u003C!--\u003Cscript>"]', 'escaped less-than sign')
+    is_deeply_ok(decode_json(data), ['<!--<script>'], 'successful roundtrip')
 
 with subtest('JSON without UTF-8 encoding'):
     is_deeply_ok(from_json('["♥"]'), ['♥'], 'characters decoded')

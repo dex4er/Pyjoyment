@@ -27,8 +27,10 @@ with subtest('Description'):
     is_ok(decode_json('false'), False, 'false')
     is_ok(decode_json('null'), None, 'null')
 
-    # "</script>" -> "<\/script>"
-    is_ok(encode_json('</script>'), rb'"<\/script>"', '"</script>"')
+    # "</script>"     -> "\u003C\/script>"
+    # "<!--<script>"  -> "\u003C!--\u003Cscript>"
+    is_ok(encode_json('</script>'), rb'"\u003C\/script>"', '"</script>"')
+    is_ok(encode_json('<!--<script>'), rb'"\u003C!--\u003Cscript>"', '"<!--<script>"')
 
 with subtest('decode_json'):
     value = decode_json(data)
