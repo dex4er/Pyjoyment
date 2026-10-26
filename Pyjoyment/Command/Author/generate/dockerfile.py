@@ -11,6 +11,7 @@ Pyjoyment.Command.Author.generate.dockerfile - Dockerfile generator command
       python -m MyApp generate dockerfile --port 8080
       python -m MyApp generate dockerfile --graceful-timeout 8
       python -m MyApp generate dockerfile --healthcheck /
+      python -m MyApp generate dockerfile --target lambda
 
     Options:
       -G, --graceful-timeout <seconds>   Graceful timeout of the workers of the
@@ -23,6 +24,9 @@ Pyjoyment.Command.Author.generate.dockerfile - Dockerfile generator command
       -h, --help                         Show this summary of available options
       -p, --port <port>                  Port that the server listens on and the
                                          image exposes, defaults to 3000
+      -t, --target <name>                Target of the image, "lambda" for an
+                                         event function of AWS Lambda, defaults
+                                         to a server
       -u, --user <name>                  Create a system user and run the
                                          application as it, defaults to the user
                                          of the image
@@ -63,6 +67,15 @@ with :mod:`http.client`, as the image has no ``curl``, and Docker shows the
 health of the container in ``docker ps``, and Docker Compose waits for it with
 ``depends_on`` and ``condition: service_healthy``. Kubernetes and Cloud Run
 ignore it and have probes of their own.
+
+With ``--target lambda``, the image is the one of an event function of AWS
+Lambda: its command runs the script of the application, or its package, which
+is the runtime of the function itself, as :mod:`Pyjoyment.Command.lambda`
+detects, with the runtime client of :mod:`Pyjo.Server.Lambda`, and it has no
+port, no ``HEALTHCHECK`` and no graceful timeout of a server, whose options
+are not for it. A function whose Function URL streams its responses has
+``PYJO_LAMBDA_INVOKE_MODE=RESPONSE_STREAM`` in its environment, as
+:attr:`Pyjo.Server.Lambda.Pyjo_Server_Lambda.invoke_mode` says.
 
 This is a core command, that means it is always enabled and its code a good
 example for learning to build new commands, you're welcome to fork it.
@@ -135,10 +148,26 @@ class Pyjoyment_Command_Author_generate_dockerfile(Pyjoyment.Command.object):
         arguments = list(args)
         if not (
             opts := getopt(
-                arguments, {'G|graceful-timeout=i': None, 'H|healthcheck=s': None, 'p|port=i': None, 'u|user=s': None}
+                arguments,
+                {
+                    'G|graceful-timeout=i': None,
+                    'H|healthcheck=s': None,
+                    'p|port=i': None,
+                    't|target=s': None,
+                    'u|user=s': None,
+                },
             )
         ):
             raise Pyjo.Exception.new(self.usage)
+
+        # Not in Mojolicious: the target of the image, an event function of AWS Lambda, which has no options of a server
+        target: str | None = opts.target
+        if target not in (None, 'lambda'):
+            raise Pyjo.Exception.new(f'Unknown target: {target}')
+        if target == 'lambda':
+            for option in ('graceful_timeout', 'healthcheck', 'port'):
+                if getattr(opts, option) is not None:
+                    raise Pyjo.Exception.new(f'Option --{option.replace("_", "-")} is not for the target lambda')
 
         name = self.app.moniker
 
@@ -147,7 +176,7 @@ class Pyjoyment_Command_Author_generate_dockerfile(Pyjoyment.Command.object):
         # Helpers of a plugin are found at run time, so the application is Any
         app: Any = self.app
         path: str | None = opts.healthcheck
-        if path is None and app.renderer.get_helper('health.path') is not None:
+        if path is None and target is None and app.renderer.get_helper('health.path') is not None:
             path = app.health.path('livez')
         port = "int(os.environ['PORT'])"
         code = f"c = http.client.HTTPConnection('127.0.0.1', {port}, timeout=2); c.request('GET', {path!r})"
@@ -168,7 +197,7 @@ class Pyjoyment_Command_Author_generate_dockerfile(Pyjoyment.Command.object):
         project = os.path.isfile(self.rel_file('pyproject.toml')) or not exe or not _metadata(Pyjo.File.path(exe))
         lock = 'uv.lock' if project else f'{script}.lock'
         values = {
-            'cmd': json.dumps([*cmd, 'prefork']),
+            'cmd': json.dumps(cmd if target == 'lambda' else [*cmd, 'prefork']),
             'graceful_timeout': opts.graceful_timeout,
             'healthcheck': healthcheck,
             'lock': lock if os.path.isfile(self.rel_file(lock)) else None,
@@ -176,6 +205,7 @@ class Pyjoyment_Command_Author_generate_dockerfile(Pyjoyment.Command.object):
             'port': opts.port or 3000,
             'python': f'{sys.version_info.major}.{sys.version_info.minor}',
             'script': None if project else script,
+            'target': target,
             'user': opts.user,
             'uv': _uv(),
         }
@@ -231,6 +261,7 @@ ENV PATH="/opt/<%= name %>/.venv/bin:$PATH"
 RUN useradd --system <%= user %>
 USER <%= user %>
 % end
+% if target != 'lambda':
 ARG PORT=<%= port %>
 ENV PORT=${PORT}
 % if graceful_timeout is not None:
@@ -239,6 +270,7 @@ ENV PYJO_GRACEFUL_TIMEOUT=<%= graceful_timeout %>
 EXPOSE ${PORT}
 % if healthcheck:
 HEALTHCHECK --timeout=3s --start-period=30s --start-interval=1s CMD <%= healthcheck %>
+% end
 % end
 CMD <%= cmd %>
 

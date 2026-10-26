@@ -440,6 +440,31 @@ with subtest('generate dockerfile'):
     with contextlib.redirect_stdout(io.StringIO()):
         dockerfile.run('--healthcheck', '')
     unlike_ok(app.rel_file('Dockerfile').slurp().decode(), r'HEALTHCHECK', 'no healthcheck')
+    # Not in Mojolicious: the image of an event function of AWS Lambda, whose command is the runtime itself, without
+    # what a server has, also the HEALTHCHECK of Pyjoyment.Plugin.Health
+    app.rel_file('Dockerfile').remove()
+    with contextlib.redirect_stdout(io.StringIO()):
+        dockerfile.run('--target', 'lambda')
+    content = app.rel_file('Dockerfile').slurp().decode()
+    cmd = json.loads(re.search(r'(?m)^CMD (.*)$', content)[1])
+    is_ok(cmd[0], 'python', 'right command')
+    ok('prefork' not in cmd, 'no server')
+    unlike_ok(content, r'PORT|EXPOSE|HEALTHCHECK|PYJO_GRACEFUL_TIMEOUT', 'nothing of a server')
+    app.rel_file('Dockerfile').remove()
+    with contextlib.redirect_stdout(io.StringIO()):
+        dockerfile.run('-t', 'lambda', '-u', 'app')
+    like_ok(app.rel_file('Dockerfile').slurp().decode(), r'(?m)^USER app\nCMD ', 'right user')
+    throws_ok(lambda: dockerfile.run('-t', 'kubernetes'), re.compile(r'^Unknown target: kubernetes'), 'unknown target')
+    throws_ok(
+        lambda: dockerfile.run('-t', 'lambda', '-p', '8080'),
+        re.compile(r'^Option --port is not for the target lambda'),
+        'option of a server',
+    )
+    throws_ok(
+        lambda: dockerfile.run('-t', 'lambda', '-G', '8'),
+        re.compile(r'^Option --graceful-timeout is not for the target lambda'),
+        'option of a server',
+    )
     buffer = io.StringIO()
     with contextlib.redirect_stderr(buffer):
         throws_ok(
