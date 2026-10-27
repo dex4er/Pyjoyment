@@ -23,7 +23,9 @@ extra_cleanup() {
 python -m Pyjoyment generate lite-app >/dev/null
 python myapp.py generate pyproject >/dev/null
 lock
-python myapp.py generate dockerfile >/dev/null
+# No HEALTHCHECK, whose request of HTTP the application, which speaks FastCGI,
+# does not answer
+python myapp.py generate dockerfile --healthcheck '' >/dev/null
 build_dockerfile
 
 # The application listens for FastCGI on the network that it shares with Caddy

@@ -157,6 +157,10 @@ class <%= class_ %>(Pyjoyment.object):
         # Configure the application
         self.secrets = config.get('secrets')
 
+%# Not in Mojolicious: the plugin Health, whose endpoints the probes of containers and orchestrators request
+        # Liveness and readiness for containers and orchestrators
+        self.plugin('Health')
+
         # Router
         r = self.routes
 

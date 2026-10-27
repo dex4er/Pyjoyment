@@ -99,6 +99,10 @@ __DATA__ = r'''
 
 from Pyjoyment.Lite import *
 
+%# Not in Mojolicious: the plugin Health, whose endpoints the probes of containers and orchestrators request
+# Liveness and readiness for containers and orchestrators
+plugin('Health')
+
 
 @get('/')
 def index(c):

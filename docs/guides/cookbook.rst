@@ -433,6 +433,9 @@ application pass.
     :language: python
     :caption: myapp.py
 
+The applications of :mod:`Pyjoyment.Command.Author.generate.app` and
+:mod:`Pyjoyment.Command.Author.generate.lite_app` have the plugin already.
+
 A check fails when it raises an exception or returns ``False``, and a
 coroutine function or a promise is waited for, with a timeout, so a check can
 ask a service that the application cannot work without, without blocking the

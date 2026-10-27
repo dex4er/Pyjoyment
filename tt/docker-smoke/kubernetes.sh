@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# A script of generate lite-app, with the plugin Health, in the manifests of
+# A script of generate lite-app, with its plugin Health, in the manifests of
 # generate kubernetes, on a cluster of kind of its own: dev with the
 # application in a ConfigMap, dev with --host-path and prod on the image of
 # generate dockerfile, each in a namespace of its own. The wheel of the
@@ -39,7 +39,6 @@ generate_app() {
 # [tool.uv.sources]
 # Pyjoyment = { path = \"${wheel_path}\" }
 # ///" perl -0pi -e 's/\A(#!.*\n)/$1$ENV{METADATA}\n/' myapp.py
-  perl -pi -e "s/^(from Pyjoyment\.Lite import \*)$/\$1\n\nplugin('Health')/" myapp.py
   grep -q "^plugin('Health')$" myapp.py || fail "plugin Health"
 }
 
