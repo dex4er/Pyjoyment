@@ -413,7 +413,7 @@ local cluster, as the one of Docker Desktop or OrbStack, mounts.
     $ kubectl apply -k kubernetes/prod
     ...
 
-The overlay ``dev`` has a copy of the application in ``kubernetes/dev/app``,
+The overlay ``dev`` has a copy of the application in ``kubernetes/dev/files``,
 which the generator writes anew each time, so it belongs in ``.gitignore``.
 
 For more information and many more container deployment options we recommend

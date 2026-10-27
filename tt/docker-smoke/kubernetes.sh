@@ -81,7 +81,7 @@ python myapp.py generate kubernetes --image "${name}" >/dev/null
 for file in base/kustomization.yaml base/deployment.yaml base/service.yaml prod/kustomization.yaml prod/deployment.yaml; do
   [[ -f kubernetes/${file} ]] || fail "kubernetes/${file}"
 done
-[[ $(cd kubernetes/dev/app && find . -type f) == ./myapp.py ]] || fail "copy of the application"
+[[ $(cd kubernetes/dev/files && find . -type f) == ./myapp.py ]] || fail "copy of the application"
 echo "ok - generated"
 
 # An overlay of the test over the one of dev, which mounts the wheel in /wheel
@@ -144,12 +144,12 @@ python myapp.py generate kubernetes >/dev/null
 "${kube[@]}" --namespace dev apply --kustomize "${work}/dev-configmap" >/dev/null
 rollout dev
 page_has dev "Changed: ${welcome}"
-[[ $("${kube[@]}" --namespace dev get configmap --output name | grep -c myapp-app) -eq 2 ]] || fail "new ConfigMap"
+[[ $("${kube[@]}" --namespace dev get configmap --output name | grep -c myapp-files) -eq 2 ]] || fail "new ConfigMap"
 echo "ok - dev with a new ConfigMap"
 
 # dev with --host-path, reloaded when the script changes
 python myapp.py generate kubernetes --host-path >/dev/null
-[[ ! -e kubernetes/dev/app ]] || fail "no copy of the application"
+[[ ! -e kubernetes/dev/files ]] || fail "no copy of the application"
 overlay dev-host-path
 "${kube[@]}" --namespace host-path apply --kustomize "${work}/dev-host-path" >/dev/null
 rollout host-path

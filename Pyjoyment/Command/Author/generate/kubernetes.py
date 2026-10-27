@@ -38,7 +38,7 @@ overlays, ``dev`` and ``prod``, which ``kubectl apply -k`` applies. ::
       dev/
         kustomization.yaml
         deployment.yaml
-        app/
+        files/
       prod/
         kustomization.yaml
         deployment.yaml
@@ -73,12 +73,12 @@ application when the pod starts, as the image of
 an ``emptyDir``, and runs it with ``pyjo-reload`` of :mod:`Pyjo.Server.Reload`,
 in the operating mode ``development``, without building an image. The
 application is a ConfigMap that ``configMapGenerator`` of Kustomize makes of a
-copy of it in ``kubernetes/dev/app``, which the pod copies, as the files of a
+copy of it in ``kubernetes/dev/files``, which the pod copies, as the files of a
 ConfigMap are read-only. The application is the files of the current
 directory, without hidden ones, ``__pycache__``, ``dist`` and ``kubernetes``,
 as for :mod:`Pyjoyment.Command.Author.generate.lambda_zip`, and a ConfigMap
 holds 1 MiB at most. A new ConfigMap of a changed application has a new name,
-which rolls the Deployment out. ``kubernetes/dev/app`` is a build of the
+which rolls the Deployment out. ``kubernetes/dev/files`` is a build of the
 application, as ``dist`` of
 :mod:`Pyjoyment.Command.Author.generate.lambda_zip`, which goes into
 ``.gitignore``.
@@ -213,7 +213,7 @@ class Pyjoyment_Command_Author_generate_kubernetes(Pyjoyment.Command.object):
         # The application in a ConfigMap of a copy of its files, or the directory of the project
         files: list[tuple[str, str, str]] = []
         dev = self.rel_file('kubernetes/dev')
-        copy = dev.child('app')
+        copy = dev.child('files')
         if os.path.isdir(copy):
             copy.remove_tree()
         if not opts.host_path:
@@ -226,7 +226,7 @@ class Pyjoyment_Command_Author_generate_kubernetes(Pyjoyment.Command.object):
                 if (size := size + os.path.getsize(file)) > _LIMIT:
                     raise Pyjo.Exception.new(f'The application is larger than a ConfigMap holds: {_LIMIT} bytes')
                 key = _key(path, keys)
-                files.append((key, json.dumps(f'{key}=app/{path}'), json.dumps(path)))
+                files.append((key, json.dumps(f'{key}=files/{path}'), json.dumps(path)))
                 destination = copy.child(*path.split('/'))
                 destination.dirname().make_path()
                 shutil.copyfile(file.to_str(), destination.to_str())
@@ -375,7 +375,7 @@ patches:
   - path: deployment.yaml
 % if not host_path:
 configMapGenerator:
-  - name: <%= name %>-app
+  - name: <%= name %>-files
     files:
 % for _, source, _ in files:
       - <%= source %>
@@ -395,10 +395,10 @@ spec:
       initContainers:
         - name: app
           image: <%= image %>
-          command: ["sh", "-c", "cp -RL /config/* /app"]
+          command: ["sh", "-c", "cp -RL /files/* /app"]
           volumeMounts:
-            - name: config
-              mountPath: /config
+            - name: files
+              mountPath: /files
             - name: app
               mountPath: /app
 % end
@@ -435,9 +435,9 @@ spec:
             path: <%= host_path %>
             type: Directory
 % else:
-        - name: config
+        - name: files
           configMap:
-            name: <%= name %>-app
+            name: <%= name %>-files
             items:
 % for key, _, path in files:
               - key: <%= key %>

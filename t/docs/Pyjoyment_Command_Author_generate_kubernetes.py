@@ -84,7 +84,7 @@ with subtest('Synopsis'):
     path = re.search(r'hostPath:\n            path: (".*")\n', read(tmp, 'dev/deployment.yaml'))
     is_ok(os.path.realpath(json.loads(path[1])) if path else None, os.path.realpath(tmp), 'host path')
     unlike_ok(read(tmp, 'dev/kustomization.yaml'), r'configMapGenerator', 'no ConfigMap')
-    ok(not os.path.exists(tmp.child('kubernetes', 'dev', 'app')), 'no copy of the application')
+    ok(not os.path.exists(tmp.child('kubernetes', 'dev', 'files')), 'no copy of the application')
 
     # python -m MyApp generate kubernetes --graceful-timeout 25
     tmp = project()
@@ -150,15 +150,15 @@ with subtest('Description'):
     like_ok(deployment, r'uv sync --no-install-project && exec /uv/venv/bin/python -m Pyjo\.Server\.Reload', 'reload')
     like_ok(deployment, r'- name: PYJO_MODE\n              value: development', 'development')
     like_ok(deployment, r'- name: UV_PROJECT_ENVIRONMENT\n              value: /uv/venv', 'environment')
-    like_ok(deployment, r'command: \["sh", "-c", "cp -RL /config/\* /app"\]', 'copy of the ConfigMap')
+    like_ok(deployment, r'command: \["sh", "-c", "cp -RL /files/\* /app"\]', 'copy of the ConfigMap')
 
     # The ConfigMap of a copy of the application, without hidden files, __pycache__, dist and kubernetes
     kustomization = read(tmp, 'dev/kustomization.yaml')
-    like_ok(kustomization, r'"MyApp\.__init__\.py=app/MyApp/__init__\.py"', 'file of the application')
+    like_ok(kustomization, r'"MyApp\.__init__\.py=files/MyApp/__init__\.py"', 'file of the application')
     like_ok(deployment, r'- key: MyApp\.__init__\.py\n                path: "MyApp/__init__\.py"', 'path of the file')
-    like_ok(kustomization, r'"public\.logo\.png=app/public/logo\.png"', 'binary file')
+    like_ok(kustomization, r'"public\.logo\.png=files/public/logo\.png"', 'binary file')
     unlike_ok(kustomization, r'hidden|__pycache__|dist|kubernetes/', 'nothing else')
-    is_ok(tmp.child('kubernetes', 'dev', 'app', 'public', 'logo.png').slurp(), b'\x89PNG\x00\xff', 'copy of the file')
+    is_ok(tmp.child('kubernetes', 'dev', 'files', 'public', 'logo.png').slurp(), b'\x89PNG\x00\xff', 'copy of the file')
 
     # A ConfigMap holds 1 MiB at most
     large = project()
@@ -175,11 +175,11 @@ with subtest('Description'):
     like_ok(output, r'\[write\] .*dev.kustomization\.yaml', 'dev written')
     like_ok(read(tmp, 'dev/kustomization.yaml'), r'MyApp/new\.py', 'new file')
     unlike_ok(read(tmp, 'dev/kustomization.yaml'), r'logo', 'removed file')
-    ok(not os.path.exists(tmp.child('kubernetes', 'dev', 'app', 'public', 'logo.png')), 'removed copy')
+    ok(not os.path.exists(tmp.child('kubernetes', 'dev', 'files', 'public', 'logo.png')), 'removed copy')
 
     # --host-path removes the copy
     generate(tmp, '--host-path')
-    ok(not os.path.exists(tmp.child('kubernetes', 'dev', 'app')), 'no copy')
+    ok(not os.path.exists(tmp.child('kubernetes', 'dev', 'files')), 'no copy')
 
     # The script of Pyjoyment.Lite, with the inline metadata of PEP 723
     tmp = Pyjo.File.tempdir()
@@ -199,7 +199,7 @@ with subtest('Description'):
     generate(tmp)
     like_ok(read(tmp, 'base/deployment.yaml'), r'(?m)^  name: my-app$', 'name')
     like_ok(read(tmp, 'base/deployment.yaml'), r'(?m)^          image: My_App$', 'name of the image')
-    like_ok(read(tmp, 'dev/kustomization.yaml'), r'(?m)^  - name: my-app-app$', 'name of the ConfigMap')
+    like_ok(read(tmp, 'dev/kustomization.yaml'), r'(?m)^  - name: my-app-files$', 'name of the ConfigMap')
 
 with subtest('Kustomize'):
     if not kubectl:
@@ -219,8 +219,8 @@ with subtest('Kustomize'):
     result = subprocess.run(
         [str(kubectl), 'kustomize', tmp.child('kubernetes', 'dev').to_str()], capture_output=True, text=True
     )
-    like_ok(result.stdout, r'(?m)^  name: pyjoyment-app-[a-z0-9]{10}$', 'ConfigMap with a hash')
+    like_ok(result.stdout, r'(?m)^  name: pyjoyment-files-[a-z0-9]{10}$', 'ConfigMap with a hash')
     like_ok(result.stdout, r'configMap:\n          items:\n          - key: MyApp\.__init__\.py', 'items')
-    like_ok(result.stdout, r'name: pyjoyment-app-[a-z0-9]{10}\n', 'volume of the ConfigMap with the hash')
+    like_ok(result.stdout, r'name: pyjoyment-files-[a-z0-9]{10}\n', 'volume of the ConfigMap with the hash')
 
 done_testing()

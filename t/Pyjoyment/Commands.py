@@ -492,14 +492,14 @@ with subtest('generate kubernetes'):
         ok(os.path.exists(app.rel_file(f'kubernetes/{name}').to_str()), f'{name} exists')
     for name in ('prod/kustomization.yaml', 'prod/deployment.yaml', 'dev/kustomization.yaml', 'dev/deployment.yaml'):
         ok(os.path.exists(app.rel_file(f'kubernetes/{name}').to_str()), f'{name} exists')
-    is_ok(app.rel_file('kubernetes/dev/app/app.txt').slurp(), b'Hello\n', 'copy of the application')
-    like_ok(app.rel_file('kubernetes/dev/kustomization.yaml').slurp().decode(), r'"app\.txt=app/app\.txt"', 'file')
+    is_ok(app.rel_file('kubernetes/dev/files/app.txt').slurp(), b'Hello\n', 'copy of the application')
+    like_ok(app.rel_file('kubernetes/dev/kustomization.yaml').slurp().decode(), r'"app\.txt=files/app\.txt"', 'file')
     buffer = io.StringIO()
     with contextlib.redirect_stdout(buffer):
         kubernetes.run('-p', '8080', '--host-path')
     like_ok(buffer.getvalue(), r'\[exist\] .*kubernetes.base.deployment\.yaml', 'base kept')
     like_ok(app.rel_file('kubernetes/dev/deployment.yaml').slurp().decode(), r'hostPath:', 'host path')
-    ok(not os.path.exists(app.rel_file('kubernetes/dev/app').to_str()), 'no copy of the application')
+    ok(not os.path.exists(app.rel_file('kubernetes/dev/files').to_str()), 'no copy of the application')
     buffer = io.StringIO()
     with contextlib.redirect_stderr(buffer):
         throws_ok(
