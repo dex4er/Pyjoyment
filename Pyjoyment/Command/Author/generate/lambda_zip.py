@@ -103,15 +103,17 @@ _UNUSED = ('ensurepip', 'idlelib', 'site-packages', 'tkinter', 'turtledemo')
 _FORMAT = ('--format', 'requirements.txt', '-o')
 
 # The bytecode of the modules of a directory, with their paths on Lambda, which compileall would join with the
-# separator of the machine, a backslash on Windows, and in processes of their own, as "compileall -j 0" does
+# separator of the machine, a backslash on Windows, and in processes of their own, as "compileall -j 0" does, which
+# are not forks of this one, whose state they would inherit
 _COMPILE = r"""
-import concurrent.futures, itertools, os, py_compile, sys
+import concurrent.futures, itertools, multiprocessing, os, py_compile, sys
 root, prefix = sys.argv[1:]
 files = [os.path.join(d, f) for d, _, names in sorted(os.walk(root)) for f in sorted(names) if f.endswith('.py')]
 dfiles = [f'{prefix}/' + os.path.relpath(f, root).replace(os.sep, '/') for f in files]
 mode = itertools.repeat(py_compile.PycInvalidationMode.UNCHECKED_HASH)
 args = (files, itertools.repeat(None), dfiles, itertools.repeat(False), itertools.repeat(-1), mode, itertools.repeat(1))
-with concurrent.futures.ProcessPoolExecutor() as pool:
+context = multiprocessing.get_context('forkserver') if multiprocessing.get_start_method() == 'fork' else None
+with concurrent.futures.ProcessPoolExecutor(mp_context=context) as pool:
     sys.exit(not all(pool.map(py_compile.compile, *args, chunksize=64)))
 """
 

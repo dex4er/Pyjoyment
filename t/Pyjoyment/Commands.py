@@ -551,9 +551,15 @@ with subtest('generate lambda-zip'):
     ok('foo/__init__.py' in function, 'dependency')
     unlike_ok(' '.join(function), r'(?:^| )(?:\.git|\.env|\.lock|bin/|dist/|python/)', 'nothing else')
     zips = app.rel_file('dist/function.zip').slurp(), app.rel_file('dist/python.zip').slurp()
+    crcs = {name: info.CRC for zip in ('function', 'python') for name, info in entries(f'dist/{zip}.zip').items()}
     with local(PYJO_EXE=None):
         output, calls = generate()
     like_ok(output, r'\[write\] .*dist.function\.zip', 'written anew')
+    is_deeply_ok(
+        {name: info.CRC for zip in ('function', 'python') for name, info in entries(f'dist/{zip}.zip').items()},
+        crcs,
+        'same contents',
+    )
     ok(zips == (app.rel_file('dist/function.zip').slurp(), app.rel_file('dist/python.zip').slurp()), 'same files')
 
     # The architecture, the free-threaded build and the lock of the project
