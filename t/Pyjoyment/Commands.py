@@ -488,7 +488,7 @@ with subtest('generate kubernetes'):
     with contextlib.redirect_stdout(buffer):
         kubernetes.run()
     like_ok(buffer.getvalue(), r'kubernetes.dev.deployment\.yaml', 'right output')
-    for name in ('base/kustomization.yaml', 'base/deployment.yaml', 'base/service.yaml'):
+    for name in ('base/kustomization.yaml', 'base/deployment.yaml', 'base/probes.yaml', 'base/service.yaml'):
         ok(os.path.exists(app.rel_file(f'kubernetes/{name}').to_str()), f'{name} exists')
     for name in ('prod/kustomization.yaml', 'prod/deployment.yaml', 'dev/kustomization.yaml', 'dev/deployment.yaml'):
         ok(os.path.exists(app.rel_file(f'kubernetes/{name}').to_str()), f'{name} exists')

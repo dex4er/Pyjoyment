@@ -43,6 +43,7 @@ overlays, ``dev`` and ``prod``, which ``kubectl apply -k`` applies. ::
       base/
         kustomization.yaml
         deployment.yaml
+        probes.yaml
         service.yaml
       dev/
         kustomization.yaml
@@ -61,7 +62,8 @@ liveness, ``/livez`` by default, and the readiness its readiness,
 ``/readyz``, which fails while the server stops gracefully, so that the
 Service sends no more requests to the pod before its end. The probes of an
 application without it connect to the port, which the server listens on once
-it has started.
+it has started. The probes are a patch of their own, ``base/probes.yaml``, as
+the application gets the plugin or loses it.
 
 The overlay ``prod`` runs the image of ``--image``, which
 :mod:`Pyjoyment.Command.Author.generate.dockerfile` builds, with the
@@ -104,7 +106,10 @@ the application when a file of it changes, where a ConfigMap changes with a
 new pod and the server is ``daemon``.
 
 The files of ``base`` and ``prod``, which are to be edited, are written once,
-and the ones of ``dev`` anew each time, as the application changes.
+and the ones of ``dev`` and ``base/probes.yaml`` anew each time, as the
+application changes, which a patch of its own in the place of the one of
+``base/probes.yaml`` in ``base/kustomization.yaml`` keeps from changing the
+probes.
 
 This is a core command, that means it is always enabled and its code a good
 example for learning to build new commands, you're welcome to fork it.
@@ -210,6 +215,8 @@ class Pyjoyment_Command_Author_generate_kubernetes(Pyjoyment.Command.object):
         self.render_to_rel_file('base_kustomization', 'kubernetes/base/kustomization.yaml', base)
         self.render_to_rel_file('base_deployment', 'kubernetes/base/deployment.yaml', base)
         self.render_to_rel_file('base_service', 'kubernetes/base/service.yaml', base)
+        # The probes anew each time, as the application gets or loses the plugin Health
+        self._write(self.rel_file('kubernetes/base/probes.yaml'), self.render_data('base_probes', base))
 
         graceful: int | None = opts.graceful_timeout
         prod = {'graceful_timeout': graceful, 'image': opts.image, 'moniker': moniker, 'name': name}
@@ -261,12 +268,15 @@ class Pyjoyment_Command_Author_generate_kubernetes(Pyjoyment.Command.object):
             'host_path': json.dumps(Pyjo.File.path().to_abs().to_str()) if opts.host_path else None,
             'image': f'ghcr.io/astral-sh/uv:python{sys.version_info.major}.{sys.version_info.minor}-trixie-slim',
             'name': name,
-            'probes': probes,
             'project': project,
         }
         for file in ('kustomization', 'deployment'):
-            dev.child(f'{file}.yaml').spew(self.render_data(f'dev_{file}', values))
-            self._loud(f'  [write] {dev.child(f"{file}.yaml")}')
+            self._write(dev.child(f'{file}.yaml'), self.render_data(f'dev_{file}', values))
+
+    # A file that the generator writes anew each time, where write_file keeps one that exists
+    def _write(self, file: Pyjo.File.object, data: str) -> None:
+        file.spew(data)
+        self._loud(f'  [write] {file}')
 
 
 # Whether the script has the inline metadata of PEP 723
@@ -302,6 +312,8 @@ labels:
 resources:
   - deployment.yaml
   - service.yaml
+patches:
+  - path: probes.yaml
 
 @@ base_deployment
 apiVersion: apps/v1
@@ -322,6 +334,18 @@ spec:
           ports:
             - name: http
               containerPort: <%= port %>
+
+@@ base_probes
+# Written by "generate kubernetes" anew each time, as the application has the plugin Health or not
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: <%= name %>
+spec:
+  template:
+    spec:
+      containers:
+        - name: <%= name %>
           startupProbe:
 % if probes:
             httpGet:

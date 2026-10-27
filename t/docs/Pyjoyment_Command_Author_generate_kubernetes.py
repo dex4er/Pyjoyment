@@ -122,7 +122,7 @@ with subtest('Description'):
     tmp.child('dist').make_path().child('function.zip').spew('')
     tmp.child('public').make_path().child('logo.png').spew(b'\x89PNG\x00\xff')
     output = generate(tmp)
-    for name in ('base/kustomization.yaml', 'base/deployment.yaml', 'base/service.yaml'):
+    for name in ('base/kustomization.yaml', 'base/deployment.yaml', 'base/probes.yaml', 'base/service.yaml'):
         ok(os.path.isfile(tmp.child('kubernetes', *name.split('/'))), name)
     for name in ('dev/kustomization.yaml', 'dev/deployment.yaml', 'prod/kustomization.yaml', 'prod/deployment.yaml'):
         ok(os.path.isfile(tmp.child('kubernetes', *name.split('/'))), name)
@@ -132,10 +132,10 @@ with subtest('Description'):
     like_ok(read(tmp, 'base/service.yaml'), r'port: 80\n      targetPort: http', 'Service')
     # The probes of the port without Pyjoyment.Plugin.Health
     for probe in ('startupProbe', 'livenessProbe', 'readinessProbe'):
-        like_ok(
-            read(tmp, 'base/deployment.yaml'), rf'{probe}:\n            tcpSocket:\n              port: http', probe
-        )
-    unlike_ok(read(tmp, 'base/deployment.yaml'), r'httpGet', 'no request without Health')
+        like_ok(read(tmp, 'base/probes.yaml'), rf'{probe}:\n            tcpSocket:\n              port: http', probe)
+    unlike_ok(read(tmp, 'base/probes.yaml'), r'httpGet', 'no request without Health')
+    unlike_ok(read(tmp, 'base/deployment.yaml'), r'Probe', 'probes of their own')
+    like_ok(read(tmp, 'base/kustomization.yaml'), r'patches:\n  - path: probes\.yaml', 'patch of the probes')
     like_ok(read(tmp, 'dev/deployment.yaml'), r'startupProbe:\n            failureThreshold: 300', 'start of dev')
 
     # The probes of Pyjoyment.Plugin.Health
@@ -143,17 +143,17 @@ with subtest('Description'):
     probes = project()
     generate(probes)
     like_ok(
-        read(probes, 'base/deployment.yaml'),
+        read(probes, 'base/probes.yaml'),
         r'startupProbe:\n            httpGet:\n              path: /livez',
         'startup',
     )
     like_ok(
-        read(probes, 'base/deployment.yaml'),
+        read(probes, 'base/probes.yaml'),
         r'livenessProbe:\n            httpGet:\n              path: /livez',
         'liveness',
     )
     like_ok(
-        read(probes, 'base/deployment.yaml'),
+        read(probes, 'base/probes.yaml'),
         r'readinessProbe:\n            httpGet:\n              path: /readyz',
         'readiness',
     )
@@ -198,6 +198,13 @@ with subtest('Description'):
     like_ok(read(tmp, 'dev/kustomization.yaml'), r'MyApp/new\.py', 'new file')
     unlike_ok(read(tmp, 'dev/kustomization.yaml'), r'logo', 'removed file')
     ok(not os.path.exists(tmp.child('kubernetes', 'dev', 'files', 'public', 'logo.png')), 'removed copy')
+
+    # The probes anew too, of the plugin Health that the application has now
+    like_ok(output, r'\[write\] .*base.probes\.yaml', 'probes written')
+    like_ok(
+        read(tmp, 'base/probes.yaml'), r'livenessProbe:\n            httpGet:\n              path: /livez', 'Health'
+    )
+    unlike_ok(read(tmp, 'base/probes.yaml'), r'tcpSocket', 'no probes of the port')
 
     # --host-path removes the copy
     generate(tmp, '--host-path')

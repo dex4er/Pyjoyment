@@ -77,7 +77,7 @@ mkdir "${work}/dev"
 cd "${work}/dev"
 generate_app "/wheel/${wheel}"
 python myapp.py generate kubernetes --image "${name}" >/dev/null
-for file in base/kustomization.yaml base/deployment.yaml base/service.yaml prod/kustomization.yaml prod/deployment.yaml; do
+for file in base/kustomization.yaml base/deployment.yaml base/probes.yaml base/service.yaml prod/kustomization.yaml prod/deployment.yaml; do
   [[ -f kubernetes/${file} ]] || fail "kubernetes/${file}"
 done
 [[ $(cd kubernetes/dev/files && find . -type f) == ./myapp.py ]] || fail "copy of the application"
