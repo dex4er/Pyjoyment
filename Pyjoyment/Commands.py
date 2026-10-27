@@ -116,6 +116,17 @@ generate dockerfile
 Use :mod:`Pyjoyment.Command.Author.generate.dockerfile` to generate
 ``Dockerfile`` for application.
 
+generate lambda-zip
+~~~~~~~~~~~~~~~~~~~
+::
+
+    $ ./myapp.py generate lambda-zip
+    $ python -m MyApp generate lambda-zip
+
+Use :mod:`Pyjoyment.Command.Author.generate.lambda_zip` to generate the ZIP
+files of an event function of AWS Lambda on a custom runtime, with a layer of
+Python.
+
 generate lite-app
 ~~~~~~~~~~~~~~~~~
 ::

@@ -320,6 +320,7 @@ This is the class hierarchy of the :mod:`Pyjoyment` distribution.
 
     - :mod:`Pyjoyment.Command.Author.generate.app`
     - :mod:`Pyjoyment.Command.Author.generate.dockerfile`
+    - :mod:`Pyjoyment.Command.Author.generate.lambda_zip`
     - :mod:`Pyjoyment.Command.Author.generate.lite_app`
     - :mod:`Pyjoyment.Command.Author.generate.plugin`
     - :mod:`Pyjoyment.Command.Author.generate.pyproject`

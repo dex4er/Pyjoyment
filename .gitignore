@@ -29,6 +29,9 @@ benchmarks/venv/
 *.tfstate.*
 *.tfvars
 
+# The ZIP files of the function that "generate lambda-zip" writes for OpenTofu
+examples/lambda_zip/function/dist/
+
 # Logs, as the one of TF_LOG_PATH of OpenTofu
 *.log
 

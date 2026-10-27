@@ -447,7 +447,13 @@ lambda`, whose command is the runtime of the function itself, under the
 emulator of the Runtime API, which the image has not, so the script mounts the
 binary of its release as the entry point of the container, of `RIE_VERSION` of
 the workflow, which Renovate bumps, or the latest one, and invokes it buffered
-and streaming, and its variant `fastcgi` runs a Lite script that listens for FastCGI, with
+and streaming, its variant `lambda-zip` runs the same script in the ZIP files of
+`generate lambda-zip`, extracted where Lambda extracts them, the layer in `/opt`
+and the function in `/var/task`, in the image of the custom runtime
+`provided.al2023`, whose emulator runs the `bootstrap` of the function, and
+checks that the Python of python-build-standalone reads the certificates of
+Amazon Linux, which its OpenSSL looks for in `/etc/ssl`, and its variant
+`fastcgi` runs a Lite script that listens for FastCGI, with
 `PYJO_LISTEN`, behind Caddy in a container of its own on the same network,
 whose image `Dockerfile.caddy` pins, so that Renovate bumps it, and checks the
 pages through Caddy.
@@ -668,6 +674,9 @@ functions of AWS Lambda, inspired by `Pyjo.Server.WSGI` and its command, and
 the client of the Runtime API of Lambda, `python -m Pyjo.Server.Lambda`,
 which runs any handler, with `http.client` outside of the event loop, as a
 handler that runs an event loop of its own, as Mangum, cannot run in one),
+`Pyjoyment.Command.Author.generate.lambda_zip` (the ZIP files of an event
+function of AWS Lambda on a custom runtime, with a layer of the Python of
+python-build-standalone, which uv installs, inspired by `generate dockerfile`),
 `Pyjo.Server.FastCGI` and `Pyjoyment.Command.fastcgi` (FastCGI on the
 connections of the listen locations `fcgi://` and `fcgi+unix://` of
 `Pyjo.Server.Daemon`, written from the specification of FastCGI 1.0, and the
@@ -920,6 +929,29 @@ copy:
   the namespace `Pyjoyment.Plugin`, which `extend_path` keeps open. A
   namespace finds its parts through the `__path__` of its parent package, so
   `Pyjoyment/__init__.py` extends its own before it imports its subpackages.
+  `generate lambda-zip` runs uv itself, as what it writes is the build of a
+  function, not a file of the project: `uv python install` with `--no-bin`,
+  without which uv links the interpreter of Linux into `~/.local/bin`, in the
+  place of the `python3.X` of the machine; the dependencies of the inline
+  metadata of a script with `uv export --script`, as `uv pip install -r` of a
+  script ignores its `[tool.uv.sources]`, and the ones of a project without
+  `uv.lock` with `uv pip install -r pyproject.toml`, as `uv export` would
+  write the lock; and the Python of the machine, which gives the tags of the
+  wheels and compiles the bytecode, with `+gil`, as a version alone finds a
+  free-threaded build too. `/var/task` and `/opt` are read-only, so the
+  bytecode is compiled before, with the invalidation mode `unchecked-hash`,
+  as a ZIP keeps the times of files in steps of two seconds, which the check
+  of a timestamp does not match, and without it each cold start compiles
+  every module it imports again, several times slower. The entries of a ZIP
+  have their modes, as a file of Windows has none, no symbolic links, which
+  the interpreter does not need, and fixed times, so that the same input
+  gives the same hash. For the same reason the bytecode is compiled with
+  `PYTHONHASHSEED=0`, as a set of strings, as `x in {'http', 'https'}`, is
+  marshalled in the order of their hashes, and `_sysconfigdata_*.py` gets the
+  prefix of Python on Lambda, `/opt/python` or `/var/task/python`, in the
+  place of the temporary directory that uv writes into it, which is taken
+  from the directory of the full version, `cpython-3.15.0-…`, not from the
+  link of the minor version that uv makes next to it.
 - `ojo` is the functions of the package `Pyjo`, which `from Pyjo import *`
   imports, and `perl -Mojo -E` is `python -m Pyjo`. A function imports the
   modules it uses when it is called, as every `import Pyjo.X` runs

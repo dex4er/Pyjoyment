@@ -14,6 +14,7 @@ script, which shows the same thing in Perl.
 | `servers/`       | applications on the servers of Pyjoyment, on ASGI, WSGI and CGI, and on AWS Lambda                     |
 | `lambda/`        | an application of `Pyjoyment.Lite` as an event function of AWS Lambda, deployed with OpenTofu          |
 | `lambda_stream/` | the same, with the responses that AWS Lambda streams through a Function URL                            |
+| `lambda_zip/`    | the same, on a custom runtime with the ZIP files of `generate lambda-zip`                              |
 | `ua/`            | the user agent: requests, web scraping, and a server and a user agent in one event loop                |
 
 ## Running
@@ -60,7 +61,9 @@ The application of `lambda/` runs as an event function of AWS Lambda, which its
 OpenTofu deploys, with what it mounts, as PHP on php-fpm, as
 [`lambda/README.md`](lambda/README.md) says, and the one of `lambda_stream/`
 as a function of its own whose responses Lambda streams, as
-[`lambda_stream/README.md`](lambda_stream/README.md) says.
+[`lambda_stream/README.md`](lambda_stream/README.md) says, and the one of
+`lambda_zip/` on a custom runtime, with Python in a layer, as
+[`lambda_zip/README.md`](lambda_zip/README.md) says.
 
 The tests in [`t/examples/`](../t/examples), in the same groups, check some of
 the scripts, and the documentation shows them on its page of examples.

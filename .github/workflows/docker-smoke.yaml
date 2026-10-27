@@ -6,9 +6,10 @@ name: Docker Smoke Test
 # generated pages and stop gracefully, and runs a Lite script as an event
 # function in the image of AWS Lambda for Python, also streaming its responses
 # with the runtime client of Pyjoyment, and in an image of "generate dockerfile
-# --target lambda" under the emulator of the Runtime API, and a Lite script that
-# speaks FastCGI to Caddy in front of it. The weekly run catches a change of
-# the images of Python, uv, AWS Lambda and Caddy.
+# --target lambda" and in the ZIP files of "generate lambda-zip" under the
+# emulator of the Runtime API, and a Lite script that speaks FastCGI to Caddy in
+# front of it. The weekly run catches a change of the images of Python, uv,
+# AWS Lambda and Caddy, and of the builds of Python that uv installs.
 on:
   push:
     branches:
@@ -55,6 +56,7 @@ jobs:
           - lambda
           - lambda-stream
           - lambda-image
+          - lambda-zip
           - fastcgi
 
     runs-on: ubuntu-26.04-arm
