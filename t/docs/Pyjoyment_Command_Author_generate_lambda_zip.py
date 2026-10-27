@@ -110,8 +110,10 @@ with subtest('Description'):
     unlike_ok(layer, r'idlelib|tkinter|site-packages', 'without what a function does not use')
     like_ok(layer, r'__pycache__/os\.', 'bytecode of the standard library')
     ok(any(name.startswith('MyApp/__pycache__/') for name in function), 'bytecode of the application')
-    compiles = [call for call in calls if call[0] == 'run']
-    ok(all('unchecked-hash' in call for call in compiles), 'unchecked-hash')
+    bytecode = next(name for name in function if name.startswith('MyApp/__pycache__/'))
+    with zipfile.ZipFile(tmp.child('dist', 'function.zip').to_str()) as archive:
+        # The flags of the header of the bytecode: based on a hash, without checking the source
+        is_ok(int.from_bytes(archive.read(bytecode)[4:8], 'little'), 0b01, 'unchecked-hash')
     pip = next(call for call in calls if call[:2] == ['pip', 'install'])
     is_ok(pip[pip.index('--python-platform') + 1], 'x86_64-manylinux_2_34', 'Amazon Linux 2023')
     is_ok(pip[pip.index('-r') + 1], 'pyproject.toml', 'pyproject.toml')

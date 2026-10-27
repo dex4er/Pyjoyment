@@ -102,6 +102,19 @@ _UNUSED = ('ensurepip', 'idlelib', 'site-packages', 'tkinter', 'turtledemo')
 # The requirements that uv exports, for uv pip install
 _FORMAT = ('--format', 'requirements.txt', '-o')
 
+# The bytecode of the modules of a directory, with their paths on Lambda, which compileall would join with the
+# separator of the machine, a backslash on Windows, and in processes of their own, as "compileall -j 0" does
+_COMPILE = r"""
+import concurrent.futures, itertools, os, py_compile, sys
+root, prefix = sys.argv[1:]
+files = [os.path.join(d, f) for d, _, names in sorted(os.walk(root)) for f in sorted(names) if f.endswith('.py')]
+dfiles = [f'{prefix}/' + os.path.relpath(f, root).replace(os.sep, '/') for f in files]
+mode = itertools.repeat(py_compile.PycInvalidationMode.UNCHECKED_HASH)
+args = (files, itertools.repeat(None), dfiles, itertools.repeat(False), itertools.repeat(-1), mode, itertools.repeat(1))
+with concurrent.futures.ProcessPoolExecutor() as pool:
+    sys.exit(not all(pool.map(py_compile.compile, *args, chunksize=64)))
+"""
+
 
 class Pyjoyment_Command_Author_generate_lambda_zip(Pyjoyment.Command.object):
     """
@@ -221,9 +234,8 @@ class Pyjoyment_Command_Author_generate_lambda_zip(Pyjoyment.Command.object):
 
     # The bytecode of a set of strings, as in "x in {'a', 'b'}", has the order of their hashes, which a fixed seed keeps
     def _compile(self, local: str, dir: Pyjo.File.object, prefix: str) -> None:
-        options = ['-q', '-j', '0', '--invalidation-mode', 'unchecked-hash', '-s', dir.to_str(), '-p', prefix]
         env = {**os.environ, 'PYTHONHASHSEED': '0'}
-        self._uv('run', '--no-project', '--python', local, '--', 'python', '-m', 'compileall', *options, dir, env=env)
+        self._uv('run', '--no-project', '--python', local, '--', 'python', '-c', _COMPILE, dir, prefix, env=env)
 
     def _uv(self, *args: str | Pyjo.File.object, env: dict[str, str] | None = None) -> None:
         command = [*_uv(), '--quiet', *map(str, args)]

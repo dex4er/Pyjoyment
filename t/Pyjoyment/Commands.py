@@ -541,6 +541,12 @@ with subtest('generate lambda-zip'):
     )
     ok('MyApp/__init__.py' in function, 'application')
     ok(any(name.startswith('MyApp/__pycache__/__init__.') for name in function), 'application compiled')
+    with zipfile.ZipFile(app.rel_file('dist/function.zip').to_str()) as archive:
+        bytecode = next(name for name in function if name.startswith('MyApp/__pycache__/__init__.'))
+        ok(b'/var/task/MyApp/__init__.py' in archive.read(bytecode), 'application compiled for the function')
+    with zipfile.ZipFile(app.rel_file('dist/python.zip').to_str()) as archive:
+        bytecode = next(name for name in python if name.startswith(f'python/lib/python{version}/__pycache__/os.'))
+        ok(f'/opt/python/lib/python{version}/os.py'.encode() in archive.read(bytecode), 'compiled for the layer')
     ok('MyApp/__pycache__/__init__.cpython-0.pyc' not in function, 'not the bytecode of the machine')
     ok('foo/__init__.py' in function, 'dependency')
     unlike_ok(' '.join(function), r'(?:^| )(?:\.git|\.env|\.lock|bin/|dist/|python/)', 'nothing else')
