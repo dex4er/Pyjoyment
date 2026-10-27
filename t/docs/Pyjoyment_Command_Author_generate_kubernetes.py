@@ -80,11 +80,9 @@ with subtest('Synopsis'):
     # python -m MyApp generate kubernetes --host-path
     tmp = project()
     generate(tmp, '--host-path')
-    like_ok(
-        read(tmp, 'dev/deployment.yaml'),
-        'hostPath:\n            path: ' + re.escape(json.dumps(os.path.realpath(tmp))) + '\n',
-        'host path',
-    )
+    # The directory of the project, as the system gives it, with the short names of 8.3 on Windows
+    path = re.search(r'hostPath:\n            path: (".*")\n', read(tmp, 'dev/deployment.yaml'))
+    is_ok(os.path.realpath(json.loads(path[1])) if path else None, os.path.realpath(tmp), 'host path')
     unlike_ok(read(tmp, 'dev/kustomization.yaml'), r'configMapGenerator', 'no ConfigMap')
     ok(not os.path.exists(tmp.child('kubernetes', 'dev', 'app')), 'no copy of the application')
 
