@@ -303,6 +303,51 @@ with subtest('Second INT and TERM'):
     is_deeply_ok(finished, [True, False], 'a second INT shuts the server down immediately')
     ok(elapsed < 2, 'stopped before the graceful timeout')
 
+# The manager and the workers close their listen sockets when the server stops gracefully, so that a new connection is
+# refused, while a request in progress keeps the worker, but on Windows, where the workers share the sockets of the
+# manager
+with subtest('A new connection while it stops gracefully'):
+    prethread = Pyjo.Server.Prethread.new(
+        heartbeat_interval=0.5, listen=['http://127.0.0.1'], pid_file=tempdir().child('prethread.pid'), workers=1
+    )
+    prethread.graceful_timeout = 3
+    prethread.unsubscribe('request')
+
+    # A request that keeps the worker from stopping gracefully
+    @prethread.on('request')
+    def request(prethread, tx):
+        pass
+
+    connections, refused, finished = [], [], []
+
+    @prethread.once('heartbeat')
+    def heartbeat(prethread, id):
+        port = prethread.ports()[0]
+        connections.append(connection := socket.create_connection(('127.0.0.1', port)))
+        connection.sendall(b'GET / HTTP/1.1\r\nHost: x\r\n\r\n')
+        signal.raise_signal(signal.SIGTERM)
+
+        # A new connection each time the manager waits, until one is refused
+        @prethread.on('wait')
+        def wait(prethread):
+            if refused:
+                return
+            try:
+                socket.create_connection(('127.0.0.1', port), timeout=1).close()
+            # A connection that comes while the socket closes is reset, as a refused one is
+            except (ConnectionRefusedError, ConnectionResetError):
+                refused.append(time.monotonic())
+
+    prethread.on('finish', lambda prethread, graceful: finished.append(time.monotonic()))
+    prethread.run()
+    for connection in connections:
+        connection.close()
+    if sys.platform == 'win32':
+        ok(not refused, 'the sockets that the workers share stay open on Windows')
+    else:
+        ok(refused, 'a new connection is refused')
+        ok(refused and refused[0] - finished[0] < 2, 'refused before the graceful timeout')
+
 with subtest('HUP'):
     if sys.platform == 'win32':
         skip('no HUP on Windows', 3)

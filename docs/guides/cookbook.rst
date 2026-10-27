@@ -542,8 +542,8 @@ worker in the backlog of the listen socket.
 Kubernetes sends ``TERM`` to a container that it stops at the same time as it
 takes the pod out of the endpoints of its services, and kube-proxy, an ingress
 controller or the load balancer of a cloud learn it a moment later. The server
-stops accepting connections at ``TERM``, so the requests that they still send
-it would fail. The ``preStop`` hook that sleeps keeps the server serving until
+closes its listen sockets at ``TERM``, so a new connection that they still
+open is refused. The ``preStop`` hook that sleeps keeps the server serving until
 they know, and ``terminationGracePeriodSeconds`` has room for it and for the
 25 seconds of
 :attr:`~Pyjo.Server.Prefork.Pyjo_Server_Prefork.graceful_timeout`. From the
@@ -572,7 +572,7 @@ its last response.
         end
         K->>M: TERM
         M->>W: TERM
-        Note over W: stop_gracefully: no new connections
+        Note over M,W: close the listen sockets:<br/>a new connection is refused
         LB->>W: GET /readyz, connection kept alive
         W-->>LB: 503, [-]shutdown failed, Connection: close
         Note over W: the requests in progress finish

@@ -78,8 +78,12 @@ with the following signals.
 INT, TERM
 ~~~~~~~~~
 
-Shut down server gracefully. A second ``INT``, as of Ctrl-C pressed twice,
-shuts it down immediately, a second ``TERM`` does nothing.
+Shut down server gracefully. The manager and the workers close the listen
+sockets, so that a new connection is refused, and the workers finish the
+accepted ones; on Windows, where the workers share the sockets of the
+manager, a new connection waits until the server ends. A second ``INT``, as
+of Ctrl-C pressed twice, shuts it down immediately, a second ``TERM`` does
+nothing.
 
 QUIT
 ~~~~
@@ -239,6 +243,12 @@ class Pyjo_Server_Prethread(Pyjo.Server.Prefork.object):
             pass
         return True
 
+    # The listen sockets are left open on Windows, where the workers share the sockets of the manager, which their
+    # reactors watch until they stop, and a new connection waits for the end of the server, as in Mojolicious
+    def _close_listen(self) -> None:
+        if sys.platform != 'win32':
+            super()._close_listen()
+
     def _spawn(self) -> None:
         # The listen sockets of the manager, which the worker duplicates, or shares on Windows
         loop = self.ioloop
@@ -323,6 +333,8 @@ class Pyjo_Server_Prethread(Pyjo.Server.Prefork.object):
                     immediate = True
                     loop.stop()
                 else:
+                    if (worker := ref()) is not None:
+                        worker._close_listen()
                     loop.stop_gracefully()
 
             loop.reactor.io(control, command).watch(control, True, False)

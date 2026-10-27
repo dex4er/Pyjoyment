@@ -74,9 +74,10 @@ following signals.
 INT, TERM
 ~~~~~~~~~
 
-Shut down server gracefully: stop accepting new connections and wait for the
-accepted ones to be closed. A second ``INT``, as of Ctrl-C pressed twice,
-shuts it down immediately, a second ``TERM`` does nothing.
+Shut down server gracefully: close the listen sockets, so that a new
+connection is refused, and wait for the accepted ones to be closed. A second
+``INT``, as of Ctrl-C pressed twice, shuts it down immediately, a second
+``TERM`` does nothing.
 
 QUIT
 ~~~~
@@ -509,7 +510,11 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
                 loop.stop()
             elif not graceful:
                 graceful = True
-                loop.next_tick(lambda loop: loop.stop_gracefully())
+                loop.next_tick(stop_gracefully)
+
+        def stop_gracefully(loop: Any) -> None:
+            self._close_listen()
+            loop.stop_gracefully()
 
         # Not in Mojolicious: the graceful stop closes a connection that is kept alive after its next response, as a
         # worker of Mojo::Server::Prefork does, so that a client that keeps requesting does not keep the server from
@@ -524,11 +529,29 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
         # Not in Mojolicious: a thread other than the main one cannot handle signals, and HUP is ignored, as there is
         # nothing to reload
         handlers: dict[signal.Signals, Any] = {}
+        waker = wakee = None
+        wakeup = -1
         if threading.current_thread() is threading.main_thread():
             for name in (signal.SIGINT, signal.SIGTERM, _QUIT):
                 handlers[name] = signal.signal(name, stop)
             if sys.platform != 'win32':
                 handlers[signal.SIGHUP] = signal.signal(signal.SIGHUP, signal.SIG_IGN)
+
+            # Not in Mojolicious: a socket pair that Python writes to on a signal wakes the event loop up, as Python
+            # repeats a system call that a signal interrupts until its timeout, so that a stop does not wait for the
+            # interval, as the workers of Pyjo.Server.Prefork are woken up
+            waker, wakee = socket.socketpair()
+            waker.setblocking(False)
+            wakee.setblocking(False)
+            wakeup = signal.set_wakeup_fd(waker.fileno())
+
+            def wake(reactor: Any, writable: bool) -> None:
+                try:
+                    wakee.recv(4096)
+                except OSError:
+                    pass
+
+            loop.reactor.io(wakee, wake).watch(wakee, True, False)
         try:
             self.start().ioloop.start()
 
@@ -537,6 +560,11 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
             if not immediate:
                 self._server_stopped()
         finally:
+            if waker is not None and wakee is not None:
+                signal.set_wakeup_fd(wakeup)
+                loop.reactor.remove(wakee)
+                waker.close()
+                wakee.close()
             for name, handler in handlers.items():
                 signal.signal(name, handler)
             loop.remove(interval)
@@ -670,6 +698,18 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
         for server in self._servers.values():
             server.close()
         self._servers = {}
+
+    # Unlike Mojolicious: the listen sockets are closed when the server starts to stop gracefully, so that a new
+    # connection is refused at once, as the servers of Go and gunicorn do, where Mojo only stops accepting connections and
+    # keeps the sockets until it ends, so that a new connection waits in the backlog of the socket, without a response,
+    # until the server ends and resets it
+    def _close_listen(self) -> None:
+        loop = self.ioloop
+        for id in self.acceptors:
+            if (acceptor := loop.acceptor(id)) is not None:
+                acceptor.close()
+        for server in self._servers.values():
+            server.close()
 
     def _close(self, id: str) -> None:
         if (fcgi := self._connections.get(id, {}).get('fcgi')) is not None:

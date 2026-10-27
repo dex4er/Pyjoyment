@@ -71,8 +71,10 @@ with the following signals.
 INT, TERM
 ~~~~~~~~~
 
-Shut down server gracefully. A second ``INT``, as of Ctrl-C pressed twice,
-shuts it down immediately, a second ``TERM`` does nothing.
+Shut down server gracefully. The manager and the workers close the listen
+sockets, so that a new connection is refused, and the workers finish the
+accepted ones. A second ``INT``, as of Ctrl-C pressed twice, shuts it down
+immediately, a second ``TERM`` does nothing.
 
 QUIT
 ~~~~
@@ -104,7 +106,7 @@ with the following signals.
 TERM
 ~~~~
 
-Stop worker gracefully.
+Stop worker gracefully, with its copies of the listen sockets closed.
 
 QUIT
 ~~~~
@@ -666,6 +668,11 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
         self.emit('finish', graceful)
         self._finished, self._graceful = True, graceful
 
+        # Unlike Mojolicious: the copies of the listen sockets of the manager are closed, as it starts no more workers, so
+        # that a new connection is refused once the workers have closed theirs, where the manager of Mojo keeps them until
+        # it ends; the new manager of a hot deployment has copies of its own
+        self._close_listen()
+
         # Not in Mojolicious: the workers that are stopping gracefully stop immediately too, after a graceful shutdown
         if not graceful:
             for w in self._pool.values():
@@ -761,6 +768,9 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
                         immediate = True
                         loop.stop()
                     else:
+                        # Unlike Mojolicious: the worker closes its copies of the listen sockets, as the daemon does
+                        if (prefork := ref()) is not None:
+                            prefork._close_listen()
                         loop.stop_gracefully()
 
             loop.reactor.io(wakee, wake).watch(wakee, True, False)
