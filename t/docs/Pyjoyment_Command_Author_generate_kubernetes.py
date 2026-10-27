@@ -114,7 +114,13 @@ with subtest('Description'):
     # The port of PORT, which the Service exposes on the port 80
     like_ok(read(tmp, 'base/deployment.yaml'), r'- name: PORT\n              value: "3000"', 'port')
     like_ok(read(tmp, 'base/service.yaml'), r'port: 80\n      targetPort: http', 'Service')
-    unlike_ok(read(tmp, 'base/deployment.yaml'), r'Probe', 'no probes without Health')
+    # The probes of the port without Pyjoyment.Plugin.Health
+    for probe in ('startupProbe', 'livenessProbe', 'readinessProbe'):
+        like_ok(
+            read(tmp, 'base/deployment.yaml'), rf'{probe}:\n            tcpSocket:\n              port: http', probe
+        )
+    unlike_ok(read(tmp, 'base/deployment.yaml'), r'httpGet', 'no request without Health')
+    like_ok(read(tmp, 'dev/deployment.yaml'), r'startupProbe:\n            failureThreshold: 300', 'start of dev')
 
     # The probes of Pyjoyment.Plugin.Health
     application.plugin('Health')

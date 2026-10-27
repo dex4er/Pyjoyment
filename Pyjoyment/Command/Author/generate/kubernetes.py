@@ -46,11 +46,13 @@ overlays, ``dev`` and ``prod``, which ``kubectl apply -k`` applies. ::
 The server listens on the port of the ``PORT`` environment variable, ``3000``
 by default, as in the image of
 :mod:`Pyjoyment.Command.Author.generate.dockerfile`, which the Service exposes
-on the port ``80``. An application with :mod:`Pyjoyment.Plugin.Health` gets
-the probes of Kubernetes: the startup and the liveness on its liveness,
-``/livez`` by default, and the readiness on its readiness, ``/readyz``, which
-fails while the server stops gracefully, so that the Service sends no more
-requests to the pod before its end.
+on the port ``80``. The probes of Kubernetes of an application with
+:mod:`Pyjoyment.Plugin.Health` request it: the startup and the liveness its
+liveness, ``/livez`` by default, and the readiness its readiness,
+``/readyz``, which fails while the server stops gracefully, so that the
+Service sends no more requests to the pod before its end. The probes of an
+application without it connect to the port, which the server listens on once
+it has started.
 
 The overlay ``prod`` runs the image of ``--image``, which
 :mod:`Pyjoyment.Command.Author.generate.dockerfile` builds, with the
@@ -174,7 +176,8 @@ class Pyjoyment_Command_Author_generate_kubernetes(Pyjoyment.Command.object):
         moniker = self.app.moniker
         name = re.sub(r'[^a-z0-9]+', '-', moniker.lower()).strip('-') or 'app'
 
-        # The probes of Pyjoyment.Plugin.Health; helpers of a plugin are found at run time, so the application is Any
+        # The probes of Pyjoyment.Plugin.Health, or of the port without it; helpers of a plugin are found at run time, so
+        # the application is Any
         app: Any = self.app
         health = app.renderer.get_helper('health.path') is not None
         probes = {'livez': app.health.path('livez'), 'readyz': app.health.path('readyz')} if health else None
@@ -299,23 +302,36 @@ spec:
           ports:
             - name: http
               containerPort: <%= port %>
-% if probes:
           startupProbe:
+% if probes:
             httpGet:
               path: <%= probes['livez'] %>
               port: http
+% else:
+            tcpSocket:
+              port: http
+% end
             periodSeconds: 1
             failureThreshold: 30
           livenessProbe:
+% if probes:
             httpGet:
               path: <%= probes['livez'] %>
               port: http
+% else:
+            tcpSocket:
+              port: http
+% end
           readinessProbe:
+% if probes:
             httpGet:
               path: <%= probes['readyz'] %>
               port: http
-            periodSeconds: 2
+% else:
+            tcpSocket:
+              port: http
 % end
+            periodSeconds: 2
 
 @@ base_service
 apiVersion: v1
@@ -419,10 +435,8 @@ spec:
             - name: VIRTUAL_ENV
               value: /uv/venv
 % end
-% if probes:
           startupProbe:
             failureThreshold: 300
-% end
           volumeMounts:
             - name: app
               mountPath: /app
