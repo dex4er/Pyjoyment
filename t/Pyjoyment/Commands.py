@@ -504,11 +504,13 @@ with subtest('generate lambda-zip'):
     app.rel_file('MyApp').make_path()
     app.rel_file('MyApp/__init__.py').spew('pass\n')
     app.rel_file('MyApp/__pycache__').make_path().child('__init__.cpython-0.pyc').spew('')
+    app.rel_file('wrapper.py').spew('#!/usr/bin/env python3\n')
     app.rel_file('.git').make_path().child('config').spew('')
     app.rel_file('.env').spew('SECRET=1\n')
     with local(PYJO_EXE=None):
         output, calls = generate()
     like_ok(output, r'\[write\] .*dist.python\.zip', 'right output')
+    like_ok(output, r'\[write\] .*dist.pyjoyment\.zip', 'right output')
     like_ok(output, r'\[write\] .*dist.function\.zip', 'right output')
     is_ok(calls[0][:3], ['python', 'install', '--no-bin'], 'Python')
     is_ok(calls[0][-1], f'cpython-{version}-linux-x86_64-gnu', 'right Python')
@@ -531,6 +533,16 @@ with subtest('generate lambda-zip'):
     with zipfile.ZipFile(app.rel_file('dist/python.zip').to_str()) as archive:
         data = archive.read(f'python/lib/python{version}/_sysconfigdata__linux.py').decode()
     is_ok(data, 'build_time_vars = {"prefix": \'/opt/python\'}\n', 'prefix of the layer')
+    site = f'python/lib/python{version}/site-packages'
+    pyjoyment = entries('dist/pyjoyment.zip')
+    ok(f'{site}/Pyjo/__init__.py' in pyjoyment, 'Pyjo in the layer')
+    ok(f'{site}/Pyjoyment/__init__.py' in pyjoyment, 'Pyjoyment in the layer')
+    ok(f'{site}/pyjoyment-0.0.2.dist-info/METADATA' in pyjoyment, 'metadata of Pyjoyment in the layer')
+    is_ok(pyjoyment[f'{site}/Pyjoyment/__init__.py'].external_attr >> 16, 0o100644, 'right mode')
+    bytecode = next(name for name in pyjoyment if name.startswith(f'{site}/Pyjoyment/__pycache__/__init__.'))
+    with zipfile.ZipFile(app.rel_file('dist/pyjoyment.zip').to_str()) as archive:
+        ok(f'/opt/{site}/Pyjoyment/__init__.py'.encode() in archive.read(bytecode), 'Pyjoyment compiled for the layer')
+    unlike_ok(' '.join(pyjoyment), r'foo', 'only Pyjoyment in the layer')
     function = entries('dist/function.zip')
     is_ok(function['bootstrap'].external_attr >> 16, 0o100755, 'executable bootstrap')
     with zipfile.ZipFile(app.rel_file('dist/function.zip').to_str()) as archive:
@@ -540,6 +552,8 @@ with subtest('generate lambda-zip'):
         bootstrap, rf'(?m)^exec /opt/python/bin/python{version} -m Pyjoyment\.HelloWorld$', 'package of the application'
     )
     ok('MyApp/__init__.py' in function, 'application')
+    is_ok(function['MyApp/__init__.py'].external_attr >> 16, 0o100644, 'right mode')
+    is_ok(function['wrapper.py'].external_attr >> 16, 0o100755, 'executable script')
     ok(any(name.startswith('MyApp/__pycache__/__init__.') for name in function), 'application compiled')
     with zipfile.ZipFile(app.rel_file('dist/function.zip').to_str()) as archive:
         bytecode = next(name for name in function if name.startswith('MyApp/__pycache__/__init__.'))
@@ -549,18 +563,22 @@ with subtest('generate lambda-zip'):
         ok(f'/opt/python/lib/python{version}/os.py'.encode() in archive.read(bytecode), 'compiled for the layer')
     ok('MyApp/__pycache__/__init__.cpython-0.pyc' not in function, 'not the bytecode of the machine')
     ok('foo/__init__.py' in function, 'dependency')
-    unlike_ok(' '.join(function), r'(?:^| )(?:\.git|\.env|\.lock|bin/|dist/|python/)', 'nothing else')
-    zips = app.rel_file('dist/function.zip').slurp(), app.rel_file('dist/python.zip').slurp()
-    crcs = {name: info.CRC for zip in ('function', 'python') for name, info in entries(f'dist/{zip}.zip').items()}
+    unlike_ok(' '.join(function), r'(?:^| )(?:\.git|\.env|\.lock|bin/|dist/|python/|Pyjo|pyjoyment)', 'nothing else')
+    zips = [app.rel_file(f'dist/{name}').slurp() for name in ('function.zip', 'python.zip', 'pyjoyment.zip')]
+    crcs = {n: i.CRC for z in ('function', 'python', 'pyjoyment') for n, i in entries(f'dist/{z}.zip').items()}
     with local(PYJO_EXE=None):
         output, calls = generate()
     like_ok(output, r'\[write\] .*dist.function\.zip', 'written anew')
     is_deeply_ok(
-        {name: info.CRC for zip in ('function', 'python') for name, info in entries(f'dist/{zip}.zip').items()},
+        {n: i.CRC for z in ('function', 'python', 'pyjoyment') for n, i in entries(f'dist/{z}.zip').items()},
         crcs,
         'same contents',
     )
-    ok(zips == (app.rel_file('dist/function.zip').slurp(), app.rel_file('dist/python.zip').slurp()), 'same files')
+    is_ok(
+        [app.rel_file(f'dist/{name}').slurp() for name in ('function.zip', 'python.zip', 'pyjoyment.zip')],
+        zips,
+        'same files',
+    )
 
     # The architecture, the free-threaded build and the lock of the project
     app.rel_file('uv.lock').spew('')
@@ -574,14 +592,20 @@ with subtest('generate lambda-zip'):
     is_ok(pip[pip.index('--python-platform') + 1], 'aarch64-manylinux_2_34', 'right platform')
     is_ok(pip[pip.index('-r') + 1], export[export.index('-o') + 1], 'exported dependencies')
     ok('python/bin/python3.15t' in entries('dist/python.zip'), 'free-threaded interpreter')
+    ok(
+        'python/lib/python3.15t/site-packages/Pyjoyment/__init__.py' in entries('dist/pyjoyment.zip'),
+        'Pyjoyment of the free-threaded Python',
+    )
 
     # Python in the function, without a layer
     app.rel_file('dist').remove_tree()
     with local(PYJO_EXE=None):
         output, calls = generate('--no-layer')
-    unlike_ok(output, r'python\.zip', 'no layer')
-    ok(not os.path.exists(app.rel_file('dist/python.zip')), 'no layer')
+    unlike_ok(output, r'python\.zip|pyjoyment\.zip', 'no layer')
+    ok(not os.path.exists(app.rel_file('dist/python.zip')), 'no layer of Python')
+    ok(not os.path.exists(app.rel_file('dist/pyjoyment.zip')), 'no layer of Pyjoyment')
     function = entries('dist/function.zip')
+    ok('Pyjoyment/__init__.py' in function, 'Pyjoyment in the function')
     is_ok(function[f'python/bin/python{version}'].external_attr >> 16, 0o100755, 'executable interpreter')
     ok(f'python/lib/python{version}/os.py' in function, 'standard library')
     with zipfile.ZipFile(app.rel_file('dist/function.zip').to_str()) as archive:
@@ -590,6 +614,26 @@ with subtest('generate lambda-zip'):
     with zipfile.ZipFile(app.rel_file('dist/function.zip').to_str()) as archive:
         bootstrap = archive.read('bootstrap').decode()
     like_ok(bootstrap, rf'(?m)^exec "\$LAMBDA_TASK_ROOT/python/bin/python{version}" -m ', 'interpreter of the function')
+
+    # The runtime of Python of Lambda, without Python and the bootstrap, and the layers of an earlier build
+    generate()
+    with local(PYJO_EXE=None):
+        output, calls = generate('--runtime', 'python3.14')
+    unlike_ok(output, r'python\.zip', 'no layer of Python')
+    ok(not any(call[0] == 'python' for call in calls), 'no Python installed')
+    ok(not os.path.exists(app.rel_file('dist/python.zip')), 'layer of Python of an earlier build removed')
+    pip = next(call for call in calls if call[:2] == ['pip', 'install'])
+    is_ok(pip[pip.index('--python') + 1], '3.14+gil', 'Python of the runtime')
+    ok(
+        'python/lib/python3.14/site-packages/Pyjoyment/__init__.py' in entries('dist/pyjoyment.zip'),
+        'layer of Pyjoyment',
+    )
+    function = entries('dist/function.zip')
+    ok('MyApp/__init__.py' in function, 'application')
+    unlike_ok(' '.join(function), r'(?:^| )(?:bootstrap|python/|Pyjo)', 'no bootstrap, Python and Pyjoyment')
+    with local(PYJO_EXE=None):
+        output, calls = generate('-r', 'python3.14', '-p', '3.14')
+    ok(os.path.exists(app.rel_file('dist/pyjoyment.zip')), 'same version')
     os.chdir(cwd)
 
     # A Lite script with the inline metadata of PEP 723, and its lock
@@ -611,6 +655,24 @@ with subtest('generate lambda-zip'):
     # Errors
     throws_ok(lambda: lambda_zip.run('-a', 'riscv64'), re.compile(r'^Unknown architecture: riscv64'), 'architecture')
     throws_ok(lambda: lambda_zip.run('-p', 'pypy3.11'), re.compile(r'^Unknown version of Python: pypy3\.11'), 'version')
+    throws_ok(lambda: lambda_zip.run('-r', 'provided.al2'), re.compile(r'^Unknown runtime: provided\.al2$'), 'runtime')
+    throws_ok(
+        lambda: lambda_zip.run('-r', 'python3.14', '-p', '3.15'),
+        re.compile(r'^Option --python is not for the runtime python3\.14'),
+        'version of the runtime',
+    )
+    dir = Pyjo.File.tempdir()
+    os.chdir(dir)
+    app.rel_file('pyproject.toml').spew('[project]\nname = "my_app"\n')
+    with local(FAKE_UV_NO_PYJOYMENT='1', PYJO_EXE=None):
+        throws_ok(
+            lambda: generate('-r', 'python3.14'),
+            re.compile(r'^Pyjoyment is not among the dependencies'),
+            'no Pyjoyment',
+        )
+        generate('-r', 'python3.14', '--no-layer')
+    ok(not os.path.exists(app.rel_file('dist/pyjoyment.zip')), 'no Pyjoyment without a layer')
+    os.chdir(cwd)
     with local(FAKE_UV_LOG=uv.child('log').to_str(), FAKE_UV_FAIL='python'), contextlib.redirect_stdout(io.StringIO()):
         throws_ok(
             lambda: lambda_zip.run(),

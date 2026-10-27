@@ -1,38 +1,24 @@
-# The framework in a layer, the packages Pyjo and Pyjoyment of the checkout, with the static files of their
-# resources, which Lambda unpacks in /opt: the names of the root that do not start with "P", which only they do, and
-# the hidden ones are left out, but not the root itself, whose name is "."
-data "archive_file" "framework" {
-  type             = "zip"
-  source_dir       = "${path.module}/../.."
-  excludes         = ["[^.P]*", ".?*", "**/__pycache__"]
-  output_path      = "${path.module}/.terraform/framework.zip"
-  output_file_mode = "0644"
+# The ZIP files of "generate lambda-zip --runtime" in the directory of the function: the layer with Pyjoyment, which
+# Lambda unpacks in /opt, and the function with the application, which are the same for the same files, so that a new
+# build changes only what has changed
+locals {
+  dist = "${path.module}/function/dist"
 }
 
-resource "aws_lambda_layer_version" "framework" {
-  layer_name               = var.name
-  filename                 = data.archive_file.framework.output_path
-  source_code_hash         = data.archive_file.framework.output_base64sha256
+# The layer of Pyjoyment, in the site-packages of the Python of the function, unless the variable "pyjoyment_layer"
+# names one that is published already
+resource "aws_lambda_layer_version" "pyjoyment" {
+  count = var.pyjoyment_layer == null ? 1 : 0
+
+  layer_name               = "${var.name}-pyjoyment"
+  filename                 = "${local.dist}/pyjoyment.zip"
+  source_code_hash         = filebase64sha256("${local.dist}/pyjoyment.zip")
   compatible_runtimes      = [var.runtime]
   compatible_architectures = ["arm64"]
 }
 
-# The function alone, as it runs with Pyjo.App.Lambda too
-data "archive_file" "function" {
-  type             = "zip"
-  output_path      = "${path.module}/.terraform/function.zip"
-  output_file_mode = "0644"
-
-  source {
-    content  = file("${path.module}/app.py")
-    filename = "app.py"
-  }
-
-  # For the PHP of a layer of the variable "layers"
-  source {
-    content  = file("${path.module}/phpinfo.php")
-    filename = "phpinfo.php"
-  }
+locals {
+  pyjoyment_layer = var.pyjoyment_layer != null ? var.pyjoyment_layer : aws_lambda_layer_version.pyjoyment[0].arn
 }
 
 resource "aws_iam_role" "function" {
@@ -58,24 +44,23 @@ resource "aws_cloudwatch_log_group" "function" {
   retention_in_days = 1
 }
 
-# The function is not in a VPC: it is on the public network of AWS
+# The function is not in a VPC: it is on the public network of AWS. The runtime puts the site-packages of the layer
+# in the path of Python
 resource "aws_lambda_function" "function" {
   function_name    = var.name
   role             = aws_iam_role.function.arn
   runtime          = var.runtime
   architectures    = ["arm64"]
   handler          = "app.handler"
-  filename         = data.archive_file.function.output_path
-  source_code_hash = data.archive_file.function.output_base64sha256
-  layers           = concat([aws_lambda_layer_version.framework.arn], var.layers)
+  filename         = "${local.dist}/function.zip"
+  source_code_hash = filebase64sha256("${local.dist}/function.zip")
+  layers           = concat([local.pyjoyment_layer], var.layers)
   memory_size      = 128
   timeout          = 10
 
-  # The directory of the layer, which the runtime does not put in the path of Python, as it does /opt/python
   environment {
     variables = {
-      PYJO_MODE  = "development"
-      PYTHONPATH = "/opt"
+      PYJO_MODE = "development"
     }
   }
 

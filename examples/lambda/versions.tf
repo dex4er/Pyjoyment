@@ -1,12 +1,8 @@
 terraform {
   required_version = "~> 1.13.0"
 
-  # The providers are not locked, so that they are the newest of their versions
+  # The provider is not locked, so that it is the newest of its versions
   required_providers {
-    archive = {
-      source  = "hashicorp/archive"
-      version = "~> 2.8"
-    }
     aws = {
       source  = "hashicorp/aws"
       version = "~> 6.0"

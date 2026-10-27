@@ -448,11 +448,15 @@ emulator of the Runtime API, which the image has not, so the script mounts the
 binary of its release as the entry point of the container, of `RIE_VERSION` of
 the workflow, which Renovate bumps, or the latest one, and invokes it buffered
 and streaming, its variant `lambda-zip` runs the same script in the ZIP files of
-`generate lambda-zip`, extracted where Lambda extracts them, the layer in `/opt`
+`generate lambda-zip`, extracted where Lambda extracts them, the layers in `/opt`
 and the function in `/var/task`, in the image of the custom runtime
 `provided.al2023`, whose emulator runs the `bootstrap` of the function, and
 checks that the Python of python-build-standalone reads the certificates of
-Amazon Linux, which its OpenSSL looks for in `/etc/ssl`, and its variant
+Amazon Linux, which its OpenSSL looks for in `/etc/ssl`, and finds Pyjoyment in
+its layer, and in the ZIP files of `generate lambda-zip --runtime python3.14`
+in the image of the runtime of Python, whose function has no Pyjoyment of its
+own, so that its invocations tell that the runtime finds the layer, and its
+variant
 `fastcgi` runs a Lite script that listens for FastCGI, with
 `PYJO_LISTEN`, behind Caddy in a container of its own on the same network,
 whose image `Dockerfile.caddy` pins, so that Renovate bumps it, and checks the
@@ -951,7 +955,19 @@ copy:
   prefix of Python on Lambda, `/opt/python` or `/var/task/python`, in the
   place of the temporary directory that uv writes into it, which is taken
   from the directory of the full version, `cpython-3.15.0-…`, not from the
-  link of the minor version that uv makes next to it.
+  link of the minor version that uv makes next to it. Pyjoyment goes to a layer
+  of its own, `pyjoyment.zip`, in `python/lib/python3.X/site-packages`, which
+  the `site` of the Python of `python.zip` puts in its path, and so does the
+  runtime of Python of Lambda of the same version, so that the same bytes serve
+  a custom runtime and the runtime of Python, and a layer that is published
+  once serves every function of that Python. The runtime of Python adds the
+  directories of the layers in its `/var/runtime/bootstrap.py`, and only when
+  `PYTHONPATH` is not set, so a function with `PYTHONPATH` does not get them,
+  nor a wrapper of `AWS_LAMBDA_EXEC_WRAPPER`, which runs in the place of that
+  bootstrap, nor `docker exec` of a test: the function of such a wrapper names
+  the site-packages in `PYTHONPATH`. A file of the application that starts
+  with `#!`, as such a wrapper, is executable in the ZIP, by a rule on its
+  content, which gives the same bytes on Windows, whose files have no modes.
 - `ojo` is the functions of the package `Pyjo`, which `from Pyjo import *`
   imports, and `perl -Mojo -E` is `python -m Pyjo`. A function imports the
   modules it uses when it is called, as every `import Pyjo.X` runs

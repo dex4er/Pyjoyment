@@ -1,17 +1,22 @@
 # An event function of AWS Lambda
 
-`app.py` is an application of `Pyjoyment.Lite` that runs as an event function
-of AWS Lambda, which the OpenTofu of this directory deploys: the function with
-`app.py` alone, and the framework, `Pyjo` and `Pyjoyment` of the checkout, in
-a layer of its own, with a Function URL, and behind an Application Load
-Balancer on request.
+`function/app.py` is an application of `Pyjoyment.Lite` that runs as an event
+function of AWS Lambda on the runtime of Python, which the OpenTofu of this
+directory deploys, with the ZIP files of `generate lambda-zip --runtime`: the
+function with `app.py` and `phpinfo.php`, and Pyjoyment in a layer of its own,
+with a Function URL, and behind an Application Load Balancer on request.
+
+The application is the directory `function`, as the generator puts every file
+of the current directory into `function.zip`, which would take the state of
+OpenTofu too. The inline metadata of the script takes Pyjoyment of the
+checkout.
 
 ## Running locally
 
 The same script runs as an application of its own:
 
 ```sh
-uv run python examples/lambda/app.py daemon
+uv run python examples/lambda/function/app.py daemon
 ```
 
 and as an event function, with the events of Lambda, under `Pyjo.App.Lambda`,
@@ -23,13 +28,25 @@ uv run python -m Pyjo.Prove -l t/examples/lambda/app.py
 
 ## Deploying to AWS
 
-OpenTofu 1.13 deploys it with the credentials and the region of the default
-chain of AWS, as `AWS_PROFILE` and `AWS_REGION`:
+The ZIP files go to `function/dist`, for the runtime of the variable
+`runtime`, `python3.15` by default, and the architecture of the function,
+`arm64`:
+
+```sh
+uv run --directory examples/lambda/function python app.py generate lambda-zip --arch arm64 --runtime python3.15
+```
+
+OpenTofu 1.13 deploys them with the credentials and the region of the default
+chain of AWS, as `AWS_PROFILE` and `AWS_REGION`, and a new build of the same
+files changes nothing:
 
 ```sh
 tofu -chdir=examples/lambda init
 tofu -chdir=examples/lambda apply
 ```
+
+`-var pyjoyment_layer=ARN` takes a layer of Pyjoyment that is published
+already, for the same Python, in the place of `function/dist/pyjoyment.zip`.
 
 The output `url` is the Function URL, which the test takes in
 `TEST_LAMBDA_URL`:
@@ -73,5 +90,5 @@ layers = [
 Locally, `PHP_FPM` names the php-fpm to start:
 
 ```sh
-PHP_FPM=$(command -v php-fpm) uv run python examples/lambda/app.py daemon
+PHP_FPM=$(command -v php-fpm) uv run python examples/lambda/function/app.py daemon
 ```

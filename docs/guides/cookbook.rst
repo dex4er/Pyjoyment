@@ -981,16 +981,28 @@ An image of the function, of any Python, has the same command, which
 A ZIP of the function for ``provided.al2023`` brings the Python of its
 ``bootstrap`` in a layer, of any version, also the free-threaded build, which
 :mod:`Pyjoyment.Command.Author.generate.lambda_zip` writes with uv to ``dist``:
-``python.zip``, the layer, and ``function.zip``, the application with its
-dependencies and the ``bootstrap`` that runs it with the Python of the layer.
+``python.zip``, the layer, ``pyjoyment.zip``, a layer with Pyjoyment, and
+``function.zip``, the application with its other dependencies and the
+``bootstrap`` that runs it with the Python of the layer.
 
 .. code-block:: console
 
     $ ./myapp.py generate lambda-zip --arch arm64
 
-The directory `examples/lambda_zip
+With ``--runtime python3.14``, the function runs on the runtime of Python of
+Lambda, with its handler, as ``myapp.handler``, and the same layer of
+Pyjoyment, which the functions of the same Python share, so that a layer of
+Pyjoyment that is published already serves in its place.
+
+.. code-block:: console
+
+    $ ./myapp.py generate lambda-zip --arch arm64 --runtime python3.14
+
+The directories `examples/lambda
+<https://github.com/dex4er/Pyjoyment/tree/main/examples/lambda>`_ and
+`examples/lambda_zip
 <https://github.com/dex4er/Pyjoyment/tree/main/examples/lambda_zip>`_ of the
-repository deploys such a function with OpenTofu.
+repository deploy such functions with OpenTofu.
 
 The same function runs locally, mounted in an application with
 :mod:`Pyjo.App.Lambda`, in a process of its own, which gets its invocations
@@ -1024,9 +1036,12 @@ runtime above, or on the runtime of Python with a wrapper that
 ``AWS_LAMBDA_EXEC_WRAPPER`` names, as ``/var/task/wrapper.py``. The function
 does not learn the invoke mode from its invocations, so
 ``PYJO_LAMBDA_INVOKE_MODE=RESPONSE_STREAM`` tells it, the same as the one of the
-Function URL.
+Function URL. The runtime puts the layers in the path of Python only for its own
+runtime client, so a function whose Pyjoyment is in a layer names its
+site-packages for the wrapper, as
+``PYTHONPATH=/opt/python/lib/python3.14/site-packages``.
 
-.. literalinclude:: ../../examples/lambda_stream/wrapper.py
+.. literalinclude:: ../../examples/lambda_stream/function/wrapper.py
     :language: python
     :caption: wrapper.py
 

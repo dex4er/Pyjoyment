@@ -3,9 +3,10 @@
 `function/app.py` is an application of `Pyjoyment.Lite` that runs as an event
 function of AWS Lambda on the custom runtime `provided.al2023`, with the ZIP
 files of `generate lambda-zip`, which the OpenTofu of this directory deploys:
-the layer with Python, of any version, also the free-threaded build, the
-function with the application, its dependencies and the `bootstrap` that runs
-the script, which is the runtime of the function itself, and a Function URL.
+the layer with Python, of any version, also the free-threaded build, the layer
+with Pyjoyment, the function with the application, its other dependencies and
+the `bootstrap` that runs the script, which is the runtime of the function
+itself, and a Function URL.
 `/python` tells the Python that runs it and the certificates that it reads.
 
 The application is the directory `function`, as the generator puts every file
@@ -51,6 +52,10 @@ tofu -chdir=examples/lambda_zip apply
 `-var arch=x86_64` is the architecture of a build with `--arch x86_64`, and
 `-var invoke_mode=RESPONSE_STREAM` makes a Function URL that streams the
 responses, which the function learns from `PYJO_LAMBDA_INVOKE_MODE`.
+`-var pyjoyment_layer=ARN` takes a layer of Pyjoyment that is published
+already, for the same Python, in the place of `function/dist/pyjoyment.zip`:
+the layer of the runtime of Python of the same version serves too, as the
+functions of `../lambda` and `../lambda_stream` have it.
 
 The output `url` is the Function URL, which the test takes in
 `TEST_LAMBDA_ZIP_URL`, and `python_url` its page `/python`:
