@@ -80,6 +80,7 @@ import Pyjoyment.Command.asgi  # noqa: E402
 import Pyjoyment.Command.Author.generate  # noqa: E402
 import Pyjoyment.Command.Author.generate.app  # noqa: E402
 import Pyjoyment.Command.Author.generate.dockerfile  # noqa: E402
+import Pyjoyment.Command.Author.generate.kubernetes  # noqa: E402
 import Pyjoyment.Command.Author.generate.lambda_zip  # noqa: E402
 import Pyjoyment.Command.Author.generate.lite_app  # noqa: E402
 import Pyjoyment.Command.Author.generate.plugin  # noqa: E402
@@ -471,6 +472,38 @@ with subtest('generate dockerfile'):
     with contextlib.redirect_stderr(buffer):
         throws_ok(
             lambda: dockerfile.run('--unknown'), re.compile(r'Usage: APPLICATION generate dockerfile'), 'unknown option'
+        )
+    like_ok(buffer.getvalue(), r'Unknown option: unknown', 'right output')
+    os.chdir(cwd)
+
+# Not in Mojolicious: generate kubernetes
+with subtest('generate kubernetes'):
+    kubernetes = Pyjoyment.Command.Author.generate.kubernetes.new()
+    ok(kubernetes.description, 'has a description')
+    like_ok(kubernetes.usage, r'kubernetes', 'has usage information')
+    dir = Pyjo.File.tempdir()
+    os.chdir(dir)
+    app.rel_file('app.txt').spew('Hello\n')
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        kubernetes.run()
+    like_ok(buffer.getvalue(), r'kubernetes.dev.deployment\.yaml', 'right output')
+    for name in ('base/kustomization.yaml', 'base/deployment.yaml', 'base/service.yaml'):
+        ok(os.path.exists(app.rel_file(f'kubernetes/{name}').to_str()), f'{name} exists')
+    for name in ('prod/kustomization.yaml', 'prod/deployment.yaml', 'dev/kustomization.yaml', 'dev/deployment.yaml'):
+        ok(os.path.exists(app.rel_file(f'kubernetes/{name}').to_str()), f'{name} exists')
+    is_ok(app.rel_file('kubernetes/dev/app/app.txt').slurp(), b'Hello\n', 'copy of the application')
+    like_ok(app.rel_file('kubernetes/dev/kustomization.yaml').slurp().decode(), r'"app\.txt=app/app\.txt"', 'file')
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        kubernetes.run('-p', '8080', '--host-path')
+    like_ok(buffer.getvalue(), r'\[exist\] .*kubernetes.base.deployment\.yaml', 'base kept')
+    like_ok(app.rel_file('kubernetes/dev/deployment.yaml').slurp().decode(), r'hostPath:', 'host path')
+    ok(not os.path.exists(app.rel_file('kubernetes/dev/app').to_str()), 'no copy of the application')
+    buffer = io.StringIO()
+    with contextlib.redirect_stderr(buffer):
+        throws_ok(
+            lambda: kubernetes.run('--unknown'), re.compile(r'Usage: APPLICATION generate kubernetes'), 'unknown option'
         )
     like_ok(buffer.getvalue(), r'Unknown option: unknown', 'right output')
     os.chdir(cwd)

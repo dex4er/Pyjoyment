@@ -116,6 +116,17 @@ generate dockerfile
 Use :mod:`Pyjoyment.Command.Author.generate.dockerfile` to generate
 ``Dockerfile`` for application.
 
+generate kubernetes
+~~~~~~~~~~~~~~~~~~~
+::
+
+    $ ./myapp.py generate kubernetes
+    $ python -m MyApp generate kubernetes
+
+Use :mod:`Pyjoyment.Command.Author.generate.kubernetes` to generate the
+manifests of Kubernetes for application, with the overlays of Kustomize for
+development and production.
+
 generate lambda-zip
 ~~~~~~~~~~~~~~~~~~~
 ::

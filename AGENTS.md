@@ -681,6 +681,10 @@ handler that runs an event loop of its own, as Mangum, cannot run in one),
 `Pyjoyment.Command.Author.generate.lambda_zip` (the ZIP files of an event
 function of AWS Lambda on a custom runtime, with a layer of the Python of
 python-build-standalone, which uv installs, inspired by `generate dockerfile`),
+`Pyjoyment.Command.Author.generate.kubernetes` (the manifests of Kubernetes
+for Kustomize, a base and the overlays `dev`, on the image of uv with the
+application in a ConfigMap, and `prod`, on the image of `generate dockerfile`,
+inspired by `generate dockerfile`),
 `Pyjo.Server.FastCGI` and `Pyjoyment.Command.fastcgi` (FastCGI on the
 connections of the listen locations `fcgi://` and `fcgi+unix://` of
 `Pyjo.Server.Daemon`, written from the specification of FastCGI 1.0, and the

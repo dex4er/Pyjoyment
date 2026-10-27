@@ -345,6 +345,7 @@ strict = [
   "Pyjoyment/Command/Author/generate/__init__.py",
   "Pyjoyment/Command/Author/generate/app.py",
   "Pyjoyment/Command/Author/generate/dockerfile.py",
+  "Pyjoyment/Command/Author/generate/kubernetes.py",
   "Pyjoyment/Command/Author/generate/lambda_zip.py",
   "Pyjoyment/Command/Author/generate/lite_app.py",
   "Pyjoyment/Command/Author/generate/plugin.py",
