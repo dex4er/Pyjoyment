@@ -397,6 +397,27 @@ as Cloud Run and Kubernetes read with their levels and fields, see
     $ docker run -d -p 3000:3000 -e PYJO_LOG_FORMAT=json --name myapp_container myapp_image
     ...
 
+For Kubernetes, :mod:`Pyjoyment.Command.Author.generate.kubernetes` generates
+the manifests of Kustomize, with an overlay ``prod`` that runs the image of
+the ``Dockerfile``, and an overlay ``dev`` that runs the application without
+an image of its own, on the image of uv, from a ConfigMap with the server
+``daemon``, or with ``--host-path`` from the directory of the project, which a
+local cluster, as the one of Docker Desktop or OrbStack, mounts, with
+``pyjo-reload``. ``--server`` chooses another server, with its options after
+``--``.
+
+.. code-block:: console
+
+    $ ./myapp.py generate kubernetes --image myapp_image
+    ...
+    $ kubectl apply -k kubernetes/dev
+    ...
+    $ kubectl apply -k kubernetes/prod
+    ...
+
+The overlay ``dev`` has a copy of the application in ``kubernetes/dev/files``,
+which the generator writes anew each time, so it belongs in ``.gitignore``.
+
 For more information and many more container deployment options we recommend
 the `Docker <https://docs.docker.com/>`_ and `Kubernetes
 <https://kubernetes.io/docs/>`_ documentation.
@@ -413,6 +434,9 @@ application pass.
 .. literalinclude:: cookbook/health.py
     :language: python
     :caption: myapp.py
+
+The applications of :mod:`Pyjoyment.Command.Author.generate.app` and
+:mod:`Pyjoyment.Command.Author.generate.lite_app` have the plugin already.
 
 A check fails when it raises an exception or returns ``False``, and a
 coroutine function or a promise is waited for, with a timeout, so a check can

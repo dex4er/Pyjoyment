@@ -7,8 +7,9 @@ name: Docker Smoke Test
 # function in the image of AWS Lambda for Python, also streaming its responses
 # with the runtime client of Pyjoyment, and in an image of "generate dockerfile
 # --target lambda" and in the ZIP files of "generate lambda-zip" under the
-# emulator of the Runtime API, and a Lite script that speaks FastCGI to Caddy in
-# front of it. The weekly run catches a change of the images of Python, uv,
+# emulator of the Runtime API, a Lite script that speaks FastCGI to Caddy in
+# front of it, and a Lite script in the manifests of "generate kubernetes" on a
+# cluster of kind. The weekly run catches a change of the images of Python, uv,
 # AWS Lambda and Caddy, and of the builds of Python that uv installs.
 on:
   push:
@@ -42,6 +43,11 @@ on:
 permissions:
   contents: read
 
+env:
+  # kind and the Kubernetes of its node, for the variant kubernetes
+  kind_version: 0.33.0 # datasource=github-releases depName=kubernetes-sigs/kind
+  kubernetes_version: 1.37.0 # datasource=docker depName=kindest/node
+
 jobs:
   smoke:
     name: smoke (${{ matrix.variant }})
@@ -58,6 +64,7 @@ jobs:
           - lambda-image
           - lambda-zip
           - fastcgi
+          - kubernetes
 
     runs-on: ubuntu-26.04-arm
     timeout-minutes: 15
@@ -71,9 +78,18 @@ jobs:
         with:
           version: 2026.10.4 # datasource=github-releases depName=jdx/mise
 
+      - name: Install kind
+        if: matrix.variant == 'kubernetes'
+        uses: helm/kind-action@v1
+        with:
+          install_only: true
+          version: v${{ env.kind_version }}
+          kubectl_version: v${{ env.kubernetes_version }}
+
       - name: Run smoke test
         env:
           VARIANT: ${{ matrix.variant }}
+          KIND_NODE_IMAGE: kindest/node:v${{ env.kubernetes_version }}
           # The emulator of the Runtime API of the variant lambda-image, which its image does not have
           RIE_VERSION: v1.37 # datasource=github-releases depName=aws/aws-lambda-runtime-interface-emulator versioning=loose
         run: tt/docker-smoke/smoke.sh "${VARIANT}"
