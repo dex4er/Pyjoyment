@@ -518,16 +518,19 @@ with subtest('generate lambda-zip'):
     is_ok(pip[pip.index('-r') + 1], 'pyproject.toml', 'dependencies of the project')
     ok(not any(call[0] == 'export' for call in calls), 'nothing exported')
     python = entries('dist/python.zip')
-    is_ok(python[f'bin/python{version}'].external_attr >> 16, 0o100755, 'executable interpreter')
-    ok('bin/python3' not in python, 'no symbolic link')
-    is_ok(python[f'lib/python{version}/os.py'].date_time, (1980, 1, 1, 0, 0, 0), 'fixed time')
-    is_ok(python[f'lib/python{version}/os.py'].external_attr >> 16, 0o100644, 'right mode')
+    is_ok(python[f'python/bin/python{version}'].external_attr >> 16, 0o100755, 'executable interpreter')
+    ok('python/bin/python3' not in python, 'no symbolic link')
+    is_ok(python[f'python/lib/python{version}/os.py'].date_time, (1980, 1, 1, 0, 0, 0), 'fixed time')
+    is_ok(python[f'python/lib/python{version}/os.py'].external_attr >> 16, 0o100644, 'right mode')
     ok(
-        any(re.fullmatch(rf'lib/python{version}/__pycache__/os\..*\.pyc', name) for name in python),
+        any(re.fullmatch(rf'python/lib/python{version}/__pycache__/os\..*\.pyc', name) for name in python),
         'standard library compiled',
     )
-    ok(f'lib/python{version}/lib-dynload/_json.so' in python, 'extension')
+    ok(f'python/lib/python{version}/lib-dynload/_json.so' in python, 'extension')
     unlike_ok(' '.join(python), r'idlelib|site-packages|config-|_tkinter|include', 'nothing unused')
+    with zipfile.ZipFile(app.rel_file('dist/python.zip').to_str()) as archive:
+        data = archive.read(f'python/lib/python{version}/_sysconfigdata__linux.py').decode()
+    is_ok(data, 'build_time_vars = {"prefix": \'/opt/python\'}\n', 'prefix of the layer')
     function = entries('dist/function.zip')
     is_ok(function['bootstrap'].external_attr >> 16, 0o100755, 'executable bootstrap')
     with zipfile.ZipFile(app.rel_file('dist/function.zip').to_str()) as archive:
@@ -558,7 +561,7 @@ with subtest('generate lambda-zip'):
     is_ok(pip[pip.index('--python') + 1], '3.15t', 'free-threaded Python')
     is_ok(pip[pip.index('--python-platform') + 1], 'aarch64-manylinux_2_34', 'right platform')
     is_ok(pip[pip.index('-r') + 1], export[export.index('-o') + 1], 'exported dependencies')
-    ok('bin/python3.15t' in entries('dist/python.zip'), 'free-threaded interpreter')
+    ok('python/bin/python3.15t' in entries('dist/python.zip'), 'free-threaded interpreter')
 
     # Python in the function, without a layer
     app.rel_file('dist').remove_tree()
@@ -569,6 +572,9 @@ with subtest('generate lambda-zip'):
     function = entries('dist/function.zip')
     is_ok(function[f'python/bin/python{version}'].external_attr >> 16, 0o100755, 'executable interpreter')
     ok(f'python/lib/python{version}/os.py' in function, 'standard library')
+    with zipfile.ZipFile(app.rel_file('dist/function.zip').to_str()) as archive:
+        data = archive.read(f'python/lib/python{version}/_sysconfigdata__linux.py').decode()
+    like_ok(data, r"'/var/task/python'", 'prefix of the function')
     with zipfile.ZipFile(app.rel_file('dist/function.zip').to_str()) as archive:
         bootstrap = archive.read('bootstrap').decode()
     like_ok(bootstrap, rf'(?m)^exec "\$LAMBDA_TASK_ROOT/python/bin/python{version}" -m ', 'interpreter of the function')

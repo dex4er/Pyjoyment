@@ -159,15 +159,17 @@ class Pyjoyment_Command_Author_generate_lambda_zip(Pyjoyment.Command.object):
         local = version if version.endswith('t') else f'{version}+gil'
 
         with Pyjo.File.tempdir() as tmp:
-            # Python, the interpreter and its standard library
+            # Python, the interpreter and its standard library, in the directory of its full version, which the variables
+            # of its build name, and not the link of its minor version
             install = tmp.child('install')
             self._uv(
                 'python', 'install', '--no-bin', '--install-dir', install, f'cpython-{version}-linux-{machine}-gnu'
             )
-            home = next(p for p in sorted(os.listdir(install)) if p.startswith('cpython-'))
-            python = tmp.child('python')
-            interpreter = _python(install.child(home), python)
+            home = next(p for p in sorted(os.listdir(install)) if re.match(r'cpython-\d+\.\d+\.\d+', p))
+            # The layer, which Lambda extracts in /opt, with Python in its directory python
+            python = tmp.child('layer', 'python')
             prefix = '/opt/python' if layer else '/var/task/python'
+            interpreter = _python(install.child(home), python, prefix)
 
             # The dependencies, without the scripts of their packages, which run the Python of the machine, and the lock
             # of uv
@@ -210,25 +212,28 @@ class Pyjoyment_Command_Author_generate_lambda_zip(Pyjoyment.Command.object):
             dist = self.rel_file('dist')
             self.create_dir(dist)
             if layer:
-                _zip(python, dist.child('python.zip'), {f'bin/{interpreter}'})
+                _zip(python.dirname(), dist.child('python.zip'), {f'python/bin/{interpreter}'})
                 self._loud(f'  [write] {dist.child("python.zip")}')
             else:
                 shutil.copytree(python, function.child('python'))
             _zip(function, dist.child('function.zip'), {'bootstrap', f'python/bin/{interpreter}'})
             self._loud(f'  [write] {dist.child("function.zip")}')
 
+    # The bytecode of a set of strings, as in "x in {'a', 'b'}", has the order of their hashes, which a fixed seed keeps
     def _compile(self, local: str, dir: Pyjo.File.object, prefix: str) -> None:
         options = ['-q', '-j', '0', '--invalidation-mode', 'unchecked-hash', '-s', dir.to_str(), '-p', prefix]
-        self._uv('run', '--no-project', '--python', local, '--', 'python', '-m', 'compileall', *options, dir)
+        env = {**os.environ, 'PYTHONHASHSEED': '0'}
+        self._uv('run', '--no-project', '--python', local, '--', 'python', '-m', 'compileall', *options, dir, env=env)
 
-    def _uv(self, *args: str | Pyjo.File.object) -> None:
+    def _uv(self, *args: str | Pyjo.File.object, env: dict[str, str] | None = None) -> None:
         command = [*_uv(), '--quiet', *map(str, args)]
-        if (code := subprocess.run(command).returncode) != 0:
+        if (code := subprocess.run(command, env=env).returncode) != 0:
             raise Pyjo.Exception.new(f'Command "uv {" ".join(map(str, args[:2]))}" failed with exit status {code}')
 
 
-# The interpreter and its standard library, without what a function does not use, and the name of the interpreter
-def _python(home: Pyjo.File.object, python: Pyjo.File.object) -> str:
+# The interpreter and its standard library, without what a function does not use, with the prefix of Python on Lambda in
+# the variables of the build, where uv puts the directory that it installs in, and the name of the interpreter
+def _python(home: Pyjo.File.object, python: Pyjo.File.object, prefix: str) -> str:
     bin = home.child('bin')
     names = sorted(os.listdir(bin))
     interpreter = next(n for n in names if re.fullmatch(r'python3\.\d+t?', n) and not os.path.islink(bin.child(n)))
@@ -239,6 +244,9 @@ def _python(home: Pyjo.File.object, python: Pyjo.File.object) -> str:
     for name in os.listdir(library):
         if name in _UNUSED or name.startswith('config-'):
             shutil.rmtree(library.child(name))
+        elif name.startswith('_sysconfigdata_') and name.endswith('.py'):
+            data = library.child(name)
+            data.spew(str(data.slurp('UTF-8')).replace(home.to_str(), prefix), 'UTF-8')
     for name in os.listdir(library.child('lib-dynload')):
         if name.startswith('_tkinter'):
             os.remove(library.child('lib-dynload', name))

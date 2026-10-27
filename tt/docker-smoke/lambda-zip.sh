@@ -32,7 +32,7 @@ esac
 python myapp.py generate lambda-zip --arch "${arch}"
 
 mkdir "${work}/opt" "${work}/task"
-unzip -q dist/python.zip -d "${work}/opt/python"
+unzip -q dist/python.zip -d "${work}/opt"
 unzip -q dist/function.zip -d "${work}/task"
 [[ -x ${work}/task/bootstrap ]] || fail "bootstrap"
 cat "${work}/task/bootstrap"

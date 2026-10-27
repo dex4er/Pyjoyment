@@ -30,10 +30,17 @@ def _main(args):
         return 2
 
     if args[:2] == ['python', 'install']:
-        home = os.path.join(args[args.index('--install-dir') + 1], args[-1])
-        name = 'python' + args[-1].split('-')[1]
+        # The directory of the full version, and the link of the minor version, which comes first in the order of names
+        version = args[-1].split('-')[1]
+        full = args[-1].replace(
+            version, version.removesuffix('t') + '.0' + ('+freethreaded' if version[-1] == 't' else '')
+        )
+        install = args[args.index('--install-dir') + 1]
+        home = os.path.join(install, full)
+        name = 'python' + version
         _spew(home, 'bin', name, content='ELF')
         try:
+            os.symlink(full, os.path.join(install, args[-1]))
             os.symlink(name, os.path.join(home, 'bin', 'python3'))
         except OSError:
             pass
@@ -46,6 +53,11 @@ def _main(args):
             'lib-dynload/_tkinter.so',
         ):
             _spew(home, 'lib', name, *path.split('/'))
+
+        # The variables of the build with the directory of the installation, and a set of strings in the bytecode
+        _spew(home, 'lib', name, '_sysconfigdata__linux.py', content=f'build_time_vars = {{"prefix": {home!r}}}\n')
+        strings = ', '.join(repr(c) for c in 'abcdefghijklmnop')
+        _spew(home, 'lib', name, 'webbrowser.py', content=f'def f(x):\n    return x in {{{strings}}}\n')
         _spew(home, 'include', 'Python.h')
     elif args[0] == 'export':
         _spew(args[args.index('-o') + 1], content='foo\n')

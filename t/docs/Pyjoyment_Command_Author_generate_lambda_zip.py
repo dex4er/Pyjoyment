@@ -63,7 +63,7 @@ with subtest('Synopsis'):
     calls = generate(tmp)
     is_ok(calls[0][-1], f'cpython-{python}-linux-x86_64-gnu', 'Python of x86_64')
     like_ok(read(tmp.child('dist', 'function.zip'), 'bootstrap'), r'(?m)^exec \S+ -m Pyjoyment$', 'package')
-    ok(f'bin/python{python}' in names(tmp.child('dist', 'python.zip')), 'layer')
+    ok(f'python/bin/python{python}' in names(tmp.child('dist', 'python.zip')), 'layer')
 
     # python -m MyApp generate lambda-zip --arch arm64
     calls = generate(tmp, '--arch', 'arm64')
@@ -72,7 +72,7 @@ with subtest('Synopsis'):
     # python -m MyApp generate lambda-zip --python 3.15t
     calls = generate(tmp, '--python', '3.15t')
     is_ok(calls[0][-1], 'cpython-3.15t-linux-x86_64-gnu', 'free-threaded Python')
-    ok('bin/python3.15t' in names(tmp.child('dist', 'python.zip')), 'free-threaded interpreter')
+    ok('python/bin/python3.15t' in names(tmp.child('dist', 'python.zip')), 'free-threaded interpreter')
 
     # python -m MyApp generate lambda-zip --no-layer
     tmp = Pyjo.File.tempdir()

@@ -945,7 +945,13 @@ copy:
   every module it imports again, several times slower. The entries of a ZIP
   have their modes, as a file of Windows has none, no symbolic links, which
   the interpreter does not need, and fixed times, so that the same input
-  gives the same hash.
+  gives the same hash. For the same reason the bytecode is compiled with
+  `PYTHONHASHSEED=0`, as a set of strings, as `x in {'http', 'https'}`, is
+  marshalled in the order of their hashes, and `_sysconfigdata_*.py` gets the
+  prefix of Python on Lambda, `/opt/python` or `/var/task/python`, in the
+  place of the temporary directory that uv writes into it, which is taken
+  from the directory of the full version, `cpython-3.15.0-…`, not from the
+  link of the minor version that uv makes next to it.
 - `ojo` is the functions of the package `Pyjo`, which `from Pyjo import *`
   imports, and `perl -Mojo -E` is `python -m Pyjo`. A function imports the
   modules it uses when it is called, as every `import Pyjo.X` runs
