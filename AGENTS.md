@@ -460,7 +460,18 @@ variant
 `fastcgi` runs a Lite script that listens for FastCGI, with
 `PYJO_LISTEN`, behind Caddy in a container of its own on the same network,
 whose image `Dockerfile.caddy` pins, so that Renovate bumps it, and checks the
-pages through Caddy.
+pages through Caddy, and its variant `kubernetes` runs a Lite script with the
+plugin Health in the manifests of `generate kubernetes` on a cluster of kind of
+its own, with a kubeconfig of its own, which the node of `KIND_NODE_IMAGE` of
+the workflow mounts the temporary directory of: `dev` with the application in
+a ConfigMap and a change of it in a new one, `dev` with `--host-path` reloaded
+when the script changes, and `prod` on the image of `generate dockerfile`,
+loaded with `kind load`, rolled out again without a failed request. The
+script of `dev` takes the wheel of the checkout from `/wheel`, which an overlay
+of the test mounts over the one of `dev`, as the ConfigMap has the
+application, not its dependencies, which uv installs in the pod. CI installs
+kind and kubectl with `helm/kind-action`, of the versions of the workflow,
+which Renovate bumps.
 The image gets the wheel of the checkout, as the version that is tested is not
 on PyPI, which is the only change of the generated `Dockerfile`. The workflow
 runs only `tt/docker-smoke/smoke.sh`, which runs the script of a variant, as

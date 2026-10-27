@@ -4,7 +4,7 @@
 # runs it and checks it. The only entry point of the workflow Docker Smoke
 # Test.
 #
-# Usage: tt/docker-smoke/smoke.sh app|lite|lite-pep723|lambda|lambda-stream|lambda-image|lambda-zip|fastcgi
+# Usage: tt/docker-smoke/smoke.sh app|lite|lite-pep723|lambda|lambda-stream|lambda-image|lambda-zip|fastcgi|kubernetes
 #
 #   app           generate app, run as python -m MyApp, with --user app
 #   lite          generate lite-app, with generate pyproject
@@ -19,12 +19,16 @@
 #                 the custom runtime provided.al2023, under the emulator of the
 #                 Runtime API
 #   fastcgi       generate lite-app, listening for FastCGI, behind Caddy
+#   kubernetes    generate lite-app, in the manifests of generate kubernetes,
+#                 dev with a ConfigMap, dev with --host-path and prod, on a
+#                 cluster of kind of its own
 #
-# It needs docker, python and uv on PATH, as "mise exec --" gives them.
+# It needs docker, python and uv on PATH, as "mise exec --" gives them, and
+# kind and kubectl for the variant kubernetes.
 
 set -euo pipefail
 
-variant=${1:?Usage: $0 app|lite|lite-pep723|lambda|lambda-stream|lambda-image|lambda-zip|fastcgi}
+variant=${1:?Usage: $0 app|lite|lite-pep723|lambda|lambda-stream|lambda-image|lambda-zip|fastcgi|kubernetes}
 dir=$(cd "$(dirname "$0")" && pwd)
 
 [[ ${variant} =~ ^[a-z0-9-]+$ && -x ${dir}/${variant}.sh ]] || {
