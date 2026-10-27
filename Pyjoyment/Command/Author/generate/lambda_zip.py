@@ -10,24 +10,28 @@ Pyjoyment.Command.Author.generate.lambda_zip - Lambda ZIP generator command
       python -m MyApp generate lambda-zip --arch arm64
       python -m MyApp generate lambda-zip --python 3.15t
       python -m MyApp generate lambda-zip --no-layer
+      python -m MyApp generate lambda-zip --runtime python3.14
 
     Options:
       -a, --arch <name>        Architecture of the function, "arm64" or "x86_64",
                                defaults to "x86_64"
       -h, --help               Show this summary of available options
-          --no-layer           Put Python into the ZIP of the function, without a
-                               layer
+          --no-layer           Put Python and Pyjoyment into the ZIP of the
+                               function, without layers
       -p, --python <version>   Version of Python, as "3.14" or "3.15t" for the
                                free-threaded build, defaults to the version that
                                runs the generator
+      -r, --runtime <name>     Runtime of the function, "provided.al2023" or one
+                               of Python, as "python3.14", defaults to
+                               "provided.al2023"
 
 :mod:`Pyjoyment.Command.Author.generate.lambda_zip` generates the ZIP files
 of an event function of AWS Lambda on a custom runtime, as
 ``provided.al2023``, in ``dist``: ``function.zip``, with the application, its
-dependencies and the ``bootstrap`` that runs it, and ``python.zip``, a layer
-with Python, which Lambda extracts in ``/opt``, so that the function runs on
-any Python, as the free-threaded build or a version that the runtimes of
-Python of Lambda do not have yet.
+dependencies and the ``bootstrap`` that runs it, ``python.zip``, a layer with
+Python, which Lambda extracts in ``/opt``, so that the function runs on any
+Python, as the free-threaded build or a version that the runtimes of Python of
+Lambda do not have yet, and ``pyjoyment.zip``, a layer with Pyjoyment.
 
 The ``bootstrap`` runs the script of the application, or its package, which
 is the runtime of the function itself, as :mod:`Pyjoyment.Command.lambda`
@@ -46,7 +50,8 @@ not use. The dependencies are the ones of ``pyproject.toml``, which
 a :mod:`Pyjoyment.Lite` script that has it and no ``pyproject.toml``, locked
 with its ``.lock`` file if there is one, with the wheels of Amazon Linux 2023,
 ``manylinux_2_34``. The application is the files of the current directory,
-without hidden ones, ``__pycache__`` and ``dist``.
+without hidden ones, ``__pycache__`` and ``dist``, and a file of it that starts
+with ``#!``, as the wrapper of ``AWS_LAMBDA_EXEC_WRAPPER``, is executable.
 
 Python cannot write its bytecode in ``/var/task`` and ``/opt``, which are
 read-only, so the generator compiles it with the Python of the same version
@@ -54,11 +59,27 @@ that uv finds or installs for the machine that it runs on, with the
 invalidation mode ``unchecked-hash``, which Python uses without checking the
 source. The files of the same input are the same, as the times in the ZIP are
 fixed, so that a deployment that compares their hashes, as the one of
-OpenTofu, changes only what has changed. Both are written anew each time.
+OpenTofu, changes only what has changed. They are written anew each time.
 
-With ``--no-layer``, Python is in ``function.zip``, in the directory
-``python``, and the function needs no layer, at the cost of a larger ZIP for
-each deployment.
+The layer of Pyjoyment has the packages ``Pyjo`` and ``Pyjoyment`` that the
+dependencies install, with their bytecode, in
+``python/lib/python3.X/site-packages``, which the Python of ``python.zip`` and
+the runtime client of the runtime of Python of Lambda of the same version both
+put in their path, the runtime client unless ``PYTHONPATH`` is set, so that one
+layer serves the functions of both, and a function can take a layer of
+Pyjoyment that is published already in its place. A wrapper of
+``AWS_LAMBDA_EXEC_WRAPPER`` runs in the place of that runtime client, so its
+function names the directory in ``PYTHONPATH``.
+
+With ``--runtime`` of a runtime of Python of Lambda, as ``python3.14``, the
+function runs on the Python of Lambda, of the version of the runtime, without
+``python.zip`` and without ``bootstrap``, with the handler of the application,
+as ``app.handler`` for a script ``app.py`` that ends with
+``handler = app.start()``.
+
+With ``--no-layer``, Python and Pyjoyment are in ``function.zip``, Python in
+the directory ``python``, and the function needs no layer, at the cost of a
+larger ZIP for each deployment.
 
 This is a core command, that means it is always enabled and its code a good
 example for learning to build new commands, you're welcome to fork it.
@@ -98,6 +119,9 @@ _MACHINES = {'arm64': 'aarch64', 'x86_64': 'x86_64'}
 
 # The parts of the standard library that a function does not use
 _UNUSED = ('ensurepip', 'idlelib', 'site-packages', 'tkinter', 'turtledemo')
+
+# The packages of Pyjoyment and its metadata, which go to a layer of their own
+_PYJOYMENT = r'Pyjo|Pyjoyment|(?i:pyjoyment-[^-]+\.dist-info)'
 
 # The requirements that uv exports, for uv pip install
 _FORMAT = ('--format', 'requirements.txt', '-o')
@@ -151,13 +175,22 @@ class Pyjoyment_Command_Author_generate_lambda_zip(Pyjoyment.Command.object):
         Run this command.
         """
         arguments = list(args)
-        if not (opts := getopt(arguments, {'a|arch=s': None, 'no-layer': None, 'p|python=s': None})):
+        if not (
+            opts := getopt(arguments, {'a|arch=s': None, 'no-layer': None, 'p|python=s': None, 'r|runtime=s': None})
+        ):
             raise Pyjo.Exception.new(self.usage)
 
         arch: str = opts.arch or 'x86_64'
         if (machine := _MACHINES.get(arch)) is None:
             raise Pyjo.Exception.new(f'Unknown architecture: {arch}')
+        runtime: str = opts.runtime or 'provided.al2023'
         version: str = opts.python or f'{sys.version_info.major}.{sys.version_info.minor}'
+        if managed := re.fullmatch(r'python(3\.\d+)', runtime):
+            if opts.python and opts.python != managed[1]:
+                raise Pyjo.Exception.new(f'Option --python is not for the runtime {runtime}')
+            version = managed[1]
+        elif runtime != 'provided.al2023':
+            raise Pyjo.Exception.new(f'Unknown runtime: {runtime}')
         if not re.fullmatch(r'3\.\d+(?:\.\d+)?t?', version):
             raise Pyjo.Exception.new(f'Unknown version of Python: {version}')
         layer = not opts.no_layer
@@ -175,16 +208,19 @@ class Pyjoyment_Command_Author_generate_lambda_zip(Pyjoyment.Command.object):
 
         with Pyjo.File.tempdir() as tmp:
             # Python, the interpreter and its standard library, in the directory of its full version, which the variables
-            # of its build name, and not the link of its minor version
-            install = tmp.child('install')
-            self._uv(
-                'python', 'install', '--no-bin', '--install-dir', install, f'cpython-{version}-linux-{machine}-gnu'
-            )
-            home = next(p for p in sorted(os.listdir(install)) if re.match(r'cpython-\d+\.\d+\.\d+', p))
-            # The layer, which Lambda extracts in /opt, with Python in its directory python
+            # of its build name, and not the link of its minor version, or the Python of the runtime of Lambda
             python = tmp.child('layer', 'python')
             prefix = '/opt/python' if layer else '/var/task/python'
-            interpreter = _python(install.child(home), python, prefix)
+            if managed:
+                interpreter = f'python{version}'
+            else:
+                install = tmp.child('install')
+                self._uv(
+                    'python', 'install', '--no-bin', '--install-dir', install, f'cpython-{version}-linux-{machine}-gnu'
+                )
+                home = next(p for p in sorted(os.listdir(install)) if re.match(r'cpython-\d+\.\d+\.\d+', p))
+                # The layer, which Lambda extracts in /opt, with Python in its directory python
+                interpreter = _python(install.child(home), python, prefix)
 
             # The dependencies, without the scripts of their packages, which run the Python of the machine, and the lock
             # of uv
@@ -202,36 +238,61 @@ class Pyjoyment_Command_Author_generate_lambda_zip(Pyjoyment.Command.object):
             self._uv(
                 'pip', 'install', '--target', deps, '--python', local, '--python-platform', platform, '-r', requirements
             )
+            # Pyjoyment, in the site-packages of the layer, which the runtimes of Python and the Python of the layer
+            # put in their path
+            pyjoyment = tmp.child('pyjoyment')
+            site = pyjoyment.child('python', 'lib', interpreter, 'site-packages')
+            if layer:
+                names = sorted(os.listdir(deps)) if os.path.isdir(deps) else []
+                if 'Pyjoyment' not in names:
+                    raise Pyjo.Exception.new('Pyjoyment is not among the dependencies')
+                site.make_path()
+                for name in filter(lambda n: re.fullmatch(_PYJOYMENT, n), names):
+                    shutil.move(deps.child(name).to_str(), site.child(name).to_str())
             if os.path.isdir(deps):
                 top = os.fspath(deps)
                 shutil.copytree(
                     deps, function, dirs_exist_ok=True, ignore=lambda dir, _: ['.lock', 'bin'] if dir == top else []
                 )
 
-            # The application, and the bootstrap that runs it
+            # The application, with its scripts executable, and the bootstrap that runs it
+            executables = {'bootstrap', f'python/bin/{interpreter}'}
             for file in Pyjo.File.path().list_tree().each():
                 name = file.to_rel(Pyjo.File.path()).to_str().replace(os.sep, '/')
                 if name.split('/')[0] != 'dist' and '__pycache__' not in name.split('/'):
                     destination = function.child(*name.split('/'))
                     destination.dirname().make_path()
                     shutil.copyfile(file.to_str(), destination.to_str())
-            executable = f'{prefix}/bin/{interpreter}' if layer else f'"$LAMBDA_TASK_ROOT/python/bin/{interpreter}"'
-            function.child('bootstrap').spew(
-                self.render_data('bootstrap', {'cmd': shlex.join(cmd), 'python': executable})
-            )
+                    with open(file, 'rb') as source:
+                        if source.read(2) == b'#!':
+                            executables.add(name)
+            if not managed:
+                executable = f'{prefix}/bin/{interpreter}' if layer else f'"$LAMBDA_TASK_ROOT/python/bin/{interpreter}"'
+                function.child('bootstrap').spew(
+                    self.render_data('bootstrap', {'cmd': shlex.join(cmd), 'python': executable})
+                )
 
             # The bytecode, as /var/task and /opt are read-only
-            self._compile(local, python, prefix)
+            if not managed:
+                self._compile(local, python, prefix)
+            if layer:
+                self._compile(local, site, f'/opt/python/lib/{interpreter}/site-packages')
             self._compile(local, function, '/var/task')
 
+            # The ZIP files, without the layers of an earlier build that this one does not write
             dist = self.rel_file('dist')
             self.create_dir(dist)
-            if layer:
+            for name in ('python.zip', 'pyjoyment.zip'):
+                dist.child(name).remove()
+            if layer and not managed:
                 _zip(python.dirname(), dist.child('python.zip'), {f'python/bin/{interpreter}'})
                 self._loud(f'  [write] {dist.child("python.zip")}')
-            else:
+            elif not managed:
                 shutil.copytree(python, function.child('python'))
-            _zip(function, dist.child('function.zip'), {'bootstrap', f'python/bin/{interpreter}'})
+            if layer:
+                _zip(pyjoyment, dist.child('pyjoyment.zip'), set())
+                self._loud(f'  [write] {dist.child("pyjoyment.zip")}')
+            _zip(function, dist.child('function.zip'), executables)
             self._loud(f'  [write] {dist.child("function.zip")}')
 
     # The bytecode of a set of strings, as in "x in {'a', 'b'}", has the order of their hashes, which a fixed seed keeps

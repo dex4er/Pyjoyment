@@ -56,6 +56,7 @@ with subtest('Synopsis'):
     like_ok(lambda_zip.usage, r'-a, --arch <name>', 'option of the architecture')
     like_ok(lambda_zip.usage, r'    --no-layer', 'option of the layer')
     like_ok(lambda_zip.usage, r'-p, --python <version>', 'option of Python')
+    like_ok(lambda_zip.usage, r'-r, --runtime <name>', 'option of the runtime')
 
     # python -m MyApp generate lambda-zip
     tmp = Pyjo.File.tempdir()
@@ -79,7 +80,17 @@ with subtest('Synopsis'):
     tmp.child('pyproject.toml').spew('[project]\nname = "my_app"\n')
     generate(tmp, '--no-layer')
     ok(f'python/bin/python{python}' in names(tmp.child('dist', 'function.zip')), 'Python in the function')
+    ok('Pyjoyment/__init__.py' in names(tmp.child('dist', 'function.zip')), 'Pyjoyment in the function')
     ok(not os.path.exists(tmp.child('dist', 'python.zip')), 'no layer')
+
+    # python -m MyApp generate lambda-zip --runtime python3.14
+    tmp = Pyjo.File.tempdir()
+    tmp.child('pyproject.toml').spew('[project]\nname = "my_app"\n')
+    calls = generate(tmp, '--runtime', 'python3.14')
+    ok(not os.path.exists(tmp.child('dist', 'python.zip')), 'Python of the runtime')
+    ok('bootstrap' not in names(tmp.child('dist', 'function.zip')), 'handler of the application')
+    pyjoyment = names(tmp.child('dist', 'pyjoyment.zip'))
+    ok('python/lib/python3.14/site-packages/Pyjoyment/__init__.py' in pyjoyment, 'Pyjoyment of the runtime')
 
     # ./myapp.py generate lambda-zip
     tmp = Pyjo.File.tempdir()
@@ -106,6 +117,11 @@ with subtest('Description'):
     ok('foo/__init__.py' in function, 'dependencies')
     ok('.hidden' not in function, 'no hidden files')
     like_ok(read(tmp.child('dist', 'function.zip'), 'bootstrap'), r'(?m)^exec /opt/python/bin/', 'Python of the layer')
+    ok('Pyjoyment/__init__.py' not in function, 'Pyjoyment in its own layer')
+    pyjoyment = names(tmp.child('dist', 'pyjoyment.zip'))
+    site = f'python/lib/python{python}/site-packages'
+    ok(f'{site}/Pyjo/__init__.py' in pyjoyment and f'{site}/Pyjoyment/__init__.py' in pyjoyment, 'layer of Pyjoyment')
+    ok(any(name.startswith(f'{site}/Pyjoyment/__pycache__/') for name in pyjoyment), 'bytecode of Pyjoyment')
     layer = ' '.join(names(tmp.child('dist', 'python.zip')))
     unlike_ok(layer, r'idlelib|tkinter|site-packages', 'without what a function does not use')
     like_ok(layer, r'__pycache__/os\.', 'bytecode of the standard library')

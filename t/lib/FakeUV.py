@@ -6,7 +6,8 @@ import sys
 
 # A uv for generate lambda-zip, which logs its arguments in the file of FAKE_UV_LOG, fails for the command of
 # FAKE_UV_FAIL, makes what the generator takes from it, a Python of python-build-standalone and the packages of the
-# dependencies, and compiles with the Python of the test, without the network
+# dependencies, with Pyjoyment unless FAKE_UV_NO_PYJOYMENT is set, and compiles with the Python of the test, without
+# the network
 def command():
     return [sys.executable, os.path.abspath(__file__)]
 
@@ -64,6 +65,10 @@ def _main(args):
     elif args[:2] == ['pip', 'install']:
         target = args[args.index('--target') + 1]
         _spew(target, 'foo', '__init__.py')
+        if not os.environ.get('FAKE_UV_NO_PYJOYMENT'):
+            _spew(target, 'Pyjo', '__init__.py')
+            _spew(target, 'Pyjoyment', '__init__.py')
+            _spew(target, 'pyjoyment-0.0.2.dist-info', 'METADATA', content='Name: Pyjoyment\n')
         _spew(target, 'bin', 'foo')
         _spew(target, '.lock')
     elif args[0] == 'run':
