@@ -245,8 +245,10 @@ def _python(home: Pyjo.File.object, python: Pyjo.File.object, prefix: str) -> st
         if name in _UNUSED or name.startswith('config-'):
             shutil.rmtree(library.child(name))
         elif name.startswith('_sysconfigdata_') and name.endswith('.py'):
+            # The directory in the literals of Python, with the backslashes of Windows escaped
             data = library.child(name)
-            data.spew(str(data.slurp('UTF-8')).replace(home.to_str(), prefix), 'UTF-8')
+            text = str(data.slurp('UTF-8')).replace(home.to_str().replace('\\', '\\\\'), prefix)
+            data.spew(text.replace(home.to_str(), prefix), 'UTF-8')
     for name in os.listdir(library.child('lib-dynload')):
         if name.startswith('_tkinter'):
             os.remove(library.child('lib-dynload', name))
