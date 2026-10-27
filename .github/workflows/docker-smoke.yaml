@@ -17,7 +17,7 @@ on:
     paths:
       - tt/docker-smoke/**
       - .github/workflows/docker-smoke.yaml
-      - examples/lambda_stream/wrapper.py
+      - examples/lambda_stream/function/wrapper.py
       - Pyjo/**
       - Pyjoyment/**
       - mise.lock
@@ -29,7 +29,7 @@ on:
     paths:
       - tt/docker-smoke/**
       - .github/workflows/docker-smoke.yaml
-      - examples/lambda_stream/wrapper.py
+      - examples/lambda_stream/function/wrapper.py
       - Pyjo/**
       - Pyjoyment/**
       - mise.lock

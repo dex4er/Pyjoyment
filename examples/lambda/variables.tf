@@ -11,9 +11,15 @@ variable "region" {
 }
 
 variable "runtime" {
-  description = "The runtime of Python of the function, python3.15 in its preview or python3.14"
+  description = "The runtime of Python of the function, the one of \"generate lambda-zip --runtime\""
   type        = string
   default     = "python3.15"
+}
+
+variable "pyjoyment_layer" {
+  description = "The ARN of a published layer of Pyjoyment, in the place of function/dist/pyjoyment.zip"
+  type        = string
+  default     = null
 }
 
 variable "multi_value_headers" {
@@ -29,7 +35,7 @@ variable "alb" {
 }
 
 variable "layers" {
-  description = "More layers of the function, after the one of the framework"
+  description = "More layers of the function, after the one of Pyjoyment"
   type        = list(string)
   default = [
     # PHP 8.5 of Bref, https://bref.sh, whose php-fpm app.py starts, with phpinfo.php under /php, in eu-central-1

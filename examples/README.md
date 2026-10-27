@@ -63,7 +63,10 @@ OpenTofu deploys, with what it mounts, as PHP on php-fpm, as
 as a function of its own whose responses Lambda streams, as
 [`lambda_stream/README.md`](lambda_stream/README.md) says, and the one of
 `lambda_zip/` on a custom runtime, with Python in a layer, as
-[`lambda_zip/README.md`](lambda_zip/README.md) says.
+[`lambda_zip/README.md`](lambda_zip/README.md) says. All of them have
+Pyjoyment in a layer of its own, of `generate lambda-zip`, which the functions
+of the same Python share, or which a layer of Pyjoyment that is published
+already replaces.
 
 The tests in [`t/examples/`](../t/examples), in the same groups, check some of
 the scripts, and the documentation shows them on its page of examples.

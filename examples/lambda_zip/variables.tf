@@ -10,6 +10,12 @@ variable "region" {
   default     = null
 }
 
+variable "pyjoyment_layer" {
+  description = "The ARN of a published layer of Pyjoyment, in the place of function/dist/pyjoyment.zip"
+  type        = string
+  default     = null
+}
+
 variable "arch" {
   description = "The architecture of the function, the one of \"generate lambda-zip --arch\""
   type        = string

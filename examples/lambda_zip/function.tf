@@ -1,6 +1,6 @@
-# The ZIP files of "generate lambda-zip" in the directory of the function: the layer with Python, which Lambda unpacks
-# in /opt, and the function with its dependencies and the bootstrap that runs it, which are the same for the same
-# files, so that a new build changes only what has changed
+# The ZIP files of "generate lambda-zip" in the directory of the function: the layers with Python and with Pyjoyment,
+# which Lambda unpacks in /opt, and the function with the application and the bootstrap that runs it, which are the
+# same for the same files, so that a new build changes only what has changed
 locals {
   dist = "${path.module}/function/dist"
 }
@@ -11,6 +11,22 @@ resource "aws_lambda_layer_version" "python" {
   source_code_hash         = filebase64sha256("${local.dist}/python.zip")
   compatible_runtimes      = ["provided.al2023"]
   compatible_architectures = [var.arch]
+}
+
+# The layer of Pyjoyment, in the site-packages of the Python of the function, unless the variable "pyjoyment_layer"
+# names one that is published already
+resource "aws_lambda_layer_version" "pyjoyment" {
+  count = var.pyjoyment_layer == null ? 1 : 0
+
+  layer_name               = "${var.name}-pyjoyment"
+  filename                 = "${local.dist}/pyjoyment.zip"
+  source_code_hash         = filebase64sha256("${local.dist}/pyjoyment.zip")
+  compatible_runtimes      = ["provided.al2023"]
+  compatible_architectures = [var.arch]
+}
+
+locals {
+  pyjoyment_layer = var.pyjoyment_layer != null ? var.pyjoyment_layer : aws_lambda_layer_version.pyjoyment[0].arn
 }
 
 resource "aws_iam_role" "function" {
@@ -46,7 +62,7 @@ resource "aws_lambda_function" "function" {
   handler          = "app.handler"
   filename         = "${local.dist}/function.zip"
   source_code_hash = filebase64sha256("${local.dist}/function.zip")
-  layers           = [aws_lambda_layer_version.python.arn]
+  layers           = [aws_lambda_layer_version.python.arn, local.pyjoyment_layer]
   memory_size      = 128
   timeout          = 10
 

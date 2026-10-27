@@ -1,37 +1,24 @@
-# The framework in a layer, the packages Pyjo and Pyjoyment of the checkout, with the static files of their
-# resources, which Lambda unpacks in /opt: the names of the root that do not start with "P", which only they do, and
-# the hidden ones are left out, but not the root itself, whose name is "."
-data "archive_file" "framework" {
-  type             = "zip"
-  source_dir       = "${path.module}/../.."
-  excludes         = ["[^.P]*", ".?*", "**/__pycache__"]
-  output_path      = "${path.module}/.terraform/framework.zip"
-  output_file_mode = "0644"
+# The ZIP files of "generate lambda-zip --runtime" in the directory of the function: the layer with Pyjoyment, which
+# Lambda unpacks in /opt, and the function with the application and the wrapper that runs its runtime client, which are
+# the same for the same files, so that a new build changes only what has changed
+locals {
+  dist = "${path.module}/function/dist"
 }
 
-resource "aws_lambda_layer_version" "framework" {
-  layer_name               = var.name
-  filename                 = data.archive_file.framework.output_path
-  source_code_hash         = data.archive_file.framework.output_base64sha256
+# The layer of Pyjoyment, in the site-packages of the Python of the function, unless the variable "pyjoyment_layer"
+# names one that is published already
+resource "aws_lambda_layer_version" "pyjoyment" {
+  count = var.pyjoyment_layer == null ? 1 : 0
+
+  layer_name               = "${var.name}-pyjoyment"
+  filename                 = "${local.dist}/pyjoyment.zip"
+  source_code_hash         = filebase64sha256("${local.dist}/pyjoyment.zip")
   compatible_runtimes      = [var.runtime]
   compatible_architectures = ["arm64"]
 }
 
-# The function and the wrapper that runs its runtime client, executable both
-data "archive_file" "function" {
-  type             = "zip"
-  output_path      = "${path.module}/.terraform/function.zip"
-  output_file_mode = "0755"
-
-  source {
-    content  = file("${path.module}/app.py")
-    filename = "app.py"
-  }
-
-  source {
-    content  = file("${path.module}/wrapper.py")
-    filename = "wrapper.py"
-  }
+locals {
+  pyjoyment_layer = var.pyjoyment_layer != null ? var.pyjoyment_layer : aws_lambda_layer_version.pyjoyment[0].arn
 }
 
 resource "aws_iam_role" "function" {
@@ -63,9 +50,9 @@ resource "aws_lambda_function" "function" {
   runtime          = var.runtime
   architectures    = ["arm64"]
   handler          = "app.handler"
-  filename         = data.archive_file.function.output_path
-  source_code_hash = data.archive_file.function.output_base64sha256
-  layers           = [aws_lambda_layer_version.framework.arn]
+  filename         = "${local.dist}/function.zip"
+  source_code_hash = filebase64sha256("${local.dist}/function.zip")
+  layers           = [local.pyjoyment_layer]
   memory_size      = 128
   timeout          = 10
 
@@ -79,8 +66,9 @@ resource "aws_lambda_function" "function" {
 
       PYJO_MODE = "development"
 
-      # The directory of the layer, which the runtime does not put in the path of Python, as it does /opt/python
-      PYTHONPATH = "/opt"
+      # The site-packages of the layer, which the runtime puts in the path of its own runtime client only, and not of
+      # the one of the wrapper
+      PYTHONPATH = "/opt/python/lib/${var.runtime}/site-packages"
     }
   }
 

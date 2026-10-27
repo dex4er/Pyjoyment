@@ -1,3 +1,10 @@
+# /// script
+# requires-python = ">=3.12"
+# dependencies = ["Pyjoyment"]
+#
+# [tool.uv.sources]
+# Pyjoyment = { path = "../../.." }
+# ///
 import Pyjo.Promise
 
 from Pyjoyment.Lite import *

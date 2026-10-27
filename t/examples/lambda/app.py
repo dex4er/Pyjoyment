@@ -49,7 +49,7 @@ for payload, url in URLS.items():
     elif not remote:
         with subtest(f'Payload {payload}'):
             env = {'PYJO_MODE': 'production'}
-            task_root = ROOT.sibling('examples', 'lambda').to_str()
+            task_root = ROOT.sibling('examples', 'lambda', 'function').to_str()
             with Pyjo.App.Lambda.new(function='app.handler', task_root=task_root, payload=payload, env=env) as function:
                 check(Pyjo.Test.Pyjo.new(function), '', payload)
 
