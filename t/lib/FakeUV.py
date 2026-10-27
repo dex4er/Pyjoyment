@@ -19,7 +19,7 @@ def calls(log):
 def _spew(*parts, content='pass\n'):
     path = os.path.join(*parts)
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, 'w') as file:
+    with open(path, 'w', newline='') as file:
         file.write(content)
 
 
