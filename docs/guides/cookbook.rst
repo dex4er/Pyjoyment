@@ -988,6 +988,10 @@ dependencies and the ``bootstrap`` that runs it with the Python of the layer.
 
     $ ./myapp.py generate lambda-zip --arch arm64
 
+The directory `examples/lambda_zip
+<https://github.com/dex4er/Pyjoyment/tree/main/examples/lambda_zip>`_ of the
+repository deploys such a function with OpenTofu.
+
 The same function runs locally, mounted in an application with
 :mod:`Pyjo.App.Lambda`, in a process of its own, which gets its invocations
 through the Runtime API of Lambda, as on AWS, and with the path of the mount as
