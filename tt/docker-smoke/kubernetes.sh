@@ -81,6 +81,7 @@ for file in base/kustomization.yaml base/deployment.yaml base/service.yaml prod/
   [[ -f kubernetes/${file} ]] || fail "kubernetes/${file}"
 done
 [[ $(cd kubernetes/dev/files && find . -type f) == ./myapp.py ]] || fail "copy of the application"
+grep -q 'exec /uv/venv/bin/python myapp.py daemon"' kubernetes/dev/deployment.yaml || fail "daemon of dev"
 echo "ok - generated"
 
 # An overlay of the test over the one of dev, which mounts the wheel in /wheel
@@ -149,6 +150,7 @@ echo "ok - dev with a new ConfigMap"
 # dev with --host-path, reloaded when the script changes
 python myapp.py generate kubernetes --host-path >/dev/null
 [[ ! -e kubernetes/dev/files ]] || fail "no copy of the application"
+grep -q 'Pyjo.Server.Reload myapp.py"' kubernetes/dev/deployment.yaml || fail "reload of dev"
 overlay dev-host-path
 "${kube[@]}" --namespace host-path apply --kustomize "${work}/dev-host-path" >/dev/null
 rollout host-path

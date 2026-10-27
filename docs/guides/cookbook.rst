@@ -400,9 +400,11 @@ as Cloud Run and Kubernetes read with their levels and fields, see
 For Kubernetes, :mod:`Pyjoyment.Command.Author.generate.kubernetes` generates
 the manifests of Kustomize, with an overlay ``prod`` that runs the image of
 the ``Dockerfile``, and an overlay ``dev`` that runs the application without
-an image of its own, on the image of uv, with ``pyjo-reload``, from a
-ConfigMap, or with ``--host-path`` from the directory of the project, which a
-local cluster, as the one of Docker Desktop or OrbStack, mounts.
+an image of its own, on the image of uv, from a ConfigMap with the server
+``daemon``, or with ``--host-path`` from the directory of the project, which a
+local cluster, as the one of Docker Desktop or OrbStack, mounts, with
+``pyjo-reload``. ``--server`` chooses another server, with its options after
+``--``.
 
 .. code-block:: console
 

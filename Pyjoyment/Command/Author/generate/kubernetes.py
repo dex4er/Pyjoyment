@@ -3,15 +3,21 @@ Pyjoyment.Command.Author.generate.kubernetes - Kubernetes generator command
 ===========================================================================
 ::
 
-    Usage: APPLICATION generate kubernetes [OPTIONS]
+    Usage: APPLICATION generate kubernetes [OPTIONS] [-- SERVER OPTIONS]
 
       ./myapp.py generate kubernetes
       python -m MyApp generate kubernetes
       python -m MyApp generate kubernetes --image ghcr.io/me/myapp:1.0
       python -m MyApp generate kubernetes --host-path
       python -m MyApp generate kubernetes --graceful-timeout 25
+      python -m MyApp generate kubernetes --no-dev
+      python -m MyApp generate kubernetes --server prefork -- --workers 2
 
     Options:
+          --dev                          Install the dependency group "dev" of
+                                         the project in the pod of "dev", which
+                                         --no-dev leaves out, defaults to
+                                         installing it
       -G, --graceful-timeout <seconds>   Graceful timeout of the workers of the
                                          server of "prod", defaults to the one of
                                          the server
@@ -24,6 +30,9 @@ Pyjoyment.Command.Author.generate.kubernetes - Kubernetes generator command
                                          application
       -p, --port <port>                  Port that the server listens on,
                                          defaults to 3000
+      -s, --server <name>                Server of "dev", "daemon", "prefork" or
+                                         "reload", defaults to "reload" with
+                                         --host-path or "daemon"
 
 :mod:`Pyjoyment.Command.Author.generate.kubernetes` generates the manifests
 of an application for Kubernetes, as Kustomize has them, in ``kubernetes``: a
@@ -72,9 +81,11 @@ The overlay ``dev`` runs the application in the image of uv with Python, of
 the version that runs the generator, which installs the dependencies of the
 application when the pod starts, as the image of
 :mod:`Pyjoyment.Command.Author.generate.dockerfile` does when it is built, in
-an ``emptyDir``, and runs it with ``pyjo-reload`` of :mod:`Pyjo.Server.Reload`,
-in the operating mode ``development``, without building an image. The
-application is a ConfigMap that ``configMapGenerator`` of Kustomize makes of a
+an ``emptyDir``, with the dependency group ``dev`` of a project, which
+``--no-dev`` leaves out, and runs it in the operating mode ``development``,
+without building an image, with the server of ``--server``: the command
+``daemon``, ``prefork``, or ``pyjo-reload`` of :mod:`Pyjo.Server.Reload`,
+with the options after ``--``. The application is a ConfigMap that ``configMapGenerator`` of Kustomize makes of a
 copy of it in ``kubernetes/dev/files``, which the pod copies, as the files of a
 ConfigMap are read-only. The application is the files of the current
 directory, without hidden ones, ``__pycache__``, ``dist`` and ``kubernetes``,
@@ -88,8 +99,9 @@ application, as ``dist`` of
 With ``--host-path``, the pod of ``dev`` mounts the directory of the project
 in the place of the ConfigMap, as a cluster that sees the disk of the
 machine, as the one of Docker Desktop or OrbStack, or of kind with
-``extraMounts``, mounts it, and ``pyjo-reload`` restarts the application when
-a file of it changes.
+``extraMounts``, mounts it, and the server is ``pyjo-reload``, which restarts
+the application when a file of it changes, where a ConfigMap changes with a
+new pod and the server is ``daemon``.
 
 The files of ``base`` and ``prod``, which are to be edited, are written once,
 and the ones of ``dev`` anew each time, as the application changes.
@@ -164,12 +176,15 @@ class Pyjoyment_Command_Author_generate_kubernetes(Pyjoyment.Command.object):
         Run this command.
         """
         arguments = list(args)
-        if not (
-            opts := getopt(
-                arguments, {'G|graceful-timeout=i': None, 'host-path': None, 'i|image=s': None, 'p|port=i': None}
-            )
-        ):
+        spec = {'dev!': None, 'G|graceful-timeout=i': None, 'host-path': None, 'i|image=s': None, 'p|port=i': None}
+        if not (opts := getopt(arguments, {**spec, 's|server=s': None})):
             raise Pyjo.Exception.new(self.usage)
+
+        # The server of dev, which reloads the application of the directory of the project, where its files change,
+        # and the arguments after "--" for it
+        server: str = opts.server or ('reload' if opts.host_path else 'daemon')
+        if server not in ('daemon', 'prefork', 'reload'):
+            raise Pyjo.Exception.new(f'Unknown server: {server}')
 
         # The name of the resources, which Kubernetes takes in lower case, with "-" in the place of "_", and the one of
         # the image, as "docker build -t" tags it
@@ -201,17 +216,22 @@ class Pyjoyment_Command_Author_generate_kubernetes(Pyjoyment.Command.object):
         self.render_to_rel_file('prod_kustomization', 'kubernetes/prod/kustomization.yaml', prod)
         self.render_to_rel_file('prod_deployment', 'kubernetes/prod/deployment.yaml', prod)
 
-        # The command of dev: the dependencies in the emptyDir, and pyjo-reload, with "python -m", which puts the
-        # application in the path, as the image of generate dockerfile does, and which watches the package of an
-        # application too, as it watches the script, "lib" and "templates" by default
+        # The command of dev: the dependencies in the emptyDir, with the group "dev" of a project unless --no-dev, and
+        # the server, with "python -m", which puts the application in the path, as the image of generate dockerfile
+        # does; pyjo-reload watches the package of an application too, as it watches the script, "lib" and "templates"
+        # by default
         locked = ' --locked' if os.path.isfile(self.rel_file(lock)) else ''
         if project:
-            sync = f'uv sync --no-install-project{locked}'
+            sync = f'uv sync --no-install-project{locked}{" --no-dev" if opts.dev is False else ""}'
         else:
             sync = f'uv venv --allow-existing /uv/venv && uv sync --script {shlex.quote(str(script))} --active{locked}'
-        watch = [] if script else ['-w', package, '-w', 'templates']
-        reload = ['/uv/venv/bin/python', '-m', 'Pyjo.Server.Reload', *watch, script or f'{package}/__main__.py']
-        command = f'{sync} && exec {shlex.join(reload)}'
+        python = '/uv/venv/bin/python'
+        if server == 'reload':
+            watch = [] if script else ['-w', package, '-w', 'templates']
+            cmd = [python, '-m', 'Pyjo.Server.Reload', *watch, *arguments, script or f'{package}/__main__.py']
+        else:
+            cmd = [python, *([script] if script else ['-m', package]), server, *arguments]
+        command = f'{sync} && exec {shlex.join(cmd)}'
 
         # The application in a ConfigMap of a copy of its files, or the directory of the project
         files: list[tuple[str, str, str]] = []

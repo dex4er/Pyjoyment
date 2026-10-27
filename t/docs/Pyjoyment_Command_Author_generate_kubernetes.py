@@ -52,20 +52,21 @@ with subtest('Synopsis'):
     kubernetes = Pyjoyment.Command.Author.generate.kubernetes.new(app=application)
     like_ok(
         kubernetes.usage,
-        r'^Usage: APPLICATION generate kubernetes \[OPTIONS\]\n\n  \./myapp\.py generate kubernetes\n',
+        r'^Usage: APPLICATION generate kubernetes \[OPTIONS\] \[-- SERVER OPTIONS\]\n\n  \./myapp\.py generate kubernetes\n',
         'usage',
     )
     like_ok(kubernetes.usage, r'-i, --image <name>', 'option of the image')
     like_ok(kubernetes.usage, r'    --host-path', 'option of the host path')
     like_ok(kubernetes.usage, r'-p, --port <port>', 'option of the port')
     like_ok(kubernetes.usage, r'-G, --graceful-timeout <seconds>', 'option of the graceful timeout')
+    like_ok(kubernetes.usage, r'    --dev ', 'option of the group dev')
+    like_ok(kubernetes.usage, r'-s, --server <name>', 'option of the server')
 
     # python -m MyApp generate kubernetes
     tmp = project()
     generate(tmp)
     like_ok(read(tmp, 'base/deployment.yaml'), r'(?m)^  name: pyjoyment$', 'name of the application')
-    like_ok(read(tmp, 'dev/deployment.yaml'), r'Pyjo\.Server\.Reload -w Pyjoyment -w templates', 'package watched')
-    like_ok(read(tmp, 'dev/deployment.yaml'), r'Pyjoyment/__main__\.py', 'package of the application')
+    like_ok(read(tmp, 'dev/deployment.yaml'), r'exec /uv/venv/bin/python -m Pyjoyment daemon"', 'daemon of the package')
     unlike_ok(read(tmp, 'prod/kustomization.yaml'), r'images:', 'image of the name of the application')
 
     # python -m MyApp generate kubernetes --image ghcr.io/me/myapp:1.0
@@ -85,6 +86,11 @@ with subtest('Synopsis'):
     is_ok(os.path.realpath(json.loads(path[1])) if path else None, os.path.realpath(tmp), 'host path')
     unlike_ok(read(tmp, 'dev/kustomization.yaml'), r'configMapGenerator', 'no ConfigMap')
     ok(not os.path.exists(tmp.child('kubernetes', 'dev', 'files')), 'no copy of the application')
+    like_ok(
+        read(tmp, 'dev/deployment.yaml'),
+        r'exec /uv/venv/bin/python -m Pyjo\.Server\.Reload -w Pyjoyment -w templates Pyjoyment/__main__\.py"',
+        'reload of the package',
+    )
 
     # python -m MyApp generate kubernetes --graceful-timeout 25
     tmp = project()
@@ -95,6 +101,16 @@ with subtest('Synopsis'):
         r'(?m)^            - name: PYJO_GRACEFUL_TIMEOUT\n              value: "25"$',
         'graceful timeout',
     )
+
+    # python -m MyApp generate kubernetes --no-dev
+    tmp = project()
+    generate(tmp, '--no-dev')
+    like_ok(read(tmp, 'dev/deployment.yaml'), r'uv sync --no-install-project --no-dev &&', 'no group dev')
+
+    # python -m MyApp generate kubernetes --server prefork -- --workers 2
+    tmp = project()
+    generate(tmp, '--server', 'prefork', '--', '--workers', '2')
+    like_ok(read(tmp, 'dev/deployment.yaml'), r'exec /uv/venv/bin/python -m Pyjoyment prefork --workers 2"', 'prefork')
 
 with subtest('Description'):
     application = Pyjoyment.new()
@@ -150,10 +166,10 @@ with subtest('Description'):
     unlike_ok(read(tmp, 'prod/deployment.yaml'), r'PYJO_GRACEFUL_TIMEOUT', 'graceful timeout of the server')
     like_ok(read(tmp, 'prod/deployment.yaml'), r'preStop:\n              sleep:\n                seconds: 5', 'preStop')
 
-    # dev, on the image of uv, with pyjo-reload in the operating mode development
+    # dev, on the image of uv, with the group dev and the server daemon in the operating mode development
     deployment = read(tmp, 'dev/deployment.yaml')
     like_ok(deployment, rf'image: ghcr\.io/astral-sh/uv:python{python}-trixie-slim', 'image of uv')
-    like_ok(deployment, r'uv sync --no-install-project && exec /uv/venv/bin/python -m Pyjo\.Server\.Reload', 'reload')
+    like_ok(deployment, r'uv sync --no-install-project && exec /uv/venv/bin/python -m Pyjoyment daemon"', 'daemon')
     like_ok(deployment, r'- name: PYJO_MODE\n              value: development', 'development')
     like_ok(deployment, r'- name: UV_PROJECT_ENVIRONMENT\n              value: /uv/venv', 'environment')
     like_ok(deployment, r'command: \["sh", "-c", "cp -RL /files/\* /app"\]', 'copy of the ConfigMap')
@@ -187,17 +203,27 @@ with subtest('Description'):
     generate(tmp, '--host-path')
     ok(not os.path.exists(tmp.child('kubernetes', 'dev', 'files')), 'no copy')
 
+    # The servers of --server, with the options after "--"
+    generate(tmp, '-s', 'reload', '--', '-v')
+    like_ok(read(tmp, 'dev/deployment.yaml'), r'Pyjo\.Server\.Reload -w Pyjoyment -w templates -v Pyjoyment/', 'reload')
+    generate(tmp, '--host-path', '--server', 'daemon', '--', '-l', 'http://*:3000')
+    like_ok(read(tmp, 'dev/deployment.yaml'), r"-m Pyjoyment daemon -l 'http://\*:3000'\"", 'daemon')
+    throws_ok(lambda: generate(tmp, '--server', 'hot'), re.compile(r'^Unknown server: hot'), 'unknown server')
+
     # The script of Pyjoyment.Lite, with the inline metadata of PEP 723
     tmp = Pyjo.File.tempdir()
     script(tmp, '# /// script\n# dependencies = ["Pyjoyment"]\n# ///\n')
     try:
         generate(tmp)
+        deployment = read(tmp, 'dev/deployment.yaml')
+        generate(tmp, '--host-path')
+        reload = read(tmp, 'dev/deployment.yaml')
     finally:
         os.environ.pop('PYJO_EXE', None)
-    deployment = read(tmp, 'dev/deployment.yaml')
     like_ok(deployment, r'uv venv --allow-existing /uv/venv && uv sync --script myapp\.py --active', 'script')
-    like_ok(deployment, r'exec /uv/venv/bin/python -m Pyjo\.Server\.Reload myapp\.py"', 'script reloaded')
+    like_ok(deployment, r'exec /uv/venv/bin/python myapp\.py daemon"', 'daemon of the script')
     like_ok(deployment, r'- name: VIRTUAL_ENV\n              value: /uv/venv', 'environment of the script')
+    like_ok(reload, r'exec /uv/venv/bin/python -m Pyjo\.Server\.Reload myapp\.py"', 'reload of the script')
 
     # A name of Kubernetes, in lower case, without "_"
     application.moniker = 'My_App'
