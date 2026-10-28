@@ -330,6 +330,15 @@ with subtest('Context'):
     like_ok(buffer, r'\[.*\] \[warn\] No context\n', 'right warn message')
     like_ok(buffer, r'\[.*\] \[fatal\] \[123\] Mojolicious rocks\n', 'right fatal message')
 
+with subtest('Nested context'):
+    path_ = dir.child('nested.log')
+    log = Pyjo.Log.new(path=path_)
+    with contextlib.redirect_stderr(io.StringIO()) as handle:
+        log.context('[123]').context('[456]').error('Grandchild')
+    del log
+    is_ok(handle.getvalue(), '', 'nothing on STDERR')
+    like_ok(decode('UTF-8', path(path_).slurp()), r'\[.*\] \[error\] \[456\] Grandchild', 'right error message')
+
 # Not in Mojolicious: the fields of a context, which a JSON message has as fields of its own
 with subtest('Context fields'):
     log = Pyjo.Log.new()
