@@ -80,6 +80,9 @@ with subtest('Watch for new and deleted files'):
     is_deeply_ok(reload.backend.modified_files(), [], 'no files have changed')
     subdir.child('.hidden.txt').spew(b'whatever')
     is_deeply_ok(reload.backend.modified_files(), [], 'hidden files are ignored')
+    # Not in Mojolicious: the bytecode of Python
+    subdir.child('__pycache__').make_path().child('test.cpython-315.pyc').spew(b'whatever')
+    is_deeply_ok(reload.backend.modified_files(), [], 'bytecode is ignored')
 
     os.unlink(new[0])
     is_deeply_ok(reload.backend.modified_files(), [new[0].to_str()], 'file has been deleted')

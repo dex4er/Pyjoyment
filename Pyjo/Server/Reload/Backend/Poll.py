@@ -104,7 +104,9 @@ class Pyjo_Server_Reload_Backend_Poll(Pyjo.Server.Reload.Backend.object):
 def _files(path: str) -> list[str]:
     if os.path.isfile(path) and os.access(path, os.R_OK):
         return [path]
-    return [file.to_str() for file in Pyjo.File.new(path).list_tree()]
+    # Not in Mojolicious: the bytecode that Python writes to __pycache__ when the server imports a module that it watches,
+    # which is not a change of a source, and would restart the server once after each start
+    return [file.to_str() for file in Pyjo.File.new(path).list_tree() if '__pycache__' not in file.to_list()]
 
 
 new = Pyjo_Server_Reload_Backend_Poll.new
