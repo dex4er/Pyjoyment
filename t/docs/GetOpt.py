@@ -157,6 +157,10 @@ with subtest('new'):
     args = ['--unknown', '--', 'x']
     ok(getopt.parse(args), 'pass through')
     is_deeply_ok(args, ['--unknown', '--', 'x'], 'kept')
+    getopt = Pyjo.GetOpt.new(require_order=True)
+    args = ['x', '-y']
+    ok(getopt.parse(args), 'require order')
+    is_deeply_ok(args, ['x', '-y'], 'options after the first argument kept')
     getopt = Pyjo.GetOpt.new(env_prefix='PYJO_')
     is_ok(getopt.env_prefix, 'PYJO_', 'prefix')
 
