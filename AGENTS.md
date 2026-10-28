@@ -1083,8 +1083,8 @@ sub {...}` is `get('/foo', cb)` or the decorator `@get('/foo')`, as a route
   `/\G\s*/gc` skipped nothing. A parser ported from Mojo that reports
   "before end of data" this way, as `Mojo::JSON` does, has to keep it where
   Mojo's tests expect it. A tokenizer that matches the text and then the tag
-  of the same position in two matches, with a lazy `??` and this rule, as
-  `Mojo::DOM::HTML` does, has them as alternatives in Python.
+  of the same position in two matches, with a lazy `??` and this rule, has
+  them as alternatives in Python.
 - Python has no relative backreference like `\g{-2}`; a named group takes
   its place, and works also where the pattern is embedded in another one.
 - Python's recursion limit is 1000 calls. A recursive parser that must reach
