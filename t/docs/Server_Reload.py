@@ -133,7 +133,7 @@ reload.run({myapp.to_str()!r}, 'prefork', '-w', '1')
 
     started = dir.child('started.txt')
     command = dir.child('command.py').spew(
-        f"import sys\nopen({started.to_str()!r}, 'w').write('1')\nsys.stdin.read()\n".encode()
+        f"import pathlib, sys\npathlib.Path({started.to_str()!r}).write_text('1')\nsys.stdin.read()\n".encode()
     )
     code = f"""
 import Pyjo.Server.Reload

@@ -396,7 +396,7 @@ with open({file.to_str()!r}, 'w') as handle:
 with subtest('Restart on SIGHUP'):
     file = dir.child('hup_exec.txt')
     cmd = dir.child('hup_exec.py').spew(
-        f"import os, time\nopen({file.to_str()!r}, 'w').write(str(os.getpid()))\ntime.sleep(1000)\n".encode()
+        f'import os, pathlib, time\npathlib.Path({file.to_str()!r}).write_text(str(os.getpid()))\ntime.sleep(1000)\n'.encode()
     )
     script = _app('hup_app.py', 'Hello HUP!', "get('/pid', lambda c: c.render(text=str(os.getpid())))")
     port = ServerStart.port()
