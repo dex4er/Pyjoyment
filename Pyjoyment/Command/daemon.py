@@ -43,6 +43,9 @@ Pyjoyment.Command.daemon - Daemon command
                                            networks
       -r, --requests <number>              Maximum number of requests per
                                            keep-alive connection, defaults to 100
+      -S, --shutdown-delay <seconds>       Time to keep serving after INT or TERM
+                                           before shutting down gracefully,
+                                           defaults to 0
 
 :mod:`Pyjoyment.Command.daemon` starts applications with the
 :mod:`Pyjo.Server.Daemon` backend.
@@ -128,6 +131,8 @@ class Pyjoyment_Command_daemon(Pyjoyment.Command.object):
                 'l|listen=s': listen,
                 'p|proxy:s': proxy,
                 'r|requests=i': lambda name, value: setattr(daemon, 'max_requests', value),
+                # Not in Mojolicious: the delay of the graceful shutdown, while the readiness fails
+                'S|shutdown-delay=i': lambda name, value: setattr(daemon, 'shutdown_delay', value),
             },
             env_prefix='PYJO_',
         ):

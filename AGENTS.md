@@ -1300,7 +1300,15 @@ pattern.match_partial(path)`.
   signal keeps the meaning that Mojo gives it, a graceful restart of the
   workers in `Pyjo.Server.Prefork`, and nothing in `Pyjo.Server.Daemon`. A
   worker stops gracefully on TERM and ignores INT, which Ctrl-C sends to all
-  the processes of the server. `graceful_timeout` of `Pyjo.Server.Prefork`
+  the processes of the server. `shutdown_delay` keeps the server serving
+  after INT or TERM, with the readiness of `Pyjoyment.Plugin.Health` failing,
+  before it closes its listen sockets, so that a load balancer sends no more
+  connections to it, which `generate kubernetes` sets in the place of a hook
+  `preStop`. The manager of `Pyjo.Server.Prefork` counts it and tells the
+  workers with USR1, not with a delay of TERM, as TERM of a worker is also its
+  graceful restart, by HUP or `accepts`, whose readiness must not fail, and
+  `Pyjo.Server.Hot` has no delay, as the new manager stops the old one with
+  TERM. `graceful_timeout` of `Pyjo.Server.Prefork`
   is 25 seconds, where Mojo has 120, below the 30 seconds that Kubernetes
   gives a container to stop, so that the server forces its workers and stops
   by itself before the orchestrator kills it. The tests of Mojo that send

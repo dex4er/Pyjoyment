@@ -51,6 +51,9 @@ Pyjoyment.Command.prethread - Pre-thread command
                                            networks
       -r, --requests <number>              Maximum number of requests per
                                            keep-alive connection, defaults to 100
+      -S, --shutdown-delay <seconds>       Time to keep serving after INT or TERM
+                                           before shutting down gracefully,
+                                           defaults to 0
       -s, --spare <number>                 Temporarily spawn up to this number of
                                            additional workers, defaults to 2
       -w, --workers <number>               Number of workers, defaults to 4

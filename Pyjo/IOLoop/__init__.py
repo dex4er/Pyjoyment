@@ -215,6 +215,7 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
         self._out: dict[str, dict[str, Any]] = {}
         self._reactor = reactor
         self._stop = 0
+        self._delay: str | None = None
 
     # Not in Mojolicious: a context manager, which removes everything, as reset does, where the block ends, as PyPy
     # frees the object only when its garbage collector runs
@@ -445,10 +446,10 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
             boolean = Pyjo.IOLoop.is_stopping()
             boolean = loop.is_stopping
 
-        Check if event loop is stopping gracefully, from :meth:`stop_gracefully`
-        until :meth:`reset`.
+        Check if event loop is stopping gracefully, from :meth:`stop_gracefully`,
+        its delay too, until :meth:`reset`.
         """
-        return bool(self._stop)
+        return bool(self._stop) or self._delay is not None
 
     @overload
     def next_tick(self, cb: TimerCallback) -> None: ...
@@ -575,6 +576,7 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
         self._in = {}
         self._out = {}
         self._stop = 0
+        self._delay = None
 
         # Perl closes what it frees at once, Python later, as PyPy does when its garbage collector runs
         if not freeze:
@@ -727,15 +729,29 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
         """
         self.reactor.stop()
 
-    def stop_gracefully(self) -> None:
+    # Not in Mojolicious: the delay, while which the event loop serves as before and is_stopping is true already, so that
+    # the readiness of a server fails before it stops accepting
+    def stop_gracefully(self, delay: float = 0) -> None:
         """::
 
             Pyjo.IOLoop.stop_gracefully()
             loop.stop_gracefully()
+            loop.stop_gracefully(delay=5)
 
         Stop accepting new connections and wait for already accepted
-        connections to be closed, before stopping the event loop.
+        connections to be closed, before stopping the event loop. With a
+        ``delay`` in seconds, the event loop keeps accepting them for that
+        long, while :attr:`is_stopping` is true already, so that a load
+        balancer that checks the readiness of the server sends no more of
+        them. A call without a delay ends the delay of an earlier one.
         """
+        if delay > 0:
+            if self._delay is None and not self._stop:
+                self._delay = self.timer(delay, lambda loop: loop.stop_gracefully())
+            return
+        if (timer := self._delay) is not None:
+            self._delay = None
+            self.remove(timer)
         self._not_accepting()
         self._stop += 1
         if not len(self.emit('finish')._in):

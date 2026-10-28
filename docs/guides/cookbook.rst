@@ -475,6 +475,9 @@ probe gives the application time to start before liveness counts.
       containers:
         - name: myapp
           image: myapp_image
+          env:
+            - name: PYJO_SHUTDOWN_DELAY
+              value: "5"
           ports:
             - containerPort: 3000
           startupProbe:
@@ -491,10 +494,6 @@ probe gives the application time to start before liveness counts.
             httpGet:
               path: /readyz
               port: 3000
-          lifecycle:
-            preStop:
-              sleep:
-                seconds: 5
 
 Until the startup probe passes, the kubelet runs neither the liveness nor the
 readiness probe, and the pod gets requests only once readiness passes, which
@@ -542,14 +541,16 @@ worker in the backlog of the listen socket.
 Kubernetes sends ``TERM`` to a container that it stops at the same time as it
 takes the pod out of the endpoints of its services, and kube-proxy, an ingress
 controller or the load balancer of a cloud learn it a moment later. The server
-closes its listen sockets at ``TERM``, so a new connection that they still
-open is refused. The ``preStop`` hook that sleeps keeps the server serving until
-they know, and ``terminationGracePeriodSeconds`` has room for it and for the
-25 seconds of
-:attr:`~Pyjo.Server.Prefork.Pyjo_Server_Prefork.graceful_timeout`. From the
-moment the server stops gracefully, readiness fails with the check
-``shutdown``, which a load balancer that keeps its connections alive sees with
-its last response.
+keeps serving after ``TERM`` for
+:attr:`~Pyjo.Server.Daemon.Pyjo_Server_Daemon.shutdown_delay`, the 5 seconds
+of ``PYJO_SHUTDOWN_DELAY``, until they know, and then closes its listen
+sockets, so a new connection that one of them still opens is refused.
+``terminationGracePeriodSeconds`` has room for the delay and for the 25
+seconds of :attr:`~Pyjo.Server.Prefork.Pyjo_Server_Prefork.graceful_timeout`.
+From ``TERM`` on, readiness fails with the check ``shutdown``, so that a load
+balancer that checks readiness, as one outside of the cluster, takes the
+instance out of its rotation during the delay, and one that keeps its
+connections alive sees it with its last response.
 
 .. mermaid::
 
@@ -562,27 +563,29 @@ its last response.
         participant W as worker
         API->>EP: pod deleted
         API->>K: pod deleted
+        K->>M: TERM
+        M->>W: USR1
         par endpoints
             EP->>LB: endpoint ready: false, terminating: true
             Note over LB: learns it a moment later
-        and preStop
-            K->>K: preStop sleep, 5 seconds
+        and shutdown_delay
+            Note over M,W: shutdown_delay, 5 seconds
             LB->>W: requests until then
             W-->>LB: responses
+            LB->>W: GET /readyz
+            W-->>LB: 503, [-]shutdown failed
         end
-        K->>M: TERM
         M->>W: TERM
         Note over M,W: close the listen sockets:<br/>a new connection is refused
-        LB->>W: GET /readyz, connection kept alive
-        W-->>LB: 503, [-]shutdown failed, Connection: close
+        W-->>LB: the next response, Connection: close
         Note over W: the requests in progress finish
         W-->>M: exits, after after_server_stop
         M-->>K: exits with status 0
-        Note over M,W: after graceful_timeout, 25 seconds,<br/>the manager kills the workers
+        Note over M,W: after shutdown_delay and graceful_timeout,<br/>30 seconds, the manager kills the workers
         Note over K,M: after<br/>terminationGracePeriodSeconds,<br/>35 seconds,<br/>the kubelet sends KILL
 
 Cloud Run stops sending requests to an instance before it stops it, and needs
-no such hook; its startup probe can wait for readiness, as it sends no
+no such delay; its startup probe can wait for readiness, as it sends no
 requests to an instance before it passes.
 
 .. code-block:: yaml

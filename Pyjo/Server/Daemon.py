@@ -75,9 +75,10 @@ INT, TERM
 ~~~~~~~~~
 
 Shut down server gracefully: close the listen sockets, so that a new
-connection is refused, and wait for the accepted ones to be closed. A second
-``INT``, as of Ctrl-C pressed twice, shuts it down immediately, a second
-``TERM`` does nothing.
+connection is refused, and wait for the accepted ones to be closed, after
+:attr:`~Pyjo_Server_Daemon.shutdown_delay`, while it serves as before. A
+second ``INT``, as of Ctrl-C pressed twice, shuts it down immediately, also
+during the delay, a second ``TERM`` does nothing.
 
 QUIT
 ~~~~
@@ -178,6 +179,7 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
         listen: Sequence[Location] | None = None,
         max_clients: int | None = None,
         max_requests: int = 100,
+        shutdown_delay: float = 0,
         silent: bool | None = None,
         **kwargs: Any,
     ) -> None:
@@ -245,6 +247,23 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
 
         Maximum number of keep-alive requests per connection, defaults to
         ``100``.
+        """
+
+        # Not in Mojolicious: the time that a load balancer, which checks the readiness of the server, needs to send no
+        # more connections to it
+        self.shutdown_delay = shutdown_delay
+        """::
+
+            delay = daemon.shutdown_delay
+            daemon.shutdown_delay = 5
+
+        Amount of time in seconds the server keeps accepting and serving
+        connections after ``INT`` or ``TERM``, before it closes the listen
+        sockets and shuts down gracefully, while
+        :attr:`Pyjo.IOLoop.Pyjo_IOLoop.is_stopping` is true already, so that
+        the readiness of :mod:`Pyjoyment.Plugin.Health` fails and a load
+        balancer sends the connections to another instance, defaults to
+        ``0``.
         """
 
         self.silent = silent
@@ -510,18 +529,15 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
                 loop.stop()
             elif not graceful:
                 graceful = True
-                loop.next_tick(stop_gracefully)
+                loop.next_tick(lambda loop: loop.stop_gracefully(self.shutdown_delay))
 
-        def stop_gracefully(loop: Any) -> None:
-            self._close_listen()
-            loop.stop_gracefully()
-
-        # Not in Mojolicious: the graceful stop closes a connection that is kept alive after its next response, as a
-        # worker of Mojo::Server::Prefork does, so that a client that keeps requesting does not keep the server from
-        # stopping; local $self->{max_requests}, the value is set back at the end
+        # Not in Mojolicious: the graceful stop, after its delay, closes the listen sockets, and a connection that is
+        # kept alive after its next response, as a worker of Mojo::Server::Prefork does, so that a client that keeps
+        # requesting does not keep the server from stopping; local $self->{max_requests}, the value is set back at the end
         max_requests = self.max_requests
 
         def finish(loop: Any) -> None:
+            self._close_listen()
             self.max_requests = 1
 
         finished = loop.once('finish', finish)
@@ -699,10 +715,10 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
             server.close()
         self._servers = {}
 
-    # Unlike Mojolicious: the listen sockets are closed when the server starts to stop gracefully, so that a new
-    # connection is refused at once, as the servers of Go and gunicorn do, where Mojo only stops accepting connections and
-    # keeps the sockets until it ends, so that a new connection waits in the backlog of the socket, without a response,
-    # until the server ends and resets it
+    # Unlike Mojolicious: the listen sockets are closed when the server starts to stop gracefully, after its delay, so
+    # that a new connection is refused at once, where Mojo only stops accepting connections and keeps the sockets until it
+    # ends, so that a new connection waits in the backlog of the socket, without a response, until the server ends and
+    # resets it
     def _close_listen(self) -> None:
         loop = self.ioloop
         for id in self.acceptors:

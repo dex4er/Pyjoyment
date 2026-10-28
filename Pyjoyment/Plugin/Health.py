@@ -35,7 +35,8 @@ the probes of Cloud Run, the health checks of load balancers and the
     pass, and ``503 Service Unavailable`` with the list of the checks while
     one of them fails, so that an orchestrator or a load balancer sends the
     requests to another instance. The check ``shutdown`` fails from the
-    moment that the server stops gracefully, as
+    moment that the server stops gracefully, also during its
+    :attr:`~Pyjo.Server.Daemon.Pyjo_Server_Daemon.shutdown_delay`, as
     :attr:`Pyjo.IOLoop.Pyjo_IOLoop.is_stopping` of the event loop of the
     thread, :data:`Pyjo.IOLoop.singleton`, which is the one of every server of
     Pyjoyment, and its workers, tells: a client whose connection is kept alive
