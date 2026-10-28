@@ -10,7 +10,7 @@ Pyjoyment - Real-time web framework
 
         # Route
         def startup(self):
-            self.routes.get('/hello').to('foo#hello')
+            self.get('/hello').to('foo#hello')
 
     # Controller
     import Pyjoyment.Controller
@@ -205,7 +205,7 @@ See also
 
 :mod:`Pyjo`, https://mojolicious.org.
 
-Ported from `Mojolicious <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojolicious.pm>`_ of Mojolicious 9.49.
+Ported from `Mojolicious <https://github.com/mojolicious/mojo/blob/v9.53/lib/Mojolicious.pm>`_ of Mojolicious 9.53.
 """
 
 # Not in Mojolicious: a namespace that other distributions can add modules to, open before the package imports its
@@ -227,6 +227,8 @@ import Pyjoyment.Controller
 import Pyjoyment.Plugins
 import Pyjoyment.Renderer
 import Pyjoyment.Routes
+import Pyjoyment.Routes.Pattern
+import Pyjoyment.Routes.Route
 import Pyjoyment.Sessions
 import Pyjoyment.Static
 import Pyjoyment.Types
@@ -577,6 +579,17 @@ class Pyjoyment_App(Pyjo.App.object):
     def secrets(self, value: list[str]) -> None:
         self._secrets = value
 
+    def any(self, *args: Any, **constraints: 'Pyjoyment.Routes.Pattern.Constraint') -> Pyjoyment.Routes.Route.object:
+        """::
+
+            route = app.any('/:foo', lambda c: ...)
+
+        Generate route with
+        :meth:`Pyjoyment.Routes.Route.Pyjoyment_Routes_Route.any` on
+        :attr:`routes`, takes the same arguments.
+        """
+        return self.routes.any(*args, **constraints)
+
     def build_controller(self, tx: Any = None) -> Pyjoyment.Controller.object:
         """::
 
@@ -656,6 +669,17 @@ class Pyjoyment_App(Pyjo.App.object):
         """
         return Pyjo.Util._stash('defaults', self, args, values)  # pyright: ignore[reportPrivateUsage]
 
+    def delete(self, *args: Any, **constraints: 'Pyjoyment.Routes.Pattern.Constraint') -> Pyjoyment.Routes.Route.object:
+        """::
+
+            route = app.delete('/:foo', lambda c: ...)
+
+        Generate route with
+        :meth:`Pyjoyment.Routes.Route.Pyjoyment_Routes_Route.delete` on
+        :attr:`routes`, takes the same arguments.
+        """
+        return self.routes.delete(*args, **constraints)
+
     def dispatch(self, c: Pyjoyment.Controller.object) -> None:
         """::
 
@@ -692,6 +716,17 @@ class Pyjoyment_App(Pyjo.App.object):
         plugins.emit_hook('before_routes', c)
         if not (tx.res.code or self.routes.dispatch(c) or tx.res.code):
             c.helpers.reply.not_found()
+
+    def get(self, *args: Any, **constraints: 'Pyjoyment.Routes.Pattern.Constraint') -> Pyjoyment.Routes.Route.object:
+        """::
+
+            route = app.get('/:foo', lambda c: ...)
+
+        Generate route with
+        :meth:`Pyjoyment.Routes.Route.Pyjoyment_Routes_Route.get` on
+        :attr:`routes`, takes the same arguments.
+        """
+        return self.routes.get(*args, **constraints)
 
     def handler(self, tx: Any) -> None:
         """::
@@ -779,6 +814,30 @@ class Pyjoyment_App(Pyjo.App.object):
         """
         return self.plugins.on(name, cb)
 
+    def options(
+        self, *args: Any, **constraints: 'Pyjoyment.Routes.Pattern.Constraint'
+    ) -> Pyjoyment.Routes.Route.object:
+        """::
+
+            route = app.options('/:foo', lambda c: ...)
+
+        Generate route with
+        :meth:`Pyjoyment.Routes.Route.Pyjoyment_Routes_Route.options` on
+        :attr:`routes`, takes the same arguments.
+        """
+        return self.routes.options(*args, **constraints)
+
+    def patch(self, *args: Any, **constraints: 'Pyjoyment.Routes.Pattern.Constraint') -> Pyjoyment.Routes.Route.object:
+        """::
+
+            route = app.patch('/:foo', lambda c: ...)
+
+        Generate route with
+        :meth:`Pyjoyment.Routes.Route.Pyjoyment_Routes_Route.patch` on
+        :attr:`routes`, takes the same arguments.
+        """
+        return self.routes.patch(*args, **constraints)
+
     def plugin(self, name: str, conf: dict[str, Any] | None = None, /, **values: Any) -> Any:
         """::
 
@@ -796,6 +855,39 @@ class Pyjoyment_App(Pyjo.App.object):
         :mod:`Pyjoyment` distribution see :mod:`Pyjoyment.Plugins`.
         """
         return self.plugins.register_plugin(name, self, conf, **values)
+
+    def post(self, *args: Any, **constraints: 'Pyjoyment.Routes.Pattern.Constraint') -> Pyjoyment.Routes.Route.object:
+        """::
+
+            route = app.post('/:foo', lambda c: ...)
+
+        Generate route with
+        :meth:`Pyjoyment.Routes.Route.Pyjoyment_Routes_Route.post` on
+        :attr:`routes`, takes the same arguments.
+        """
+        return self.routes.post(*args, **constraints)
+
+    def put(self, *args: Any, **constraints: 'Pyjoyment.Routes.Pattern.Constraint') -> Pyjoyment.Routes.Route.object:
+        """::
+
+            route = app.put('/:foo', lambda c: ...)
+
+        Generate route with
+        :meth:`Pyjoyment.Routes.Route.Pyjoyment_Routes_Route.put` on
+        :attr:`routes`, takes the same arguments.
+        """
+        return self.routes.put(*args, **constraints)
+
+    def query(self, *args: Any, **constraints: 'Pyjoyment.Routes.Pattern.Constraint') -> Pyjoyment.Routes.Route.object:
+        """::
+
+            route = app.query('/:foo', lambda c: ...)
+
+        Generate route with
+        :meth:`Pyjoyment.Routes.Route.Pyjoyment_Routes_Route.query` on
+        :attr:`routes`, takes the same arguments.
+        """
+        return self.routes.query(*args, **constraints)
 
     def server(self, server: Pyjo.Server.object) -> None:
         """::
@@ -895,6 +987,17 @@ class Pyjoyment_App(Pyjo.App.object):
         self.renderer.add_template(name, cb)
         return cb
 
+    def under(self, *args: Any, **constraints: 'Pyjoyment.Routes.Pattern.Constraint') -> Pyjoyment.Routes.Route.object:
+        """::
+
+            route = app.under('/:foo', lambda c: ...)
+
+        Generate route with
+        :meth:`Pyjoyment.Routes.Route.Pyjoyment_Routes_Route.under` on
+        :attr:`routes`, takes the same arguments.
+        """
+        return self.routes.under(*args, **constraints)
+
     def warmup(self) -> None:
         """::
 
@@ -904,6 +1007,19 @@ class Pyjoyment_App(Pyjo.App.object):
         """
         for namespace in self.preload_namespaces:
             Pyjo.Loader.load_classes(namespace)
+
+    def websocket(
+        self, *args: Any, **constraints: 'Pyjoyment.Routes.Pattern.Constraint'
+    ) -> Pyjoyment.Routes.Route.object:
+        """::
+
+            route = app.websocket('/:foo', lambda c: ...)
+
+        Generate route with
+        :meth:`Pyjoyment.Routes.Route.Pyjoyment_Routes_Route.websocket` on
+        :attr:`routes`, takes the same arguments.
+        """
+        return self.routes.websocket(*args, **constraints)
 
 
 def _action(next: Any, c: Pyjoyment.Controller.object, action: Callable[..., Any], last: bool) -> Any:

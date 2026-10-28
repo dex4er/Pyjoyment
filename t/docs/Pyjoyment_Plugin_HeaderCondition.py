@@ -15,7 +15,7 @@ lite.log.level = 'fatal'
 with subtest('Synopsis'):
     # Pyjoyment
     app.plugin('HeaderCondition')
-    app.routes.get('/foo').requires(headers={'Referer': re.compile(r'example\.com')}).to(text='referer')
+    app.get('/foo').requires(headers={'Referer': re.compile(r'example\.com')}).to(text='referer')
 
     # Pyjoyment.Lite
     plugin('HeaderCondition')
@@ -25,7 +25,7 @@ with subtest('Synopsis'):
         c.render(text='referer')
 
     # All headers need to match
-    app.routes.get('/foo').requires(headers={'X-Secret-Header': 'Foo', 'Referer': re.compile(r'example\.com')})
+    app.get('/foo').requires(headers={'X-Secret-Header': 'Foo', 'Referer': re.compile(r'example\.com')})
 
     # The "agent" condition is a shortcut for the "User-Agent" header
     @get('/').requires(agent=re.compile(r'Firefox'))
