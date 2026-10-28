@@ -109,8 +109,8 @@ See also
 
 :mod:`Pyjoyment`, https://mojolicious.org.
 
-Ported from `Mojo::Server::Daemon <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/Server/Daemon.pm>`_
-of Mojolicious 9.49.
+Ported from `Mojo::Server::Daemon <https://github.com/mojolicious/mojo/blob/v9.51/lib/Mojo/Server/Daemon.pm>`_
+of Mojolicious 9.51.
 
 Classes
 -------
@@ -762,6 +762,7 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
 
                 ws.on('resume', resume)
                 self._write(id)
+                return ws.server_read(tx.req.content.leftovers())
 
             # Failed upgrade
             else:
