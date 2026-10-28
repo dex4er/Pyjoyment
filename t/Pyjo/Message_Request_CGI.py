@@ -550,6 +550,55 @@ with subtest('Parse Apache mod_fastcgi CGI environment variables (multipart file
     is_ok(file.filename, 'file.txt', 'right filename')
     is_ok(file.slurp(), b'11023456789', 'right uploaded content')
 
+with subtest('Parse PSGI like environment (SCRIPT_NAME prefix already removed)'):
+    req = Pyjo.Message.Request.new()
+    req.parse(
+        {
+            'PATH_INFO': '/app/admin',
+            'REQUEST_METHOD': 'GET',
+            'REQUEST_URI': '/app/app/admin?foo=bar',
+            'QUERY_STRING': 'foo=bar',
+            'SCRIPT_NAME': '/app',
+            'HTTP_HOST': 'localhost:8080',
+            'SERVER_PROTOCOL': 'HTTP/1.1',
+        }
+    )
+    ok(req.is_finished, 'request is finished')
+    is_ok(req.method, 'GET', 'right method')
+    is_ok(req.url.path, 'app/admin', 'right path')
+    is_ok(req.url.base.path, '/app/', 'right base path')
+    is_ok(req.url.to_abs().to_str(), 'http://localhost:8080/app/app/admin?foo=bar', 'right absolute URL')
+
+    req = Pyjo.Message.Request.new()
+    req.parse(
+        {
+            'PATH_INFO': '/appadmin',
+            'REQUEST_METHOD': 'GET',
+            'REQUEST_URI': '/app/appadmin',
+            'SCRIPT_NAME': '/app',
+            'HTTP_HOST': 'localhost:8080',
+            'SERVER_PROTOCOL': 'HTTP/1.1',
+        }
+    )
+    ok(req.is_finished, 'request is finished')
+    is_ok(req.url.path, 'appadmin', 'right path')
+    is_ok(req.url.to_abs().to_str(), 'http://localhost:8080/app/appadmin', 'right absolute URL')
+
+with subtest('Parse CGI environment (SCRIPT_NAME prefix without segment boundary)'):
+    req = Pyjo.Message.Request.new()
+    req.parse(
+        {
+            'PATH_INFO': '/appadmin',
+            'REQUEST_METHOD': 'GET',
+            'SCRIPT_NAME': '/app',
+            'HTTP_HOST': 'localhost:8080',
+            'SERVER_PROTOCOL': 'HTTP/1.1',
+        }
+    )
+    ok(req.is_finished, 'request is finished')
+    is_ok(req.url.path, 'appadmin', 'right path')
+    is_ok(req.url.to_abs().to_str(), 'http://localhost:8080/app/appadmin', 'right absolute URL')
+
 with subtest('Parse IIS 7.5 like CGI environment (HTTPS=off)'):
     req = Pyjo.Message.Request.new()
     req.parse(

@@ -51,8 +51,8 @@ See also
 
 :mod:`Pyjoyment`, https://mojolicious.org.
 
-Ported from `Mojo::Message::Request <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/Message/Request.pm>`_
-of Mojolicious 9.49.
+Ported from `Mojo::Message::Request <https://github.com/mojolicious/mojo/blob/v9.51/lib/Mojo/Message/Request.pm>`_
+of Mojolicious 9.51.
 """
 
 import Pyjo.Cookie.Request
@@ -60,7 +60,7 @@ import Pyjo.Message
 import Pyjo.Parameters
 import Pyjo.URL
 
-from Pyjo.Util import b64_decode, b64_encode, decode
+from Pyjo.Util import b64_decode, b64_encode, decode, url_unescape
 
 import base64
 import builtins
@@ -658,10 +658,12 @@ class Pyjo_Message_Request(Pyjo.Message.object):
             # Make sure there is a trailing slash (important for merging)
             base.path.parse(value if value.endswith('/') else f'{value}/')
 
-            # Remove SCRIPT_NAME prefix if necessary
+            # Remove SCRIPT_NAME prefix if necessary (unless the server already did it)
             buffer = path.to_str()
             value = re.sub(r'^/|/$', '', value)
-            buffer = re.sub(rf'^/?{re.escape(value)}/?', '', buffer, count=1)
+            uri = url_unescape(re.sub(r'\?.*$', '', str(env.get('REQUEST_URI') or ''), count=1))
+            if not uri.startswith(f'/{value}' + str(env.get('PATH_INFO') or '')):
+                buffer = re.sub(rf'^/?{re.escape(value)}(?:/|$)', '', buffer, count=1)
             buffer = re.sub(r'^/', '', buffer, count=1)
             path.parse(buffer)
 
