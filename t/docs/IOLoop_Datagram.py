@@ -252,6 +252,9 @@ with subtest('__aiter__, iterate, recv_p and send_p'):
         await other.send_p(b'Hello!', ('127.0.0.1', server.port))
         printed.append((await received)[0])
         await datagram.send_p(b'Bye!')
+        # The echo before the close, as Windows reports a datagram that comes to a closed port as an error of the
+        # server, which would end its iteration
+        await datagram.recv_p()
         await datagram.close_gracefully_p()
         promise = datagram.close_gracefully_p()
         await promise
