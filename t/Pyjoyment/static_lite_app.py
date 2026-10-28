@@ -14,7 +14,7 @@ import Pyjo.Asset.Memory
 import Pyjo.Date
 import Pyjo.Test.Pyjo
 
-from Pyjo.File import curfile
+from Pyjo.File import curfile, tempdir
 from Pyjo.Test import *
 from Pyjoyment.Lite import get, hook, options, post
 
@@ -505,6 +505,28 @@ with subtest('Assets'):
         .header_exists_not('Cache-Control')
         .content_like(r'\* foo\.css asset')
     )
+
+with subtest('Assets rebuilt during development'):
+    dir = tempdir()
+    assets = dir.child('assets').make_path()
+    t.app.static.paths.insert(0, dir.to_str())
+    c = t.app.build_controller()
+
+    t.app.mode = 'development'
+    is_ok(c.url_for_asset('/rebuilt.js').path, '/assets/rebuilt.js', 'asset has not been built yet')
+    assets.child('rebuilt.ab1234.js').spew('production')
+    is_ok(c.url_for_asset('/rebuilt.js').path, '/assets/rebuilt.ab1234.js', 'new asset has been found')
+    assets.child('rebuilt.development.js').spew('development')
+    is_ok(c.url_for_asset('/rebuilt.js').path, '/assets/rebuilt.development.js', 'development asset has precedence')
+    t.get_ok('/assets/rebuilt.development.js').status_is(200).content_is('development')
+
+    t.app.mode = 'production'
+    assets.child('other.ab1234.js').spew('production')
+    is_ok(c.url_for_asset('/other.js').path, '/assets/other.js', 'assets are not rebuilt in production')
+
+    t.app.static.paths.pop(0)
+    t.app.static.warmup()
+
 
 with subtest('File'):
     c = t.app.build_controller()
