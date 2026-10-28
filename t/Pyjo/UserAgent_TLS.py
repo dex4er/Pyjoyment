@@ -91,8 +91,8 @@ with subtest('Web server with valid certificates'):
 
 with subtest('Web server with valid certificates and no verification'):
     daemon = Pyjo.Server.Daemon.new(app=app, ioloop=Pyjo.IOLoop.singleton, silent=True)
-    # Unlike Mojolicious: TLSv1_2 and a cipher of it that the client of Python offers, where Mojo uses TLSv1 and
-    # AES256-SHA, as OpenSSL 3 disables TLSv1 and Python deprecates it
+    # Unlike Mojolicious: a cipher of TLSv1_2 that the client of Python offers, where Mojo uses AES256-SHA, which the
+    # default context of Python leaves out
     listen = (
         'https://127.0.0.1'
         + f'?cert={cert("server.crt")}'
@@ -124,7 +124,6 @@ with subtest('Web server with valid certificates and no verification'):
 
 with subtest('Client side TLS options'):
     daemon = Pyjo.Server.Daemon.new(app=app, ioloop=Pyjo.IOLoop.singleton, silent=True)
-    # Unlike Mojolicious: TLSv1_2, where Mojo uses TLSv1_1, as OpenSSL 3 disables it and Python deprecates it
     daemon.listen = ['https://127.0.0.1/?version=TLSv1_2']
     port = daemon.start().ports()[0]
 
@@ -143,12 +142,11 @@ with subtest('Client side TLS options'):
 
     with subtest('Setting acceptable protocol version'):
         ua = Pyjo.UserAgent.new(ioloop=Pyjo.IOLoop.singleton)
-        # Unlike Mojolicious: TLSv1_3 for a server of TLSv1_2, where Mojo has TLSv1_2 for TLSv1_1
         context = ssl.create_default_context()
         context.minimum_version = ssl.TLSVersion.TLSv1_3
         ua.tls_context = context
         tx = ua.get(f'https://127.0.0.1:{port}')
-        # Unlike Mojolicious: the message of OpenSSL, where IO::Socket::SSL says "wrong ssl version"
+        # Unlike Mojolicious: the message of OpenSSL, where IO::Socket::SSL says "SSL connect attempt failed"
         like_ok(tx.error['message'], r'(?i)protocol version|unsupported protocol', 'has error')
 
     daemon.stop()
