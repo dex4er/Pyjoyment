@@ -395,9 +395,14 @@ with subtest('server'):
     # The event loop of the singleton, which a blocking request on an event loop of its own does not run, as a reactor of
     # poll shows, where the one of asyncio follows the loop that runs
     if type(Pyjo.IOLoop.singleton.reactor).__module__ == 'Pyjo.Reactor.Poll':
+        # The timer of the action comes when the singleton runs again, after the timeout has destroyed the transaction,
+        # so the action renders only while it has one, as it would reject a promise that nothing handles
+        app.routes.get(
+            '/too-late', lambda c: Pyjo.Promise.timer(0.1, 'Later!').then(lambda text: c.tx and c.render(text=text))
+        )
         other = Pyjo.UserAgent.new(request_timeout=0.5)
         other.server.app = app
-        is_ok(other.get('/later').error, {'message': 'Request timeout'}, 'no response on an event loop of its own')
+        is_ok(other.get('/too-late').error, {'message': 'Request timeout'}, 'no response on an event loop of its own')
         other.close()
 
 with subtest('source_address'):

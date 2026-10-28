@@ -345,6 +345,9 @@ class Pyjo_Reactor_Asyncio(Pyjo.Reactor.object):
         def done(task: asyncio.Task[Any]) -> None:
             self._tasks.discard(task)
             if task.cancelled():
+                # A task cancelled before its first step never starts the coroutine, which would warn that it was never
+                # awaited
+                coro.close()
                 reject(asyncio.CancelledError())
             elif (e := task.exception()) is not None:
                 reject(e)
