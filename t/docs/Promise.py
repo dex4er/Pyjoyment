@@ -310,6 +310,13 @@ with subtest('timer and timeout'):
     promise = Pyjo.Promise.new()
     promise = promise.timer(0.01, 'Success!')
     promise = Pyjo.Promise.new().timer(0.01)
+
+    # Wait 5 seconds between two steps
+    promise = Pyjo.Promise.resolve()
+    with contextlib.redirect_stdout(io.StringIO()) as output:
+        promise.then(lambda *_: Pyjo.Promise.timer(0.01)).then(lambda *_: print('Five seconds later')).wait()
+    is_ok(output.getvalue(), 'Five seconds later\n', 'delay between two steps')
+
     new = Pyjo.Promise.timeout(0.01, 'Timeout!')
     new.catch(got.append)
     promise = Pyjo.Promise.new()

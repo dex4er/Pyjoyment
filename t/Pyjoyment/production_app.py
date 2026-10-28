@@ -39,191 +39,186 @@ PyjoymentTest.__path__.append(syntax_error.to_str())
 
 t = Pyjo.Test.Pyjo.new('PyjoymentTest')
 
-# Application is already available
-is_ok(t.app.routes.find('something').to_str(), '/test4/:something', 'right pattern')
-is_ok(t.app.routes.find('test3').pattern.defaults['namespace'], 'PyjoymentTest2.Foo', 'right namespace')
-is_ok(t.app.routes.find('withblock').pattern.defaults['controller'], 'foo', 'right controller')
-is_ok(type(t.app.routes.find('something')), Pyjoyment.Routes.Route.object, 'right class')
-is_ok(type(t.app.routes.find('something').root), Pyjoyment.Routes.object, 'right class')
-is_ok(t.app.sessions.cookie_domain, '.example.com', 'right domain')
-is_ok(t.app.sessions.cookie_path, '/bar', 'right path')
-is_deeply_ok(
-    t.app.commands.namespaces,
-    ['Pyjoyment.Command.Author', 'Pyjoyment.Command', 'PyjoymentTest.Command'],
-    'right namespaces',
-)
-is_ok(t.app, t.app.commands.app, 'applications are equal')
-is_ok(t.app.static.file('hello.txt').slurp(), b'Hello Mojo from a static file!\n', 'right content')
-is_ok(t.app.static.file('does_not_exist.html'), None, 'no file')
-is_ok(t.app.moniker, 'pyjoyment_test', 'right moniker')
+with subtest('Application is already available'):
+    is_ok(t.app.routes.find('something').to_str(), '/test4/:something', 'right pattern')
+    is_ok(t.app.routes.find('test3').pattern.defaults['namespace'], 'PyjoymentTest2.Foo', 'right namespace')
+    is_ok(t.app.routes.find('withblock').pattern.defaults['controller'], 'foo', 'right controller')
+    is_ok(type(t.app.routes.find('something')), Pyjoyment.Routes.Route.object, 'right class')
+    is_ok(type(t.app.routes.find('something').root), Pyjoyment.Routes.object, 'right class')
+    is_ok(t.app.sessions.cookie_domain, '.example.com', 'right domain')
+    is_ok(t.app.sessions.cookie_path, '/bar', 'right path')
+    is_deeply_ok(
+        t.app.commands.namespaces,
+        ['Pyjoyment.Command.Author', 'Pyjoyment.Command', 'PyjoymentTest.Command'],
+        'right namespaces',
+    )
+    is_ok(t.app, t.app.commands.app, 'applications are equal')
+    is_ok(t.app.static.file('hello.txt').slurp(), b'Hello Mojo from a static file!\n', 'right content')
+    is_ok(t.app.static.file('does_not_exist.html'), None, 'no file')
+    is_ok(t.app.moniker, 'pyjoyment_test', 'right moniker')
 
-# Remove extra files
-# Renamed from Mojolicious: pyjo, the directory of the bundled files of Pyjoyment, where Mojo has mojo
-is_ok(t.app.static.file('pyjo/jquery/jquery.js'), None, 'no jQuery')
+with subtest('Remove extra files'):
+    # Renamed from Mojolicious: pyjo, the directory of the bundled files of Pyjoyment, where Mojo has mojo
+    is_ok(t.app.static.file('pyjo/jquery/jquery.js'), None, 'no jQuery')
 
-# Default namespaces
-is_deeply_ok(t.app.routes.namespaces, ['PyjoymentTest.Controller', 'PyjoymentTest'], 'right namespaces')
+with subtest('Default namespaces'):
+    is_deeply_ok(t.app.routes.namespaces, ['PyjoymentTest.Controller', 'PyjoymentTest'], 'right namespaces')
 
-# Plugin.Test.SomePlugin2.register (security violation)
-(
-    t.get_ok('/plugin-test-some_plugin2/register')
-    .status_isnt(404)
-    .status_is(500)
-    .header_is('Server', 'Pyjoyment (Python)')
-    .content_like(r'Not development mode error!')
-)
+with subtest('Plugin.Test.SomePlugin2.register (security violation)'):
+    (
+        t.get_ok('/plugin-test-some_plugin2/register')
+        .status_isnt(404)
+        .status_is(500)
+        .header_is('Server', 'Pyjoyment (Python)')
+        .content_like(r'Not development mode error!')
+    )
 
-# Plugin.Test.SomePlugin2.register (security violation again)
-(
-    t.get_ok('/plugin-test-some_plugin2/register')
-    .status_isnt(404)
-    .status_is(500)
-    .header_is('Server', 'Pyjoyment (Python)')
-    .content_like(r'Not development mode error!')
-)
+with subtest('Plugin.Test.SomePlugin2.register (security violation again)'):
+    (
+        t.get_ok('/plugin-test-some_plugin2/register')
+        .status_isnt(404)
+        .status_is(500)
+        .header_is('Server', 'Pyjoyment (Python)')
+        .content_like(r'Not development mode error!')
+    )
 
-# SyntaxError.foo in production mode (syntax error in controller)
-(
-    t.get_ok('/syntax_error/foo')
-    .status_is(500)
-    .header_is('Server', 'Pyjoyment (Python)')
-    .content_like(r'Not development mode error!')
-)
+with subtest('SyntaxError.foo in production mode (syntax error in controller)'):
+    (
+        t.get_ok('/syntax_error/foo')
+        .status_is(500)
+        .header_is('Server', 'Pyjoyment (Python)')
+        .content_like(r'Not development mode error!')
+    )
 
-# Foo.syntaxerror in production mode (syntax error in template)
-(
-    t.get_ok('/foo/syntaxerror')
-    .status_is(500)
-    .header_is('Server', 'Pyjoyment (Python)')
-    .content_like(r'Not development mode error!')
-)
+with subtest('Foo.syntaxerror in production mode (syntax error in template)'):
+    (
+        t.get_ok('/foo/syntaxerror')
+        .status_is(500)
+        .header_is('Server', 'Pyjoyment (Python)')
+        .content_like(r'Not development mode error!')
+    )
 
-# Exceptional.this_one_dies (action dies)
-(
-    t.get_ok('/exceptional/this_one_dies')
-    .status_is(500)
-    .header_is('Server', 'Pyjoyment (Python)')
-    .content_like(r'Not development mode error!')
-)
+with subtest('Exceptional.this_one_dies (action dies)'):
+    (
+        t.get_ok('/exceptional/this_one_dies')
+        .status_is(500)
+        .header_is('Server', 'Pyjoyment (Python)')
+        .content_like(r'Not development mode error!')
+    )
 
-# Exceptional.this_one_might_die (bridge dies)
-(
-    t.get_ok('/exceptional_too/this_one_dies')
-    .status_is(500)
-    .header_is('Server', 'Pyjoyment (Python)')
-    .content_like(r'Not development mode error!')
-)
+with subtest('Exceptional.this_one_might_die (bridge dies)'):
+    (
+        t.get_ok('/exceptional_too/this_one_dies')
+        .status_is(500)
+        .header_is('Server', 'Pyjoyment (Python)')
+        .content_like(r'Not development mode error!')
+    )
 
-# Exceptional.this_one_might_die (action dies)
-(
-    t.get_ok('/exceptional_too/this_one_dies', {'X-DoNotDie': 1})
-    .status_is(500)
-    .header_is('Server', 'Pyjoyment (Python)')
-    .content_like(r'Not development mode error!')
-)
+with subtest('Exceptional.this_one_might_die (action dies)'):
+    (
+        t.get_ok('/exceptional_too/this_one_dies', {'X-DoNotDie': 1})
+        .status_is(500)
+        .header_is('Server', 'Pyjoyment (Python)')
+        .content_like(r'Not development mode error!')
+    )
 
-# Exceptional.this_one_does_not_exist (action does not exist)
-(
-    t.get_ok('/exceptional/this_one_does_not_exist')
-    .status_is(404)
-    .header_is('Server', 'Pyjoyment (Python)')
-    .content_like(r'Page Not Found')
-)
+with subtest('Exceptional.this_one_does_not_exist (action does not exist)'):
+    (
+        t.get_ok('/exceptional/this_one_does_not_exist')
+        .status_is(404)
+        .header_is('Server', 'Pyjoyment (Python)')
+        .content_like(r'Page Not Found')
+    )
 
-# Exceptional.this_one_does_not_exist (action behind bridge does not exist)
-(
-    t.get_ok('/exceptional_too/this_one_does_not_exist', {'X-DoNotDie': 1})
-    .status_is(404)
-    .header_is('Server', 'Pyjoyment (Python)')
-    .content_like(r'Page Not Found')
-)
+with subtest('Exceptional.this_one_does_not_exist (action behind bridge does not exist)'):
+    (
+        t.get_ok('/exceptional_too/this_one_does_not_exist', {'X-DoNotDie': 1})
+        .status_is(404)
+        .header_is('Server', 'Pyjoyment (Python)')
+        .content_like(r'Page Not Found')
+    )
 
-# Static file /hello.txt in production mode
-(
-    t.get_ok('/hello.txt')
-    .status_is(200)
-    .header_is('Server', 'Pyjoyment (Python)')
-    .content_like(r'Hello Mojo from a static file!')
-)
+with subtest('Static file /hello.txt in production mode'):
+    (
+        t.get_ok('/hello.txt')
+        .status_is(200)
+        .header_is('Server', 'Pyjoyment (Python)')
+        .content_like(r'Hello Mojo from a static file!')
+    )
 
-# Foo.bar in production mode (missing action)
-(
-    t.get_ok('/foo/baz')
-    .status_is(500)
-    .header_is('Server', 'Pyjoyment (Python)')
-    .content_like(r'Not development mode error!')
-)
+with subtest('Foo.bar in production mode (missing action)'):
+    (
+        t.get_ok('/foo/baz')
+        .status_is(500)
+        .header_is('Server', 'Pyjoyment (Python)')
+        .content_like(r'Not development mode error!')
+    )
 
-# Try to access a file which is not under the web root via path traversal in
-# production mode
-(
-    t.get_ok('/../../Pyjoyment/secret.txt')
-    .status_is(404)
-    .header_is('Server', 'Pyjoyment (Python)')
-    .content_like(r'Page Not Found')
-)
+with subtest('Path traversal in production mode'):
+    (
+        t.get_ok('/../../Pyjoyment/secret.txt')
+        .status_is(404)
+        .header_is('Server', 'Pyjoyment (Python)')
+        .content_like(r'Page Not Found')
+    )
 
-# Try to access a file which is not under the web root via path traversal in
-# production mode (triple dot)
-(
-    t.get_ok('/.../Pyjoyment/secret.txt')
-    .status_is(404)
-    .header_is('Server', 'Pyjoyment (Python)')
-    .content_like(r'Page Not Found')
-)
+with subtest('Path traversal in production mode (triple dot)'):
+    (
+        t.get_ok('/.../Pyjoyment/secret.txt')
+        .status_is(404)
+        .header_is('Server', 'Pyjoyment (Python)')
+        .content_like(r'Page Not Found')
+    )
 
-# Try to access a file which is not under the web root via path traversal in
-# production mode (backslashes)
-(
-    t.get_ok('/..\\..\\Pyjoyment\\secret.txt')
-    .status_is(404)
-    .header_is('Server', 'Pyjoyment (Python)')
-    .content_like(r'Page Not Found')
-)
+with subtest('Path traversal in production mode (backslashes)'):
+    (
+        t.get_ok('/..\\..\\Pyjoyment\\secret.txt')
+        .status_is(404)
+        .header_is('Server', 'Pyjoyment (Python)')
+        .content_like(r'Page Not Found')
+    )
 
-# Try to access a file which is not under the web root via path traversal in
-# production mode (escaped backslashes)
-(
-    t.get_ok('/..%5C..%5CPyjoyment%5Csecret.txt')
-    .status_is(404)
-    .header_is('Server', 'Pyjoyment (Python)')
-    .content_like(r'Page Not Found')
-)
+with subtest('Path traversal in production mode (escaped backslashes)'):
+    (
+        t.get_ok('/..%5C..%5CPyjoyment%5Csecret.txt')
+        .status_is(404)
+        .header_is('Server', 'Pyjoyment (Python)')
+        .content_like(r'Page Not Found')
+    )
 
-# Check that backslashes in query or fragment parts don't block access in
-# production mode
-t.get_ok('/hello.txt?one=\\1#two=\\2').status_is(200).content_like(r'Hello Mojo from a static file!')
+with subtest('Backslashes in query or fragment parts in production mode'):
+    t.get_ok('/hello.txt?one=\\1#two=\\2').status_is(200).content_like(r'Hello Mojo from a static file!')
 
-# Embedded production static file
-(
-    t.get_ok('/some/static/file.txt')
-    .status_is(200)
-    .header_is('Server', 'Pyjoyment (Python)')
-    .content_is('Production static file with low precedence.\n\n')
-)
+with subtest('Embedded production static file'):
+    (
+        t.get_ok('/some/static/file.txt')
+        .status_is(200)
+        .header_is('Server', 'Pyjoyment (Python)')
+        .content_is('Production static file with low precedence.\n\n')
+    )
 
-# Embedded production template
-(
-    t.get_ok('/just/some/template')
-    .status_is(200)
-    .header_is('Server', 'Pyjoyment (Python)')
-    .content_is('Production template with low precedence.\n')
-)
+with subtest('Embedded production template'):
+    (
+        t.get_ok('/just/some/template')
+        .status_is(200)
+        .header_is('Server', 'Pyjoyment (Python)')
+        .content_is('Production template with low precedence.\n')
+    )
 
-# PyjoymentTest3.Bar.index (controller class in development namespace)
-(
-    t.get_ok('/test9', {'X-Test': 'Hi there!'})
-    .status_is(500)
-    .header_is('Server', 'Pyjoyment (Python)')
-    .content_like(r'Not development mode error!')
-)
+with subtest('PyjoymentTest3.Bar.index (controller class in development namespace)'):
+    (
+        t.get_ok('/test9', {'X-Test': 'Hi there!'})
+        .status_is(500)
+        .header_is('Server', 'Pyjoyment (Python)')
+        .content_like(r'Not development mode error!')
+    )
 
-# PyjoymentTest.Baz.index (controller class precedence)
-(
-    t.get_ok('/test10')
-    .status_is(200)
-    .header_is('Server', 'Pyjoyment (Python)')
-    .content_is('Production namespace has low precedence!')
-)
+with subtest('PyjoymentTest.Baz.index (controller class precedence)'):
+    (
+        t.get_ok('/test10')
+        .status_is(200)
+        .header_is('Server', 'Pyjoyment (Python)')
+        .content_is('Production namespace has low precedence!')
+    )
 
 done_testing()

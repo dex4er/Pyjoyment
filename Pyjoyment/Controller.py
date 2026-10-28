@@ -67,8 +67,8 @@ See also
 
 :mod:`Pyjoyment`, https://mojolicious.org.
 
-Ported from `Mojolicious::Controller <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojolicious/Controller.pm>`_
-of Mojolicious 9.49.
+Ported from `Mojolicious::Controller <https://github.com/mojolicious/mojo/blob/v9.52/lib/Mojolicious/Controller.pm>`_
+of Mojolicious 9.52.
 """
 
 # No imports, for security reasons!
@@ -1022,8 +1022,10 @@ class Pyjoyment_Controller(Pyjo.Base.object):
             if generated.get('websocket'):
                 base.scheme = 'wss' if base.protocol == 'https' else 'ws'
 
-        # Make path absolute
+        # Make path absolute (skip parsing if there is no base path and nothing would need to be decoded)
         base_path = base.path
+        if base_path.to_str() == '' and '%' not in path.to_str():
+            return url
         path.parts[0:0] = base_path.parts
         base_path.parts = []
         base_path.trailing_slash = False

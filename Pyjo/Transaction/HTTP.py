@@ -95,8 +95,8 @@ See also
 
 :mod:`Pyjoyment`, https://mojolicious.org.
 
-Ported from `Mojo::Transaction::HTTP <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/Transaction/HTTP.pm>`_
-of Mojolicious 9.49.
+Ported from `Mojo::Transaction::HTTP <https://github.com/mojolicious/mojo/blob/v9.52/lib/Mojo/Transaction/HTTP.pm>`_
+of Mojolicious 9.52.
 """
 
 import Pyjo.Exception
@@ -300,8 +300,9 @@ class Pyjo_Transaction_HTTP(Pyjo.Transaction.object):
         if buffer is None:
             self._writing = False
 
-        # Finished
-        elif not len(buffer):
+        # Finished (static content does not need an extra round trip for the empty chunk)
+        elif not len(buffer) or (not msg.content.is_dynamic and self._offset >= msg.body_size):
+            msg.finish()
             if finish:
                 self.completed()
             else:

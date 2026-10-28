@@ -143,8 +143,8 @@ See also
 
 :mod:`Pyjoyment`, https://mojolicious.org.
 
-Ported from `Mojo::Promise <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/Promise.pm>`_
-of Mojolicious 9.49.
+Ported from `Mojo::Promise <https://github.com/mojolicious/mojo/blob/v9.52/lib/Mojo/Promise.pm>`_
+of Mojolicious 9.52.
 
 Functions
 ---------
@@ -561,7 +561,13 @@ class Pyjo_Promise(Pyjo.Base.object):
 
         Create a new :mod:`Pyjo.Promise` object with a timer or attach a timer
         to an existing promise. The promise will be resolved after the given
-        amount of time in seconds with or without a value.
+        amount of time in seconds with or without a value, unless it has already
+        been settled. Note that this does not delay the resolution of an existing
+        promise, to add a delay to a promise chain you have to return a new timer
+        promise instead. ::
+
+            # Wait 5 seconds between two steps
+            promise.then(lambda *_: Pyjo.Promise.timer(5)).then(lambda *_: print('Five seconds later'))
         """
         return _timer(self_or_cls, 'resolve', after, value)
 
@@ -576,7 +582,7 @@ class Pyjo_Promise(Pyjo.Base.object):
         Create a new :mod:`Pyjo.Promise` object with a timeout or attach a
         timeout to an existing promise. The promise will be rejected after the
         given amount of time in seconds with a reason, which defaults to
-        ``Promise timeout``.
+        ``Promise timeout``, unless it has already been settled.
         """
         return _timer(self_or_cls, 'reject', after, reason)
 

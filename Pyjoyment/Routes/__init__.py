@@ -42,8 +42,8 @@ See also
 
 :mod:`Pyjoyment`, https://mojolicious.org.
 
-Ported from `Mojolicious::Routes <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojolicious/Routes.pm>`_
-of Mojolicious 9.49.
+Ported from `Mojolicious::Routes <https://github.com/mojolicious/mojo/blob/v9.52/lib/Mojolicious/Routes.pm>`_
+of Mojolicious 9.52.
 """
 
 import Pyjo.App
@@ -270,8 +270,7 @@ class Pyjoyment_Routes(Pyjoyment_Routes_Route):
 
         # Method (HEAD will be treated as GET)
         method = req.method.upper()
-        override = req.url.query.clone().param('_method')
-        if override and method == 'POST':
+        if method == 'POST' and (override := req.url.query.clone().param('_method')):
             method = override.upper()
         if method == 'HEAD':
             method = 'GET'

@@ -109,8 +109,8 @@ See also
 
 :mod:`Pyjoyment`, https://mojolicious.org.
 
-Ported from `Mojo::Server::Daemon <https://github.com/mojolicious/mojo/blob/v9.51/lib/Mojo/Server/Daemon.pm>`_
-of Mojolicious 9.51.
+Ported from `Mojo::Server::Daemon <https://github.com/mojolicious/mojo/blob/v9.52/lib/Mojo/Server/Daemon.pm>`_
+of Mojolicious 9.52.
 
 Classes
 -------
@@ -133,6 +133,7 @@ from Pyjo.Util import term_escape, warn
 from Pyjo.WebSocket import server_handshake
 
 import atexit
+import contextlib
 import os
 import re
 import signal
@@ -176,6 +177,7 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
         inactivity_timeout: float | None = None,
         ioloop: Pyjo.IOLoop.object | None = None,
         keep_alive_timeout: float | None = None,
+        lingering_timeout: float = 5,
         listen: Sequence[Location] | None = None,
         max_clients: int | None = None,
         max_requests: int = 100,
@@ -227,6 +229,21 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
 
         self._keep_alive_timeout: float | None = keep_alive_timeout
         self._locations: list[Location] | None = list(listen) if listen is not None else None
+
+        # Not in Mojolicious: the rest of a request that has its response already, as one over a limit, is read before the
+        # connection is closed, as a close with unread data resets it, which loses the response on Windows
+        self.lingering_timeout = lingering_timeout
+        """::
+
+            timeout = daemon.lingering_timeout
+            daemon.lingering_timeout = 10
+
+        Maximum amount of time in seconds a connection whose request has not
+        been read to its end, as one that exceeds a limit, is kept open after its
+        response, to read and discard the rest of the request, so that the
+        client receives the response before the connection is closed, defaults
+        to ``5``.
+        """
 
         self.max_clients = max_clients
         """::
@@ -664,8 +681,9 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
         stream.timeout = self.inactivity_timeout
         handle = stream.handle
         if handle.family != getattr(socket, 'AF_UNIX', None):
-            tx.local_address, tx.local_port = handle.getsockname()[:2]
-            tx.remote_address, tx.remote_port = handle.getpeername()[:2]
+            if (addr := c.get('addr')) is None:
+                addr = c['addr'] = (*handle.getsockname()[:2], *handle.getpeername()[:2])
+            tx.local_address, tx.local_port, tx.remote_address, tx.remote_port = addr
         if c.get('tls'):
             tx.req.url.base.scheme = 'https'
 
@@ -770,6 +788,8 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
 
         # Close connection if necessary
         if tx.error or not tx.keep_alive:
+            if (req := tx.req).error or not req.is_finished:
+                return self._linger(id)
             return self._remove(id)
 
         # Build new transaction for leftovers
@@ -780,6 +800,22 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
         # Keep-alive connection
         if c.get('tx') is None:
             self.ioloop.stream(id).timeout = self.keep_alive_timeout
+
+    # Not in Mojolicious: the end of the response, with the rest of the request read and discarded until the client closes
+    # the connection or the lingering timeout, as a close with unread data resets the connection, which loses the response
+    # on Windows, as it does on other systems where the reset comes before the client has read it
+    def _linger(self, id: str) -> None:
+        stream = self.ioloop.stream(id)
+        self._close(id)
+        if stream is None:
+            return
+        stream.unsubscribe('read')
+
+        # The end of the response, which a TLS connection cannot send without its own close
+        if not isinstance(handle := stream.handle, ssl.SSLSocket):
+            with contextlib.suppress(OSError):
+                handle.shutdown(socket.SHUT_WR)
+        self.ioloop.timer(self.lingering_timeout, lambda loop: loop.remove(id))
 
     def _listen(self, listen: Location) -> None:
         # A Pyjo.URL stringifies, as a Mojo::URL does for Mojo::URL->new

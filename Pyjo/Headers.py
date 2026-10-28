@@ -52,8 +52,8 @@ See also
 
 :mod:`Pyjoyment`, https://mojolicious.org.
 
-Ported from `Mojo::Headers <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/Headers.pm>`_
-of Mojolicious 9.49.
+Ported from `Mojo::Headers <https://github.com/mojolicious/mojo/blob/v9.52/lib/Mojo/Headers.pm>`_
+of Mojolicious 9.52.
 
 Classes
 -------
@@ -165,7 +165,7 @@ class Pyjo_Headers(Pyjo.Base.object, Pyjo.String.Mixin.object):
 
         self._headers: dict[str, list[str]] = {}
         self._names: dict[str, str] = {}
-        self._buffer = b''
+        self._buffer = bytearray()
         self._cache: list[list[str]] = []
         self._state: str | None = None
         self._limit = False
@@ -515,7 +515,7 @@ class Pyjo_Headers(Pyjo.Base.object, Pyjo.String.Mixin.object):
 
         Get and remove leftover data from header parser.
         """
-        buffer, self._buffer = self._buffer, b''
+        buffer, self._buffer = bytes(self._buffer), bytearray()
         return buffer
 
     link = _Shortcut('Link', '\'<http://127.0.0.1/foo/3>; rel="next"\'', ' from :rfc:`5988`')
@@ -573,16 +573,17 @@ class Pyjo_Headers(Pyjo.Base.object, Pyjo.String.Mixin.object):
         """
         self._state = 'headers'
         # Not in Mojolicious: characters, as ISO-8859-1
-        self._buffer += bytes(chunk) if isinstance(chunk, (bytes, bytearray)) else chunk.encode('latin-1')
+        self._buffer += chunk if isinstance(chunk, (bytes, bytearray)) else chunk.encode('latin-1')
         headers = self._cache
         size = self.max_line_size
         lines = self.max_lines
-        while m := re.match(rb'(.*?)\x0d?\x0a', self._buffer):
-            line = m[1].decode('latin-1')
-            self._buffer = self._buffer[m.end() :]
+        while (length := self._buffer.find(b'\x0a') + 1) > 0:
+            raw = self._buffer[: length - 1]
+            del self._buffer[:length]
+            line = (raw[:-1] if raw.endswith(b'\x0d') else raw).decode('latin-1')
 
             # Check line size limit
-            if m.end() > size or len(headers) >= lines:
+            if length > size or len(headers) >= lines:
                 self._state, self._limit = 'finished', True
                 return self
 

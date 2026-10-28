@@ -49,7 +49,7 @@ See also
 :mod:`Pyjoyment`, https://mojolicious.org.
 
 Ported from `Mojolicious::Routes::Match
-<https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojolicious/Routes/Match.pm>`_ of Mojolicious 9.49.
+<https://github.com/mojolicious/mojo/blob/v9.52/lib/Mojolicious/Routes/Match.pm>`_ of Mojolicious 9.52.
 """
 
 import Pyjo.Base
@@ -231,7 +231,7 @@ class Pyjoyment_Routes_Match(Pyjo.Base.object):
 
             # Match children
             snapshot = list(self.stack) if r.parent is not None else []
-            for child in r.children:
+            for child in r._candidates(path):  # pyright: ignore[reportPrivateUsage]
                 if self._match(child, c, method, path, websocket):
                     return True
                 self.stack = list(snapshot)

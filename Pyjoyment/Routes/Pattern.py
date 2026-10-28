@@ -27,7 +27,7 @@ See also
 :mod:`Pyjoyment`, https://mojolicious.org.
 
 Ported from `Mojolicious::Routes::Pattern
-<https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojolicious/Routes/Pattern.pm>`_ of Mojolicious 9.49.
+<https://github.com/mojolicious/mojo/blob/v9.52/lib/Mojolicious/Routes/Pattern.pm>`_ of Mojolicious 9.52.
 """
 
 import Pyjo.Base
@@ -182,6 +182,9 @@ class Pyjoyment_Routes_Pattern(Pyjo.Base.object):
         Character indicating the start of a wildcard placeholder, defaults to
         ``*``.
         """
+
+        # The regex that _compile made, which tells a custom one apart
+        self._compiled: re.Pattern[str] | None = None
 
         if pattern is not None or constraints:
             self.parse(pattern, **constraints)
@@ -338,7 +341,7 @@ class Pyjoyment_Routes_Pattern(Pyjo.Base.object):
         if detect:
             regex += _compile_format(constraints.get('format'), 'format' in defaults)
 
-        self.regex = re.compile(f'^{regex}', re.DOTALL)
+        self.regex = self._compiled = re.compile(f'^{regex}', re.DOTALL)
         return self.regex
 
     def _tokenize(self, pattern: str) -> Self:

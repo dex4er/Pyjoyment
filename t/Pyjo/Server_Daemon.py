@@ -406,6 +406,79 @@ with subtest('Single-accept and connection limit'):
     ok(accepting[0], 'accepting connections')
     ok(not accepting[1], 'connection limit reached')
 
+with subtest('Destroy daemon while writing'):
+    loop = Pyjo.IOLoop.new()
+    app_ = Pyjoyment.new()
+    app_.log.level = 'fatal'
+    got = {}
+
+    @app_.routes.get('/')
+    def destroy(c):
+        c.render(text='x' * 1_000_000)
+        got.pop('daemon')
+
+    got['daemon'] = Pyjo.Server.Daemon.new(app=app_, ioloop=loop, listen=['http://127.0.0.1'], silent=True).start()
+    port = loop.acceptor(got['daemon'].acceptors[0]).port
+
+    # Unlike Mojolicious: the errors of the reactor, which Mojo warns of
+    errors = []
+    loop.reactor.on('error', lambda reactor, err: errors.append(str(err)))
+    closed, timeout = [], []
+
+    @loop.client(port=port)
+    def client(loop, err, stream):
+        @stream.on('close')
+        def close(stream):
+            closed.append(True)
+            loop.stop()
+
+        stream.on('read', lambda stream, chunk: None)
+        stream.write(b'GET / HTTP/1.1\x0d\x0aConnection: close\x0d\x0a\x0d\x0a')
+
+    loop.timer(5, lambda loop: (timeout.append(True), loop.stop()))
+    loop.start()
+    ok(closed, 'connection has been closed')
+    ok(not timeout, 'no timeout')
+    is_deeply_ok([e for e in errors if 'I/O watcher failed' in e], [], 'no exceptions')
+
+# Not in Mojolicious: the rest of a request that has its response already, which the server reads before it closes the
+# connection, so that the client gets the response
+with subtest('Response before the end of the request'):
+    loop = Pyjo.IOLoop.new()
+    app_ = Pyjoyment.new()
+    app_.log.level = 'fatal'
+    app_.max_request_size = 10
+    app_.routes.post('/').to(cb=lambda c: c.render(text='Too big' if c.req.is_limit_exceeded else 'Fine'))
+    daemon = Pyjo.Server.Daemon.new(
+        app=app_, ioloop=loop, listen=['http://127.0.0.1'], lingering_timeout=0.5, silent=True
+    ).start()
+    port = loop.acceptor(daemon.acceptors[0]).port
+
+    def run(seconds):
+        loop.timer(seconds, lambda loop: loop.stop())
+        loop.start()
+
+    def send(client, data):
+        try:
+            client.sendall(data)
+            run(0.1)
+            client.sendall(data)
+            return None
+        except OSError as e:
+            return e
+
+    with socket.create_connection(('127.0.0.1', port)) as client:
+        client.sendall(b'POST / HTTP/1.1\r\nHost: x\r\nContent-Length: 100\r\n\r\n' + b'a' * 50)
+        run(0.2)
+        client.settimeout(5)
+        response = b''
+        while chunk := client.recv(4096):
+            response += chunk
+        like_ok(response, rb'(?s)^HTTP/1\.1 200 OK\r\n.*\r\n\r\nToo big$', 'response and end of the response')
+        is_ok(send(client, b'a' * 25), None, 'rest of the request has been read')
+        run(0.5)
+        isa_ok(send(client, b'a' * 25), OSError, 'connection closed after the lingering timeout')
+
 with subtest('Request limit'):
     daemon = Pyjo.Server.Daemon.new(app=app, listen=['http://127.0.0.1'], silent=True).start()
     port = daemon.ports()[0]

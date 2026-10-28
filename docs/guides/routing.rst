@@ -220,10 +220,12 @@ can be accessed from everywhere (even at runtime).
     :caption: MyApp/Controller/Foo.py
 
 All routes match in the same order in which they were defined, and matching
-stops as soon as a suitable route has been found. So you can improve the
-routing performance by declaring your most frequently accessed routes first.
-A routing cache will also be used automatically to handle sudden traffic
-spikes more gracefully.
+stops as soon as a suitable route has been found. Routes are indexed by the
+text their patterns start with, so routes that cannot match a path are skipped
+right away, and the routing performance stays the same even for applications
+with many routes. Only routes starting with a placeholder, like ``/:name``,
+always have to be tried. A routing cache will also be used automatically to
+handle sudden traffic spikes more gracefully.
 
 Routing destination
 ~~~~~~~~~~~~~~~~~~~
@@ -361,10 +363,6 @@ old ones.
     cats.get('/').to(action='index')
     cats.get('/nyan').to(action='nyan')
     cats.get('/lol')
-
-With a few common prefixes you can also greatly improve the routing
-performance of applications with many routes, because children are only
-tried if the prefix matched first.
 
 Special stash values
 ~~~~~~~~~~~~~~~~~~~~
@@ -1147,5 +1145,5 @@ wiki <https://github.com/mojolicious/mojo/wiki>`_, which contains a lot more
 documentation and examples by many different authors.
 
 Ported from `Mojolicious::Guides::Routing
-<https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojolicious/Guides/Routing.pod>`_
-of Mojolicious 9.49.
+<https://github.com/mojolicious/mojo/blob/v9.52/lib/Mojolicious/Guides/Routing.pod>`_
+of Mojolicious 9.52.

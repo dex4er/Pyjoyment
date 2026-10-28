@@ -36,7 +36,7 @@ See also
 :mod:`Pyjoyment`, https://mojolicious.org.
 
 Ported from `Mojolicious::Routes::Route
-<https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojolicious/Routes/Route.pm>`_ of Mojolicious 9.49.
+<https://github.com/mojolicious/mojo/blob/v9.52/lib/Mojolicious/Routes/Route.pm>`_ of Mojolicious 9.52.
 """
 
 import Pyjo.Base
@@ -59,6 +59,10 @@ _RESERVED = frozenset(
     'action app cb controller data extends format handler inline json layout namespace path status template text '
     'toml variant yaml'.split()
 )
+
+
+# The children without a text that their paths start with, and the ones with it, by its length and by the text
+type _PrefixIndex = tuple[list[int], dict[int, dict[str, list[int]]]]
 
 
 class Pyjoyment_Routes_Route(Pyjo.Base.object):
@@ -117,6 +121,7 @@ class Pyjoyment_Routes_Route(Pyjo.Base.object):
         self._methods: list[str] | None = None
         self._name: str | None = None
         self._parent: weakref.ref[Pyjoyment_Routes_Route] | None = None
+        self._prefix_index: _PrefixIndex | None = None
         self._requires: list[tuple[str, Any]] | None = None
         self._websocket = False
 
@@ -176,6 +181,7 @@ class Pyjoyment_Routes_Route(Pyjo.Base.object):
             # Reattach route
             r.add_child(r.find('foo'))
         """
+        _invalidate(self)
         self.children.append(route.remove().set(parent=self))
         route.pattern.types = self.root.types
         return self
@@ -508,6 +514,7 @@ class Pyjoyment_Routes_Route(Pyjo.Base.object):
         """
         if (parent := self.parent) is None:
             return self
+        _invalidate(parent)
         parent.children[:] = [child for child in parent.children if child is not self]
         self.parent = None
         return self
@@ -733,6 +740,53 @@ class Pyjoyment_Routes_Route(Pyjo.Base.object):
             route.name = name
         return route
 
+    def _candidates(self, path: str) -> 'list[Pyjoyment_Routes_Route]':
+
+        # Index children by the text their patterns start with (routes are frozen after the first request)
+        children = self.children
+        if not children:
+            return children
+        if (index := self._prefix_index) is None:
+            index = self._prefix_index = ([], {})
+            for i, child in enumerate(children):
+                if (prefixes := child._prefixes()) is not None:
+                    for prefix in prefixes:
+                        index[1].setdefault(len(prefix), {}).setdefault(prefix, []).append(i)
+                else:
+                    index[0].append(i)
+
+        # Children that could match the path, in their original order
+        if not (text := index[1]):
+            return children
+        found = set(index[0])
+        for length, prefixes in text.items():
+            if hit := prefixes.get(path[:length]):
+                found.update(hit)
+        return [children[i] for i in sorted(found)]
+
+    # Text one of the paths matched by this route has to start with (None if it could be anything)
+    def _prefixes(self) -> list[str] | None:
+
+        # Custom regexes and pattern classes could match anything
+        pattern = self.pattern
+        regex, compiled = pattern.regex, pattern._compiled  # pyright: ignore[reportPrivateUsage]
+        if type(pattern) is not Pyjoyment.Routes.Pattern.object or (regex is not None and regex is not compiled):
+            return None
+        if tree := pattern.tree:
+            first = tree[0]
+            return [first[1]] if first[0] == 'text' else None
+
+        # Routes with an empty pattern pass the path on to their children
+        children = self.children
+        if self.partial or not children:
+            return None
+        prefixes: list[str] = []
+        for child in children:
+            if (child_prefixes := child._prefixes()) is None:
+                return None
+            prefixes.extend(child_prefixes)
+        return prefixes
+
     def _index(self) -> 'dict[str, Pyjoyment_Routes_Route]':
         auto: dict[str, Pyjoyment_Routes_Route] = {}
         custom: dict[str, Pyjoyment_Routes_Route] = {}
@@ -760,6 +814,12 @@ class Pyjoyment_Routes_Route(Pyjo.Base.object):
             new_pattern.defaults['format'] = defaults['format']
 
         return route
+
+
+def _invalidate(route: Pyjoyment_Routes_Route | None) -> None:
+    while route is not None:
+        route._prefix_index = None  # pyright: ignore[reportPrivateUsage]
+        route = route.parent
 
 
 new = Pyjoyment_Routes_Route.new

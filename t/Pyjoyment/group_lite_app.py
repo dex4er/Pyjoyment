@@ -250,281 +250,300 @@ def preserve_stash(c):
     stash = c.stash()
 
 
-# Zero expiration persists
-t.ua.max_redirects = 1
-t.get_ok('/expiration?redirect=1').status_is(200).header_is('Server', 'Pyjoyment (Python)').content_is('0')
-ok(not t.tx.res.cookie('pyjoyment').expires, 'no expiration')
-t.reset_session()
+with subtest('Zero expiration persists'):
+    t.ua.max_redirects = 1
+    t.get_ok('/expiration?redirect=1').status_is(200).header_is('Server', 'Pyjoyment (Python)').content_is('0')
+    ok(not t.tx.res.cookie('pyjoyment').expires, 'no expiration')
+    t.reset_session()
 
-# Multiple cookies with same name
-t.get_ok('/multi').status_is(200).header_is('Server', 'Pyjoyment (Python)').content_is('\n\n\n\n\n\n\n\n')
+with subtest('Multiple cookies with same name'):
+    t.get_ok('/multi').status_is(200).header_is('Server', 'Pyjoyment (Python)').content_is('\n\n\n\n\n\n\n\n')
 
-# Multiple cookies with same name (again)
-(
-    t.get_ok('/multi')
-    .status_is(200)
-    .header_is('Server', 'Pyjoyment (Python)')
-    .content_is('two\nthree\none\ntwo\nfive\nsix\nfour\nfive\n')
-)
+with subtest('Multiple cookies with same name (again)'):
+    (
+        t.get_ok('/multi')
+        .status_is(200)
+        .header_is('Server', 'Pyjoyment (Python)')
+        .content_is('two\nthree\none\ntwo\nfive\nsix\nfour\nfive\n')
+    )
 
-# Missing action behind bridge
-t.get_ok('/missing').status_is(500).content_like(r'Route without action and nothing to render')
+with subtest('Missing action behind bridge'):
+    t.get_ok('/missing').status_is(500).content_like(r'Route without action and nothing to render')
 
-# Suspended bridge
-with t.app.log.capture('trace') as logs:
-    t.get_ok('/suspended?ok=1').status_is(200).header_is('Server', 'Pyjoyment (Python)').content_is('suspended!')
-    like_ok(str(logs), r'GET "/suspended"', 'right message')
-    like_ok(str(logs), r'Routing to a callback', 'right message')
-    like_ok(str(logs), r'Nothing has been rendered, expecting delayed response', 'right message')
-    # Unlike Mojolicious: the name is the MD5 sum of the template of Python
-    like_ok(str(logs), r'Rendering inline template "4f2c392370a7161007d603b890866ed8"', 'right message')
+with subtest('Suspended bridge'):
+    with t.app.log.capture('trace') as logs:
+        t.get_ok('/suspended?ok=1').status_is(200).header_is('Server', 'Pyjoyment (Python)').content_is('suspended!')
+        like_ok(str(logs), r'GET "/suspended"', 'right message')
+        like_ok(str(logs), r'Routing to a callback', 'right message')
+        like_ok(str(logs), r'Nothing has been rendered, expecting delayed response', 'right message')
+        # Unlike Mojolicious: the name is the MD5 sum of the template of Python
+        like_ok(str(logs), r'Rendering inline template "4f2c392370a7161007d603b890866ed8"', 'right message')
 
-# Suspended bridge (stopped)
-t.get_ok('/suspended?ok=0').status_is(200).header_is('Server', 'Pyjoyment (Python)').content_is('stopped!')
+with subtest('Suspended bridge (stopped)'):
+    t.get_ok('/suspended?ok=0').status_is(200).header_is('Server', 'Pyjoyment (Python)').content_is('stopped!')
 
-# Authenticated with header
-(
-    t.get_ok('/with_under', {'X-Bender': 'Rodriguez'})
-    .status_is(200)
-    .header_is('Server', 'Pyjoyment (Python)')
-    .header_is('X-Under', '23, 24')
-    .header_like('X-Under', r'23, 24')
-    .content_is('Unders are cool!')
-)
+with subtest('Authenticated with header'):
+    (
+        t.get_ok('/with_under', {'X-Bender': 'Rodriguez'})
+        .status_is(200)
+        .header_is('Server', 'Pyjoyment (Python)')
+        .header_is('X-Under', '23, 24')
+        .header_like('X-Under', r'23, 24')
+        .content_is('Unders are cool!')
+    )
 
-# Authenticated with header too
-(
-    t.get_ok('/with_under_too', {'X-Bender': 'Rodriguez'})
-    .status_is(200)
-    .header_is('Server', 'Pyjoyment (Python)')
-    .header_is('X-Under', '23, 24')
-    .header_like('X-Under', r'23, 24')
-    .content_is('Unders are cool too!')
-)
+with subtest('Authenticated with header too'):
+    (
+        t.get_ok('/with_under_too', {'X-Bender': 'Rodriguez'})
+        .status_is(200)
+        .header_is('Server', 'Pyjoyment (Python)')
+        .header_is('X-Under', '23, 24')
+        .header_like('X-Under', r'23, 24')
+        .content_is('Unders are cool too!')
+    )
 
-# Not authenticated with header
-(t.get_ok('/with_under_too').status_is(401).header_is('Server', 'Pyjoyment (Python)').content_like(r'Unauthorized'))
+with subtest('Not authenticated with header'):
+    (t.get_ok('/with_under_too').status_is(401).header_is('Server', 'Pyjoyment (Python)').content_like(r'Unauthorized'))
 
-# Not authenticated with parameter
-t.get_ok('/param_auth').status_is(200).header_is('Server', 'Pyjoyment (Python)').content_is('Not Bender!\n')
-is_ok(stash.get('_name'), None, 'no "_name" value')
+with subtest('Not authenticated with parameter'):
+    t.get_ok('/param_auth').status_is(200).header_is('Server', 'Pyjoyment (Python)').content_is('Not Bender!\n')
+    is_ok(stash.get('_name'), None, 'no "_name" value')
 
-# Authenticated with parameter
-(t.get_ok('/param_auth?name=Bender').status_is(200).header_is('Server', 'Pyjoyment (Python)').content_is('Bender!\n'))
+with subtest('Authenticated with parameter'):
+    (
+        t.get_ok('/param_auth?name=Bender')
+        .status_is(200)
+        .header_is('Server', 'Pyjoyment (Python)')
+        .content_is('Bender!\n')
+    )
 
-# Not authenticated with parameter
-t.get_ok('/param_auth/too').status_is(200).header_is('Server', 'Pyjoyment (Python)').content_is('Not Bender!\n')
+with subtest('Not authenticated with parameter'):
+    t.get_ok('/param_auth/too').status_is(200).header_is('Server', 'Pyjoyment (Python)').content_is('Not Bender!\n')
 
-# Authenticated with parameter too
-(
-    t.get_ok('/param_auth/too?name=Bender')
-    .status_is(200)
-    .header_is('Server', 'Pyjoyment (Python)')
-    .content_is('You could be Bender too!')
-)
+with subtest('Authenticated with parameter too'):
+    (
+        t.get_ok('/param_auth/too?name=Bender')
+        .status_is(200)
+        .header_is('Server', 'Pyjoyment (Python)')
+        .content_is('You could be Bender too!')
+    )
 
-# No cookies, session or flash
-t.get_ok('/bridge2stash', {'X-Flash': 1}).status_is(200).content_is('stash too!!!!!!!!\n')
-ok(t.tx.res.cookie('pyjoyment').expires, 'has expiration')
-is_ok(stash.get('_name'), 'stash', 'right "_name" value')
+with subtest('No cookies, session or flash'):
+    t.get_ok('/bridge2stash', {'X-Flash': 1}).status_is(200).content_is('stash too!!!!!!!!\n')
+    ok(t.tx.res.cookie('pyjoyment').expires, 'has expiration')
+    is_ok(stash.get('_name'), 'stash', 'right "_name" value')
 
-# Cookies, session and flash
-with t.app.log.capture('trace') as logs:
+with subtest('Cookies, session and flash'):
+    with t.app.log.capture('trace') as logs:
+        (
+            t.get_ok('/bridge2stash')
+            .status_is(200)
+            .content_is('stash too!cookie!!signed_cookie!!bad_cookie--12345678!session!flash!\n')
+        )
+        like_ok(str(logs), r'Cookie "foo" is not signed', 'right message')
+        like_ok(str(logs), r'Cookie "bad" has bad signature', 'right message')
+        ok(t.tx.res.cookie('pyjoyment').httponly, 'session cookie has HttpOnly flag')
+        is_ok(t.tx.res.cookie('pyjoyment').samesite, 'Lax', 'right SameSite value')
+    t.app.sessions.samesite = 'Strict'
+    t.get_ok('/bridge2stash').status_is(200)
+    is_ok(t.tx.res.cookie('pyjoyment').samesite, 'Strict', 'right SameSite value')
+    t.app.sessions.samesite = None
+    t.get_ok('/bridge2stash').status_is(200)
+    is_ok(t.tx.res.cookie('pyjoyment').samesite, None, 'no SameSite value')
+
+with subtest('Broken session cookie'):
+    t.reset_session()
+    session = u('☃☃☃☃☃').encode().b64_encode('')
+    hmac = session.clone().hmac_sha1_sum(t.app.secrets[0])
+    (
+        t.get_ok('/bridge2stash', {'Cookie': f'pyjoyment={session}--{hmac}'})
+        .status_is(200)
+        .content_is('stash too!!!!!!!!\n')
+    )
+
+with subtest('Not collecting cookies'):
+    t.reset_session().ua.cookie_jar.ignore = lambda cookie: True
+    t.get_ok('/bridge2stash', {'X-Flash': 1}).status_is(200).content_is('stash too!!!!!!!!\n')
+
+with subtest('Still not collecting cookies'):
+    t.get_ok('/bridge2stash', {'X-Flash': 1}).status_is(200).content_is('stash too!!!!!!!!\n')
+    t.ua.cookie_jar.ignore = lambda cookie: False
+
+with subtest('Fresh start without cookies, session or flash'):
+    t.get_ok('/bridge2stash', {'X-Flash': 1}).status_is(200).content_is('stash too!!!!!!!!\n')
+
+with subtest('Random static requests'):
+    # Renamed from Mojolicious: the bundled files are in /pyjo, where Mojo has them in /mojo
+    t.get_ok('/pyjo/logo-white.png').status_is(200)
+    t.get_ok('/pyjo/logo-white.png').status_is(200)
+
+with subtest('With cookies, session and flash again'):
     (
         t.get_ok('/bridge2stash')
         .status_is(200)
         .content_is('stash too!cookie!!signed_cookie!!bad_cookie--12345678!session!flash!\n')
     )
-    like_ok(str(logs), r'Cookie "foo" is not signed', 'right message')
-    like_ok(str(logs), r'Cookie "bad" has bad signature', 'right message')
-    ok(t.tx.res.cookie('pyjoyment').httponly, 'session cookie has HttpOnly flag')
-    is_ok(t.tx.res.cookie('pyjoyment').samesite, 'Lax', 'right SameSite value')
-t.app.sessions.samesite = 'Strict'
-t.get_ok('/bridge2stash').status_is(200)
-is_ok(t.tx.res.cookie('pyjoyment').samesite, 'Strict', 'right SameSite value')
-t.app.sessions.samesite = None
-t.get_ok('/bridge2stash').status_is(200)
-is_ok(t.tx.res.cookie('pyjoyment').samesite, None, 'no SameSite value')
 
-# Broken session cookie
-t.reset_session()
-session = u('☃☃☃☃☃').encode().b64_encode('')
-hmac = session.clone().hmac_sha1_sum(t.app.secrets[0])
-(t.get_ok('/bridge2stash', {'Cookie': f'pyjoyment={session}--{hmac}'}).status_is(200).content_is('stash too!!!!!!!!\n'))
+with subtest('With cookies and session but no flash (rotating secrets)'):
+    t.app.secrets = ['test2', 'test1']
+    (
+        t.get_ok('/bridge2stash', {'X-Flash2': 1})
+        .status_is(200)
+        .content_is('stash too!cookie!!signed_cookie!!bad_cookie--12345678!session!!\n')
+    )
+    ok(t.tx.res.cookie('pyjoyment').expires < time.time(), 'session cookie expires')
 
-# Not collecting cookies
-t.reset_session().ua.cookie_jar.ignore = lambda cookie: True
-t.get_ok('/bridge2stash', {'X-Flash': 1}).status_is(200).content_is('stash too!!!!!!!!\n')
+with subtest('With cookies and session cleared (rotating secrets)'):
+    t.app.secrets = ['test3', 'test2']
+    t.get_ok('/bridge2stash').status_is(200).content_is('stash too!cookie!!signed_cookie!!bad_cookie--12345678!!!\n')
 
-# Still not collecting cookies
-t.get_ok('/bridge2stash', {'X-Flash': 1}).status_is(200).content_is('stash too!!!!!!!!\n')
-t.ua.cookie_jar.ignore = lambda cookie: False
+with subtest('Late session does not affect rendering'):
+    t.get_ok('/late/session').status_is(200).content_is('not yet!')
 
-# Fresh start without cookies, session or flash
-t.get_ok('/bridge2stash', {'X-Flash': 1}).status_is(200).content_is('stash too!!!!!!!!\n')
+with subtest('Previous late session does affect rendering'):
+    t.get_ok('/late/session').status_is(200).content_is('works!')
 
-# Random static requests
-# Renamed from Mojolicious: the bundled files are in /pyjo, where Mojo has them in /mojo
-t.get_ok('/pyjo/logo-white.png').status_is(200)
-t.get_ok('/pyjo/logo-white.png').status_is(200)
+with subtest('Previous late session does affect rendering again'):
+    t.get_ok('/late/session').status_is(200).content_is('works!')
 
-# With cookies, session and flash again
-(
-    t.get_ok('/bridge2stash')
-    .status_is(200)
-    .content_is('stash too!cookie!!signed_cookie!!bad_cookie--12345678!session!flash!\n')
-)
+with subtest('Counter'):
+    (
+        t.get_ok('/with/under/count', {'X-Bender': 'Rodriguez'})
+        .status_is(200)
+        .header_is('Server', 'Pyjoyment (Python)')
+        .header_is('X-Under', '1')
+        .content_is('counter\n')
+    )
+    is_ok(stash.get('_name'), None, 'no "_name" value')
 
-# With cookies and session but no flash (rotating secrets)
-t.app.secrets = ['test2', 'test1']
-(
-    t.get_ok('/bridge2stash', {'X-Flash2': 1})
-    .status_is(200)
-    .content_is('stash too!cookie!!signed_cookie!!bad_cookie--12345678!session!!\n')
-)
-ok(t.tx.res.cookie('pyjoyment').expires < time.time(), 'session cookie expires')
+with subtest('Cookies, session and no flash again'):
+    (
+        t.get_ok('/bridge2stash', {'X-Flash': 1})
+        .status_is(200)
+        .content_is('stash too!cookie!!signed_cookie!!bad_cookie--12345678!session!!\n')
+    )
 
-# With cookies and session cleared (rotating secrets)
-t.app.secrets = ['test3', 'test2']
-t.get_ok('/bridge2stash').status_is(200).content_is('stash too!cookie!!signed_cookie!!bad_cookie--12345678!!!\n')
+with subtest('With cookies, session and flash'):
+    (
+        t.get_ok('/bridge2stash')
+        .status_is(200)
+        .content_is('stash too!cookie!!signed_cookie!!bad_cookie--12345678!session!flash!\n')
+    )
 
-# Late session does not affect rendering
-t.get_ok('/late/session').status_is(200).content_is('not yet!')
+with subtest('With cookies and session but no flash'):
+    (
+        t.get_ok('/bridge2stash', {'X-Flash2': 1})
+        .status_is(200)
+        .content_is('stash too!cookie!!signed_cookie!!bad_cookie--12345678!session!!\n')
+    )
 
-# Previous late session does affect rendering
-t.get_ok('/late/session').status_is(200).content_is('works!')
+with subtest('Prefix'):
+    t.get_ok('/prefix').status_is(200).header_is('Server', 'Pyjoyment (Python)').content_is('prefixed GET works!')
 
-# Previous late session does affect rendering again
-t.get_ok('/late/session').status_is(200).content_is('works!')
+with subtest('POST request with prefix'):
+    t.post_ok('/prefix').status_is(200).header_is('Server', 'Pyjoyment (Python)').content_is('prefixed POST works!')
 
-# Counter
-(
-    t.get_ok('/with/under/count', {'X-Bender': 'Rodriguez'})
-    .status_is(200)
-    .header_is('Server', 'Pyjoyment (Python)')
-    .header_is('X-Under', '1')
-    .content_is('counter\n')
-)
-is_ok(stash.get('_name'), None, 'no "_name" value')
+with subtest('GET request with prefix'):
+    t.get_ok('/prefix/works').status_is(200).header_is('Server', 'Pyjoyment (Python)').content_is('prefix works!')
 
-# Cookies, session and no flash again
-(
-    t.get_ok('/bridge2stash', {'X-Flash': 1})
-    .status_is(200)
-    .content_is('stash too!cookie!!signed_cookie!!bad_cookie--12345678!session!!\n')
-)
+with subtest('Another prefix'):
+    t.get_ok('/prefix2/foo').status_is(200).content_is('prefixed!\n')
 
-# With cookies, session and flash
-(
-    t.get_ok('/bridge2stash')
-    .status_is(200)
-    .content_is('stash too!cookie!!signed_cookie!!bad_cookie--12345678!session!flash!\n')
-)
+with subtest('Another prefix again'):
+    t.get_ok('/prefix2/bar').status_is(200).content_is('also prefixed!\n')
 
-# With cookies and session but no flash
-(
-    t.get_ok('/bridge2stash', {'X-Flash2': 1})
-    .status_is(200)
-    .content_is('stash too!cookie!!signed_cookie!!bad_cookie--12345678!session!!\n')
-)
+with subtest('Reset under statements'):
+    t.get_ok('/reset').status_is(200).content_is('reset works!')
 
-# Prefix
-t.get_ok('/prefix').status_is(200).header_is('Server', 'Pyjoyment (Python)').content_is('prefixed GET works!')
+with subtest('Not reachable with prefix'):
+    t.get_ok('/prefix/reset').status_is(404).content_is('Oops!\n')
 
-# POST request with prefix
-t.post_ok('/prefix').status_is(200).header_is('Server', 'Pyjoyment (Python)').content_is('prefixed POST works!')
+with subtest('Group'):
+    t.get_ok('/group').status_is(200).content_is('onetwo!\n')
 
-# GET request with prefix
-t.get_ok('/prefix/works').status_is(200).header_is('Server', 'Pyjoyment (Python)').content_is('prefix works!')
+with subtest('Nested group'):
+    t.get_ok('/group/nested').status_is(200).content_is('threetwoone!\n')
 
-# Another prefix
-t.get_ok('/prefix2/foo').status_is(200).content_is('prefixed!\n')
+with subtest('GET request to nested group'):
+    t.get_ok('/group/nested/whatever').status_is(200).content_is('onetwothree!\n')
 
-# Another prefix again
-t.get_ok('/prefix2/bar').status_is(200).content_is('also prefixed!\n')
+with subtest('Another GET request to nested group'):
+    t.get_ok('/group/nested/something').status_is(404).content_is('Oops!\n')
 
-# Reset under statements
-t.get_ok('/reset').status_is(200).content_is('reset works!')
+with subtest('Authenticated by group'):
+    t.get_ok('/authgroup?ok=1').status_is(200).content_type_is('text/html;charset=UTF-8').content_is("You're ok.")
 
-# Not reachable with prefix
-t.get_ok('/prefix/reset').status_is(404).content_is('Oops!\n')
+with subtest('Not authenticated by group'):
+    t.get_ok('/authgroup').status_is(200).content_type_is('text/html;charset=UTF-8').content_is("You're not ok.")
 
-# Group
-t.get_ok('/group').status_is(200).content_is('onetwo!\n')
+with subtest('Authenticated by group (with format)'):
+    (
+        t.get_ok('/authgroup.txt?ok=1')
+        .status_is(200)
+        .content_type_is('text/plain;charset=UTF-8')
+        .content_is("You're ok.")
+    )
 
-# Nested group
-t.get_ok('/group/nested').status_is(200).content_is('threetwoone!\n')
+with subtest('Not authenticated by group (with format)'):
+    t.get_ok('/authgroup.txt').status_is(200).content_type_is('text/plain;charset=UTF-8').content_is("You're not ok.")
 
-# GET request to nested group
-t.get_ok('/group/nested/whatever').status_is(200).content_is('onetwothree!\n')
+with subtest('Bypassed group authentication'):
+    t.get_ok('/noauthgroup').status_is(200).content_is('Whatever one.\n')
 
-# Another GET request to nested group
-t.get_ok('/group/nested/something').status_is(404).content_is('Oops!\n')
+with subtest('Disabled format detection'):
+    (
+        t.get_ok('/no_format')
+        .status_is(200)
+        .content_type_is('text/html;charset=UTF-8')
+        .content_is('No format detection.')
+    )
 
-# Authenticated by group
-t.get_ok('/authgroup?ok=1').status_is(200).content_type_is('text/html;charset=UTF-8').content_is("You're ok.")
+with subtest('Invalid format'):
+    t.get_ok('/no_format.txt').status_is(404).content_type_is('text/html;charset=UTF-8').content_is('Oops!\n')
 
-# Not authenticated by group
-t.get_ok('/authgroup').status_is(200).content_type_is('text/html;charset=UTF-8').content_is("You're not ok.")
+with subtest('Invalid format'):
+    t.get_ok('/some_formats').status_is(404).content_type_is('text/html;charset=UTF-8').content_is('Oops!\n')
 
-# Authenticated by group (with format)
-(t.get_ok('/authgroup.txt?ok=1').status_is(200).content_type_is('text/plain;charset=UTF-8').content_is("You're ok."))
+with subtest('Format "txt" has been detected'):
+    (
+        t.get_ok('/some_formats.txt')
+        .status_is(200)
+        .content_type_is('text/plain;charset=UTF-8')
+        .content_is('Some format detection.')
+    )
 
-# Not authenticated by group (with format)
-t.get_ok('/authgroup.txt').status_is(200).content_type_is('text/plain;charset=UTF-8').content_is("You're not ok.")
+with subtest('Format "json" has been detected'):
+    (
+        t.get_ok('/some_formats.json')
+        .status_is(200)
+        .content_type_is('application/json;charset=UTF-8')
+        .content_is('Some format detection.')
+    )
 
-# Bypassed group authentication
-t.get_ok('/noauthgroup').status_is(200).content_is('Whatever one.\n')
+with subtest('Invalid format'):
+    t.get_ok('/some_formats.xml').status_is(404).content_type_is('text/html;charset=UTF-8').content_is('Oops!\n')
 
-# Disabled format detection
-(t.get_ok('/no_format').status_is(200).content_type_is('text/html;charset=UTF-8').content_is('No format detection.'))
+with subtest('Invalid format'):
+    t.get_ok('/no_real_format').status_is(404).content_type_is('text/html;charset=UTF-8').content_is('Oops!\n')
 
-# Invalid format
-t.get_ok('/no_format.txt').status_is(404).content_type_is('text/html;charset=UTF-8').content_is('Oops!\n')
+with subtest('No format detected'):
+    (
+        t.get_ok('/no_real_format.xml')
+        .status_is(200)
+        .content_type_is('text/html;charset=UTF-8')
+        .content_is('No real format.')
+    )
 
-# Invalid format
-t.get_ok('/some_formats').status_is(404).content_type_is('text/html;charset=UTF-8').content_is('Oops!\n')
+with subtest('Invalid format'):
+    t.get_ok('/no_real_format.txt').status_is(404).content_type_is('text/html;charset=UTF-8').content_is('Oops!\n')
 
-# Format "txt" has been detected
-(
-    t.get_ok('/some_formats.txt')
-    .status_is(200)
-    .content_type_is('text/plain;charset=UTF-8')
-    .content_is('Some format detection.')
-)
+with subtest('Invalid format'):
+    t.get_ok('/one_format').status_is(404).content_type_is('text/html;charset=UTF-8').content_is('Oops!\n')
 
-# Format "json" has been detected
-(
-    t.get_ok('/some_formats.json')
-    .status_is(200)
-    .content_type_is('application/json;charset=UTF-8')
-    .content_is('Some format detection.')
-)
+with subtest('Format "xml" detected'):
+    t.get_ok('/one_format.xml').status_is(200).content_type_is('application/xml').content_is('One format.')
 
-# Invalid format
-t.get_ok('/some_formats.xml').status_is(404).content_type_is('text/html;charset=UTF-8').content_is('Oops!\n')
-
-# Invalid format
-t.get_ok('/no_real_format').status_is(404).content_type_is('text/html;charset=UTF-8').content_is('Oops!\n')
-
-# No format detected
-(
-    t.get_ok('/no_real_format.xml')
-    .status_is(200)
-    .content_type_is('text/html;charset=UTF-8')
-    .content_is('No real format.')
-)
-
-# Invalid format
-t.get_ok('/no_real_format.txt').status_is(404).content_type_is('text/html;charset=UTF-8').content_is('Oops!\n')
-
-# Invalid format
-t.get_ok('/one_format').status_is(404).content_type_is('text/html;charset=UTF-8').content_is('Oops!\n')
-
-# Format "xml" detected
-t.get_ok('/one_format.xml').status_is(200).content_type_is('application/xml').content_is('One format.')
-
-# Invalid format
-t.get_ok('/one_format.txt').status_is(404).content_type_is('text/html;charset=UTF-8').content_is('Oops!\n')
+with subtest('Invalid format'):
+    t.get_ok('/one_format.txt').status_is(404).content_type_is('text/html;charset=UTF-8').content_is('Oops!\n')
 
 done_testing()

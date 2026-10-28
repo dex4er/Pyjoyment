@@ -7,6 +7,7 @@ Pyjo.Util test
 """
 
 from Pyjo.File import tempdir
+from Pyjo.String.Bytes import b
 from Pyjo.String.HTML import html
 from Pyjo.String.Unicode import u
 from Pyjo.Test import *
@@ -388,6 +389,34 @@ with subtest('html_unescape (special entities)'):
 with subtest('html_unescape (multi-character entity)'):
     is_ok(html_unescape('&acE;'), '∾̳', 'right HTML unescaped result')
 
+with subtest('html_unescape (invalid code points)'):
+    is_ok(html_unescape('&#0;'), '�', 'null character reference')
+    is_ok(html_unescape('&#x0;'), '�', 'null character reference')
+    is_ok(html_unescape('&#xD800;'), '�', 'leading surrogate')
+    is_ok(html_unescape('&#xDBFF;'), '�', 'leading surrogate')
+    is_ok(html_unescape('&#xDC00;'), '�', 'trailing surrogate')
+    is_ok(html_unescape('&#xDFFF;'), '�', 'trailing surrogate')
+    is_ok(html_unescape('&#55296;'), '�', 'surrogate in decimal')
+    is_ok(html_unescape('&#1114112;'), '�', 'outside unicode range')
+    is_ok(html_unescape('&#9999999;'), '�', 'outside unicode range')
+    is_ok(html_unescape('&#xD83D;&#xDE00;'), '��', 'surrogate pairs are not combined')
+    is_ok(html_unescape('&#xD7FF;'), '퟿', 'below surrogate range')
+    is_ok(html_unescape('&#xE000;'), '', 'above surrogate range')
+    is_ok(html_unescape('&#x10FFFF;'), '\U0010ffff', 'noncharacters are preserved')
+    is_ok(html_unescape('&#xFFFE;'), '￾', 'noncharacters are preserved')
+
+with subtest('html_unescape (windows-1252 remap)'):
+    is_ok(html_unescape('&#x80;'), '€', 'euro sign')
+    is_ok(html_unescape('&#128;'), '€', 'euro sign in decimal')
+    is_ok(html_unescape('&#0128;'), '€', 'euro sign with leading zero')
+    is_ok(html_unescape('&#x93;'), '“', 'left double quotation mark')
+    is_ok(html_unescape('&#x99;'), '™', 'trade mark sign')
+    is_ok(html_unescape('&#x9F;'), 'Ÿ', 'latin capital letter y with diaeresis')
+    is_ok(html_unescape('&#x81;'), '\x81', 'unmapped control is preserved')
+    is_ok(html_unescape('&#x9D;'), '\x9d', 'unmapped control is preserved')
+    is_ok(html_unescape('&#x7F;'), '\x7f', 'delete is not remapped')
+    is_ok(html_unescape('&#xA0;'), '\xa0', 'no-break space is not remapped')
+
 with subtest('html_unescape (apos)'):
     is_ok(html_unescape('foobar&apos;&lt;baz&gt;&#x26;&#34;'), 'foobar\'<baz>&"', 'right HTML unescaped result')
 
@@ -567,6 +596,7 @@ with subtest('xor_encode'):
     is_ok(xor_encode(b'\x10\x1d\x14\x14\x17\x58\x0f\x17\x0a\x14\x1c', b'x'), b'hello world', 'right result')
     is_ok(xor_encode(b'hello', b'123456789'), b'\x59\x57\x5f\x58\x5a', 'right result')
     is_ok(xor_encode(b'\x59\x57\x5f\x58\x5a', b'123456789'), b'hello', 'right result')
+    is_ok(xor_encode(b'', b'foo'), b'', 'right result')
 
 with subtest('steady_time'):
     like_ok(str(steady_time()), r'^[\d.]+$', 'high resolution time')
@@ -760,6 +790,7 @@ with subtest('gzip/gunzip'):
     ok(len(compressed) < len(uncompressed), 'string is shorter')
     result = gunzip(compressed)
     is_ok(result, uncompressed, 'same string')
+    is_ok(gunzip(gzip(b(uncompressed))), uncompressed, 'same string')
 
 with subtest('scope_guard'):
     test = ['a']

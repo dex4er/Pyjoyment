@@ -1,3 +1,4 @@
+import Pyjo.DOM
 import Pyjo.Test.Pyjo
 import Pyjoyment
 
@@ -13,6 +14,25 @@ any('/', {'text': 'Hello Test!'})
 @websocket('/websocket')
 def ws(c):
     c.send({'text': b'testing message'})
+
+
+@get('/html')
+def html_page(c):
+    c.session(visited=1)
+    c.render(inline='<div><p id="a">One</p><p>Two</p></div>')
+
+
+get('/json', {'json': {'foo': [1, 2, 3], 'bar': 'baz'}})
+
+
+@websocket('/echo')
+def echo(c):
+    c.on('binary', lambda c, bytes: c.send({'binary': bytes}))
+    # The bytes are characters 0-255, as Perl sends a string of bytes
+    c.on('text', lambda c, bytes: c.send(bytes.decode('latin-1')))
+
+
+websocket('/close', lambda c: c.finish(4000))
 
 
 @any('/sse')
@@ -104,11 +124,22 @@ with subtest('query_ok'):
     is_deeply_ok(args, ['ok', 1, 'QUERY /'], 'right result')
     is_ok(t.tx.req.method, 'QUERY', 'right method')
 
+with subtest('request_ok'):
+    t.request_ok(t.ua.build_tx('GET', '/'))
+    is_deeply_ok(args, ['ok', 1, 'GET /'], 'right result')
+    is_ok(t.tx.req.method, 'GET', 'right method')
+
 with subtest('status_is'):
     t.status_is(200)
     is_deeply_ok(args, ['is', 200, 200, '200 OK'], 'right result')
     t.status_is(404, 'some description')
     is_deeply_ok(args, ['is', 200, 404, 'some description'], 'right result')
+
+with subtest('status_isnt'):
+    t.status_isnt(404)
+    is_deeply_ok(args, ['isnt', 200, 404, 'not 404 Not Found'], 'right result')
+    t.status_isnt(200, 'some description')
+    is_deeply_ok(args, ['isnt', 200, 200, 'some description'], 'right result')
 
 with subtest('content_is'):
     t.content_is('Hello Test!')
@@ -266,6 +297,96 @@ with subtest('header_unlike'):
         args, ['unlike', 'text/html;charset=UTF-8', re.compile(r'image/png'), 'some description'], 'right result'
     )
 
+with subtest('text_is'):
+    t.get_ok('/html').text_is('p', 'One')
+    is_deeply_ok(args, ['is', 'One', 'One', 'exact match for selector "p"'], 'right result')
+    t.text_is('p', 'Two', 'some description')
+    is_deeply_ok(args, ['is', 'One', 'Two', 'some description'], 'right result')
+    t.text_is('span', 'One')
+    is_deeply_ok(args, ['is', None, 'One', 'exact match for selector "span"'], 'right result')
+
+with subtest('text_isnt'):
+    t.get_ok('/html').text_isnt('p', 'Two')
+    is_deeply_ok(args, ['isnt', 'One', 'Two', 'no match for selector "p"'], 'right result')
+    t.text_isnt('p', 'Two', 'some description')
+    is_deeply_ok(args, ['isnt', 'One', 'Two', 'some description'], 'right result')
+
+with subtest('text_like'):
+    t.get_ok('/html').text_like('p', re.compile(r'On'))
+    is_deeply_ok(args, ['like', 'One', re.compile(r'On'), 'similar match for selector "p"'], 'right result')
+    t.text_like('p', re.compile(r'On'), 'some description')
+    is_deeply_ok(args, ['like', 'One', re.compile(r'On'), 'some description'], 'right result')
+
+with subtest('text_unlike'):
+    t.get_ok('/html').text_unlike('p', re.compile(r'Tw'))
+    is_deeply_ok(args, ['unlike', 'One', re.compile(r'Tw'), 'no similar match for selector "p"'], 'right result')
+    t.text_unlike('p', re.compile(r'Tw'), 'some description')
+    is_deeply_ok(args, ['unlike', 'One', re.compile(r'Tw'), 'some description'], 'right result')
+
+with subtest('element_exists'):
+    t.get_ok('/html').element_exists('p#a')
+    is_ok(args[0], 'ok', 'right test')
+    isa_ok(args[1], Pyjo.DOM.object, 'right element')
+    is_ok(args[1].text, 'One', 'right text')
+    is_ok(args[2], 'element for selector "p#a" exists', 'right description')
+    t.element_exists('span', 'some description')
+    is_deeply_ok(args, ['ok', None, 'some description'], 'right result')
+
+with subtest('element_exists_not'):
+    t.get_ok('/html').element_exists_not('span')
+    is_deeply_ok(args, ['ok', True, 'no element for selector "span"'], 'right result')
+    t.element_exists_not('p', 'some description')
+    is_deeply_ok(args, ['ok', False, 'some description'], 'right result')
+
+with subtest('element_count_is'):
+    t.get_ok('/html').element_count_is('p', 2)
+    is_deeply_ok(args, ['is', 2, 2, 'element count for selector "p"'], 'right result')
+    t.element_count_is('span', 1, 'some description')
+    is_deeply_ok(args, ['is', 0, 1, 'some description'], 'right result')
+
+with subtest('json_has'):
+    t.get_ok('/json').json_has('/foo')
+    is_deeply_ok(args, ['ok', True, 'has value for JSON Pointer "/foo"'], 'right result')
+    t.json_has('/missing', 'some description')
+    is_deeply_ok(args, ['ok', False, 'some description'], 'right result')
+
+with subtest('json_hasnt'):
+    t.get_ok('/json').json_hasnt('/missing')
+    is_deeply_ok(args, ['ok', True, 'has no value for JSON Pointer "/missing"'], 'right result')
+    t.json_hasnt('/foo', 'some description')
+    is_deeply_ok(args, ['ok', False, 'some description'], 'right result')
+
+with subtest('json_is'):
+    t.get_ok('/json').json_is('/foo', [1, 2, 3])
+    is_deeply_ok(args, ['is_deeply', [1, 2, 3], [1, 2, 3], 'exact match for JSON Pointer "/foo"'], 'right result')
+    t.json_is('/foo/1', 2, 'some description')
+    is_deeply_ok(args, ['is_deeply', 2, 2, 'some description'], 'right result')
+    t.json_is({'foo': [1, 2, 3], 'bar': 'baz'})
+    is_deeply_ok(
+        args,
+        [
+            'is_deeply',
+            {'foo': [1, 2, 3], 'bar': 'baz'},
+            {'foo': [1, 2, 3], 'bar': 'baz'},
+            'exact match for JSON Pointer ""',
+        ],
+        'right result',
+    )
+
+with subtest('json_like'):
+    t.get_ok('/json').json_like('/bar', re.compile(r'baz'))
+    is_deeply_ok(args, ['like', 'baz', re.compile(r'baz'), 'similar match for JSON Pointer "/bar"'], 'right result')
+    t.json_like('/bar', re.compile(r'baz'), 'some description')
+    is_deeply_ok(args, ['like', 'baz', re.compile(r'baz'), 'some description'], 'right result')
+
+with subtest('json_unlike'):
+    t.get_ok('/json').json_unlike('/bar', re.compile(r'yada'))
+    is_deeply_ok(
+        args, ['unlike', 'baz', re.compile(r'yada'), 'no similar match for JSON Pointer "/bar"'], 'right result'
+    )
+    t.json_unlike('/bar', re.compile(r'yada'), 'some description')
+    is_deeply_ok(args, ['unlike', 'baz', re.compile(r'yada'), 'some description'], 'right result')
+
 with subtest('message_is'):
     t.websocket_ok('/websocket').message_ok().message_is('testing message')
     is_deeply_ok(args, ['is', 'testing message', 'testing message', 'exact match for message'], 'right result')
@@ -303,6 +424,73 @@ with subtest('message_unlike'):
     is_deeply_ok(args, ['unlike', 'testing message', re.compile(r'^test'), 'message is not similar'], 'right result')
     t.websocket_ok('/websocket').message_ok().message_unlike(re.compile(r'^test'), 'some description')
     is_deeply_ok(args, ['unlike', 'testing message', re.compile(r'^test'), 'some description'], 'right result')
+
+with subtest('send_ok'):
+    t.websocket_ok('/echo').send_ok('hi')
+    is_deeply_ok(args, ['ok', 1, 'send message'], 'right result')
+    t.send_ok('hi', 'some description')
+    is_deeply_ok(args, ['ok', 1, 'some description'], 'right result')
+    t.finish_ok()
+    t.get_ok('/').send_ok('hi')
+    is_deeply_ok(args, ['ok', 0, 'send message'], 'right result')
+
+with subtest('Message type checks'):
+    t.websocket_ok('/echo').send_ok({'binary': b'bin'}).message_ok().message_is({'binary': b'bin'})
+    is_deeply_ok(args, ['is', b'bin', b'bin', 'exact match for message'], 'right result')
+    t.message_is({'text': 'bin'})
+    is_deeply_ok(args, ['is', '', 'bin', 'exact match for message'], 'right result')
+    t.send_ok({'text': b'txt'}).message_ok().message_is({'text': b'txt'})
+    is_deeply_ok(args, ['is', b'txt', b'txt', 'exact match for message'], 'right result')
+    t.message_is({'binary': b'txt'})
+    is_deeply_ok(args, ['is', '', b'txt', 'exact match for message'], 'right result')
+    t.finish_ok()
+
+with subtest('json_message_has'):
+    t.websocket_ok('/echo').send_ok({'json': {'a': [1, 2]}}).message_ok().json_message_has('/a')
+    is_deeply_ok(args, ['ok', True, 'has value for JSON Pointer "/a"'], 'right result')
+    t.json_message_has('/b', 'some description')
+    is_deeply_ok(args, ['ok', False, 'some description'], 'right result')
+    t.finish_ok()
+
+with subtest('json_message_hasnt'):
+    t.websocket_ok('/echo').send_ok({'json': {'a': [1, 2]}}).message_ok().json_message_hasnt('/b')
+    is_deeply_ok(args, ['ok', True, 'has no value for JSON Pointer "/b"'], 'right result')
+    t.json_message_hasnt('/a', 'some description')
+    is_deeply_ok(args, ['ok', False, 'some description'], 'right result')
+    t.finish_ok()
+
+with subtest('json_message_is'):
+    t.websocket_ok('/echo').send_ok({'json': {'a': [1, 2]}}).message_ok().json_message_is('/a', [1, 2])
+    is_deeply_ok(args, ['is_deeply', [1, 2], [1, 2], 'exact match for JSON Pointer "/a"'], 'right result')
+    t.json_message_is('/a/1', 2, 'some description')
+    is_deeply_ok(args, ['is_deeply', 2, 2, 'some description'], 'right result')
+    t.json_message_is({'a': [1, 2]})
+    is_deeply_ok(args, ['is_deeply', {'a': [1, 2]}, {'a': [1, 2]}, 'exact match for JSON Pointer ""'], 'right result')
+    t.finish_ok()
+
+with subtest('json_message_like'):
+    t.websocket_ok('/echo').send_ok({'json': {'a': 'test'}}).message_ok().json_message_like('/a', re.compile(r'es'))
+    is_deeply_ok(args, ['like', 'test', re.compile(r'es'), 'similar match for JSON Pointer "/a"'], 'right result')
+    t.json_message_like('/a', re.compile(r'es'), 'some description')
+    is_deeply_ok(args, ['like', 'test', re.compile(r'es'), 'some description'], 'right result')
+    t.finish_ok()
+
+with subtest('json_message_unlike'):
+    t.websocket_ok('/echo').send_ok({'json': {'a': 'test'}}).message_ok().json_message_unlike('/a', re.compile(r'yada'))
+    is_deeply_ok(
+        args, ['unlike', 'test', re.compile(r'yada'), 'no similar match for JSON Pointer "/a"'], 'right result'
+    )
+    t.json_message_unlike('/a', re.compile(r'yada'), 'some description')
+    is_deeply_ok(args, ['unlike', 'test', re.compile(r'yada'), 'some description'], 'right result')
+    t.finish_ok()
+
+with subtest('finish_ok'):
+    t.websocket_ok('/echo').finish_ok()
+    is_deeply_ok(args, ['ok', 1, 'closed WebSocket'], 'right result')
+
+with subtest('finished_ok'):
+    t.websocket_ok('/close').finished_ok(4000)
+    is_deeply_ok(args, ['ok', 1, 'WebSocket closed with status 4000'], 'right result')
 
 with subtest('SSE'):
     with subtest('get_sse_ok'):
@@ -373,5 +561,28 @@ with subtest('SSE'):
         t.sse_text_unlike(re.compile(r'Two'), 'some description')
         is_deeply_ok(args, ['unlike', 'One', re.compile(r'Two'), 'some description'], 'right result')
         t.sse_finish_ok()
+
+with subtest('Descriptions'):
+    t.get_ok('/').status_is(200, 'ä')
+    # Unlike Mojolicious: the description stays a str, which Pyjo.Test prints as it is, where Mojo encodes it in UTF-8
+    # for Test::More
+    is_deeply_ok(args, ['is', 200, 200, 'ä'], 'description is encoded')
+
+with subtest('reset_session'):
+    t.get_ok('/html')
+    ok(t.tx, 'has transaction')
+    ok(t.ua.cookie_jar.all(), 'has cookies')
+    is_ok(t.reset_session(), t, 'returns itself')
+    is_ok(t.tx, None, 'no transaction')
+    is_deeply_ok(t.ua.cookie_jar.all(), [], 'no cookies')
+
+with subtest('new'):
+    is_ok(Pyjo.Test.Pyjo.new().app, app, 'default application')
+    is_ok(Pyjo.Test.Pyjo.new(app).app, app, 'same application')
+    t2 = Pyjo.Test.Pyjo.new(app, {'test': 23})
+    is_ok(t2.app, app, 'same application')
+    is_ok(t2.app.config()['test'], 23, 'right value')
+    is_ok(t2.app.config()['config_override'], 1, 'right value')
+
 
 done_testing()

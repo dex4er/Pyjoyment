@@ -304,7 +304,7 @@ class _Call:
         # The response has started, so the connection is closed, as the response cannot change, unless it has ended, as
         # Starlette raises the exception after its response 500
         if self.started:
-            if not self.closed:
+            if self.ended or not self.closed:
                 self.app.log.error(f'ASGI application failed: {message}')
                 if not self.ended:
                     self._close()

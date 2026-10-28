@@ -87,8 +87,8 @@ See also
 
 :mod:`Pyjoyment`, https://mojolicious.org.
 
-Ported from `Mojo::Log <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/Log.pm>`_
-of Mojolicious 9.49.
+Ported from `Mojo::Log <https://github.com/mojolicious/mojo/blob/v9.52/lib/Mojo/Log.pm>`_
+of Mojolicious 9.52.
 """
 
 import Pyjo.EventEmitter
@@ -439,7 +439,7 @@ class Pyjo_Log(Pyjo.EventEmitter.object):
             context = log.context({'user': 'sri'})
         """
         log = self.new(level=self.level)
-        log._parent = self
+        log._parent = self._parent or self
         # Not in Mojolicious: the items of a dict as fields
         log._context = [
             field
