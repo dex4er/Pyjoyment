@@ -458,9 +458,9 @@ with subtest('Signals'):
     import sys
     import time
 
-    restored = []
+    restored, refused = [], []
 
-    def run(*signals, connect=False, poll=False):
+    def run(*signals, connect=False, poll=False, refuse=False):
         # An event loop of its own, which the connections of the other subtests do not keep from stopping gracefully
         finished, connections = [], []
         with (
@@ -478,6 +478,19 @@ with subtest('Signals'):
                 loop.recurring(0.1, lambda loop: ua.get(url, lambda ua, tx: None))
             for i, signum in enumerate(signals):
                 loop.timer(0.2 * (i + 1), lambda loop, signum=signum: os.kill(os.getpid(), signum))
+            # A new connection while the server stops gracefully, which the closed listen socket refuses
+            if refuse:
+                port = daemon.ports()[0]
+
+                def new(loop):
+                    try:
+                        socket.create_connection(('127.0.0.1', port), timeout=1).close()
+                        refused.append(False)
+                    # A connection that comes while the socket closes is reset, as a refused one is
+                    except (ConnectionRefusedError, ConnectionResetError):
+                        refused.append(True)
+
+                loop.timer(0.6, new)
             loop.timer(5, lambda loop: loop.stop())
             daemon.stop()
             daemon.run()
@@ -487,7 +500,7 @@ with subtest('Signals'):
         return bool(finished)
 
     if sys.platform == 'win32':
-        skip('no signals of POSIX', 11)
+        skip('no signals of POSIX', 12)
     else:
         ok(run(signal.SIGTERM), 'TERM stops gracefully')
         ok(run(signal.SIGINT), 'INT stops gracefully')
@@ -500,8 +513,9 @@ with subtest('Signals'):
             'second INT stops immediately, with a connection that keeps it from stopping',
         )
         started = time.monotonic()
-        ok(run(signal.SIGTERM, signal.SIGTERM, connect=True), 'graceful stop before the second TERM')
+        ok(run(signal.SIGTERM, signal.SIGTERM, connect=True, refuse=True), 'graceful stop before the second TERM')
         ok(time.monotonic() - started > 4, 'second TERM does nothing')
+        is_deeply_ok(refused, [True], 'a new connection is refused while it stops gracefully')
         started = time.monotonic()
         ok(run(signal.SIGTERM, poll=True), 'TERM stops gracefully, with a client that keeps requesting')
         ok(time.monotonic() - started < 2, 'a connection kept alive closes after its next response')

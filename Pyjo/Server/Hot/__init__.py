@@ -55,8 +55,11 @@ the following signals.
 INT, TERM
 ~~~~~~~~~
 
-Shut down server gracefully. A second ``INT``, as of Ctrl-C pressed twice,
-shuts it down immediately, a second ``TERM`` does nothing.
+Shut down server gracefully. The manager and the workers close the listen
+sockets, so that a new connection is refused, and the workers finish the
+accepted ones; after a hot deployment, the new manager keeps the sockets that
+it has inherited open. A second ``INT``, as of Ctrl-C pressed twice, shuts it
+down immediately, a second ``TERM`` does nothing.
 
 QUIT
 ~~~~
@@ -104,7 +107,7 @@ following signals.
 TERM
 ~~~~
 
-Stop worker gracefully.
+Stop worker gracefully, with its copies of the listen sockets closed.
 
 QUIT
 ~~~~

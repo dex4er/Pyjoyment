@@ -313,6 +313,47 @@ with subtest('Second INT and TERM'):
     is_deeply_ok(finished, [True, False], 'a second INT shuts the server down immediately')
     ok(elapsed < 2, 'stopped before the graceful timeout')
 
+# Not in Mojolicious: the manager and the workers close their copies of the listen sockets when the server stops
+# gracefully, so that a new connection is refused, while a request in progress keeps the worker
+with subtest('A new connection while it stops gracefully'):
+    prefork = Pyjo.Server.Prefork.new(
+        heartbeat_interval=0.5, listen=['http://127.0.0.1'], pid_file=tempdir().child('prefork.pid'), workers=1
+    )
+    prefork.graceful_timeout = 5
+    prefork.unsubscribe('request')
+
+    # A request that keeps the worker from stopping gracefully
+    @prefork.on('request')
+    def request(prefork, tx):
+        pass
+
+    connections, refused, finished = [], [], []
+
+    @prefork.once('heartbeat')
+    def heartbeat(prefork, pid):
+        port = prefork.ports()[0]
+        connections.append(connection := socket.create_connection(('127.0.0.1', port)))
+        connection.sendall(b'GET / HTTP/1.1\r\nHost: x\r\n\r\n')
+        os.kill(os.getpid(), signal.SIGTERM)
+
+        # A new connection each time the manager waits, until one is refused
+        @prefork.on('wait')
+        def wait(prefork):
+            if refused:
+                return
+            try:
+                socket.create_connection(('127.0.0.1', port), timeout=1).close()
+            # A connection that comes while the socket closes is reset, as a refused one is
+            except (ConnectionRefusedError, ConnectionResetError):
+                refused.append(time.monotonic())
+
+    prefork.on('finish', lambda prefork, graceful: finished.append(time.monotonic()))
+    prefork.run()
+    for connection in connections:
+        connection.close()
+    ok(refused, 'a new connection is refused')
+    ok(refused and refused[0] - finished[0] < 3, 'refused before the graceful timeout')
+
 # Not in Mojolicious: HUP restarts the workers gracefully, or emits the event "reload"
 with subtest('HUP'):
     prefork = Pyjo.Server.Prefork.new(
