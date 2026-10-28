@@ -227,6 +227,13 @@ with many routes. Only routes starting with a placeholder, like ``/:name``,
 always have to be tried. A routing cache will also be used automatically to
 handle sudden traffic spikes more gracefully.
 
+For convenience, the application object also has shortcut methods like
+:meth:`~Pyjoyment.Pyjoyment_App.get` and :meth:`~Pyjoyment.Pyjoyment_App.under`,
+which generate routes directly on :attr:`~Pyjoyment.Pyjoyment_App.routes`. ::
+
+    # Same as "self.routes.get(...)"
+    self.get('/welcome').to(controller='foo', action='welcome')
+
 Routing destination
 ~~~~~~~~~~~~~~~~~~~
 
@@ -1145,5 +1152,5 @@ wiki <https://github.com/mojolicious/mojo/wiki>`_, which contains a lot more
 documentation and examples by many different authors.
 
 Ported from `Mojolicious::Guides::Routing
-<https://github.com/mojolicious/mojo/blob/v9.52/lib/Mojolicious/Guides/Routing.pod>`_
-of Mojolicious 9.52.
+<https://github.com/mojolicious/mojo/blob/v9.53/lib/Mojolicious/Guides/Routing.pod>`_
+of Mojolicious 9.53.

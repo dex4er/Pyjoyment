@@ -405,8 +405,8 @@ See also
 
 :mod:`Pyjoyment`, https://mojolicious.org.
 
-Ported from `Mojo::DOM::CSS <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/DOM/CSS.pm>`_
-of Mojolicious 9.49.
+Ported from `Mojo::DOM::CSS <https://github.com/mojolicious/mojo/blob/v9.53/lib/Mojo/DOM/CSS.pm>`_
+of Mojolicious 9.53.
 
 Classes
 -------
@@ -416,6 +416,7 @@ import Pyjo.Base
 
 from Pyjo.Util import getenv, trim, warn
 
+import collections
 import pprint
 import re
 
@@ -857,6 +858,24 @@ def _select_all(scope: Tree, group: list[Selector]) -> list[Tree]:
 
 # Mojo's _select with $one true
 def _select_one(scope: Tree, group: list[Selector]) -> Tree | None:
+
+    # Scoped selectors require the whole tree to be searched
+    selectors, tree = group, scope
+    if any(_is_scoped(s) for s in selectors):
+        selectors, tree = _absolutize(selectors), _root(scope)
+
+    # Without combinators the first match in document order can be returned right away
+    if all(len(s) == 1 and isinstance(s[0], list) for s in selectors):
+        queue: collections.deque[Tree] = collections.deque(tree[1 if tree[0] == 'root' else 4 :])
+        while queue:
+            current = queue.popleft()
+            if current[0] != 'tag':
+                continue
+            if any(_selector(s[0], current, tree, scope) for s in selectors):
+                return current
+            queue.extendleft(reversed(current[4:]))
+        return None
+
     results = _select(scope, group)
     return results[0] if len(results) else None
 

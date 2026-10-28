@@ -312,9 +312,9 @@ After reading the :doc:`tutorial`, you should already be familiar with
 
     treeView-beta
         Pyjo.Server.Reload
-            Pyjo.Server.Daemon
+            Pyjo.Server.Daemon (or Pyjo.Server.Prefork)
 
-It is basically a restarter that forks a new :mod:`Pyjo.Server.Daemon` web
+It is basically a restarter that starts a new :mod:`Pyjo.Server.Daemon` web
 server whenever a file in your project changes, and should therefore only be
 used during development. To start applications with it you can use the
 ``pyjo-reload`` script.
@@ -323,6 +323,21 @@ used during development. To start applications with it you can use the
 
     $ pyjo-reload ./myapp.py
     Web application available at http://127.0.0.1:3000
+
+Any other server command can be used too, just put it after the application.
+
+.. code-block:: console
+
+    $ pyjo-reload ./myapp.py prefork -w 2
+
+Additional commands that should run during development, like asset bundlers
+in watch mode, can be started alongside the server. They run until
+:mod:`Pyjo.Server.Reload` is stopped, and see the same ``PYJO_MODE`` as your
+application.
+
+.. code-block:: console
+
+    $ pyjo-reload -x 'npx webpack --watch' ./myapp.py
 
 Containers
 ~~~~~~~~~~
@@ -2583,5 +2598,5 @@ wiki <https://github.com/mojolicious/mojo/wiki>`_, which contains a lot more
 documentation and examples by many different authors.
 
 Ported from `Mojolicious::Guides::Cookbook
-<https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojolicious/Guides/Cookbook.pod>`_
-of Mojolicious 9.49.
+<https://github.com/mojolicious/mojo/blob/v9.53/lib/Mojolicious/Guides/Cookbook.pod>`_
+of Mojolicious 9.53.

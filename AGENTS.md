@@ -183,24 +183,22 @@ lock matches with `uv lock --check`.
 version, run `mise lock` so every platform in `mise.lock` is refreshed; CI
 installs with `--locked` and fails on a tool that is not in the lock.
 
-`pyjo-reload` (`Pyjo.Server.Reload`) runs the application in a worker that is
-an `os.fork` of its manager, and forks a new one when a file that it watches
-changes: the script of the application, and `lib` and `templates` by default,
-or the paths of `-w` in their place. Before the first fork, the manager imports
-`Pyjo.Server.Reload` and starts the daemon whose listen sockets it keeps, which
-loads most of the toolkit, as `Pyjo.JSON`, `Pyjo.IOLoop`, `Pyjo.UserAgent` and
-`Pyjo.Server.Daemon`, and a worker inherits these modules as they were then.
-Only the script of the application, and what it imports that the manager has
-not loaded, as `Pyjoyment` and the package of a distribution, as `Pyjo.MCP`,
-is loaded anew in each worker. So a change of a module of the toolkit, by an
-edit of the checkout or by `uv sync` of a newer Pyjoyment, needs a restart of
-`pyjo-reload` itself, not a change of a file that it watches, and so does a
-change of an installed package, which it does not watch. The modules that the
-manager loads are listed with:
-
-```sh
-PYTHONPATH=. mise exec -- python -c "import sys, Pyjo.Server.Reload as R; r = R.new(); r.daemon.listen = ['http://127.0.0.1:0']; r.daemon.start().stop(); print(sorted(m for m in sys.modules if m.startswith('Pyjo')))"
-```
+`pyjo-reload` (`Pyjo.Server.Reload`) runs the server command of the
+application, `daemon` by default, as a new interpreter of the script, with
+`os.fork` and `os.execvp` in a process group of its own, and runs it again when
+a file that it watches changes: the script of the application, and `lib` and
+`templates` by default, or the paths of `-w` in their place. The manager
+creates the listen sockets once and passes them on in `PYJO_LISTEN` and
+`PYJO_REUSE`, and the path of its modules in `PYTHONPATH`, as Morbo passes
+`PERL5LIB`. Each server loads the toolkit anew, so a change of a module of the
+checkout, or `uv sync` of a newer Pyjoyment, takes effect at the next restart,
+which a change of a file that it watches or HUP makes; an installed package is
+not watched. The manager stops a server with QUIT, which stops the servers of
+Pyjoyment immediately, where TERM stops them gracefully and would wait for the
+connections that a browser keeps alive, and with TERM of its process group,
+which stops the subprocesses and the commands of `-x`, and KILL after 5
+seconds. A server ignores QUIT until it sets a handler of its own, as QUIT
+would dump the core of one that is still starting.
 
 ## Tests
 
@@ -1083,8 +1081,8 @@ sub {...}` is `get('/foo', cb)` or the decorator `@get('/foo')`, as a route
   `/\G\s*/gc` skipped nothing. A parser ported from Mojo that reports
   "before end of data" this way, as `Mojo::JSON` does, has to keep it where
   Mojo's tests expect it. A tokenizer that matches the text and then the tag
-  of the same position in two matches, with a lazy `??` and this rule, as
-  `Mojo::DOM::HTML` does, has them as alternatives in Python.
+  of the same position in two matches, with a lazy `??` and this rule, has
+  them as alternatives in Python.
 - Python has no relative backreference like `\g{-2}`; a named group takes
   its place, and works also where the pattern is embedded in another one.
 - Python's recursion limit is 1000 calls. A recursive parser that must reach

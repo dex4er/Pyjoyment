@@ -954,4 +954,34 @@ throws_ok(
     'right error',
 )
 
+with subtest('Route shortcuts'):
+    app_ = Pyjoyment.new()
+    for method in ('delete', 'get', 'options', 'patch', 'post', 'put', 'query'):
+        route = getattr(app_, method)('/shortcut', lambda c, method=method: c.render(text=method))
+        isa_ok(route, Pyjoyment.Routes.Route.object, 'right class')
+        is_deeply_ok(route.methods(), [method.upper()], 'right methods')
+    app_.any(['PUT'], '/any', lambda c: c.render(text='any'))
+
+    def under(c):
+        if c.req.headers.header('X-Pass'):
+            return True
+        c.render(text='denied', status=403)
+        return None
+
+    app_.under('/under', under).get('/inner', lambda c: c.render(text='inner'))
+
+    @app_.websocket('/ws')
+    def ws(c):
+        c.on('message', lambda c, msg: c.send(f'echo: {msg}'))
+
+    t = Pyjo.Test.Pyjo.new(app_)
+    for method in ('delete', 'get', 'options', 'patch', 'post', 'put', 'query'):
+        getattr(t, f'{method}_ok')('/shortcut').status_is(200).content_is(method)
+    t.put_ok('/any').status_is(200).content_is('any')
+    t.get_ok('/any').status_is(404)
+    t.get_ok('/under/inner', {'X-Pass': 1}).status_is(200).content_is('inner')
+    t.get_ok('/under/inner').status_is(403).content_is('denied')
+    t.websocket_ok('/ws').send_ok('hi').message_ok().message_is('echo: hi').finish_ok()
+
+
 done_testing()

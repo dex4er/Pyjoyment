@@ -15,8 +15,8 @@ from unittest.mock import patch
 # values are those of getopt of Mojo::Util with the same arguments
 
 
-def parse(args, *options, pass_through=False):
-    getopt = Pyjo.GetOpt.new(pass_through=pass_through)
+def parse(args, *options, pass_through=False, require_order=False):
+    getopt = Pyjo.GetOpt.new(pass_through=pass_through, require_order=require_order)
     for spec in options:
         getopt.option(spec)
     stderr = io.StringIO()
@@ -156,6 +156,17 @@ with subtest('Pass through'):
     is_ok(result.test, 'foo', 'right value')
     is_deeply_ok(args, ['-x', 'bar', '--', '-y'], 'unknown options and the end of the options kept')
     is_ok(stderr, '', 'no warning')
+
+with subtest('Require order'):
+    args = ['-t', 'foo', 'myapp.py', '-t', 'bar', '--', '-y']
+    result, stderr = parse(args, 't|test=s', require_order=True)
+    ok(result, 'success')
+    is_ok(result.test, 'foo', 'right value')
+    is_deeply_ok(args, ['myapp.py', '-t', 'bar', '--', '-y'], 'everything after the first argument kept')
+    is_ok(stderr, '', 'no warning')
+    args = ['-t', 'foo', '--', '-y']
+    result, stderr = parse(args, 't|test=s', require_order=True)
+    is_deeply_ok(args, ['-y'], 'end of the options removed')
 
 with subtest('Targets'):
     getopt = Pyjo.GetOpt.new()

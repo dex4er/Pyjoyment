@@ -33,7 +33,7 @@ with subtest('Synopsis'):
     class MyApp(Pyjoyment.object):
         # Route
         def startup(self):
-            self.routes.get('/hello').to('foo#hello')
+            self.get('/hello').to('foo#hello')
 
     # Controller
     import Pyjoyment.Controller
@@ -327,6 +327,11 @@ with subtest('ua'):
     app.ua = Pyjo.UserAgent.new()
     # The example of a blocking request needs the network, so it is not run
 
+with subtest('any'):
+    app = Pyjoyment.new()
+    route = app.any('/:foo', lambda c: ...)
+    is_ok(route.parent, app.routes, 'route on routes')
+
 with subtest('build_controller'):
     app = Pyjoyment.new()
     app.log.level = 'fatal'
@@ -379,6 +384,11 @@ with subtest('defaults'):
     app.defaults(foo='test', bar=23)
     is_ok(app.build_controller().stash('bar'), 23, 'stash of a new controller')
 
+with subtest('delete'):
+    app = Pyjoyment.new()
+    route = app.delete('/:foo', lambda c: ...)
+    is_ok(route.parent, app.routes, 'route on routes')
+
 with subtest('dispatch'):
     app = Pyjoyment.new()
     app.log.level = 'fatal'
@@ -390,6 +400,11 @@ with subtest('dispatch'):
     c.req.url.parse('/')
     app.dispatch(c)
     is_ok(c.res.body, b'dispatched', 'dispatched')
+
+with subtest('get'):
+    app = Pyjoyment.new()
+    route = app.get('/:foo', lambda c: ...)
+    is_ok(route.parent, app.routes, 'route on routes')
 
 with subtest('handler'):
     app = Pyjoyment.new()
@@ -454,6 +469,16 @@ with subtest('new'):
     app = Pyjoyment.new({'moniker': 'foo_bar'})
     is_ok(app.moniker, 'foo_bar', 'dict')
 
+with subtest('options'):
+    app = Pyjoyment.new()
+    route = app.options('/:foo', lambda c: ...)
+    is_ok(route.parent, app.routes, 'route on routes')
+
+with subtest('patch'):
+    app = Pyjoyment.new()
+    route = app.patch('/:foo', lambda c: ...)
+    is_ok(route.parent, app.routes, 'route on routes')
+
 with subtest('plugin'):
     app = Pyjoyment.new()
     app.plugin('header_condition')
@@ -466,6 +491,21 @@ with subtest('plugin'):
     app.plugin('Pyjoyment.Plugin.HeaderCondition', foo=23)
     app.plugin('Pyjoyment.Plugin.HeaderCondition', {'foo': 23})
     ok('agent' in app.routes.conditions, 'plugin registered')
+
+with subtest('post'):
+    app = Pyjoyment.new()
+    route = app.post('/:foo', lambda c: ...)
+    is_ok(route.parent, app.routes, 'route on routes')
+
+with subtest('put'):
+    app = Pyjoyment.new()
+    route = app.put('/:foo', lambda c: ...)
+    is_ok(route.parent, app.routes, 'route on routes')
+
+with subtest('query'):
+    app = Pyjoyment.new()
+    route = app.query('/:foo', lambda c: ...)
+    is_ok(route.parent, app.routes, 'route on routes')
 
 with subtest('server'):
     app = Pyjoyment.new()
@@ -537,10 +577,20 @@ with subtest('template'):
     c.render('hello', name='Joe')
     is_ok(c.res.text, '<p>Hello Joe!</p>', 'rendered')
 
+with subtest('under'):
+    app = Pyjoyment.new()
+    route = app.under('/:foo', lambda c: ...)
+    is_ok(route.parent, app.routes, 'route on routes')
+
 with subtest('warmup'):
     app = Pyjoyment.new()
     app.preload_namespaces = ['Pyjoyment.Plugin']
     app.warmup()
     ok('Pyjoyment.Plugin.DefaultHelpers' in sys.modules, 'preloaded')
+
+with subtest('websocket'):
+    app = Pyjoyment.new()
+    route = app.websocket('/:foo', lambda c: ...)
+    is_ok(route.parent, app.routes, 'route on routes')
 
 done_testing()

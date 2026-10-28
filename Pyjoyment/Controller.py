@@ -67,8 +67,8 @@ See also
 
 :mod:`Pyjoyment`, https://mojolicious.org.
 
-Ported from `Mojolicious::Controller <https://github.com/mojolicious/mojo/blob/v9.52/lib/Mojolicious/Controller.pm>`_
-of Mojolicious 9.52.
+Ported from `Mojolicious::Controller <https://github.com/mojolicious/mojo/blob/v9.53/lib/Mojolicious/Controller.pm>`_
+of Mojolicious 9.53.
 """
 
 # No imports, for security reasons!
@@ -1038,9 +1038,18 @@ class Pyjoyment_Controller(Pyjo.Base.object):
             url = c.url_for_asset('/app.js')
 
         Generate a portable :mod:`Pyjo.URL` object with base for a static
-        asset.
+        asset. In ``development`` mode the asset directories are scanned again
+        every time, so assets that have just been rebuilt with a different name
+        are found too.
         """
-        return self.url_for(asset if _ABSOLUTE.match(asset) else self.app.static.asset_path(asset))
+        if _ABSOLUTE.match(asset):
+            return self.url_for(asset)
+
+        # Bundlers can rebuild assets with new names at any time during development
+        app = self.app
+        if app.mode == 'development':
+            app.static.warmup()
+        return self.url_for(app.static.asset_path(asset))
 
     def url_for_file(self, file: str) -> Pyjo.URL.object:
         """::

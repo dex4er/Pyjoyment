@@ -153,6 +153,9 @@ with subtest('getopt'):
     args = ['-t', '3', '-x']
     opts = getopt(args, {'H|headers=s': headers, 't|timeout=i': None}, pass_through=True)
     is_deeply_ok(args, ['-x'], 'pass through')
+    args = ['-v', 'myapp.py', 'prefork', '-w', '2']
+    opts = getopt(args, {'v|verbose': None}, require_order=True)
+    is_deeply_ok(args, ['myapp.py', 'prefork', '-w', '2'], 'require order')
     os.environ['PYJO_TIMEOUT'] = '5'
     try:
         opts = getopt([], {'t|timeout=i': None}, env_prefix='PYJO_')

@@ -171,8 +171,8 @@ See also
 
 :mod:`Pyjoyment`, https://mojolicious.org.
 
-Ported from `Mojo::UserAgent <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/UserAgent.pm>`_
-of Mojolicious 9.49.
+Ported from `Mojo::UserAgent <https://github.com/mojolicious/mojo/blob/v9.53/lib/Mojo/UserAgent.pm>`_
+of Mojolicious 9.53.
 
 Classes
 -------
@@ -618,7 +618,7 @@ class Pyjo_UserAgent(Pyjo.EventEmitter.object):
 
             # Mock web service
             ua.server.app = Pyjoyment.new()
-            ua.server.app.routes.get('/time', lambda c: c.render(json={'now': time.time()}))
+            ua.server.app.get('/time', lambda c: c.render(json={'now': time.time()}))
             now = ua.get('/time').result.json()['now']
 
             # Change log level

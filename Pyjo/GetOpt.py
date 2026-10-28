@@ -181,21 +181,27 @@ class Pyjo_GetOpt(Pyjo.Base.object):
     implements the following new ones.
     """
 
-    def __init__(self, *, pass_through: bool = False, env_prefix: str | None = None) -> None:
+    def __init__(
+        self, *, pass_through: bool = False, require_order: bool = False, env_prefix: str | None = None
+    ) -> None:
         """::
 
             getopt = Pyjo.GetOpt.new()
             getopt = Pyjo.GetOpt.new(pass_through=True)
+            getopt = Pyjo.GetOpt.new(require_order=True)
             getopt = Pyjo.GetOpt.new(env_prefix='PYJO_')
 
         Construct a new :mod:`Pyjo.GetOpt` object. With ``pass_through``,
         unknown options and ``--`` stay in the list of arguments, without a
-        warning. With ``env_prefix``, an option that is not given has the
-        value of the environment variable of its name, see
-        `Environment`_.
+        warning. With ``require_order``, the options end at the first argument
+        that is not one, and what follows it stays in the list of arguments,
+        options too, as the arguments of a command that the program runs. With
+        ``env_prefix``, an option that is not given has the value of the
+        environment variable of its name, see `Environment`_.
         """
         self.env_prefix = env_prefix
         self.pass_through = pass_through
+        self.require_order = require_order
         self._names: dict[str, _Option] = {}
         self._negations: set[str] = set()
         self._options: list[_Option] = []
@@ -312,8 +318,11 @@ class Pyjo_GetOpt(Pyjo.Base.object):
                 keep.extend(rest[i - 1 :] if self.pass_through else rest[i:])
                 break
 
-            # An argument
+            # An argument, after which the options end with require_order
             if not arg.startswith('-') or arg == '-':
+                if self.require_order:
+                    keep.extend(rest[i - 1 :])
+                    break
                 keep.append(arg)
                 continue
 

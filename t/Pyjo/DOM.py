@@ -3176,6 +3176,27 @@ with subtest('Runaway "<"'):
 """)
     is_ok(dom.at('.test').text, 'works', 'right text')
 
+with subtest('Unclosed comments, CDATA sections, processing instructions and RCDATA elements'):
+    dom = Pyjo.DOM.new('<p><!-- a <p><!-- b <![CDATA[ c <? d <![CDATA[ e <? f')
+    is_ok(dom.find('p').size, 2, 'right number of elements')
+    is_ok(dom.all_text, '<!-- a <!-- b <![CDATA[ c <? d <![CDATA[ e <? f', 'right text')
+
+    dom = Pyjo.DOM.new('<div><textarea>a<p><textarea>b</div><p><!--c-->')
+    is_deeply_ok(dom.find('textarea').map('text').to_list(), ['a', 'b'], 'right text')
+    is_ok(dom.find('p').size, 2, 'right number of elements')
+
+with subtest('Stray "=" after tag name'):
+    dom = Pyjo.DOM.new('<div ="x"><img ="foo" src="bar"></div =y><p ="">a</p>')
+    is_ok(dom.at('img').attr('src'), 'bar', 'right attribute')
+    is_ok(dom.at('div').children().size, 1, 'right number of children')
+    is_ok(dom.at('p').text, 'a', 'right text')
+    is_ok(str(dom), '<div "x"><img "foo" src="bar"></div><p "">a</p>', 'right result')
+
+with subtest('Runaway "<" in what looks like an attribute value'):
+    dom = Pyjo.DOM.new('<a&amp;=<b x="1">test</b>')
+    is_ok(dom.at('b').text, 'test', 'right text')
+    is_ok(str(dom), '&lt;a&amp;=<b x="1">test</b>', 'right result')
+
 with subtest('"<" followed by space is not a tag opener'):
     dom = Pyjo.DOM.new('if a < script then="<!--"> </script> <p>FAIL</p>-->')
     is_deeply_ok(dom.find('script, p').map('to_string').to_list(), [], 'fragment contains no tags, just a comment')
@@ -3273,6 +3294,14 @@ with subtest('Descendant combinator chain with non-matching selector'):
 
     exists = Pyjo.DOM.new('<div id="x"><a><b><c><d>ok</d></c></b></a></div>')
     is_ok(exists.at('#x * * * *').text, 'ok', 'matching id still resolves descendants')
+
+with subtest('First match without combinators'):
+    dom = Pyjo.DOM.new('<div><p id="a">A</p><span><b class="x">B</b></span></div><p class="x">C</p>')
+    is_ok(dom.at('b, p').text, 'A', 'first match in document order')
+    is_ok(dom.at('.x').text, 'B', 'nested match comes first')
+    is_ok(dom.at('span').at('b.x, p').text, 'B', 'only matches inside the element')
+    is_ok(dom.at('div').at('p.x'), None, 'no match inside the element')
+    is_ok(dom.at('i'), None, 'no match')
 
 with subtest('Unknown CSS selector'):
     dom = Pyjo.DOM.new('<html><head></head><body><div><div>x</div></div></body></html>')

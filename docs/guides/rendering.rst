@@ -562,6 +562,50 @@ example (``rollup.config.js``):
       // Add your own rules and entry point here
     };
 
+Vite `configuration <https://vite.dev/config/>`_ example
+(``vite.config.js``):
+
+.. code-block:: javascript
+
+    import Path from '@mojojs/path';
+
+    const isDev = process.env.PYJO_MODE === 'development';
+
+    export default {
+      // Pyjoyment already serves the "public" directory
+      publicDir: false,
+      build: {
+        outDir: Path.currentFile().sibling('public', 'assets').toString(),
+        rollupOptions: {
+          output: {
+            entryFileNames: isDev ? '[name].development.js' : '[name].[hash].js',
+            assetFileNames: isDev ? '[name].development.[ext]' : '[name].[hash].[ext]'
+          }
+        }
+      },
+
+      // Add your own plugins and entry point here
+    };
+
+During development you can let :mod:`Pyjo.Server.Reload` start your bundler
+in watch mode, so it rebuilds assets whenever their sources change. The
+``PYJO_MODE`` environment variable will be set for it too, and because assets
+are found again for every request in ``development`` mode and not cached by
+browsers, there is no need to restart your application.
+
+.. code-block:: console
+
+    $ pyjo-reload -x 'npx webpack --watch' ./myapp.py
+    $ pyjo-reload -x 'npx rollup -c -w' ./myapp.py
+    $ pyjo-reload -x 'npx vite build --watch' ./myapp.py
+
+For production you just run the bundler once before deploying your
+application, with ``PYJO_MODE`` set accordingly.
+
+.. code-block:: console
+
+    $ PYJO_MODE=production npx webpack
+
 Everything else is up to your bundler of choice, so you need to consult its
 documentation for further information. And where you keep your asset
 sources, such as ``.vue`` and ``.jsx`` files, is not important, as long as
@@ -1237,5 +1281,5 @@ wiki <https://github.com/mojolicious/mojo/wiki>`_, which contains a lot more
 documentation and examples by many different authors.
 
 Ported from `Mojolicious::Guides::Rendering
-<https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojolicious/Guides/Rendering.pod>`_
-of Mojolicious 9.49.
+<https://github.com/mojolicious/mojo/blob/v9.53/lib/Mojolicious/Guides/Rendering.pod>`_
+of Mojolicious 9.53.

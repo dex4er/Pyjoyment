@@ -28,8 +28,8 @@ See also
 
 :mod:`Pyjoyment`, https://mojolicious.org.
 
-Ported from `Mojo::DOM::HTML <https://github.com/mojolicious/mojo/blob/v9.51/lib/Mojo/DOM/HTML.pm>`_
-of Mojolicious 9.51.
+Ported from `Mojo::DOM::HTML <https://github.com/mojolicious/mojo/blob/v9.53/lib/Mojo/DOM/HTML.pm>`_
+of Mojolicious 9.53.
 
 Functions
 ---------
@@ -58,38 +58,24 @@ _ATTR = r"""
   \s*
 """
 _ATTR_RE = re.compile(_ATTR, re.X)
-# Unlike Mojolicious: Mojo makes a match of the text and one of the tag with a
-# lazy "??" and the rule of Perl that a match of no length cannot follow
-# another one at the same position; Python has no such rule, so the text, the
-# tag and a runaway "<" are alternatives
-_TOKEN_RE = re.compile(
-    rf"""
-  (?:
-    ([^<]+)                                                                    # Text
-  |
-    <(?:
-      !(?:
-        DOCTYPE(
-        \s+\w+                                                                 # Doctype
-        (?:(?:\s+\w+)?(?:\s+(?:"[^"]*"|'[^']*'))+)?                            # External ID
-        (?:\s+\[.+?\])?                                                        # Int Subset
-        \s*)
-      |
-        --(.*?)(?:--!?|(?<=<!--)-?(?=>))                                       # Comment
-      |
-        \[CDATA\[(.*?)\]\]                                                     # CDATA
-      )
-    |
-      \?(.*?)\?                                                                # Processing Instruction
-    |
-      ((?:/\s*)?[^<>\s/0-9.\-][^<>\s/]*\s*(?:(?:{_ATTR}){{0,32766}})*+)        # Tag
-    )>
-  |
-    (<)                                                                        # Runaway "<"
-  )
+_MARKUP = {
+    'doctype': re.compile(
+        r"""
+    <!DOCTYPE(
+    \s+\w+                                        # Doctype
+    (?:(?:\s+\w+)?(?:\s+(?:"[^"]*"|'[^']*'))+)?   # External ID
+    (?:\s+\[.+?\])?                               # Int Subset
+    \s*)>
 """,
-    re.X | re.I | re.S,
-)
+        re.X | re.I | re.S,
+    ),
+    'comment': re.compile(r'<!--(.*?)(?:--!?|(?<=<!--)-?(?=>))>', re.S),
+    'cdata': re.compile(r'<!\[CDATA\[(.*?)\]\]>', re.I | re.S),
+    'pi': re.compile(r'<\?(.*?)\?>', re.S),
+}
+_TAG_RE = re.compile(r'<(/\s*)?([^<>\s/0-9.\-][^<>\s/]*)\s*')
+_TEXT_RE = re.compile(r'[^<]+')
+_STRAY_RE = re.compile(r'=\s*')
 
 # HTML elements that only contain raw text
 RAW = {'script', 'style'}
@@ -203,112 +189,140 @@ class Pyjo_DOM_HTML(Pyjo.Base.object):
         string = str(html)
 
         # Detect XML from a leading declaration
-        if not self._xml_set and re.match(r'\ufeff?\s*<\?xml[\s?]', string, re.I):
+        if not self._xml_set and re.match(r'﻿?\s*<\?xml[\s?]', string, re.I):
             self.xml = True
 
         xml = self.xml
         tree: Tree = ['root']
         current = [tree]
+        unclosed: set[str] = set()
         pos = 0
-        while m := _TOKEN_RE.match(string, pos):
-            pos = m.end()
-            text, doctype, comment, cdata, pi, tag, runaway = (m[i] for i in (1, 2, 3, 4, 5, 6, 11))
+        while (offset := pos) < len(string):
+            # Text
+            if m := _TEXT_RE.match(string, offset):
+                pos = m.end()
+                _node(current[0], 'text', html_unescape(m[0]))
+                continue
 
-            # DOCTYPE, CDATA (outside of foreign content) and processing instructions end at the first ">" in HTML
-            if (
-                not xml
-                and (i := next((v for v in (doctype, cdata, pi) if v is not None), '').find('>')) >= 0
-                and not (cdata is not None and _foreign(current[0]))
-            ):
-                pos = m.start(2 if doctype is not None else 4 if cdata is not None else 5) + i + 1
-                doctype, cdata, pi = (v[:i] if v is not None else v for v in (doctype, cdata, pi))
+            # DOCTYPE, comment, CDATA and processing instruction (only trying the regex for the opener keeps failures fast)
+            next = string[offset + 1 : offset + 2]
+            if next in ('!', '?'):
+                opener = string[offset : offset + 9].upper()
+                type = (
+                    'comment'
+                    if opener[:4] == '<!--'
+                    else 'doctype'
+                    if opener == '<!DOCTYPE'
+                    else 'cdata'
+                    if opener == '<![CDATA['
+                    else 'pi'
+                    if next == '?'
+                    else None
+                )
 
-            # Text (and runaway "<")
-            if runaway is not None:
-                text = (text or '') + '<'
-            if text is not None:
-                _node(current[0], 'text', html_unescape(text))
+                if type and type not in unclosed:
+                    if m := _MARKUP[type].match(string, offset):
+                        pos, value = m.end(), m[1]
+
+                        # DOCTYPE, CDATA (outside of foreign content) and processing instructions end at the first ">"
+                        # in HTML
+                        i = -1 if xml or type == 'comment' else value.find('>')
+                        if i >= 0 and not (type == 'cdata' and _foreign(current[0])):
+                            pos = m.start(1) + i + 1
+                            value = value[:i]
+
+                        _node(current[0], type, value)
+                        continue
+
+                    # Without an end for this one, there is none for later ones either (DOCTYPE can fail for other
+                    # reasons)
+                    if type != 'doctype':
+                        unclosed.add(type)
 
             # Tag
-            if tag is not None:
+            if m := _TAG_RE.match(string, offset):
+                pos = m.end()
+                is_end, tag = m[1] is not None, m[2] if xml else m[2].lower()
+
+                # Stray "=" right after the tag name (like an empty attribute name)
+                if stray := _STRAY_RE.match(string, pos):
+                    pos = stray.end()
+
+                # Attributes
+                attrs: dict[str, str | None] = {}
+                closing = False
+                while a := _ATTR_RE.match(string, pos):
+                    pos = a.end()
+                    key = a[1] if xml else a[1].lower()
+                    value = a[3] if a[3] is not None else a[4]
+
+                    # Empty tag
+                    if key == '/':
+                        closing = True
+                        continue
+
+                    attrs[key] = html_attr_unescape(value) if value is not None else value
+
+                # Incomplete tag
+                if not string.startswith('>', pos):
+                    pos = offset
+
                 # End
-                if end_m := re.match(r'/\s*([^\s/]+)', tag):
-                    end = end_m[1] if xml else end_m[1].lower()
+                elif is_end:
+                    pos += 1
 
                     # No more content
-                    if not xml and (tags := NO_MORE_CONTENT.get(end)):
+                    if not xml and (tags := NO_MORE_CONTENT.get(tag)):
                         for t in tags:
                             _end(t, xml, current)
 
-                    _end(end, xml, current)
+                    _end(tag, xml, current)
+                    continue
 
                 # Start
-                elif start_m := re.match(r'([^\s/]+)([\s\S]*)', tag):
-                    start, attr = start_m[1] if xml else start_m[1].lower(), start_m[2]
-
-                    # Attributes
-                    attrs: dict[str, str | None] = {}
-                    closing = False
-                    for a in _ATTR_RE.finditer(attr):
-                        key = a[1] if xml else a[1].lower()
-                        value = a[3] if a[3] is not None else a[4]
-
-                        # Empty tag
-                        if key == '/':
-                            closing = True
-                            continue
-
-                        attrs[key] = html_attr_unescape(value) if value is not None else value
+                else:
+                    pos += 1
 
                     # "image" is an alias for "img"
-                    if not xml and start == 'image':
-                        start = 'img'
-                    _start(start, attrs, xml, current)
+                    if not xml and tag == 'image':
+                        tag = 'img'
+                    _start(tag, attrs, xml, current)
 
                     # Element without end tag (self-closing)
-                    if not xml and start in EMPTY or (xml or start not in BLOCK) and closing:
-                        _end(start, xml, current)
+                    if not xml and tag in EMPTY or (xml or tag not in BLOCK) and closing:
+                        _end(tag, xml, current)
 
                     # Raw text elements (not in foreign content)
-                    if xml or start not in RAW and start not in RCDATA or _foreign(current[0][3]):
+                    if xml or tag not in RAW and tag not in RCDATA or _foreign(current[0][3]):
                         continue
 
-                    if start == 'script':
+                    if tag == 'script':
                         script, found_end, pos = _script_content(string, pos)
                         if len(script):
                             _node(current[0], 'raw', script)
                         if found_end:
-                            _end(start, False, current)
+                            _end(tag, False, current)
                         continue
 
+                    # Without an end tag for this element, there is none for later elements of the same type either
+                    if tag in unclosed:
+                        continue
                     if not (
-                        raw := re.compile(rf'(.*?)</{re.escape(start)}(?=[\s/>])[^>]*>?', re.S | re.I).match(
-                            string, pos
-                        )
+                        raw := re.compile(rf'(.*?)</{re.escape(tag)}(?=[\s/>])[^>]*>?', re.S | re.I).match(string, pos)
                     ):
+                        unclosed.add(tag)
                         continue
                     pos = raw.end()
-                    if start in RCDATA:
+                    if tag in RCDATA:
                         _node(current[0], 'text', html_unescape(raw[1]))
                     else:
                         _node(current[0], 'raw', raw[1])
-                    _end(start, False, current)
+                    _end(tag, False, current)
+                    continue
 
-            # DOCTYPE
-            elif doctype is not None:
-                _node(current[0], 'doctype', doctype)
-
-            # Comment
-            elif comment is not None:
-                _node(current[0], 'comment', comment)
-
-            # CDATA
-            elif cdata is not None:
-                _node(current[0], 'cdata', cdata)
-
-            # Processing instruction
-            elif pi is not None:
-                _node(current[0], 'pi', pi)
+            # Runaway "<"
+            _node(current[0], 'text', '<')
+            pos = offset + 1
 
         self.tree = tree
         return self

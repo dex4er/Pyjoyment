@@ -388,7 +388,12 @@ def getenv(name: str, default: str | None = None) -> str | None:
 
 @overload
 def getopt(
-    specs: 'dict[str, Pyjo.GetOpt.Target]', /, *, pass_through: bool = False, env_prefix: str | None = None
+    specs: 'dict[str, Pyjo.GetOpt.Target]',
+    /,
+    *,
+    pass_through: bool = False,
+    require_order: bool = False,
+    env_prefix: str | None = None,
 ) -> 'Pyjo.GetOpt.Pyjo_GetOpt_Result': ...
 
 
@@ -399,6 +404,7 @@ def getopt(
     /,
     *,
     pass_through: bool = False,
+    require_order: bool = False,
     env_prefix: str | None = None,
 ) -> 'Pyjo.GetOpt.Pyjo_GetOpt_Result': ...
 
@@ -409,6 +415,7 @@ def getopt(
     /,
     *,
     pass_through: bool = False,
+    require_order: bool = False,
     env_prefix: str | None = None,
 ) -> 'Pyjo.GetOpt.Pyjo_GetOpt_Result':
     """::
@@ -416,13 +423,15 @@ def getopt(
         opts = getopt({'H|headers=s': headers, 't|timeout=i': None, 'v|verbose': None})
         opts = getopt(args, {'H|headers=s': headers, 't|timeout=i': None, 'v|verbose': None})
         opts = getopt(args, {'H|headers=s': headers, 't|timeout=i': None}, pass_through=True)
+        opts = getopt(args, {'v|verbose': None}, require_order=True)
         opts = getopt(args, {'t|timeout=i': None}, env_prefix='PYJO_')
 
     Extract options from a list with :mod:`Pyjo.GetOpt`, defaults to using
     the arguments of ``sys.argv``. The target of an option is a list for its
     values, a callback, which gets its name and its value, or ``None`` for
     its value in the result, which is false after an error. With
-    ``env_prefix``, an option that is not given has the value of the
+    ``require_order``, the options end at the first argument that is not one.
+    With ``env_prefix``, an option that is not given has the value of the
     environment variable of its name, as ``PYJO_TIMEOUT`` for ``--timeout``,
     see :mod:`Pyjo.GetOpt`. ::
 
@@ -435,7 +444,7 @@ def getopt(
     import Pyjo.GetOpt
 
     argv = None if isinstance(args, dict) else args
-    parser = Pyjo.GetOpt.new(pass_through=pass_through, env_prefix=env_prefix)
+    parser = Pyjo.GetOpt.new(pass_through=pass_through, require_order=require_order, env_prefix=env_prefix)
     for spec, target in (args if isinstance(args, dict) else specs or {}).items():
         parser.option(spec, target)
     return parser.parse(argv)

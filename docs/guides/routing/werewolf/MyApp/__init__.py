@@ -9,7 +9,7 @@ class MyApp(Pyjoyment.object):
         self.plugin('WerewolfCondition')
 
         # /hideout (keep them out for 4 days after full moon)
-        self.routes.get('/hideout').requires(werewolf=4).to(controller='foo', action='bar')
+        self.get('/hideout').requires(werewolf=4).to(controller='foo', action='bar')
 
 
 new = MyApp.new

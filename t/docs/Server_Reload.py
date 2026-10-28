@@ -7,11 +7,11 @@ import os
 import signal
 import subprocess
 import sys
-import tempfile
+import time
 
 
 if not hasattr(os, 'fork'):
-    plan(skip_all='no os.fork')
+    plan(skip_all='Pyjo.Server.Reload does not support Windows')
 
 # PyPy with its JIT on macOS: the child of a fork crashes now and then with a bus error, under load
 if sys.platform == 'darwin' and getattr(sys, 'pypy_translation_info', {}).get('translation.jit'):
@@ -59,12 +59,29 @@ def server(*args, **kwargs):
             **kwargs,
         )
         atexit.register(lambda: process.poll() is None and process.kill())
-        if ServerStart.listening(port, process):
+        # The listen socket of the manager accepts connections before the server answers them
+        if ServerStart.listening(port, process) and answers(port):
             return port, process
         process.stdout.close()
         return None
 
     return ServerStart.retry(start)
+
+
+def answers(port):
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline:
+        try:
+            conn = http.client.HTTPConnection('127.0.0.1', port, timeout=10)
+            conn.request('GET', '/')
+            status = conn.getresponse().status
+            conn.close()
+            if status == 200:
+                return True
+        except OSError:
+            pass
+        time.sleep(0.1)
+    return False
 
 
 def stop(process):
@@ -102,26 +119,49 @@ reload.run({myapp.to_str()!r})
     is_ok(status, 0, 'stopped')
     like_ok(output, rf'Web application available at http://127.0.0.1:{port}', 'listening')
 
+    code = f"""
+import Pyjo.Server.Reload
+
+reload = Pyjo.Server.Reload.new()
+reload.daemon.listen = ['http://127.0.0.1:{{port}}']
+reload.run({myapp.to_str()!r}, 'prefork', '-w', '1')
+"""
+    port, process = server('-c', code)
+    status, output = stop(process)
+    is_ok(status, 0, 'stopped')
+    like_ok(output, rf'Web application available at http://127.0.0.1:{port}', 'prefork')
+
+    started = dir.child('started.txt')
+    command = dir.child('command.py').spew(
+        f"import pathlib, sys\npathlib.Path({started.to_str()!r}).write_text('1')\nsys.stdin.read()\n".encode()
+    )
+    code = f"""
+import Pyjo.Server.Reload
+
+reload = Pyjo.Server.Reload.new(exec=[{f'{sys.executable} {command}'!r}])
+reload.daemon.listen = ['http://127.0.0.1:{{port}}']
+reload.run({myapp.to_str()!r})
+"""
+    port, process = server('-c', code)
+    ServerStart.wait_for(lambda: os.path.exists(started), 'the command')
+    status, output = stop(process)
+    is_ok(status, 0, 'stopped')
+    ok(os.path.exists(started), 'command')
+
 with subtest('Description'):
     port, process = server('-m', 'Pyjo.Server.Reload', '-l', 'http://127.0.0.1:{port}', myapp.to_str())
     status, output = stop(process)
     is_ok(status, 0, 'python -m Pyjo.Server.Reload')
     like_ok(output, rf'Web application available at http://127.0.0.1:{port}', 'listening')
 
-with subtest('threads'):
-    port, process = server('-m', 'Pyjo.Server.Reload', '--threads', '-l', 'http://127.0.0.1:{port}', myapp.to_str())
-
-    # The manager listens before it forks the worker, which writes its process id file once it has loaded the
-    # application and started its threads, so that the request does not wait for the start of the worker
-    pid_file = os.path.join(tempfile.gettempdir(), f'pyjo-reload-{process.pid}.pid')
-    ok(ServerStart.wait_for(lambda: os.path.exists(pid_file), 'the process id file') is None, 'process id file')
+with subtest('Server command'):
+    port, process = server('-m', 'Pyjo.Server.Reload', '-l', 'http://127.0.0.1:{port}', myapp.to_str(), 'prethread')
     conn = http.client.HTTPConnection('127.0.0.1', port, timeout=10)
     conn.request('GET', '/thread')
     is_ok(conn.getresponse().read(), b'Pyjo.Server.Prethread', 'served by a thread')
     conn.close()
     status, output = stop(process)
     is_ok(status, 0, 'stopped')
-    ok(not os.path.exists(pid_file), 'process id file removed')
 
 with subtest('pyjo-reload'):
     result = subprocess.run(
@@ -133,8 +173,10 @@ with subtest('pyjo-reload'):
     # The usage of the section pyjo-reload, as script/morbo dies with its usage
     is_ok(result.returncode, 1, 'help')
     is_ok(result.stderr, extract_usage(Pyjo.Server.Reload.__file__, section='pyjo-reload'), 'usage')
-    like_ok(result.stderr, r'^Usage: pyjo-reload \[OPTIONS\] \[APPLICATION\]\n', 'usage of pyjo-reload')
-    for option in ('--backend', '--listen', '--log-format', '--mode', '--threads', '--verbose', '--watch'):
+    like_ok(
+        result.stderr, r'^Usage: pyjo-reload \[OPTIONS\] APPLICATION \[COMMAND\] \[ARGS\]\n', 'usage of pyjo-reload'
+    )
+    for option in ('--backend', '--listen', '--log-format', '--mode', '--verbose', '--watch', '--exec'):
         like_ok(result.stderr, rf'{option}', option)
 
 with subtest('new'):
@@ -155,6 +197,12 @@ with subtest('daemon'):
     reload.daemon = Pyjo.Server.Daemon.new()
     isnt_ok(reload.daemon, daemon, 'set')
 
+with subtest('exec'):
+    commands = Pyjo.Server.Reload.new().exec
+    is_deeply_ok(commands, [], 'default')
+    reload.exec = ['npx webpack --watch', 'npx tailwindcss -i app.css -o public/assets/app.css --watch']
+    is_ok(len(reload.exec), 2, 'set')
+
 with subtest('silent'):
     boolean = Pyjo.Server.Reload.new().silent
     is_ok(boolean, True, 'default')
@@ -172,6 +220,10 @@ reload.run('myapp.py')
     port, process = server('-c', code, cwd=dir.to_str())
     status, output = stop(process)
     is_ok(status, 0, 'relative path of the application')
+    code = code.replace("reload.run('myapp.py')", "reload.run('myapp.py', 'prefork', '-w', '1')")
+    port, process = server('-c', code, cwd=dir.to_str())
+    status, output = stop(process)
+    is_ok(status, 0, 'server command')
 
 with subtest('main'):
     code = f"""
@@ -182,5 +234,9 @@ Pyjo.Server.Reload.main(['-l', 'http://127.0.0.1:{{port}}', {myapp.to_str()!r}])
     port, process = server('-c', code)
     status, output = stop(process)
     is_ok(status, 0, 'command line interface')
+    code = code.replace(f'{myapp.to_str()!r}])', f"{myapp.to_str()!r}, 'prefork', '-w', '2'])")
+    port, process = server('-c', code)
+    status, output = stop(process)
+    is_ok(status, 0, 'server command')
 
 done_testing()

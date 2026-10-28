@@ -110,6 +110,11 @@ with subtest('Minimal route'):
         with Pyjo.Test.Pyjo.new('MyApp') as t:
             t.get_ok('/welcome').status_is(200).content_is('Hello there.')
 
+with subtest('Route shortcuts'):
+    app = Pyjoyment.new()
+    app.get('/welcome').to(controller='foo', action='welcome')
+    is_deeply_ok(endpoint(app.routes, '/welcome'), {'controller': 'foo', 'action': 'welcome'}, 'same as routes')
+
 with subtest('Routing destination'):
     r = Pyjoyment.new().routes
     r.get('/welcome').to(controller='foo', action='welcome')

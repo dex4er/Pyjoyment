@@ -5,7 +5,7 @@ Pyjoyment.Plugin.HeaderCondition - Header condition plugin
 
     # Pyjoyment
     app.plugin('HeaderCondition')
-    app.routes.get('/foo').requires(headers={'Referer': re.compile(r'example\\.com')})
+    app.get('/foo').requires(headers={'Referer': re.compile(r'example\\.com')})
 
     # Pyjoyment.Lite
     plugin('HeaderCondition')
@@ -14,7 +14,7 @@ Pyjoyment.Plugin.HeaderCondition - Header condition plugin
     def index(c): ...
 
     # All headers need to match
-    app.routes.get('/foo').requires(headers={'X-Secret-Header': 'Foo', 'Referer': re.compile(r'example\\.com')})
+    app.get('/foo').requires(headers={'X-Secret-Header': 'Foo', 'Referer': re.compile(r'example\\.com')})
 
     # The "agent" condition is a shortcut for the "User-Agent" header
     @get('/').requires(agent=re.compile(r'Firefox'))
@@ -39,7 +39,7 @@ See also
 :mod:`Pyjoyment`, https://mojolicious.org.
 
 Ported from `Mojolicious::Plugin::HeaderCondition
-<https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojolicious/Plugin/HeaderCondition.pm>`_ of Mojolicious 9.49.
+<https://github.com/mojolicious/mojo/blob/v9.53/lib/Mojolicious/Plugin/HeaderCondition.pm>`_ of Mojolicious 9.53.
 """
 
 import Pyjoyment.Plugin

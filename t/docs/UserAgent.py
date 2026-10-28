@@ -364,7 +364,7 @@ with subtest('server'):
     ua = Pyjo.UserAgent.new()
     ua.server.app = app = Pyjoyment.new()
     app.log.level = 'fatal'
-    ua.server.app.routes.get('/time', lambda c: c.render(json={'now': time.time()}))
+    ua.server.app.get('/time', lambda c: c.render(json={'now': time.time()}))
     now = ua.get('/time').result.json()['now']
     ok(now > 0, 'mock web service')
 
