@@ -41,7 +41,9 @@ Reporting security issues
 Please report security issues privately, with `the form of GitHub
 <https://github.com/dex4er/Pyjoyment/security/advisories/new>`_ for
 reporting a vulnerability, and give us a few days to develop and release a
-proper fix.
+proper fix. The `security policy
+<https://github.com/dex4er/Pyjoyment/blob/main/SECURITY.md>`_ says what a
+report contains, what happens next and what is in scope.
 
 Resolving issues
 ----------------
