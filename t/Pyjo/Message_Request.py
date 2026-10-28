@@ -1064,6 +1064,26 @@ with subtest('Parse HTTP 1.1 multipart request with missing name'):
     is_deeply_ok(req.params.pairs, [], 'no multipart parameter')
     is_ok(req.content.boundary, '----------0xKhTmLbOuNdArY', 'right boundary')
 
+with subtest('Parse HTTP 1.1 multipart request (cached form data)'):
+    body = (
+        b'------------0xKhTmLbOuNdArY\x0d\x0a'
+        + b'Content-Disposition: form-data; name="text"\x0d\x0a\x0d\x0avalue\x0d\x0a'
+        + b'------------0xKhTmLbOuNdArY\x0d\x0a'
+        + b'Content-Disposition: form-data; name="upload"; filename="hello.txt"\x0d\x0a\x0d\x0aHello!\x0d\x0a'
+        + b'------------0xKhTmLbOuNdArY--'
+    )
+    req = Pyjo.Message.Request.new()
+    req.parse(b'POST /upload HTTP/1.1\x0d\x0a')
+    req.parse(b'Content-Type: multipart/form-data; boundary=----------0xKhTmLbOuNdArY\x0d\x0a')
+    req.parse(b'Content-Length: ' + str(len(body)).encode() + b'\x0d\x0a\x0d\x0a' + body)
+    ok(req.is_finished, 'request is finished')
+    is_ok(req.uploads()[0].filename, 'hello.txt', 'right filename')
+    is_ok(req.uploads()[0], req.uploads()[0], 'same upload object')
+    req.uploads().append('x')
+    is_ok(len(req.uploads()), 1, 'cached uploads have not been changed')
+    is_deeply_ok(req.body_params.pairs, [('text', 'value')], 'right parameters')
+    is_ok(req.upload('upload').asset.slurp(), b'Hello!', 'right content')
+
 with subtest('Parse full HTTP 1.1 proxy request with basic authentication'):
     req = Pyjo.Message.Request.new()
     req.parse(b'GET http://127.0.0.1/foo/bar#baz HTTP/1.1\x0d\x0a')

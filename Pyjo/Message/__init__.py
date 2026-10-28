@@ -70,8 +70,8 @@ See also
 
 :mod:`Pyjoyment`, https://mojolicious.org.
 
-Ported from `Mojo::Message <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/Message.pm>`_
-of Mojolicious 9.49.
+Ported from `Mojo::Message <https://github.com/mojolicious/mojo/blob/v9.52/lib/Mojo/Message.pm>`_
+of Mojolicious 9.52.
 """
 
 import Pyjo.Asset.Memory
@@ -111,8 +111,10 @@ class Error(TypedDict):
     code: NotRequired[int]
 
 
-# A part of multipart/form-data: the name, the value or the content of an upload, and the filename
-type _FormData = tuple[str, Any, str | None]
+# The parameters and the uploads of multipart/form-data, parsed once, as the hash of Mojo
+class _FormData(TypedDict):
+    params: list[tuple[str, str]]
+    uploads: list[Pyjo.Upload.object]
 
 
 class Pyjo_Message(Pyjo.EventEmitter.object):
@@ -175,6 +177,7 @@ class Pyjo_Message(Pyjo.EventEmitter.object):
         self._error: Error | None = None
         self._finished = False
         self._fix = False
+        self._formdata: _FormData | None = None
         self._json: Any = None
         self._limit = False
         self._raw_size = 0
@@ -288,7 +291,7 @@ class Pyjo_Message(Pyjo.EventEmitter.object):
 
         # "multipart/form-data"
         elif re.search(r'multipart/form-data', type, re.I):
-            for name, value, _ in self._parse_formdata():
+            for name, value in self._parse_formdata()['params']:
                 params.append(name, value)
 
         return params
@@ -731,12 +734,7 @@ class Pyjo_Message(Pyjo.EventEmitter.object):
             for upload in msg.uploads():
                 print(upload.name)
         """
-        uploads: list[Pyjo.Upload.object] = []
-        for name, part, filename in self._parse_formdata(True):
-            upload = Pyjo.Upload.new(name=name, filename=filename, asset=part.asset, headers=part.headers)
-            uploads.append(upload)
-
-        return uploads
+        return list(self._parse_formdata()['uploads'])
 
     def _build(self, method: Callable[[int], bytes | None]) -> bytes:
         buffer, offset = b'', 0
@@ -771,8 +769,11 @@ class Pyjo_Message(Pyjo.EventEmitter.object):
         self.error = {'message': message}
         return self
 
-    def _parse_formdata(self, upload: bool = False) -> list[_FormData]:
-        formdata: list[_FormData] = []
+    # Renamed from Mojolicious: _formdata, the attribute _formdata is the cache
+    def _parse_formdata(self) -> _FormData:
+        if self._formdata is not None:
+            return self._formdata
+        formdata = self._formdata = _FormData(params=[], uploads=[])
         content = self.content
         if not content.is_multipart:
             return formdata
@@ -791,25 +792,30 @@ class Pyjo_Message(Pyjo.EventEmitter.object):
             if not (disposition := part.headers.content_disposition):
                 continue
             filename = m[1] if (m := re.search(r'[; ]filename="((?:\\"|[^"])*)"', disposition)) else None
-            if upload and filename is None or not upload and filename is not None:
-                continue
             if (name := m[1] if (m := re.search(r'[; ]name="((?:\\"|[^;"])*)"', disposition)) else None) is None:
                 continue
-            value: Any = part if upload else _single(part).asset.slurp()
-
             if charset:
                 if name:
                     name = decoded if (decoded := decode(charset, name)) is not None else name
                 if filename:
                     filename = decoded if (decoded := decode(charset, filename)) is not None else filename
-                if not upload:
+
+            # Upload
+            if filename is not None:
+                formdata['uploads'].append(
+                    Pyjo.Upload.new(name=name, filename=filename, asset=_single(part).asset, headers=part.headers)
+                )
+
+            # Parameter
+            else:
+                value: bytes | str = _single(part).asset.slurp()
+                if charset:
                     value = decoded if (decoded := decode(charset, value)) is not None else value
 
-            # A value that does not decode is a string of the characters 0-255, as a Perl byte string
-            if isinstance(value, bytes):
-                value = value.decode('latin-1')
-
-            formdata.append((name, value, filename))
+                # A value that does not decode is a string of the characters 0-255, as a Perl byte string
+                if isinstance(value, bytes):
+                    value = value.decode('latin-1')
+                formdata['params'].append((name, value))
 
         return formdata
 
