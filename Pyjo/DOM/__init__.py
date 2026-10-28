@@ -42,7 +42,8 @@ Pyjo.DOM - Minimalistic HTML/XML DOM parser with CSS selectors
 
 :mod:`Pyjo.DOM` is a minimalistic and relaxed HTML/XML DOM parser with CSS
 selector support. It will even try to interpret broken HTML and XML, so you
-should not use it for validation.
+should not use it for validation or sanitization. Its interpretation of broken
+markup can differ from that of a web browser.
 
 Nodes and elements
 ------------------
@@ -105,8 +106,8 @@ See also
 
 :mod:`Pyjoyment`, https://mojolicious.org.
 
-Ported from `Mojo::DOM <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/DOM.pm>`_
-of Mojolicious 9.49.
+Ported from `Mojo::DOM <https://github.com/mojolicious/mojo/blob/v9.50/lib/Mojo/DOM.pm>`_
+of Mojolicious 9.50.
 
 Classes
 -------
