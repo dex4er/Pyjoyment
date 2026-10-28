@@ -109,8 +109,8 @@ See also
 
 :mod:`Pyjoyment`, https://mojolicious.org.
 
-Ported from `Mojo::Server::Daemon <https://github.com/mojolicious/mojo/blob/v9.51/lib/Mojo/Server/Daemon.pm>`_
-of Mojolicious 9.51.
+Ported from `Mojo::Server::Daemon <https://github.com/mojolicious/mojo/blob/v9.52/lib/Mojo/Server/Daemon.pm>`_
+of Mojolicious 9.52.
 
 Classes
 -------
@@ -664,8 +664,9 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
         stream.timeout = self.inactivity_timeout
         handle = stream.handle
         if handle.family != getattr(socket, 'AF_UNIX', None):
-            tx.local_address, tx.local_port = handle.getsockname()[:2]
-            tx.remote_address, tx.remote_port = handle.getpeername()[:2]
+            if (addr := c.get('addr')) is None:
+                addr = c['addr'] = (*handle.getsockname()[:2], *handle.getpeername()[:2])
+            tx.local_address, tx.local_port, tx.remote_address, tx.remote_port = addr
         if c.get('tls'):
             tx.req.url.base.scheme = 'https'
 

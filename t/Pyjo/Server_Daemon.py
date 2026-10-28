@@ -406,6 +406,41 @@ with subtest('Single-accept and connection limit'):
     ok(accepting[0], 'accepting connections')
     ok(not accepting[1], 'connection limit reached')
 
+with subtest('Destroy daemon while writing'):
+    loop = Pyjo.IOLoop.new()
+    app_ = Pyjoyment.new()
+    app_.log.level = 'fatal'
+    got = {}
+
+    @app_.routes.get('/')
+    def destroy(c):
+        c.render(text='x' * 1_000_000)
+        got.pop('daemon')
+
+    got['daemon'] = Pyjo.Server.Daemon.new(app=app_, ioloop=loop, listen=['http://127.0.0.1'], silent=True).start()
+    port = loop.acceptor(got['daemon'].acceptors[0]).port
+
+    # Unlike Mojolicious: the errors of the reactor, which Mojo warns of
+    errors = []
+    loop.reactor.on('error', lambda reactor, err: errors.append(str(err)))
+    closed, timeout = [], []
+
+    @loop.client(port=port)
+    def client(loop, err, stream):
+        @stream.on('close')
+        def close(stream):
+            closed.append(True)
+            loop.stop()
+
+        stream.on('read', lambda stream, chunk: None)
+        stream.write(b'GET / HTTP/1.1\x0d\x0aConnection: close\x0d\x0a\x0d\x0a')
+
+    loop.timer(5, lambda loop: (timeout.append(True), loop.stop()))
+    loop.start()
+    ok(closed, 'connection has been closed')
+    ok(not timeout, 'no timeout')
+    is_deeply_ok([e for e in errors if 'I/O watcher failed' in e], [], 'no exceptions')
+
 with subtest('Request limit'):
     daemon = Pyjo.Server.Daemon.new(app=app, listen=['http://127.0.0.1'], silent=True).start()
     port = daemon.ports()[0]
