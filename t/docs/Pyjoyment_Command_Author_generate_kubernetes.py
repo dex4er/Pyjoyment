@@ -59,6 +59,7 @@ with subtest('Synopsis'):
     like_ok(kubernetes.usage, r'    --host-path', 'option of the host path')
     like_ok(kubernetes.usage, r'-p, --port <port>', 'option of the port')
     like_ok(kubernetes.usage, r'-G, --graceful-timeout <seconds>', 'option of the graceful timeout')
+    like_ok(kubernetes.usage, r'-S, --shutdown-delay <seconds>', 'option of the shutdown delay')
     like_ok(kubernetes.usage, r'    --dev ', 'option of the group dev')
     like_ok(kubernetes.usage, r'-s, --server <name>', 'option of the server')
 
@@ -101,6 +102,28 @@ with subtest('Synopsis'):
         r'(?m)^            - name: PYJO_GRACEFUL_TIMEOUT\n              value: "25"$',
         'graceful timeout',
     )
+
+    # python -m MyApp generate kubernetes --shutdown-delay 10
+    tmp = project()
+    generate(tmp, '--shutdown-delay', '10')
+    like_ok(
+        read(tmp, 'prod/deployment.yaml'), r'(?m)^      terminationGracePeriodSeconds: 40$', 'grace period of the delay'
+    )
+    like_ok(
+        read(tmp, 'prod/deployment.yaml'),
+        r'(?m)^            - name: PYJO_SHUTDOWN_DELAY\n              value: "10"$',
+        'shutdown delay',
+    )
+
+    # No delay
+    tmp = project()
+    generate(tmp, '--shutdown-delay', '0')
+    like_ok(
+        read(tmp, 'prod/deployment.yaml'),
+        r'(?m)^      terminationGracePeriodSeconds: 30$',
+        'grace period without delay',
+    )
+    unlike_ok(read(tmp, 'prod/deployment.yaml'), r'PYJO_SHUTDOWN_DELAY', 'no shutdown delay')
 
     # python -m MyApp generate kubernetes --no-dev
     tmp = project()
@@ -164,7 +187,12 @@ with subtest('Description'):
     like_ok(read(tmp, 'prod/deployment.yaml'), r'- name: PYJO_MODE\n              value: production', 'production')
     like_ok(read(tmp, 'prod/deployment.yaml'), r'(?m)^      terminationGracePeriodSeconds: 35$', 'grace period')
     unlike_ok(read(tmp, 'prod/deployment.yaml'), r'PYJO_GRACEFUL_TIMEOUT', 'graceful timeout of the server')
-    like_ok(read(tmp, 'prod/deployment.yaml'), r'preStop:\n              sleep:\n                seconds: 5', 'preStop')
+    like_ok(
+        read(tmp, 'prod/deployment.yaml'),
+        r'(?m)^            - name: PYJO_SHUTDOWN_DELAY\n              value: "5"$',
+        'shutdown delay of the server',
+    )
+    unlike_ok(read(tmp, 'prod/deployment.yaml'), r'preStop', 'no preStop')
 
     # dev, on the image of uv, with the group dev and the server daemon in the operating mode development
     deployment = read(tmp, 'dev/deployment.yaml')

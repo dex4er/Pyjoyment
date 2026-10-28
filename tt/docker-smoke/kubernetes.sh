@@ -160,8 +160,9 @@ perl -pi -e 's/Changed: /Reloaded: /' myapp.py
 page_has host-path "Reloaded: ${welcome}"
 echo "ok - dev with --host-path reloaded"
 
-# prod, with no failed request while it rolls out again, as the hook preStop
-# keeps a pod serving until the proxies of the cluster know that it stops
+# prod, with no failed request while it rolls out again, as the shutdown delay
+# of the server keeps a pod serving until the proxies of the cluster know that
+# it stops
 "${kube[@]}" --namespace prod apply --kustomize kubernetes/prod >/dev/null
 rollout prod
 [[ $("${kube[@]}" --namespace prod get deploy/myapp --output jsonpath='{.status.readyReplicas}') -eq 2 ]] || fail "replicas"

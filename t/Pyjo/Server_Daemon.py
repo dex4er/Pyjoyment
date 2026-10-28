@@ -521,6 +521,71 @@ with subtest('Signals'):
         ok(time.monotonic() - started < 2, 'a connection kept alive closes after its next response')
         is_ok(restored[-1], 100, 'max_requests is set back')
 
+# Not in Mojolicious: the delay of a graceful stop, while the server serves as before and readiness fails, and a new
+# connection is refused after it
+with subtest('Shutdown delay'):
+    import signal
+    import sys
+    import time
+
+    # The singleton, as the one of every server, whose is_stopping readiness tells, and which the application uses
+    def delayed(*signals):
+        results = {}
+        with (
+            Pyjo.IOLoop.singleton as loop,
+            Pyjo.Server.Daemon.new(listen=['http://127.0.0.1'], shutdown_delay=1, silent=True) as daemon,
+            Pyjo.UserAgent.new(ioloop=loop) as ua,
+        ):
+            app = daemon.app = Pyjoyment.new()
+            app.log.level = 'fatal'
+            app.plugin('Health')
+            port = daemon.start().ports()[0]
+            started = time.monotonic()
+            loop.once('finish', lambda loop: results.update(finish=time.monotonic() - started))
+            # A connection that keeps the server from stopping, until the end
+            connection = socket.create_connection(('127.0.0.1', port))
+            for i, signum in enumerate(signals):
+                loop.timer(0.2 * (i + 1), lambda loop, signum=signum: os.kill(os.getpid(), signum))
+
+            def during(loop):
+                results['stopping'] = loop.is_stopping
+                for path in ('livez', 'readyz'):
+                    ua.get(
+                        f'http://127.0.0.1:{port}/{path}',
+                        {'Connection': 'close'},
+                        lambda ua, tx, path=path: results.update({path: tx.res.code}),
+                    )
+
+            def after(loop):
+                try:
+                    socket.create_connection(('127.0.0.1', port), timeout=1).close()
+                    results['refused'] = False
+                # A connection that comes while the socket closes is reset, as a refused one is
+                except (ConnectionRefusedError, ConnectionResetError):
+                    results['refused'] = True
+
+            loop.timer(0.6, during)
+            loop.timer(1.6, after)
+            loop.timer(2, lambda loop: loop.stop())
+            daemon.run()
+            connection.close()
+        results['elapsed'] = time.monotonic() - started
+        return results
+
+    if sys.platform == 'win32':
+        skip('no signals of POSIX', 8)
+    else:
+        results = delayed(signal.SIGTERM)
+        ok(results.get('stopping'), 'stopping during the delay')
+        is_ok(results.get('livez'), 200, 'served during the delay')
+        is_ok(results.get('readyz'), 503, 'not ready during the delay')
+        ok(1 <= results.get('finish', 0) < 1.6, 'graceful stop after the delay')
+        ok(results.get('refused'), 'a new connection is refused after the delay')
+        results = delayed(signal.SIGINT, signal.SIGINT)
+        ok('finish' not in results, 'second INT during the delay stops immediately')
+        ok(results['elapsed'] < 1, 'without waiting for the delay')
+        is_ok(Pyjo.Server.Daemon.new().shutdown_delay, 0, 'no delay by default')
+
 # Not in Mojolicious: the end of the server, which the application learns once the event loop has stopped, and whose
 # cleanup the server waits for, unless it stops immediately
 with subtest('End of the server'):

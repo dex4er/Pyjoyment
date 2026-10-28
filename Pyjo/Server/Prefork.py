@@ -73,8 +73,10 @@ INT, TERM
 
 Shut down server gracefully. The manager and the workers close the listen
 sockets, so that a new connection is refused, and the workers finish the
-accepted ones. A second ``INT``, as of Ctrl-C pressed twice, shuts it down
-immediately, a second ``TERM`` does nothing.
+accepted ones, after :attr:`~Pyjo.Server.Daemon.Pyjo_Server_Daemon.shutdown_delay`,
+while the workers serve as before, which the manager tells them with ``USR1``.
+A second ``INT``, as of Ctrl-C pressed twice, shuts it down immediately, also
+during the delay, a second ``TERM`` does nothing.
 
 QUIT
 ~~~~
@@ -107,6 +109,13 @@ TERM
 ~~~~
 
 Stop worker gracefully, with its copies of the listen sockets closed.
+
+USR1
+~~~~
+
+Stop worker gracefully after
+:attr:`~Pyjo.Server.Daemon.Pyjo_Server_Daemon.shutdown_delay`, while it
+serves as before.
 
 QUIT
 ~~~~
@@ -216,6 +225,7 @@ from typing import Any, NoReturn, TypedDict
 class _Worker(TypedDict, total=False):
     force: bool
     graceful: float | None
+    delayed: bool
     healthy: bool
     quit: int
     time: float
@@ -366,6 +376,7 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
         low as ``1``).
         """
 
+        self._delayed: float | None = None
         self._finished = False
         self._graceful = False
         self._pool: dict[int, _Worker] = {}
@@ -528,6 +539,16 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
             _exit(0)
 
     def _manage(self) -> None:
+        # Not in Mojolicious: the delay of a graceful shutdown, which the workers are told, also the ones that start in it
+        if (delayed := self._delayed) is not None and not self._finished:
+            if delayed <= time.monotonic():
+                self._term(True)
+            else:
+                for pid, w in self._pool.items():
+                    if not w.get('delayed'):
+                        w['delayed'] = True
+                        self._delay_worker(pid)
+
         # Spawn more workers if necessary and check PID file
         if not self._finished:
             graceful = sum(1 for w in self._pool.values() if w.get('graceful'))
@@ -586,6 +607,12 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
         # Unlike Mojolicious: TERM stops a worker gracefully, where Mojo sends QUIT
         return _kill(signal.SIGTERM if graceful else signal.SIGKILL, pid)
 
+    # Not in Mojolicious: a worker is told the delay of a graceful shutdown, in a method of its own, which
+    # Pyjo.Server.Prethread does without signals
+    def _delay_worker(self, pid: int) -> None:
+        if sys.platform != 'win32':
+            _kill(signal.SIGUSR1, pid)
+
     # The signals that the handlers noted, as the handlers of Mojo do them
     def _signal(self) -> None:
         while len(self._signals):
@@ -601,10 +628,10 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
                     self.emit('reap', pid)._stopped(pid)
             # Unlike Mojolicious: INT and TERM shut the server down gracefully, as Docker and Kubernetes stop it with TERM,
             # and QUIT immediately, where Mojo does it the other way round, as nginx and unicorn do; a second INT, as of
-            # Ctrl-C pressed twice, shuts it down immediately
+            # Ctrl-C pressed twice, shuts it down immediately, also during the delay
             elif signum in (signal.SIGINT, signal.SIGTERM):
-                if not self._finished:
-                    self._term(True)
+                if not self._finished and self._delayed is None:
+                    self._shutdown()
                 elif signum == signal.SIGINT:
                     self._term()
             elif signum == _QUIT:
@@ -632,6 +659,13 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
         now = time.monotonic()
         for w in self._pool.values():
             w['graceful'] = w.get('graceful') or now
+
+    # Not in Mojolicious: the graceful shutdown after its delay, while the workers serve as before
+    def _shutdown(self) -> None:
+        if (delay := self.shutdown_delay) <= 0:
+            return self._term(True)
+        self.app.log.info(f'Stopping gracefully in {_number(delay)} seconds')
+        self._delayed = time.monotonic() + delay
 
     def _spawn(self) -> None:
         # Manager
@@ -682,7 +716,9 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
         # Poll for heartbeats
         reader, wakee = self.emit('wait')._reader, self._wakee
         assert reader is not None and wakee is not None
-        readable = select.select([reader, wakee], [], [], 1)[0]
+        # Not in Mojolicious: the end of the delay of a graceful shutdown is not waited for longer
+        timeout = 1 if (delayed := self._delayed) is None else min(1, max(0, delayed - time.monotonic()))
+        readable = select.select([reader, wakee], [], [], timeout)[0]
         if wakee in readable:
             try:
                 wakee.recv(4096)
@@ -764,13 +800,14 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
                 # graceful stop
                 nonlocal immediate
                 while noted:
-                    if noted.pop(0) == signal.SIGQUIT:
+                    if (signum := noted.pop(0)) == signal.SIGQUIT:
                         immediate = True
                         loop.stop()
-                    else:
-                        # Unlike Mojolicious: the worker closes its copies of the listen sockets, as the daemon does
+                    # Not in Mojolicious: USR1 stops the worker gracefully after the delay of the graceful shutdown
+                    elif signum == signal.SIGUSR1:
                         if (prefork := ref()) is not None:
-                            prefork._close_listen()
+                            loop.stop_gracefully(prefork.shutdown_delay)
+                    else:
                         loop.stop_gracefully()
 
             loop.reactor.io(wakee, wake).watch(wakee, True, False)
@@ -779,8 +816,10 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
             # handlers
             signal.pthread_sigmask(signal.SIG_UNBLOCK, _WORKER)
 
+            # Unlike Mojolicious: the worker closes its copies of the listen sockets, as the daemon does
             def max_requests(loop: Any) -> None:
                 if (prefork := ref()) is not None:
+                    prefork._close_listen()
                     prefork.max_requests = 1
 
             loop.on('finish', max_requests)
@@ -809,7 +848,7 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
 _QUIT = signal.SIGBREAK if sys.platform == 'win32' else signal.SIGQUIT
 
 # Not in Mojolicious: the signals that the workers handle, which the manager blocks while it forks
-_WORKER = {signal.SIGTERM, _QUIT}
+_WORKER = {signal.SIGTERM, _QUIT} if sys.platform == 'win32' else {signal.SIGTERM, _QUIT, signal.SIGUSR1}
 
 
 # Not in Mojolicious: os._exit, as the worker leaves what the manager does at its end, with the buffers of the standard

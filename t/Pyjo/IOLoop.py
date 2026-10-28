@@ -421,6 +421,42 @@ with subtest('Graceful shutdown (without connection)'):
     loop.reset()
     ok(not loop.is_stopping, 'not stopping after reset')
 
+# Not in Mojolicious: the delay of a graceful shutdown, while the event loop accepts as before and is stopping already
+with subtest('Graceful shutdown (delay)'):
+    events = []
+    loop = Pyjo.IOLoop.new()
+    id = loop.server(lambda loop, stream, id: events.append('accepted'), address='127.0.0.1')
+    port = loop.acceptor(id).port
+
+    def delay_cb(loop):
+        events.append(('stopping', loop.is_stopping, loop.acceptor(id).is_accepting))
+        loop.client(lambda loop, err, stream: stream.close(), port=port)
+
+    loop.on('finish', lambda loop: events.append(('finish', loop.acceptor(id).is_accepting)))
+    loop.next_tick(lambda loop: loop.stop_gracefully(0.3))
+    loop.next_tick(lambda loop: loop.stop_gracefully(10))
+    loop.timer(0.1, delay_cb)
+    loop.timer(30, failed_cb)
+    loop.start()
+    is_deeply_ok(
+        events,
+        [('stopping', True, True), 'accepted', ('finish', False)],
+        'accepting and stopping during the delay, a second delay is ignored',
+    )
+    loop.reset()
+
+    events = []
+    loop = Pyjo.IOLoop.new()
+    loop.on('finish', lambda loop: events.append('finish'))
+    loop.next_tick(lambda loop: loop.stop_gracefully(10))
+    loop.timer(0.1, lambda loop: loop.stop_gracefully())
+    loop.timer(30, failed_cb)
+    loop.start()
+    is_deeply_ok(events, ['finish'], 'a stop without a delay ends the delay')
+    ok(loop.is_stopping, 'stopping')
+    loop.reset()
+    ok(not loop.is_stopping, 'not stopping after reset')
+
 with subtest('Graceful shutdown (max_accepts)'):
     err = None
     loop = Pyjo.IOLoop.new(max_accepts=1)

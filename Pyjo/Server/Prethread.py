@@ -80,10 +80,11 @@ INT, TERM
 
 Shut down server gracefully. The manager and the workers close the listen
 sockets, so that a new connection is refused, and the workers finish the
-accepted ones; on Windows, where the workers share the sockets of the
-manager, a new connection waits until the server ends. A second ``INT``, as
-of Ctrl-C pressed twice, shuts it down immediately, a second ``TERM`` does
-nothing.
+accepted ones, after :attr:`~Pyjo.Server.Daemon.Pyjo_Server_Daemon.shutdown_delay`,
+while the workers serve as before; on Windows, where the workers share the
+sockets of the manager, a new connection waits until the server ends. A
+second ``INT``, as of Ctrl-C pressed twice, shuts it down immediately, also
+during the delay, a second ``TERM`` does nothing.
 
 QUIT
 ~~~~
@@ -243,6 +244,14 @@ class Pyjo_Server_Prethread(Pyjo.Server.Prefork.object):
             pass
         return True
 
+    def _delay_worker(self, pid: int) -> None:
+        if (t := self._threads.get(pid)) is None:
+            return
+        try:
+            t['control'].send(b'D')
+        except OSError:
+            pass
+
     # The listen sockets are left open on Windows, where the workers share the sockets of the manager, which their
     # reactors watch until they stop, and a new connection waits for the end of the server, as in Mojolicious
     def _close_listen(self) -> None:
@@ -309,6 +318,7 @@ class Pyjo_Server_Prethread(Pyjo.Server.Prefork.object):
                 nonlocal finished
                 finished = True
                 if (worker := ref()) is not None:
+                    worker._close_listen()
                     worker.max_requests = 1
 
             loop.on('finish', finish)
@@ -320,7 +330,8 @@ class Pyjo_Server_Prethread(Pyjo.Server.Prefork.object):
             loop.next_tick(heartbeat)
             loop.recurring(self.heartbeat_interval, heartbeat)
 
-            # The manager stops the worker with a byte, gracefully, or immediately, also when it is gone
+            # The manager stops the worker with a byte, gracefully, after the delay of the graceful shutdown, or
+            # immediately, also when it is gone
             immediate = False
 
             def command(reactor: Any, writable: bool) -> None:
@@ -332,10 +343,10 @@ class Pyjo_Server_Prethread(Pyjo.Server.Prefork.object):
                 if not chunk or b'Q' in chunk:
                     immediate = True
                     loop.stop()
-                else:
-                    if (worker := ref()) is not None:
-                        worker._close_listen()
+                elif b'T' in chunk:
                     loop.stop_gracefully()
+                elif (worker := ref()) is not None:
+                    loop.stop_gracefully(worker.shutdown_delay)
 
             loop.reactor.io(control, command).watch(control, True, False)
 

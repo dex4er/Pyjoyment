@@ -348,6 +348,72 @@ with subtest('A new connection while it stops gracefully'):
         ok(refused, 'a new connection is refused')
         ok(refused and refused[0] - finished[0] < 2, 'refused before the graceful timeout')
 
+# The delay of a graceful shutdown, which the manager tells the workers, while they serve as before and readiness
+# fails, and the listen sockets are closed after it, but on Windows
+with subtest('Shutdown delay'):
+    import Pyjoyment
+
+    import http.client
+
+    app = Pyjoyment.new()
+    app.log.level = 'fatal'
+    app.plugin('Health')
+    app.routes.get('/wait').to(cb=lambda c: c.render_later())
+    prethread = Pyjo.Server.Prethread.new(
+        app=app,
+        heartbeat_interval=0.5,
+        listen=['http://127.0.0.1'],
+        pid_file=tempdir().child('prethread.pid'),
+        shutdown_delay=1,
+        workers=1,
+    )
+    prethread.graceful_timeout = 2
+
+    def get(port, path):
+        connection = http.client.HTTPConnection('127.0.0.1', port, timeout=2)
+        try:
+            connection.request('GET', path)
+            return connection.getresponse().status
+        finally:
+            connection.close()
+
+    connections, codes, refused, finished, started = [], {'livez': [], 'readyz': []}, [], [], []
+
+    @prethread.once('heartbeat')
+    def heartbeat(prethread, id):
+        port = prethread.ports()[0]
+        # A request that keeps the worker from stopping gracefully
+        connections.append(connection := socket.create_connection(('127.0.0.1', port)))
+        connection.sendall(b'GET /wait HTTP/1.1\r\nHost: x\r\n\r\n')
+        started.append(time.monotonic())
+        signal.raise_signal(signal.SIGTERM)
+
+        # The probes during the delay, and a new connection after it, each time the manager waits
+        @prethread.on('wait')
+        def wait(prethread):
+            elapsed = time.monotonic() - started[0]
+            if elapsed < 0.8:
+                for path in codes:
+                    codes[path].append(get(port, f'/{path}'))
+            elif elapsed > 1.2 and not refused:
+                try:
+                    socket.create_connection(('127.0.0.1', port), timeout=1).close()
+                # A connection that comes while the socket closes is reset, as a refused one is
+                except (ConnectionRefusedError, ConnectionResetError):
+                    refused.append(elapsed)
+
+    prethread.on('finish', lambda prethread, graceful: finished.append(time.monotonic()))
+    prethread.run()
+    for connection in connections:
+        connection.close()
+    ok(codes['livez'] and set(codes['livez']) == {200}, 'served during the delay')
+    ok(503 in codes['readyz'], 'not ready during the delay')
+    ok(finished and finished[0] - started[0] >= 1, 'graceful shutdown after the delay')
+    if sys.platform == 'win32':
+        ok(not refused, 'the sockets that the workers share stay open on Windows')
+    else:
+        ok(refused, 'a new connection is refused after the delay')
+
 with subtest('HUP'):
     if sys.platform == 'win32':
         skip('no HUP on Windows', 3)

@@ -10,6 +10,7 @@ Pyjoyment.Command.Author.generate.kubernetes - Kubernetes generator command
       python -m MyApp generate kubernetes --image ghcr.io/me/myapp:1.0
       python -m MyApp generate kubernetes --host-path
       python -m MyApp generate kubernetes --graceful-timeout 25
+      python -m MyApp generate kubernetes --shutdown-delay 10
       python -m MyApp generate kubernetes --no-dev
       python -m MyApp generate kubernetes --server prefork -- --workers 2
 
@@ -30,6 +31,8 @@ Pyjoyment.Command.Author.generate.kubernetes - Kubernetes generator command
                                          application
       -p, --port <port>                  Port that the server listens on,
                                          defaults to 3000
+      -S, --shutdown-delay <seconds>     Time that the server of "prod" keeps
+                                         serving after TERM, defaults to 5
       -s, --server <name>                Server of "dev", "daemon", "prefork" or
                                          "reload", defaults to "reload" with
                                          --host-path or "daemon"
@@ -69,12 +72,13 @@ The overlay ``prod`` runs the image of ``--image``, which
 :mod:`Pyjoyment.Command.Author.generate.dockerfile` builds, with the
 pre-forking server of the image, in the operating mode ``production``.
 Kubernetes takes a pod that it stops out of the endpoints of its Service at
-the same time as it sends it ``TERM``, so the hook ``preStop`` sleeps 5
-seconds, until the proxies of the cluster know it, and
-``terminationGracePeriodSeconds`` is 10 seconds above the 25 seconds that
+the same time as it sends it ``TERM``, so the server keeps serving for the 5
+seconds of ``--shutdown-delay``, which sets ``PYJO_SHUTDOWN_DELAY``, until the
+proxies of the cluster know it, and ``terminationGracePeriodSeconds`` is 5
+seconds above the delay and the 25 seconds that
 :attr:`Pyjo.Server.Prefork.Pyjo_Server_Prefork.graceful_timeout` gives a
-worker, or above ``--graceful-timeout``, which sets ``PYJO_GRACEFUL_TIMEOUT``,
-so that the server stops by itself before the kill of Kubernetes. Without
+worker, or ``--graceful-timeout``, which sets ``PYJO_GRACEFUL_TIMEOUT``, so
+that the server stops by itself before the kill of Kubernetes. Without
 ``--image``, the image is the one of the name of the application, as
 ``docker build -t myapp .`` tags it, which a cluster of Docker Desktop or
 OrbStack takes from Docker.
@@ -182,7 +186,7 @@ class Pyjoyment_Command_Author_generate_kubernetes(Pyjoyment.Command.object):
         """
         arguments = list(args)
         spec = {'dev!': None, 'G|graceful-timeout=i': None, 'host-path': None, 'i|image=s': None, 'p|port=i': None}
-        if not (opts := getopt(arguments, {**spec, 's|server=s': None})):
+        if not (opts := getopt(arguments, {**spec, 'S|shutdown-delay=i': None, 's|server=s': None})):
             raise Pyjo.Exception.new(self.usage)
 
         # The server of dev, which reloads the application of the directory of the project, where its files change,
@@ -219,7 +223,8 @@ class Pyjoyment_Command_Author_generate_kubernetes(Pyjoyment.Command.object):
         self._write(self.rel_file('kubernetes/base/probes.yaml'), self.render_data('base_probes', base))
 
         graceful: int | None = opts.graceful_timeout
-        prod = {'graceful_timeout': graceful, 'image': opts.image, 'moniker': moniker, 'name': name}
+        delay: int = 5 if opts.shutdown_delay is None else opts.shutdown_delay
+        prod = {'delay': delay, 'graceful_timeout': graceful, 'image': opts.image, 'moniker': moniker, 'name': name}
         self.render_to_rel_file('prod_kustomization', 'kubernetes/prod/kustomization.yaml', prod)
         self.render_to_rel_file('prod_deployment', 'kubernetes/prod/deployment.yaml', prod)
 
@@ -410,7 +415,7 @@ spec:
   replicas: 2
   template:
     spec:
-      terminationGracePeriodSeconds: <%= (25 if graceful_timeout is None else graceful_timeout) + 10 %>
+      terminationGracePeriodSeconds: <%= delay + (25 if graceful_timeout is None else graceful_timeout) + 5 %>
       containers:
         - name: <%= name %>
           env:
@@ -420,10 +425,10 @@ spec:
             - name: PYJO_GRACEFUL_TIMEOUT
               value: "<%= graceful_timeout %>"
 % end
-          lifecycle:
-            preStop:
-              sleep:
-                seconds: 5
+% if delay:
+            - name: PYJO_SHUTDOWN_DELAY
+              value: "<%= delay %>"
+% end
 
 @@ dev_kustomization
 # Written by "generate kubernetes" anew each time

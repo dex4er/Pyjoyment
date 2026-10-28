@@ -50,6 +50,9 @@ Pyjoyment.Command.prefork - Pre-fork command
                                            networks
       -r, --requests <number>              Maximum number of requests per
                                            keep-alive connection, defaults to 100
+      -S, --shutdown-delay <seconds>       Time to keep serving after INT or TERM
+                                           before shutting down gracefully,
+                                           defaults to 0
       -s, --spare <number>                 Temporarily spawn up to this number of
                                            additional workers, defaults to 2
       -w, --workers <number>               Number of workers, defaults to 4
@@ -147,6 +150,8 @@ class Pyjoyment_Command_prefork(Pyjoyment.Command.object):
                 'P|pid-file=s': lambda name, value: setattr(prefork, 'pid_file', value),
                 'p|proxy:s': proxy,
                 'r|requests=i': lambda name, value: setattr(prefork, 'max_requests', value),
+                # Not in Mojolicious: the delay of the graceful shutdown, while the readiness fails
+                'S|shutdown-delay=i': lambda name, value: setattr(prefork, 'shutdown_delay', value),
                 's|spare=i': lambda name, value: setattr(prefork, 'spare', value),
                 'w|workers=i': lambda name, value: setattr(prefork, 'workers', value),
             },
