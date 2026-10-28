@@ -83,8 +83,8 @@ names are lowercased and selectors need to be lowercase as well. ::
     dom = Pyjo.DOM.new('<P ID="greeting">Hi!</P>')
     print(dom.at('p[id]').text)
 
-If an XML declaration is found, the parser will automatically switch into XML
-mode and everything becomes case-sensitive. ::
+If the document starts with an XML declaration, the parser will automatically
+switch into XML mode and everything becomes case-sensitive. ::
 
     # XML semantics
     dom = Pyjo.DOM.new('<?xml version="1.0"?><P ID="greeting">Hi!</P>')
@@ -106,8 +106,8 @@ See also
 
 :mod:`Pyjoyment`, https://mojolicious.org.
 
-Ported from `Mojo::DOM <https://github.com/mojolicious/mojo/blob/v9.50/lib/Mojo/DOM.pm>`_
-of Mojolicious 9.50.
+Ported from `Mojo::DOM <https://github.com/mojolicious/mojo/blob/v9.51/lib/Mojo/DOM.pm>`_
+of Mojolicious 9.51.
 
 Classes
 -------
@@ -1243,14 +1243,17 @@ def _clone(tree: Tree, parent: Tree | None = None) -> Tree:
 
 def _fragment(*nodes: Tree) -> Tree:
     root: Tree = ['root', *nodes]
-    _link(root, list(nodes))
+    _link(root, list(nodes), True)
     return root
 
 
-def _link(parent: Tree, children: list[Tree]) -> list[Tree]:
+def _link(parent: Tree, children: list[Tree], fragment: bool = False) -> list[Tree]:
 
-    # Link parent to children
+    # Link parent to children (raw text is only allowed in script and style elements)
+    raw = fragment or parent[0] == 'tag' and parent[1] in ('script', 'style')
     for node in children:
+        if node[0] == 'raw' and not raw:
+            node[0] = 'text'
         node[3 if node[0] == 'tag' else 2] = parent
 
     return children
