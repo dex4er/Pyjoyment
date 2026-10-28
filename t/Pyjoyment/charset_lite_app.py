@@ -67,61 +67,66 @@ def params(c):
 
 t = Pyjo.Test.Pyjo.new()
 
-# Plain old ASCII
-t.post_ok('/', form={'foo': 'yatta'}).status_is(200).content_is('foo: yatta')
+with subtest('Plain old ASCII'):
+    t.post_ok('/', form={'foo': 'yatta'}).status_is(200).content_is('foo: yatta')
 
-# Send raw Shift_JIS octets (like browsers do)
-(
-    t.post_ok('/', form={'foo': yatta_sjis}, charset=None)
-    .status_is(200)
-    .content_type_unlike(r'application')
-    .content_type_like(r'Shift_JIS')
-    .content_like(yatta)
-)
+with subtest('Send raw Shift_JIS octets (like browsers do)'):
+    (
+        t.post_ok('/', form={'foo': yatta_sjis}, charset=None)
+        .status_is(200)
+        .content_type_unlike(r'application')
+        .content_type_like(r'Shift_JIS')
+        .content_like(yatta)
+    )
 
-# Send raw Shift_JIS octets (like browsers do, multipart message)
-(
-    t.post_ok('/', {'Content-Type': 'multipart/form-data'}, form={'foo': yatta_sjis}, charset=None)
-    .status_is(200)
-    .content_type_like(r'Shift_JIS')
-    .content_like(yatta)
-)
+with subtest('Send raw Shift_JIS octets (like browsers do, multipart message)'):
+    (
+        t.post_ok('/', {'Content-Type': 'multipart/form-data'}, form={'foo': yatta_sjis}, charset=None)
+        .status_is(200)
+        .content_type_like(r'Shift_JIS')
+        .content_like(yatta)
+    )
 
-# Send as string
-t.post_ok('/', form={'foo': yatta}, charset='shift_jis').status_is(200).content_type_like(r'Shift_JIS').content_like(
-    yatta
-)
+with subtest('Send as string'):
+    (
+        t.post_ok('/', form={'foo': yatta}, charset='shift_jis')
+        .status_is(200)
+        .content_type_like(r'Shift_JIS')
+        .content_like(yatta)
+    )
 
-# Send as string (multipart message)
-(
-    t.post_ok('/', {'Content-Type': 'multipart/form-data'}, form={'foo': yatta}, charset='shift_jis')
-    .status_is(200)
-    .content_type_like(r'Shift_JIS')
-    .content_like(yatta)
-)
+with subtest('Send as string (multipart message)'):
+    (
+        t.post_ok('/', {'Content-Type': 'multipart/form-data'}, form={'foo': yatta}, charset='shift_jis')
+        .status_is(200)
+        .content_type_like(r'Shift_JIS')
+        .content_like(yatta)
+    )
 
-# Unicode renderer
-t.get_ok('/unicode').status_is(200).content_type_is('text/plain;charset=UTF-8').content_is(yatta)
+with subtest('Unicode renderer'):
+    t.get_ok('/unicode').status_is(200).content_type_is('text/plain;charset=UTF-8').content_is(yatta)
 
-# Templates in the DATA section should be written in UTF-8,
-# and those in separate files in Shift_JIS (Pyjoyment will do the decoding)
-t.get_ok('/').status_is(200).content_type_like(r'Shift_JIS').content_like(yatta)
+with subtest(
+    'Templates in the DATA section should be written in UTF-8, and those in separate files in Shift_JIS '
+    '(Pyjoyment will do the decoding)'
+):
+    t.get_ok('/').status_is(200).content_type_like(r'Shift_JIS').content_like(yatta)
 
-# Unicode format
-t.get_ok(f'/.{yatta}').status_is(500).content_like(r'Route without action and nothing to render')
+with subtest('Unicode format'):
+    t.get_ok(f'/.{yatta}').status_is(500).content_like(r'Route without action and nothing to render')
 
-# Send and receive raw Shift_JIS octets (like browsers do)
-t.post_ok('/data', yatta_sjis).status_is(200).content_is(yatta_sjis.decode('latin-1'))
+with subtest('Send and receive raw Shift_JIS octets (like browsers do)'):
+    t.post_ok('/data', yatta_sjis).status_is(200).content_is(yatta_sjis.decode('latin-1'))
 
-# JSON data
-t.get_ok('/json').status_is(200).content_type_is('application/json;charset=UTF-8').json_is({'test': yatta})
+with subtest('JSON data'):
+    t.get_ok('/json').status_is(200).content_type_is('application/json;charset=UTF-8').json_is({'test': yatta})
 
-# IRI
-t.get_ok('/привет/мир').status_is(200).content_type_is('application/json;charset=UTF-8').json_is({'foo': yatta})
+with subtest('IRI'):
+    t.get_ok('/привет/мир').status_is(200).content_type_is('application/json;charset=UTF-8').json_is({'foo': yatta})
 
-# Shift_JIS parameters
-url = t.ua.server.url().set(path='/params', query=('foo', 3, 'yatta', yatta))
-url.query.charset = 'shift_jis'
-t.get_ok(url).status_is(200).json_is({'params': {'foo': '3', 'yatta': yatta}, 'yatta': yatta})
+with subtest('Shift_JIS parameters'):
+    url = t.ua.server.url().set(path='/params', query=('foo', 3, 'yatta', yatta))
+    url.query.charset = 'shift_jis'
+    t.get_ok(url).status_is(200).json_is({'params': {'foo': '3', 'yatta': yatta}, 'yatta': yatta})
 
 done_testing()
