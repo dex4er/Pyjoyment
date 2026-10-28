@@ -40,8 +40,8 @@ See also
 
 :mod:`Pyjoyment`, https://mojolicious.org.
 
-Ported from `Mojo::Asset::Memory <https://github.com/mojolicious/mojo/blob/v9.49/lib/Mojo/Asset/Memory.pm>`_
-of Mojolicious 9.49.
+Ported from `Mojo::Asset::Memory <https://github.com/mojolicious/mojo/blob/v9.51/lib/Mojo/Asset/Memory.pm>`_
+of Mojolicious 9.51.
 """
 
 import Pyjo.Asset
@@ -186,7 +186,7 @@ class Pyjo_Asset_Memory(Pyjo.Asset.object):
             max = 131072
 
         offset += self.start_range
-        if (end := self.end_range) and (offset + max) > end:
+        if (end := self.end_range) is not None and (offset + max) > end:
             max = end + 1 - offset
 
         return self._content[offset : offset + max] if max > 0 else b''

@@ -125,6 +125,18 @@ with subtest('Memory asset range support (ab[cdefghi]jk)'):
     is_ok(mem.get_chunk(5, 1), b'h', 'chunk from position 5 (1 byte)')
     is_ok(mem.get_chunk(5, 3), b'hi', 'chunk from position 5 (2 byte)')
 
+with subtest('File asset range support ([a]bcdef)'):
+    file = Pyjo.Asset.File.new(end_range=0)
+    file.add_chunk(b'abcdef')
+    is_ok(file.get_chunk(0), b'a', 'chunk from position 0')
+    is_ok(file.get_chunk(1), b'', 'chunk from position 1')
+
+with subtest('Memory asset range support ([a]bcdef)'):
+    mem = Pyjo.Asset.Memory.new(end_range=0)
+    mem.add_chunk(b'abcdef')
+    is_ok(mem.get_chunk(0), b'a', 'chunk from position 0')
+    is_ok(mem.get_chunk(1), b'', 'chunk from position 1')
+
 with subtest('Huge file asset'):
     file = Pyjo.Asset.File.new()
     ok(not file.is_range, 'no range')

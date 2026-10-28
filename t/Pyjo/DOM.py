@@ -1884,7 +1884,12 @@ with subtest('Inline DTD'):
   ]>
 <foo />
 """)
-    is_ok(dom.tree[1][1], ' book\n  SYSTEM "usr.dtd"\n  [\n    <!ENTITY test "yeah">\n  ]', 'right doctype')
+    is_ok(
+        dom.tree[1][1],
+        ' book\n  SYSTEM "usr.dtd"\n  [\n    <!ENTITY test "yeah"',
+        'right doctype (ends at first ">" in HTML)',
+    )
+    is_ok(dom.tree[2][1], '\n  ]>\n', 'right text')
     ok(not dom.xml, 'XML mode not detected')
     is_ok(dom.at('foo'), '<foo></foo>', 'right element')
     dom = Pyjo.DOM.new("""\
@@ -1906,7 +1911,10 @@ with subtest('Inline DTD'):
     )
     is_ok(dom.at('foo').attr()['xml:lang'], 'de', 'right attribute')
     is_ok(dom.at('foo').text, 'Check!\n', 'right text')
-    dom = Pyjo.DOM.new("""\
+    dom = (
+        Pyjo.DOM.new()
+        .set(xml=True)
+        .parse("""\
 <!DOCTYPE TESTSUITE PUBLIC "my.dtd" 'mhhh' [
     <!ELEMENT foo ANY>
     <!ATTLIST foo bar ENTITY 'true'>
@@ -1918,6 +1926,7 @@ with subtest('Inline DTD'):
 <?check for-nothing?>
 <foo bar='false'>&leertaste;!!!</foo>
 """)
+    )
     is_ok(
         dom.tree[1][1],
         " TESTSUITE PUBLIC \"my.dtd\" 'mhhh' [\n    <!ELEMENT foo ANY>\n    <!ATTLIST foo bar ENTITY 'true'>\n"
@@ -2650,6 +2659,129 @@ with subtest('"textarea"'):
     is_ok(
         str(dom), '<textarea>&lt;/textarea&gt;&lt;script&gt;alert(1)&lt;/script&gt;</textarea>', 'end tag stays escaped'
     )
+
+with subtest('CDATA, processing instructions and DOCTYPE end at the first ">" in HTML'):
+    dom = Pyjo.DOM.new('<![CDATA[><img src=x onerror=alert(1)>]]>')
+    is_ok(dom.child_nodes[0].type, 'cdata', 'right type')
+    is_ok(dom.child_nodes[0].content, '', 'no content')
+    is_ok(dom.at('img')['onerror'], 'alert(1)', 'right attribute')
+    is_ok(dom.child_nodes[2].content, ']]>', 'right text')
+    dom.find('img').each(lambda e, num: e.remove())
+    is_ok(str(dom), '<![CDATA[]]>]]&gt;', 'right result')
+
+    dom = Pyjo.DOM.new('<?><img src=x onerror=alert(1)>?>')
+    is_ok(dom.child_nodes[0].type, 'pi', 'right type')
+    is_ok(dom.at('img')['onerror'], 'alert(1)', 'right attribute')
+    dom.find('img').each(lambda e, num: e.remove())
+    is_ok(str(dom), '<??>?&gt;', 'right result')
+
+    dom = Pyjo.DOM.new('<!DOCTYPE html [><img src=x onerror=alert(1)>]>')
+    is_ok(dom.child_nodes[0].type, 'doctype', 'right type')
+    is_ok(dom.child_nodes[0].content, ' html [', 'right content')
+    is_ok(dom.at('img')['onerror'], 'alert(1)', 'right attribute')
+    dom.find('img').each(lambda e, num: e.remove())
+    is_ok(str(dom), '<!DOCTYPE html [>]&gt;', 'right result')
+
+    dom = Pyjo.DOM.new('<p><![CDATA[1 < 2]]><?php echo 1?></p>')
+    is_ok(dom.at('p').child_nodes[0].content, '1 < 2', 'right content')
+    is_ok(dom.at('p').child_nodes[1].content, 'php echo 1', 'right content')
+    is_ok(str(dom), '<p><![CDATA[1 < 2]]><?php echo 1?></p>', 'successful roundtrip')
+
+    dom = Pyjo.DOM.new('<svg><script><![CDATA[ if (a > b) {} ]]></script></svg>')
+    is_ok(dom.at('script').child_nodes.first().type, 'cdata', 'right type')
+    is_ok(dom.at('script').child_nodes.first().content, ' if (a > b) {} ', 'right content')
+    is_ok(str(dom), '<svg><script><![CDATA[ if (a > b) {} ]]></script></svg>', 'successful roundtrip')
+
+    dom = Pyjo.DOM.new('<svg><foreignObject><![CDATA[><img src=x onerror=alert(1)>]]></foreignObject></svg>')
+    is_ok(dom.at('foreignobject img')['onerror'], 'alert(1)', 'right attribute')
+
+    dom = Pyjo.DOM.new().set(xml=True).parse('<root><![CDATA[><img src=x onerror=alert(1)>]]></root>')
+    ok(not dom.at('img'), 'no img element in XML mode')
+    is_ok(dom.at('root').text, '><img src=x onerror=alert(1)>', 'right text')
+
+with subtest('"style" and "script" in foreign content'):
+    dom = Pyjo.DOM.new('<svg><style><img src=x onerror=alert(1)></style></svg>')
+    is_ok(dom.at('svg > style > img')['onerror'], 'alert(1)', 'right attribute')
+    dom.find('img').each(lambda e, num: e.remove())
+    is_ok(str(dom), '<svg><style></style></svg>', 'right result')
+
+    dom = Pyjo.DOM.new('<math><script><img src=x onerror=alert(1)></script></math>')
+    is_ok(dom.at('math > script > img')['onerror'], 'alert(1)', 'right attribute')
+
+    dom = Pyjo.DOM.new('<svg><title><img src=x onerror=alert(1)></title></svg>')
+    is_ok(dom.at('svg > title > img')['onerror'], 'alert(1)', 'right attribute')
+
+    dom = Pyjo.DOM.new('<svg><foreignObject><style><b>test</b></style></foreignObject></svg>')
+    ok(not dom.at('b'), 'no b element')
+    is_ok(dom.at('style').text, '<b>test</b>', 'right text')
+
+    dom = Pyjo.DOM.new('<math><mi><style><b>test</b></style></mi></math>')
+    ok(not dom.at('b'), 'no b element')
+
+    dom = Pyjo.DOM.new('<math><annotation-xml><style><b>test</b></style></annotation-xml></math>')
+    ok(dom.at('b'), 'b element')
+    dom = Pyjo.DOM.new('<math><annotation-xml encoding="text/html"><style><b>test</b></style></annotation-xml></math>')
+    ok(not dom.at('b'), 'no b element')
+
+with subtest('Raw text end tags'):
+    dom = Pyjo.DOM.new('<style></style/><img src=x onerror=alert(1)></style>')
+    is_ok(dom.at('style').text, '', 'no text')
+    is_ok(dom.at('img')['onerror'], 'alert(1)', 'right attribute')
+    dom.find('img').each(lambda e, num: e.remove())
+    is_ok(str(dom), '<style></style>', 'right result')
+
+    dom = Pyjo.DOM.new('<script>1</script/><img src=x onerror=alert(1)></script>')
+    is_ok(dom.at('script').text, '1', 'right text')
+    is_ok(dom.at('img')['onerror'], 'alert(1)', 'right attribute')
+
+    dom = Pyjo.DOM.new('<style>a</style foo="bar">b')
+    is_ok(dom.at('style').text, 'a', 'right text')
+    is_ok(str(dom), '<style>a</style>b', 'right result')
+
+    dom = Pyjo.DOM.new('<title>a</title/>b')
+    is_ok(dom.at('title').text, 'a', 'right text')
+    is_ok(str(dom), '<title>a</title>b', 'right result')
+
+    dom = Pyjo.DOM.new('<div><p>a</p/>b</div>')
+    is_ok(str(dom), '<div><p>a</p>b</div>', 'right result')
+
+with subtest('Raw text moved out of "style" and "script"'):
+    dom = Pyjo.DOM.new('<p><style><img src=x onerror=alert(1)></style></p>')
+    dom.find(':not(p)').each(lambda e, num: e.strip())
+    is_ok(str(dom), '<p>&lt;img src=x onerror=alert(1)&gt;</p>', 'right result')
+    is_ok(dom.at('p').child_nodes.first().type, 'text', 'right type')
+
+    dom = Pyjo.DOM.new('<div><script><b>test</b></script></div>')
+    dom.at('div').append_content(dom.at('script').child_nodes.first())
+    is_ok(str(dom), '<div><script><b>test</b></script>&lt;b&gt;test&lt;/b&gt;</div>', 'right result')
+
+    dom = Pyjo.DOM.new('<script></script>')
+    dom.at('script').append_content(Pyjo.DOM.new('<style>a < b</style>').at('style').child_nodes.first())
+    is_ok(str(dom), '<script>a < b</script>', 'raw text stays raw')
+
+    is_ok(tag_to_html('div', lambda: '<b>test</b>'), '<div><b>test</b></div>', 'raw content')
+    dom = Pyjo.DOM.new('<p></p>')
+    dom.at('p').append_content(dom.new_tag('div', lambda: '<b>test</b>'))
+    is_ok(str(dom), '<p><div><b>test</b></div></p>', 'raw content')
+
+with subtest('Only a leading XML declaration enables XML mode'):
+    dom = Pyjo.DOM.new('<p>x</p><?php echo "xml"?><SCRIPT>alert(1)</SCRIPT>')
+    ok(not dom.xml, 'XML mode not detected')
+    is_ok(dom.find('script').size, 1, 'one script element')
+
+    dom = Pyjo.DOM.new('<?xml-stylesheet href="test.xsl"?><SCRIPT>alert(1)</SCRIPT>')
+    ok(not dom.xml, 'XML mode not detected')
+    is_ok(dom.find('script').size, 1, 'one script element')
+
+    dom = Pyjo.DOM.new('<p>x</p><?xml version="1.0"?><SCRIPT>alert(1)</SCRIPT>')
+    ok(not dom.xml, 'XML mode not detected')
+    is_ok(dom.find('script').size, 1, 'one script element')
+
+    ok(Pyjo.DOM.new('<?xml version="1.0"?><Foo/>').xml, 'XML mode detected')
+    ok(Pyjo.DOM.new('\n  <?xml version="1.0"?><Foo/>').xml, 'XML mode detected')
+    ok(Pyjo.DOM.new('﻿<?xml version="1.0"?><Foo/>').xml, 'XML mode detected')
+    ok(Pyjo.DOM.new('<?xml?><Foo/>').xml, 'XML mode detected')
+    ok(not Pyjo.DOM.new().set(xml=False).parse('<?xml version="1.0"?><Foo/>').xml, 'XML mode not detected')
 
 with subtest('Comments'):
     dom = Pyjo.DOM.new("""\

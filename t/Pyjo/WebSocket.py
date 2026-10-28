@@ -4,6 +4,7 @@ import Pyjo.Transaction.WebSocket
 
 from Pyjo.String.Unicode import u
 from Pyjo.Test import *
+from Pyjo.WebSocket import build_frame
 from Pyjoyment.Lite import app, get, websocket
 
 import contextlib
@@ -509,6 +510,31 @@ with subtest('Timeout'):
     is_ok(got['stash']['finished'], 1, 'finish event has been emitted once')
     like_ok(str(logs), r'Inactivity timeout', 'right log message')
     del logs
+
+with subtest('Frame sent together with handshake'):
+    got = {'buffer': b''}
+    app.plugins.once('before_dispatch', lambda c: got.update(stash=c.stash()))
+
+    @Pyjo.IOLoop.client(address='127.0.0.1', port=ua.server.nb_url().port)
+    def frame_handshake(loop, err, stream):
+        @stream.on('read')
+        def read(stream, chunk):
+            got['buffer'] += chunk
+            if b'test1test2ws:' in got['buffer']:
+                stream.close()
+
+        stream.write(
+            b'GET / HTTP/1.1\x0d\x0a'
+            b'Connection: Upgrade\x0d\x0a'
+            b'Upgrade: websocket\x0d\x0a'
+            b'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\x0d\x0a'
+            b'Sec-WebSocket-Version: 13\x0d\x0a\x0d\x0a' + build_frame(1, 1, 0, 0, 0, 1, b'test1')
+        )
+
+    while not got.get('stash', {}).get('finished'):
+        Pyjo.IOLoop.one_tick()
+    like_ok(got['buffer'], rb'(?s)101 Switching Protocols.*test1test2ws:', 'right response')
+    is_ok(got['stash']['finished'], 1, 'finish event has been emitted once')
 
 with subtest('Ping/pong'):
     got = {}

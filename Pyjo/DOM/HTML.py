@@ -28,8 +28,8 @@ See also
 
 :mod:`Pyjoyment`, https://mojolicious.org.
 
-Ported from `Mojo::DOM::HTML <https://github.com/mojolicious/mojo/blob/v9.50/lib/Mojo/DOM/HTML.pm>`_
-of Mojolicious 9.50.
+Ported from `Mojo::DOM::HTML <https://github.com/mojolicious/mojo/blob/v9.51/lib/Mojo/DOM/HTML.pm>`_
+of Mojolicious 9.51.
 
 Functions
 ---------
@@ -110,6 +110,9 @@ for _name in (
 # Container HTML elements that create their own scope
 SCOPE = {'math', 'svg'}
 
+# SVG and MathML elements that are HTML integration points
+INTEGRATION = {'desc', 'foreignobject', 'mi', 'mn', 'mo', 'ms', 'mtext', 'title'}
+
 # HTML table elements with optional end tags
 TABLE = {'colgroup', 'tbody', 'td', 'tfoot', 'th', 'thead', 'tr'}
 
@@ -181,7 +184,7 @@ class Pyjo_DOM_HTML(Pyjo.Base.object):
             html.xml = boolean
 
         Disable HTML semantics in parser and activate case-sensitivity, defaults
-        to auto-detection based on XML declarations.
+        to auto-detection based on a leading XML declaration.
         """
         return self._xml
 
@@ -199,6 +202,10 @@ class Pyjo_DOM_HTML(Pyjo.Base.object):
         """
         string = str(html)
 
+        # Detect XML from a leading declaration
+        if not self._xml_set and re.match(r'\ufeff?\s*<\?xml[\s?]', string, re.I):
+            self.xml = True
+
         xml = self.xml
         tree: Tree = ['root']
         current = [tree]
@@ -206,6 +213,15 @@ class Pyjo_DOM_HTML(Pyjo.Base.object):
         while m := _TOKEN_RE.match(string, pos):
             pos = m.end()
             text, doctype, comment, cdata, pi, tag, runaway = (m[i] for i in (1, 2, 3, 4, 5, 6, 11))
+
+            # DOCTYPE, CDATA (outside of foreign content) and processing instructions end at the first ">" in HTML
+            if (
+                not xml
+                and (i := next((v for v in (doctype, cdata, pi) if v is not None), '').find('>')) >= 0
+                and not (cdata is not None and _foreign(current[0]))
+            ):
+                pos = m.start(2 if doctype is not None else 4 if cdata is not None else 5) + i + 1
+                doctype, cdata, pi = (v[:i] if v is not None else v for v in (doctype, cdata, pi))
 
             # Text (and runaway "<")
             if runaway is not None:
@@ -216,7 +232,7 @@ class Pyjo_DOM_HTML(Pyjo.Base.object):
             # Tag
             if tag is not None:
                 # End
-                if end_m := re.match(r'/\s*(\S+)', tag):
+                if end_m := re.match(r'/\s*([^\s/]+)', tag):
                     end = end_m[1] if xml else end_m[1].lower()
 
                     # No more content
@@ -253,8 +269,8 @@ class Pyjo_DOM_HTML(Pyjo.Base.object):
                     if not xml and start in EMPTY or (xml or start not in BLOCK) and closing:
                         _end(start, xml, current)
 
-                    # Raw text elements
-                    if xml or start not in RAW and start not in RCDATA:
+                    # Raw text elements (not in foreign content)
+                    if xml or start not in RAW and start not in RCDATA or _foreign(current[0][3]):
                         continue
 
                     if start == 'script':
@@ -266,7 +282,9 @@ class Pyjo_DOM_HTML(Pyjo.Base.object):
                         continue
 
                     if not (
-                        raw := re.compile(rf'(.*?)</{re.escape(start)}(?:\s+|\s*>)', re.S | re.I).match(string, pos)
+                        raw := re.compile(rf'(.*?)</{re.escape(start)}(?=[\s/>])[^>]*>?', re.S | re.I).match(
+                            string, pos
+                        )
                     ):
                         continue
                     pos = raw.end()
@@ -288,10 +306,8 @@ class Pyjo_DOM_HTML(Pyjo.Base.object):
             elif cdata is not None:
                 _node(current[0], 'cdata', cdata)
 
-            # Processing instruction (try to detect XML)
+            # Processing instruction
             elif pi is not None:
-                if not self._xml_set and re.search(r'xml', pi, re.I):
-                    self.xml = xml = True
                 _node(current[0], 'pi', pi)
 
         self.tree = tree
@@ -352,6 +368,23 @@ def _end(end: str, xml: bool | None, current: list[Tree]) -> None:
             return
 
         next = next[3]
+
+
+def _foreign(next: Tree) -> bool:
+
+    # Search stack for SVG and MathML elements, but stop at HTML integration points
+    while next[0] != 'root':
+        if next[1] in SCOPE:
+            return True
+        if next[1] in INTEGRATION:
+            return False
+        if next[1] == 'annotation-xml' and re.match(
+            r'(?:text/html|application/xhtml\+xml)\Z', next[2].get('encoding') or '', re.I
+        ):
+            return False
+        next = next[3]
+
+    return False
 
 
 def _node(current: Tree, type: str, content: str) -> None:
@@ -417,7 +450,8 @@ def _render(tree: Tree, xml: bool | None) -> str:
     return ''
 
 
-_SCRIPT_END_RE = re.compile(r'</script(?:\s+|\s*>)', re.S | re.I)
+_SCRIPT_END_RE = re.compile(r'</script(?=[\s/>])[^>]*>?', re.S | re.I)
+_SCRIPT_END_TAG_RE = re.compile(r'</script(?=[\s/>])', re.S | re.I)
 
 
 def _script_content(html: str, pos: int) -> tuple[str, bool, int]:
@@ -449,7 +483,7 @@ def _script_content(html: str, pos: int) -> tuple[str, bool, int]:
             else:
                 pos = p + 1
         else:
-            if m := _SCRIPT_END_RE.match(html, pos):
+            if m := _SCRIPT_END_TAG_RE.match(html, pos):
                 pos, state = m.end(), 1
             elif html.startswith('-->', pos):
                 pos, state = pos + 3, 0
