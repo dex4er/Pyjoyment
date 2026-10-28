@@ -384,6 +384,7 @@ with subtest('Shutdown delay'):
             connection.close()
 
     connections, codes, refused, finished, started = [], {'livez': [], 'readyz': []}, [], [], []
+    waits = []
 
     @prefork.once('heartbeat')
     def heartbeat(prefork, id):
@@ -401,7 +402,10 @@ with subtest('Shutdown delay'):
             if elapsed < 0.8:
                 for path in codes:
                     codes[path].append(get(port, f'/{path}'))
-            elif elapsed > 1.2 and not refused:
+            elif elapsed > 1.2:
+                waits.append(elapsed)
+                if refused:
+                    return
                 try:
                     socket.create_connection(('127.0.0.1', port), timeout=1).close()
                 # A connection that comes while the socket closes is reset, as a refused one is
@@ -415,6 +419,7 @@ with subtest('Shutdown delay'):
     ok(codes['livez'] and set(codes['livez']) == {200}, 'served during the delay')
     ok(503 in codes['readyz'], 'not ready during the delay')
     ok(finished and finished[0] - started[0] >= 1, 'graceful shutdown after the delay')
+    ok(len(waits) < 50, f'the manager waits as before after the delay ({len(waits)} times)')
     ok(refused, 'a new connection is refused after the delay')
 
 # Not in Mojolicious: HUP restarts the workers gracefully, or emits the event "reload"

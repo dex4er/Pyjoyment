@@ -701,6 +701,8 @@ class Pyjo_Server_Prefork(Pyjo.Server.Daemon.object):
     def _term(self, graceful: bool = False) -> None:
         self.emit('finish', graceful)
         self._finished, self._graceful = True, graceful
+        # Not in Mojolicious: the delay of a graceful shutdown is over, so that the manager waits as before
+        self._delayed = None
 
         # Unlike Mojolicious: the copies of the listen sockets of the manager are closed, as it starts no more workers, so
         # that a new connection is refused once the workers have closed theirs, where the manager of Mojo keeps them until
