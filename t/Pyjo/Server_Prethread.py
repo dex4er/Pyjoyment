@@ -332,8 +332,10 @@ with subtest('A new connection while it stops gracefully'):
         def wait(prethread):
             if refused:
                 return
+            # Longer than the second after which a client sends its SYN again, as Linux drops the SYN that comes while
+            # the socket closes, and refuses the next one
             try:
-                socket.create_connection(('127.0.0.1', port), timeout=1).close()
+                socket.create_connection(('127.0.0.1', port), timeout=3).close()
             # A connection that comes while the socket closes is reset, as a refused one is
             except (ConnectionRefusedError, ConnectionResetError):
                 refused.append(time.monotonic())
