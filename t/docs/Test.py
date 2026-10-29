@@ -202,6 +202,31 @@ with subtest('Chains'):
     )
     is_ok(code, 0, 'right exit status')
 
+with subtest('Extensions'):
+    with tempfile.TemporaryDirectory() as tmp:
+        with open(os.path.join(tmp, 'MyTest.py'), 'w') as f:
+            f.write(
+                textwrap.dedent(
+                    """
+                    import Pyjo.Test
+
+                    __tracebackhide__ = Pyjo.Test.__tracebackhide__
+
+
+                    def host_is(url, host, desc=None):
+                        return Pyjo.Test.is_ok(url.host, host, desc or f'host is {host}')
+                    """
+                )
+            )
+        out, err, code = run(
+            "host_is(url, 'example.com')\nhost_is(url, 'example.org')",
+            setup="import Pyjo.URL\nfrom MyTest import host_is\nurl = Pyjo.URL.new('http://example.com')",
+            env={'PYTHONPATH': os.pathsep.join([ROOT, tmp])},
+        )
+    is_ok(out, 'ok 1 - host is example.com\nnot ok 2 - host is example.org\n1..2\n', 'assertions of a module')
+    like_ok(err, r'#   at <string> line 6\.', 'line of the test')
+    is_ok(code, 1, 'right exit status')
+
 with subtest('Exceptions'):
     with tempfile.TemporaryDirectory() as tmp:
         with open(os.path.join(tmp, 'test_url.py'), 'w') as f:
