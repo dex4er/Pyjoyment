@@ -681,6 +681,30 @@ with subtest('Parse HTTP 1.1 chunked gzip compressed response'):
     is_ok(res.headers.content_encoding, None, 'no "Content-Encoding" value')
     is_ok(res.body, uncompressed, 'right content')
 
+# Not in Mojolicious: the events of a gzip compressed stream of events, which Mojo parses from the compressed bytes
+with subtest('Parse HTTP 1.1 gzip compressed SSE response'):
+    uncompressed = b''.join(b'data: %d %s\x0a\x0a' % (i, b'x' * 50) for i in range(40))
+    compressed = gzip(uncompressed)
+    res = Pyjo.Message.Response.new()
+    events = []
+    res.content.on('sse', lambda content, event: events.append(event))
+    res.parse(b'HTTP/1.1 200 OK\x0d\x0a')
+    res.parse(b'Content-Type: text/event-stream\x0d\x0a')
+    res.parse(b'Content-Encoding: gzip\x0d\x0a')
+    res.parse(b'Content-Length: %d\x0d\x0a\x0d\x0a' % len(compressed))
+    ok(res.content.is_sse, 'content is SSE')
+    ok(res.content.is_compressed, 'content is compressed')
+    res.parse(compressed[0:1])
+    is_deeply_ok(events, [None], 'connection established')
+    res.parse(compressed[1:100])
+    res.parse(compressed[100:])
+    ok(res.is_finished, 'response is finished')
+    ok(not res.error, 'no error')
+    is_ok(len(events), 41, 'right number of events')
+    is_deeply_ok(events[1], {'type': 'message', 'text': '0 ' + 'x' * 50, 'id': None}, 'right event')
+    is_ok(events[40]['text'], '39 ' + 'x' * 50, 'right event')
+    is_ok(res.body, b'', 'no content')
+
 with subtest('Build HTTP 1.1 response start-line with minimal headers'):
     res = Pyjo.Message.Response.new()
     res.code = 404

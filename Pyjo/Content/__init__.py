@@ -202,6 +202,7 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
         self._real_size: int | None = None
         self._size = 0
         self._sse = False
+        self._sse_buffer = bytearray()
         self._state: str | None = None
 
     @property
@@ -656,21 +657,12 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
             self.emit('read', chunk)
             return
 
-        # Decompress, as Compress::Raw::Zlib does with WANT_GZIP
-        self._post_buffer += chunk
-        if self._gz is None:
-            self._gz = zlib.decompressobj(wbits=16 + zlib.MAX_WBITS)
-        gz = self._gz
-        try:
-            out = gz.decompress(self._post_buffer)
-            self._post_buffer = gz.unused_data
-        except zlib.error:
-            out = b''
-        self._gz_total += len(out)
+        # Decompress
+        out = self._inflate(chunk)
         self.emit('read', out)
 
         # Replace Content-Encoding with Content-Length
-        if gz.eof:
+        if self._gz.eof:
             self.headers.content_length = self._gz_total
             self.headers.remove('Content-Encoding')
 
@@ -745,18 +737,40 @@ class Pyjo_Content(Pyjo.EventEmitter.object):
         self._pre_buffer = bytearray(leftovers)
         self._header_size = self._raw_size - len(leftovers)
 
+    def _inflate(self, chunk: bytes) -> bytes:
+        # Decompress, as Compress::Raw::Zlib does with WANT_GZIP
+        self._post_buffer += chunk
+        if self._gz is None:
+            self._gz = zlib.decompressobj(wbits=16 + zlib.MAX_WBITS)
+        gz = self._gz
+        try:
+            out = gz.decompress(self._post_buffer)
+            self._post_buffer = gz.unused_data
+        except zlib.error:
+            out = b''
+        self._gz_total += len(out)
+        return out
+
     def _parse_sse(self) -> None:
         # Connection established, with None for the event that Mojo leaves out
         if not self._sse:
             self.emit('sse', None)
         self._sse = True
 
+        # Unlike Mojolicious: the events of a compressed stream are parsed from the decompressed bytes, where Mojo parses
+        # the compressed ones and finds no event
+        buffer = self._pre_buffer
+        if self.auto_decompress and self.is_compressed:
+            self._sse_buffer += self._inflate(bytes(self._pre_buffer))
+            self._pre_buffer = bytearray()
+            buffer = self._sse_buffer
+
         # Parse SSE
-        while event := parse_event(self._pre_buffer):
+        while event := parse_event(buffer):
             self.emit('sse', event)
 
         # Check buffer size
-        if len(self._pre_buffer) > self.max_buffer_size:
+        if len(buffer) > self.max_buffer_size or len(self._post_buffer) > self.max_buffer_size:
             self._state, self._limit = 'finished', True
 
     # Perl's looks_like_number and the number of a string
