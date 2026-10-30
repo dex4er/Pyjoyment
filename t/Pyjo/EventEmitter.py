@@ -272,11 +272,11 @@ with subtest('Arguments of a callback'):
     )
 
     def broken(e):
-        len()
+        raise TypeError('broken body')
 
     e = Pyjo.EventEmitter.new()
     e.on('foo', broken)
     err = eval_(lambda: e.emit('foo'))
-    like_ok(str(err), r'^len\(\) takes exactly one argument \(0 given\)$', 'no hint for an error of the body')
+    is_ok(str(err), 'broken body', 'no hint for an error of the body')
 
 done_testing()
