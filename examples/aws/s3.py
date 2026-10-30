@@ -20,8 +20,10 @@ __DATA__
 """
 
 import Pyjo.Date
+import Pyjo.GetOpt
 import Pyjo.Promise
 
+from Pyjo.Util import die, getopt
 from Pyjoyment.Lite import *
 
 import contextlib
@@ -33,9 +35,23 @@ import aiobotocore.session
 import botocore.exceptions
 
 
-# The bucket, whose objects the application serves, with the credentials and the region of the AWS SDK, as of
-# AWS_PROFILE
-bucket = os.environ['S3_BUCKET']
+# The options before the command, with the names of the AWS CLI, which set the environment variables that the
+# application and the AWS SDK read: python s3.py --profile myprofile --bucket mybucket daemon
+getopt(
+    {
+        'bucket=s': Pyjo.GetOpt.env('S3_BUCKET'),
+        'endpoint-url=s': Pyjo.GetOpt.env('AWS_ENDPOINT_URL'),
+        'profile=s': Pyjo.GetOpt.env('AWS_PROFILE'),
+        'region=s': Pyjo.GetOpt.env('AWS_REGION'),
+    },
+    pass_through=True,
+    require_order=True,
+)
+
+# The bucket, whose objects the application serves, with the credentials and the region of the AWS SDK
+bucket = os.environ.get('S3_BUCKET') or die(
+    'Usage: s3.py --bucket BUCKET [--profile PROFILE] [--region REGION] [--endpoint-url URL] COMMAND [OPTIONS]'
+)
 
 session = aiobotocore.session.get_session()
 

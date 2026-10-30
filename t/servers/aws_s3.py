@@ -9,6 +9,7 @@ from Pyjo.Util import xml_escape
 
 import importlib.util
 import os
+import sys
 
 
 # The asynchronous AWS SDK of the example, of the dependency group "servers": uv run --only-group servers python -m
@@ -81,20 +82,25 @@ def get_object(c):
 
 
 with Pyjo.Server.Daemon.new(app=s3, listen=['http://127.0.0.1'], silent=True) as daemon:
+    # The credentials of the SDK, without the files of the AWS CLI
     os.environ.update(
         {
-            'S3_BUCKET': 'bucket',
-            'AWS_ENDPOINT_URL': f'http://127.0.0.1:{daemon.start().ports()[0]}',
             'AWS_ACCESS_KEY_ID': 'test',
             'AWS_SECRET_ACCESS_KEY': 'test',
-            'AWS_REGION': 'us-east-1',
             'AWS_CONFIG_FILE': os.devnull,
             'AWS_SHARED_CREDENTIALS_FILE': os.devnull,
         }
     )
-    os.environ.pop('AWS_PROFILE', None)
+    for name in ('AWS_ENDPOINT_URL', 'AWS_PROFILE', 'AWS_REGION', 'S3_BUCKET'):
+        os.environ.pop(name, None)
 
+    # The options of the example before its command, which it takes from sys.argv, where it leaves the command
+    sys.argv[1:] = ['--bucket', 'bucket', '--endpoint-url', f'http://127.0.0.1:{daemon.start().ports()[0]}']
+    sys.argv += ['--region', 'us-east-1', 'daemon', '-l', 'http://*:8080']
     t = Pyjo.Test.Pyjo.new(EXAMPLE)
+    is_deeply_ok(sys.argv[1:], ['daemon', '-l', 'http://*:8080'], 'command left')
+    is_ok(os.environ['S3_BUCKET'], 'bucket', 'bucket')
+    is_ok(os.environ['AWS_REGION'], 'us-east-1', 'region')
 
     with subtest('Folders'):
         t.get_ok('/').status_is(200).text_is('h1', '/').element_count_is('li', 4)

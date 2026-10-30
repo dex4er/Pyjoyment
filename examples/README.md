@@ -49,12 +49,13 @@ MCP SDK, are in the dependency group `servers` of the project:
 uv run --group servers python examples/mount/mount_mcp.py daemon
 ```
 
-The application of `aws/` serves the bucket of `S3_BUCKET` with aiobotocore, the
-asynchronous AWS SDK, on the credentials and the region of the SDK, as of
-`AWS_PROFILE`:
+The application of `aws/` serves a bucket with aiobotocore, the asynchronous AWS
+SDK. Its options before the command have the names of the AWS CLI, `--bucket`,
+`--profile`, `--region` and `--endpoint-url`, or the environment variables
+`S3_BUCKET`, `AWS_PROFILE`, `AWS_REGION` and `AWS_ENDPOINT_URL` in their place:
 
 ```sh
-AWS_PROFILE=myprofile S3_BUCKET=mybucket uv run --with aiobotocore python examples/aws/s3.py daemon
+uv run --with aiobotocore python examples/aws/s3.py --profile myprofile --bucket mybucket daemon
 ```
 
 A script that needs a program which Pyjoyment does not run, as php-fpm for
