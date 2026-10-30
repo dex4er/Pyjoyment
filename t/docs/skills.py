@@ -34,6 +34,10 @@ with subtest('Plugin'):
     plugin = load_json(Skills.PLUGIN, '.claude-plugin', 'plugin.json')
     is_ok(plugin['name'], entry['name'], 'name of the entry')
     ok(plugin['description'], 'description')
+    with open(os.path.join(Skills.PLUGIN, '.claude-plugin', 'icon.png'), 'rb') as f:
+        png = f.read(24)
+    is_ok(png[:8], b'\x89PNG\r\n\x1a\n', 'icon is a PNG')
+    is_ok(png[16:24], (512).to_bytes(4) * 2, 'icon of 512 x 512 pixels')
 
 with subtest('Skills'):
     skills = sorted(os.listdir(Skills.SKILLS))

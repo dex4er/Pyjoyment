@@ -1898,7 +1898,9 @@ the plugin `pyjoyment` of Claude Code in `plugins/pyjoyment`, a skill in each
 plugin is not in the root of the repository, as Claude Code warns of the
 `CLAUDE.md` of the root of a plugin. It has no version, so that Claude Code
 updates it with each commit, instead of a version that a change of a skill
-would have to bump.
+would have to bump. Its icon, `.claude-plugin/icon.png`, is the joystick of
+`Pyjoyment/resources/public/favicon.svg`, rendered with
+`rsvg-convert -w 512 -h 512`, as Claude Code takes no SVG for it.
 
 A skill is the idioms, the mistakes, the commands and the links to the
 documentation of its subject, not a copy of a guide, as it goes into the
