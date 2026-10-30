@@ -221,6 +221,41 @@ right away, it will assume that this was intentional and return control to
 the web server, which can then handle other requests while waiting for events
 such as timers to finally generate a response.
 
+What does "Action returned a str, which is not a response" mean?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+An action generates its response with the methods of the controller, such as
+:meth:`~Pyjoyment.Controller.Pyjoyment_Controller.render`, and what it returns
+is not the response, as it is for a view of other Python web frameworks. When
+an action returns a string, bytes, a dict, a list or a tuple and nothing has
+been rendered, not even a template named after its route, :mod:`Pyjoyment`
+reports it instead of waiting for a delayed response.
+
+.. code-block:: python
+
+    @get('/')
+    def hello(c):
+        c.render(text='Hello World!')
+
+    @get('/data')
+    def data(c):
+        c.render(json={'hello': 'world'})
+
+What does "Helper "log" has no attribute "debug"" mean?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A helper is called, also one without arguments, which returns an object, such
+as ``log`` of :mod:`Pyjoyment.Plugin.DefaultHelpers` the logger of the
+request, and ``ua`` the user agent of the application. Without the call, the
+attribute is taken from the helper itself.
+
+.. code-block:: python
+
+    @get('/')
+    def hello(c):
+        c.log().debug('Hello!')
+        c.render(text='Hello World!')
+
 What does "Inactivity timeout" mean?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

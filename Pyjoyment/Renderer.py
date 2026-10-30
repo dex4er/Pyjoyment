@@ -37,7 +37,7 @@ import Pyjo.Loader
 from Pyjo.JSON import encode_json
 from Pyjo.String.Template import is_template
 from Pyjo.TOML import dump as dump_toml
-from Pyjo.Util import decamelize, deprecated, encode, gzip, md5_sum
+from Pyjo.Util import _suggest, decamelize, deprecated, encode, gzip, md5_sum  # pyright: ignore[reportPrivateUsage]
 from Pyjo.YAML import dump
 
 import io
@@ -604,8 +604,12 @@ class Pyjoyment_Renderer_Helpers:
         # The location of the caller, which croak adds to the message
         caller = sys._getframe(1)  # pyright: ignore[reportPrivateUsage]
         at = f'at {caller.f_code.co_filename} line {caller.f_lineno}'
+
+        # Not in Mojolicious: the nested helper that the name most likely meant
+        suggestion = None if name.startswith('_') else _suggest(name, dir(type(self)))
+        mean = f' Did you mean "{suggestion}"?' if suggestion is not None else ''
         raise AttributeError(
-            f'Can\'t locate object method "{name}" via package "{package}" {at}.\n', name=name, obj=self
+            f'Can\'t locate object method "{name}" via package "{package}" {at}.{mean}\n', name=name, obj=self
         )
 
 

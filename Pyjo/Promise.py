@@ -168,7 +168,7 @@ import warnings
 import weakref
 
 from collections.abc import Awaitable, Callable, Coroutine, Generator
-from typing import Any, Concatenate, cast
+from typing import TYPE_CHECKING, Any, Concatenate, cast
 
 
 type Anything = builtins.object
@@ -310,6 +310,15 @@ class Pyjo_Promise(Pyjo.Base.object):
         if self._status == 'resolve':
             return _result(results)
         raise _exception(results)
+
+    if not TYPE_CHECKING:
+        # Not in Mojolicious: an attribute of the value taken from the promise itself, as of the result of a request of
+        # get_p without await; out of the sight of type checkers, which would take any attribute of a promise for one
+        def __getattr__(self, name: str) -> Any:
+            message = f"'{type(self).__name__}' object has no attribute '{name}'"
+            if not name.startswith('_'):
+                message += ', a promise gives its value to await or to a callback of then'
+            raise AttributeError(message, name=name, obj=self)
 
     def __del__(self) -> None:
         if getattr(self, '_handled', True) or getattr(self, '_status', '') != 'reject' or self._results is None:

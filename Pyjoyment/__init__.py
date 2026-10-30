@@ -474,8 +474,15 @@ class Pyjoyment_App(Pyjo.App.object):
         # The location of the caller, which croak adds to the message
         caller = sys._getframe(1)  # pyright: ignore[reportPrivateUsage]
         at = f'at {caller.f_code.co_filename} line {caller.f_lineno}'
+
+        # Not in Mojolicious: the attribute or the helper that the name most likely meant
+        mean = ''
+        if not name.startswith('_'):
+            names = [*dir(self), *(h.split('.')[0] for h in renderer.helpers)] if renderer is not None else []
+            if (suggestion := Pyjo.Util._suggest(name, names)) is not None:  # pyright: ignore[reportPrivateUsage]
+                mean = f' Did you mean "{suggestion}"?'
         raise AttributeError(
-            f'Can\'t locate object method "{name}" via package "{package}" {at}.\n', name=name, obj=self
+            f'Can\'t locate object method "{name}" via package "{package}" {at}.{mean}\n', name=name, obj=self
         )
 
     @property
@@ -1023,7 +1030,18 @@ class Pyjoyment_App(Pyjo.App.object):
 
 
 def _action(next: Any, c: Pyjoyment.Controller.object, action: Callable[..., Any], last: bool) -> Any:
-    val = action(c)
+    try:
+        val = action(c)
+    except TypeError as e:
+        # Not in Mojolicious: the arguments of an action, which Perl does not check, as the placeholders of the route
+        # as the arguments of another framework
+        hint = 'an action gets the controller only, which has the values of the placeholders in c.param(...)'
+        Pyjo.Util._call_hint(e, hint)  # pyright: ignore[reportPrivateUsage]
+        raise
+    # Not in Mojolicious: the response that an endpoint returns, as a view of another framework does, which the
+    # automatic rendering reports when it renders nothing
+    if last and issubclass(type(val), (str, bytes, dict, list, tuple)):
+        c.stash()['pyjo.returned'] = type(val).__name__
     # Not in Mojolicious: an action that is a coroutine function runs as a promise, which async sub of Mojo returns
     if inspect.iscoroutine(val):
         val = Pyjo.Promise.new(val)

@@ -341,6 +341,15 @@ with subtest('Error'):
     reactor.start()
     like_ok(str(err), r'works!', 'right error')
 
+    # Not in Mojolicious: the arguments of a callback, which Perl does not check
+    reactor.timer(0, lambda: None)
+    reactor.start()
+    like_ok(
+        str(err),
+        r'takes 0 positional arguments but 1 was given: the callbacks of a reactor get the reactor first',
+        'hint',
+    )
+
 with subtest('Reset events'):
     reactor.on('error', lambda reactor, err: None)
     ok(reactor.has_subscribers('error'), 'has subscribers')

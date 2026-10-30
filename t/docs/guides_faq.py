@@ -160,6 +160,40 @@ with subtest('What does "Your secret passphrase needs to be changed" mean?'):
     app.secrets = ['My very secret passphrase.']
     is_deeply_ok(app.secrets, ['My very secret passphrase.'], 'changed')
 
+with subtest('What does "Action returned a str, which is not a response" mean?'):
+    app = Pyjoyment.new()
+    app.log.level = 'fatal'
+    r = app.routes
+
+    @r.get('/')
+    def hello(c):
+        c.render(text='Hello World!')
+
+    @r.get('/data')
+    def data(c):
+        c.render(json={'hello': 'world'})
+
+    r.get('/returned').to(cb=lambda c: 'Hello World!')
+    t = Pyjo.Test.Pyjo.new(app)
+    t.get_ok('/').status_is(200).content_is('Hello World!')
+    t.get_ok('/data').status_is(200).json_is({'hello': 'world'})
+    t.get_ok('/returned').status_is(500).content_like(r'Action returned a str, which is not a response')
+
+with subtest('What does "Helper "log" has no attribute "debug"" mean?'):
+    app = Pyjoyment.new()
+    app.log.level = 'fatal'
+    r = app.routes
+
+    @r.get('/')
+    def hello_log(c):
+        c.log().debug('Hello!')
+        c.render(text='Hello World!')
+
+    r.get('/uncalled').to(cb=lambda c: c.log.debug('Hello!'))
+    t = Pyjo.Test.Pyjo.new(app)
+    t.get_ok('/').status_is(200).content_is('Hello World!')
+    t.get_ok('/uncalled').status_is(500).content_like(r'Helper &quot;log&quot; has no attribute &quot;debug&quot;')
+
 with subtest('What does "Inactivity timeout" mean?'):
     with patch.dict(os.environ, {}, clear=False):
         os.environ.pop('PYJO_INACTIVITY_TIMEOUT', None)
