@@ -2,8 +2,9 @@
 
 The tests of Pyjoyment. Each `.py` file under this directory is a test script
 that prints [TAP](https://testanything.org/), written with `Pyjo.Test` and run
-by `Pyjo.Prove`, the harness of the project. `AGENTS.md` says how the tests
-are ported from Mojolicious and the rules they follow.
+by `Pyjo.Prove`, the harness of the project. The skill `framework-tests`, in
+[`.claude/skills/framework-tests/SKILL.md`](../.claude/skills/framework-tests/SKILL.md),
+says how the tests are ported from Mojolicious and the rules they follow.
 
 ## Layout
 
