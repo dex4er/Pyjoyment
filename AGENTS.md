@@ -145,7 +145,13 @@ of them is a regression.
   where they make the work easier, so that code of Mojolicious, of Node.js or
   of a library of Python ports with few changes: `Pyjo.JSON.Schema` takes the
   type hints of Python and the chains of zod. A feature that Mojolicious does
-  not have is welcome by this measure.
+  not have is welcome by this measure. A standard does not replace a pattern of
+  Mojolicious that does more for its area: the routes keep the placeholders of
+  Mojolicious, with their types, defaults, formats and the partial match of
+  nested routes, which recognize a request, and the URI Templates of RFC 6570
+  of `Pyjo.URL.Template` are for the URIs that a protocol gives as templates,
+  as MCP and OpenAPI do, whose plugin turns such a template into the pattern
+  of a route.
 
 ## Development Environment
 

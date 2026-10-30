@@ -147,6 +147,10 @@ The colon prefix is optional for standard placeholders that are surrounded by
 
     /i♥mojolicious -> /<one>♥<two> -> {'one': 'i', 'two': 'mojolicious'}
 
+Braces are not placeholders: a pattern is not a URI Template of :rfc:`6570`,
+as ``/users/{id}``, which :mod:`Pyjo.URL.Template` expands and matches for the
+protocols that give their URIs as templates.
+
 .. _routing-relaxed-placeholders:
 
 Relaxed placeholders

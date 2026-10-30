@@ -39,10 +39,16 @@ character of what follows it in the template, as ``{name}`` ends at the
     # {'owner': 'dex4er', 'path': 'src/main.py'}
     Pyjo.URL.Template.new('repo://{owner}/blob/{+path}').match('repo://dex4er/blob/src/main.py')
 
+A template is for the URIs that a protocol gives as templates, as the resource
+templates of the Model Context Protocol. A request of an application is
+dispatched by its routes, whose patterns of :mod:`Pyjoyment.Routes.Pattern`
+have placeholders with types, defaults and formats, which a template does not
+have.
+
 See also
 --------
 
-:mod:`Pyjo.URL`, https://mojolicious.org.
+:mod:`Pyjo.URL`, :mod:`Pyjoyment.Routes.Pattern`, https://mojolicious.org.
 
 It has no counterpart in Mojolicious, and is written from :rfc:`6570`.
 
