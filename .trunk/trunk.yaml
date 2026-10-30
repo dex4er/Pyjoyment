@@ -123,6 +123,13 @@ lint:
         - Pyjoyment/resources/public/pyjo/bootstrap/**
         - Pyjoyment/resources/public/pyjo/highlight.js/**
         - Pyjoyment/resources/public/pyjo/pyjo.css
+    # The skills for coding agents, which an agent reads as they are written, so
+    # that no formatter wraps a span of code or a command across lines
+    - linters:
+        - markdownlint
+        - prettier
+      paths:
+        - plugins/pyjoyment/skills/**
     # Configuration files of the tests, which are templates of Pyjo.Template
     # before they are JSON, TOML or YAML, as those of Mojolicious
     - linters:

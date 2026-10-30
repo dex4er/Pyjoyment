@@ -104,6 +104,20 @@ or, in a project managed with [uv](https://docs.astral.sh/uv/):
 uv add git+https://github.com/dex4er/Pyjoyment
 ```
 
+The skills for coding agents that write applications with Pyjoyment are a
+plugin of [Claude Code](https://code.claude.com/docs/en/plugins), whose
+`SKILL.md` files other agents read too:
+
+```text
+/plugin install pyjoyment --marketplace dex4er/Pyjoyment
+```
+
+or from the shell, as the extensions of the editors have no `/plugin`:
+
+```sh
+claude plugin install pyjoyment --marketplace dex4er/Pyjoyment
+```
+
 ## Quick start
 
 These three lines are a whole web application.
