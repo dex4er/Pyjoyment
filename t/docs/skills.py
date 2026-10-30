@@ -39,19 +39,27 @@ with subtest('Plugin'):
     is_ok(png[:8], b'\x89PNG\r\n\x1a\n', 'icon is a PNG')
     is_ok(png[16:24], (512).to_bytes(4) * 2, 'icon of 512 x 512 pixels')
 
-with subtest('Skills'):
-    skills = sorted(os.listdir(Skills.SKILLS))
-    ok(skills, 'skills')
-    for skill in skills:
-        front, body = Skills.parse(skill)
-        ok(front is not None, f'{skill}: front matter on the first line')
-        is_deeply_ok(sorted(set(front) - PORTABLE), [], f'{skill}: portable fields')
-        is_ok(front.get('name'), skill, f'{skill}: name of the directory')
-        like_ok(skill, r'^[a-z0-9]+(?:-[a-z0-9]+)*$', f'{skill}: name')
-        ok(len(skill) <= 64, f'{skill}: short name')
-        ok(0 < len(front.get('description') or '') <= 1024, f'{skill}: description')
-        ok(len(body.splitlines()) < 500, f'{skill}: short body')
-        for link in re.findall(r'\]\((?!https?:)([^)]+)\)', body):
-            ok(os.path.exists(os.path.join(Skills.SKILLS, skill, link)), f'{skill}: {link} exists')
+for title, directory in (('Skills of the plugin', Skills.SKILLS), ('Skills of the project', Skills.PROJECT)):
+    with subtest(title):
+        skills = sorted(os.listdir(directory))
+        ok(skills, 'skills')
+        for skill in skills:
+            front, body = Skills.parse(skill, directory)
+            ok(front is not None, f'{skill}: front matter on the first line')
+            is_deeply_ok(sorted(set(front) - PORTABLE), [], f'{skill}: portable fields')
+            is_ok(front.get('name'), skill, f'{skill}: name of the directory')
+            like_ok(skill, r'^[a-z0-9]+(?:-[a-z0-9]+)*$', f'{skill}: name')
+            ok(len(skill) <= 64, f'{skill}: short name')
+            ok(0 < len(front.get('description') or '') <= 1024, f'{skill}: description')
+            ok(len(body.splitlines()) < 500, f'{skill}: short body')
+            for link in re.findall(r'\]\((?!https?:)([^)]+)\)', body):
+                ok(os.path.exists(os.path.join(directory, skill, link)), f'{skill}: {link} exists')
+
+# AGENTS.md names each skill of the project by its file, which other agents read as it is
+with subtest('Skills of the project in AGENTS.md'):
+    with open(os.path.join(Skills.ROOT, 'AGENTS.md'), encoding='utf-8') as f:
+        agents = f.read()
+    named = sorted(set(re.findall(r'`\.claude/skills/([a-z0-9-]+)/SKILL\.md`', agents)))
+    is_deeply_ok(named, sorted(os.listdir(Skills.PROJECT)), 'every skill of the project, and no other')
 
 done_testing()
