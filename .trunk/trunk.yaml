@@ -141,6 +141,7 @@ lint:
         - pyright
       paths:
         - benchmarks/**
+        - examples/aws/s3.py
         - examples/mount/hello_mangum.py
         - examples/mount/mount_mcp.py
         - examples/pyjo/resolv_dns.py

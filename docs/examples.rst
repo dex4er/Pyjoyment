@@ -161,6 +161,19 @@ runs it with the runtime client of Pyjoyment:
        :code: sh
 
 
+Amazon S3
+---------
+
+A bucket of Amazon S3 as a website, with `aiobotocore
+<https://github.com/aio-libs/aiobotocore>`_, the asynchronous AWS SDK, whose
+requests the actions await in the event loop of the server: the content of an
+object, as it comes, ``index.html`` of a folder, or the list of its folders
+and objects:
+
+    .. include:: ../examples/aws/s3.py
+       :code: python
+
+
 Requests on a timer
 -------------------
 

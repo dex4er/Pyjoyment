@@ -305,9 +305,11 @@ port 0 instead, which `ports()` gives.
   Mangum as an event function of AWS Lambda with `Pyjo.App.Lambda`, and the
   server of the MCP SDK of the example `mount_mcp.py`, which the client of the
   SDK calls, on the daemon and without sessions on the workers of prefork, and
-  compares the schemas of the type hints of `Pyjo.JSON.Schema` with the ones
-  of pydantic, which the MCP SDK gives its tools. The servers, the frameworks
-  and pydantic are in the dependency group `servers`, not in
+  the example `aws/s3.py` with aiobotocore, the asynchronous AWS SDK, against
+  a mock of S3 on the daemon in the same event loop, and compares the schemas
+  of the type hints of `Pyjo.JSON.Schema` with the ones of pydantic, which the
+  MCP SDK gives its tools. The servers, the frameworks,
+  aiobotocore and pydantic are in the dependency group `servers`, not in
   `dependencies`; without it, the tests are skipped.
 - `t/lib/` holds helpers shared by the tests. Run on their own, they skip with
   `plan(skip_all=...)`, so `-r t` reports them as skipped instead of failing.
