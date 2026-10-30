@@ -146,9 +146,9 @@ app.start()
 - A script of `Pyjoyment.Lite` without `app.start()` as its last line does
   nothing, without a message. For AWS Lambda it is `handler = app.start()`.
 - `requests`, `time.sleep` or a database driver without asyncio in an action
-  stop the event loop for every connection: use `c.ua()`, `await
-Pyjo.Promise.timer(1)`, a library of asyncio, or the workers of `prefork`
-  for what has to block.
+  stop the event loop for every connection: use `c.ua()`,
+  `await Pyjo.Promise.timer(1)`, a library of asyncio, or the workers of
+  `prefork` for what has to block.
 - Jinja and `render_template` work outside of the renderer, without its
   helpers, layouts and the templates of `__DATA__`: use `ep` templates.
 - The test client of another framework with pytest has no event loop of the

@@ -1913,7 +1913,10 @@ matter of each skill, and a test of a skill, as `t/docs/skills_migration.py`,
 runs its code, which `blocks` of `t/lib/Skills.py` takes from its `SKILL.md`,
 so that an example that went stale does not teach an agent the wrong thing.
 `claude plugin validate .` and `claude plugin validate ./plugins/pyjoyment`
-check them as Claude Code reads them.
+check them as Claude Code reads them. The formatters and the linters of Markdown
+leave the skills out, in `.trunk/trunk.yaml` and `.prettierignore`, as an
+agent reads a skill as it is written, and a formatter would wrap a span of
+code or a command across lines.
 
 ## Commits and Pull Requests
 
