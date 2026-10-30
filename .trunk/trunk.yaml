@@ -53,12 +53,16 @@ lint:
     # with biome.jsonc. parse_regex is matched against the whole output of a
     # batch, so `^` needs `(?m)` to match at every line; without it Trunk
     # reports only the first issue that Biome prints. Trunk runs Biome on a copy
-    # of the files in a sandbox outside the repository, pointing it back at
-    # biome.jsonc with --config-path, where the .gitignore of the repository,
-    # which vcs.useIgnoreFile reads, makes Biome panic on a path outside the
-    # root, so the commands turn it off, as Trunk applies .gitignore itself,
+    # of the files in a sandbox outside the repository, with a copy of
+    # biome.jsonc of direct_configs, not --config-path of the one of the
+    # repository, as Biome takes the options of its parser, as the front matter
+    # of Markdown, only for the files under the directory of its
+    # configuration. The sandbox has no .gitignore, which vcs.useIgnoreFile
+    # reads, so the commands turn it off, as Trunk applies .gitignore itself,
     # and --no-errors-on-unmatched passes a file that biome.jsonc leaves out.
     - name: biome
+      direct_configs:
+        - biome.jsonc
       files:
         - css
         - html
@@ -76,7 +80,7 @@ lint:
           name: lint
           parse_regex: (?m)^::(?P<severity>.*) title=(?P<code>[^,]+),file=(?P<path>[^,]+),line=(?P<line>[^,]+),endLine=[^,]+,col=(?P<col>[^,]+),endColumn=[^:]+::(?P<message>.*)
           read_output_from: stdout
-          run: biome check --config-path=${workspace}/biome.jsonc --vcs-use-ignore-file=false --reporter=github --no-errors-on-unmatched ${target}
+          run: biome check --vcs-use-ignore-file=false --reporter=github --no-errors-on-unmatched ${target}
           run_from: ${root_or_parent_with(biome.jsonc)}
         - output: regex
           success_codes:
@@ -87,7 +91,7 @@ lint:
           name: fmt
           parse_regex: (?m)^::(?P<severity>.*) title=(?P<code>[^,]+),file=(?P<path>[^,]+),line=(?P<line>[^,]+),endLine=[^,]+,col=(?P<col>[^,]+),endColumn=[^:]+::(?P<message>.*)
           read_output_from: stdout
-          run: biome format --config-path=${workspace}/biome.jsonc --vcs-use-ignore-file=false --reporter=github --write --no-errors-on-unmatched ${target}
+          run: biome format --vcs-use-ignore-file=false --reporter=github --write --no-errors-on-unmatched ${target}
           run_from: ${root_or_parent_with(biome.jsonc)}
       run_timeout: 1m
   enabled:
@@ -174,12 +178,6 @@ lint:
         - Pyjoyment/resources/public/pyjo/bootstrap/**
         - Pyjoyment/resources/public/pyjo/highlight.js/**
         - Pyjoyment/resources/public/pyjo/pyjo.css
-    # The skills for coding agents, which an agent reads as they are written, so
-    # that no formatter wraps a span of code or a command across lines
-    - linters:
-        - biome
-      paths:
-        - plugins/pyjoyment/skills/**
     # Configuration files of the tests, which are templates of Pyjo.Template
     # before they are JSON, TOML or YAML, as those of Mojolicious
     - linters:

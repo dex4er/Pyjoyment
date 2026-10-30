@@ -1658,10 +1658,12 @@ the workflow, as Bundle Check does, as the author that `gitIgnoredAuthors`
 of `.renovaterc.json` names, so that Renovate keeps updating the branch, and
 starts the checks of the commit with `workflow_dispatch`; anywhere else, a
 `biome.jsonc` that the Biome of `package.json` would migrate fails the check.
-The definition of Biome in `.trunk/trunk.yaml` runs it without the
-`.gitignore` of the repository, which makes Biome panic in the sandbox of
-Trunk, and matches its report at every line, where the plugin of Trunk
-reports only the first issue of a batch. yamllint checks what Biome does not,
+The definition of Biome in `.trunk/trunk.yaml` runs it in the sandbox of Trunk
+with a copy of `biome.jsonc`, as Biome takes the options of its parser, as
+the front matter of Markdown, only for the files under the directory of its
+configuration, without the `.gitignore` of the repository, and matches its
+report at every line, where the plugin of Trunk reports only the first issue
+of a batch. yamllint checks what Biome does not,
 as the duplicated keys.
 
 The `trunk` launcher is not pinned in
@@ -1932,10 +1934,9 @@ matter of each skill, and a test of a skill, as `t/docs/skills_migration.py`,
 runs its code, which `blocks` of `t/lib/Skills.py` takes from its `SKILL.md`,
 so that an example that went stale does not teach an agent the wrong thing.
 `claude plugin validate .` and `claude plugin validate ./plugins/pyjoyment`
-check them as Claude Code reads them. Biome leaves the skills out, in `biome.jsonc` and
-`.trunk/trunk.yaml`, as an
-agent reads a skill as it is written, and a formatter would wrap a span of
-code or a command across lines.
+check them as Claude Code reads them. Biome formats them with `frontmatter` of
+`markdown.parser` of `biome.jsonc`, without which it reads the front matter of
+a `SKILL.md` as Markdown, and turns its YAML into a heading.
 
 ## Commits and Pull Requests
 

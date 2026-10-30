@@ -3,8 +3,6 @@
   "files": {
     "includes": [
       "**",
-      // The skills for coding agents, which an agent reads as they are written
-      "!**/plugins/pyjoyment/skills",
       // Libraries and stylesheets that Pyjoyment bundles as they are, from
       // their own projects or from Mojolicious, so that a newer version
       // replaces them without a diff of formatting, and the lock of npm, which
@@ -35,6 +33,13 @@
     "useEditorconfig": true
   },
   "markdown": {
+    // The front matter of a file, as the one of the SKILL.md of a skill, which
+    // the parser reads as Markdown otherwise, and turns its YAML into a
+    // heading. Biome takes the options of the parser only for the files under
+    // the directory of the configuration, so Trunk copies it to its sandbox.
+    "parser": {
+      "frontmatter": true
+    },
     "formatter": {
       // The HTML of a page, as the logo of README.md, stays as it is written
       "formatEmbeds": false
