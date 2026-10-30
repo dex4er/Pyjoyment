@@ -119,6 +119,24 @@ with the first of its methods: ::
 Each method is a test of its own, which runs also after a test of the chain
 failed, and a failure shows the line of the method.
 
+Extensions
+----------
+
+A failed test shows the line of the first frame outside of :mod:`Pyjo.Test`
+and of the modules that leave their frames out of the traceback of pytest
+with ``__tracebackhide__``, so that the assertions of a module of their own,
+as a subclass of :mod:`Pyjo.Test.Pyjo`, show the line of the test that calls
+them: ::
+
+    # MyTest.py
+    import Pyjo.Test
+
+    __tracebackhide__ = Pyjo.Test.__tracebackhide__
+
+
+    def host_is(url, host, desc=None):
+        return Pyjo.Test.is_ok(url.host, host, desc or f'host is {host}')
+
 Exit status
 -----------
 
@@ -1023,10 +1041,14 @@ def _class_names(cls: type | tuple[type, ...]) -> str:
     return cls.__name__
 
 
-# The first frame outside of the package, as Pyjo.Test.Pyjo raises $Test::Builder::Level of Test::Mojo
+# The first frame outside of the package and of the modules that pytest leaves out of a traceback, as an extension of
+# Pyjo.Test.Pyjo in a package of its own, as Pyjo.Test.Pyjo raises $Test::Builder::Level of Test::Mojo
 def _caller() -> str | None:
     frame = inspect.currentframe()
-    while frame is not None and os.path.dirname(frame.f_code.co_filename) == os.path.dirname(__file__):
+    while frame is not None and (
+        os.path.dirname(frame.f_code.co_filename) == os.path.dirname(__file__)
+        or frame.f_globals.get('__tracebackhide__')
+    ):
         frame = frame.f_back
     if frame is None:
         return None
