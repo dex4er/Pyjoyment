@@ -112,6 +112,12 @@ plugin of [Claude Code](https://code.claude.com/docs/en/plugins), whose
 /plugin install pyjoyment --marketplace dex4er/Pyjoyment
 ```
 
+or from the shell, as the extensions of the editors have no `/plugin`:
+
+```sh
+claude plugin install pyjoyment --marketplace dex4er/Pyjoyment
+```
+
 ## Quick start
 
 These three lines are a whole web application.

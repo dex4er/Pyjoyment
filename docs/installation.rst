@@ -15,3 +15,7 @@ plugin of `Claude Code <https://code.claude.com/docs/en/plugins>`_, whose
 ``SKILL.md`` files other agents read too: ::
 
     /plugin install pyjoyment --marketplace dex4er/Pyjoyment
+
+or from the shell, as the extensions of the editors have no ``/plugin``: ::
+
+    claude plugin install pyjoyment --marketplace dex4er/Pyjoyment
