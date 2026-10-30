@@ -84,7 +84,7 @@ try:
         is_ok(stderr.strip(), '404 Not Found', 'response of an error')
         stdout, stderr, status = run('scrape.py', 'http://127.0.0.1:1/')
         isnt_ok(status, 0, 'error of the connection')
-        like_ok(stderr, r'(?i)refused', 'exception')
+        like_ok(stderr, r'(?i)refused|10061', 'exception')
 
     with subtest('Many pages at the same time'):
         stdout, stderr, status = run('titles.py', *(f'{base}/page/{n}' for n in range(1, 6)))
