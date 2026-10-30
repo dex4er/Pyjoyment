@@ -165,14 +165,16 @@ with subtest('An address of another family than the socket'):
     datagram.close()
 
 with subtest('A datagram that cannot be sent'):
-    datagram = Pyjo.IOLoop.Datagram.new().bind(address='0.0.0.0')
+    datagram = Pyjo.IOLoop.Datagram.new().bind(address='127.0.0.1')
     errors = []
     sent = []
     datagram.on('error', lambda datagram, err: errors.append(err))
 
-    # A broadcast without the socket option
-    datagram.send(b'broadcast', ('255.255.255.255', 9), lambda datagram: sent.append(True))
-    isa_ok(errors[0], PermissionError, 'error')
+    # Larger than a datagram of UDP can be, which fails on any network, where a broadcast without the socket option
+    # fails with an error that depends on the route, as EADDRNOTAVAIL of a route through a tunnel
+    datagram.send(b'x' * 70000, ('127.0.0.1', 9), lambda datagram: sent.append(True))
+    isa_ok(errors[0], OSError, 'error')
+    is_ok(errors[0].errno, errno.EMSGSIZE, 'message too long')
     is_deeply_ok(sent, [], 'not sent')
     is_ok(datagram.bytes_waiting, 0, 'not waiting')
     ok(datagram.handle, 'still open')
