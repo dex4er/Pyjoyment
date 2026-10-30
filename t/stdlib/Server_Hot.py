@@ -58,14 +58,15 @@ def read_pid(pid):
 def get(port):
     deadline = time.monotonic() + 20
     while time.monotonic() < deadline:
+        # The connection is closed also when the request fails, as PyPy would close it only with its garbage collector
+        conn = http.client.HTTPConnection('127.0.0.1', port, timeout=2)
         try:
-            conn = http.client.HTTPConnection('127.0.0.1', port, timeout=2)
             conn.request('GET', '/')
-            body = conn.getresponse().read()
-            conn.close()
-            return body
+            return conn.getresponse().read()
         except OSError:
             time.sleep(0.1)
+        finally:
+            conn.close()
     return None
 
 
