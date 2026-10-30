@@ -145,7 +145,13 @@ of them is a regression.
   where they make the work easier, so that code of Mojolicious, of Node.js or
   of a library of Python ports with few changes: `Pyjo.JSON.Schema` takes the
   type hints of Python and the chains of zod. A feature that Mojolicious does
-  not have is welcome by this measure.
+  not have is welcome by this measure. A standard does not replace a pattern of
+  Mojolicious that does more for its area: the routes keep the placeholders of
+  Mojolicious, with their types, defaults, formats and the partial match of
+  nested routes, which recognize a request, and the URI Templates of RFC 6570
+  of `Pyjo.URL.Template` are for the URIs that a protocol gives as templates,
+  as MCP and OpenAPI do, whose plugin turns such a template into the pattern
+  of a route.
 
 ## Development Environment
 
@@ -731,6 +737,12 @@ transport, written from the specification, whose first consumer is the
 distribution of MCP, and whose `to_action` makes an action of a route of
 Pyjoyment, which takes the controller from the route, as `Pyjo` does not import
 `Pyjoyment`, and whose `serve` serves a stream of messages in both directions),
+`Pyjo.URL.Template` (the URI Templates of RFC 6570, written from the RFC,
+whose tests are its examples, with their expansion and the match of a URI,
+which the RFC leaves to the implementations, from both ends of the URI, so
+that a URI of a client takes a time linear in its length, and one expression
+takes what the others leave, whose first consumer is the distribution of MCP,
+with the templates of its resources),
 `Pyjo.Test.pytest_plugin` (the plugin of pytest, which runs the test scripts
 as `Pyjo.Prove` does and the functions of `Pyjo.Test` in the tests of pytest),
 `Pyjo.YAML` (the subset of YAML of `CPAN::Meta::YAML`,
