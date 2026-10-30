@@ -578,10 +578,8 @@ with subtest('Server-Sent Events web service'):
     with cookbook('livelog') as t:
         t.get_ok('/').status_is(200).content_like(re.compile(r"new EventSource\('/events'\)"))
 
-        # A log message once the response headers have been written, and the connection that sse_finish_ok closes
-        # ends when the user agent reads again, or when it is inactive for its timeout, as in Mojolicious
+        # A log message once the response headers have been written
         Pyjo.IOLoop.timer(0.5, lambda loop: t.app.log.info('Hello SSE!'))
-        t.ua.inactivity_timeout = 2
         with t.app.log.capture('info'):
             t.get_sse_ok('/events').status_is(200).sse_ok().sse_type_is('log').sse_text_is('[info] Hello SSE!')
             t.sse_finish_ok()

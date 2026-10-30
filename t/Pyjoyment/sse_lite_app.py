@@ -38,6 +38,14 @@ def redirect(c):
     c.redirect_to('/infinite')
 
 
+# Not in Mojolicious: a stream of one event, which stays open without another one, as sse_finish_ok of Mojo waits for
+# the next event
+@get('/quiet')
+def quiet(c):
+    c.helpers.inactivity_timeout(0)
+    c.write_sse({'text': 'One'})
+
+
 t = Pyjo.Test.Pyjo.new()
 t.ua.max_redirects = 10
 
@@ -115,5 +123,12 @@ with subtest('Follow redirect'):
         .sse_text_like(r'\d+')
         .sse_finish_ok()
     )
+
+# Not in Mojolicious: sse_finish_ok of a stream without events closes it at once
+with subtest('Finish without events'):
+    t.ua.inactivity_timeout = 30
+    started = time.monotonic()
+    t.get_sse_ok('/quiet').status_is(200).sse_ok().sse_text_is('One').sse_finish_ok()
+    ok(time.monotonic() - started < 5, 'closed at once')
 
 done_testing()
