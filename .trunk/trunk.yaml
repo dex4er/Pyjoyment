@@ -49,11 +49,57 @@ lint:
           formatter: true
           batch: true
           in_place: true
+    # Biome formats and lints CSS, HTML, JavaScript, JSON, Markdown and YAML,
+    # with biome.jsonc. parse_regex is matched against the whole output of a
+    # batch, so `^` needs `(?m)` to match at every line; without it Trunk
+    # reports only the first issue that Biome prints. Trunk runs Biome on a copy
+    # of the files in a sandbox outside the repository, with a copy of
+    # biome.jsonc of direct_configs, not --config-path of the one of the
+    # repository, as Biome takes the options of its parser, as the front matter
+    # of Markdown, only for the files under the directory of its
+    # configuration. The sandbox has no .gitignore, which vcs.useIgnoreFile
+    # reads, so the commands turn it off, as Trunk applies .gitignore itself,
+    # and --no-errors-on-unmatched passes a file that biome.jsonc leaves out.
+    - name: biome
+      direct_configs:
+        - biome.jsonc
+      files:
+        - css
+        - html
+        - javascript
+        - json
+        - markdown
+        - yaml
+      commands:
+        - output: regex
+          success_codes:
+            - 0
+            - 1
+          batch: true
+          cache_results: false
+          name: lint
+          parse_regex: (?m)^::(?P<severity>.*) title=(?P<code>[^,]+),file=(?P<path>[^,]+),line=(?P<line>[^,]+),endLine=[^,]+,col=(?P<col>[^,]+),endColumn=[^:]+::(?P<message>.*)
+          read_output_from: stdout
+          run: biome check --vcs-use-ignore-file=false --reporter=github --no-errors-on-unmatched ${target}
+          run_from: ${root_or_parent_with(biome.jsonc)}
+        - output: regex
+          success_codes:
+            - 0
+          batch: true
+          cache_results: false
+          formatter: true
+          name: fmt
+          parse_regex: (?m)^::(?P<severity>.*) title=(?P<code>[^,]+),file=(?P<path>[^,]+),line=(?P<line>[^,]+),endLine=[^,]+,col=(?P<col>[^,]+),endColumn=[^:]+::(?P<message>.*)
+          read_output_from: stdout
+          run: biome format --vcs-use-ignore-file=false --reporter=github --write --no-errors-on-unmatched ${target}
+          run_from: ${root_or_parent_with(biome.jsonc)}
+      run_timeout: 1m
   enabled:
     - actionlint@1.17.0
+    # The version of package.json, which Renovate bumps in both, and which the
+    # ! keeps from trunk upgrade
+    - biome@2.6.4! # datasource=npm depName=@biomejs/biome
     - git-diff-check
-    - markdownlint@0.50.0
-    - prettier@3.9.10
     - pyright@1.1.414
     # The format command of ruff is disabled in the plugin by default
     - ruff@0.17.2:
@@ -63,7 +109,8 @@ lint:
     - shellcheck@0.11.0
     - shfmt@3.14.1
     - taplo@0.10.0
-    - yamlfmt@0.21.0
+    # yamllint checks what Biome does not, as the duplicated keys and the
+    # values that YAML 1.1 reads otherwise
     - yamllint@1.38.0
   disabled:
     # bandit: security checks for Python code; not used here
@@ -80,6 +127,9 @@ lint:
     - hadolint
     # isort: sorts Python imports; ruff sorts them (rule I)
     - isort
+    # markdownlint: lints Markdown; Biome formats it and has its rules that are
+    # not about formatting
+    - markdownlint
     # osv-scanner: known vulnerabilities in dependency lockfiles; there are no
     # runtime dependencies
     - osv-scanner
@@ -92,6 +142,9 @@ lint:
     # pinact: pins GitHub Actions to commit hashes; Renovate keeps the actions
     # up to date by their tags
     - pinact
+    # prettier: formats CSS, HTML, JavaScript, JSON, Markdown and YAML; Biome
+    # formats them
+    - prettier
     # renovate: validates the Renovate configuration; Renovate validates it
     # itself on every run, and the linter is a heavy npm package
     - renovate
@@ -107,10 +160,12 @@ lint:
     # trufflehog: secret scanner; not needed here, and it would report the
     # default self-signed TLS key in Pyjo/IOLoop/certs, tracked on purpose
     - trufflehog
+    # yamlfmt: formats YAML; Biome formats it
+    - yamlfmt
   ignore:
     # Rewritten by trunk upgrade
     - linters:
-        - yamlfmt
+        - biome
       paths:
         - .trunk/trunk.yaml
     # Libraries and stylesheets that Pyjoyment bundles as they are, from
@@ -123,19 +178,11 @@ lint:
         - Pyjoyment/resources/public/pyjo/bootstrap/**
         - Pyjoyment/resources/public/pyjo/highlight.js/**
         - Pyjoyment/resources/public/pyjo/pyjo.css
-    # The skills for coding agents, which an agent reads as they are written, so
-    # that no formatter wraps a span of code or a command across lines
-    - linters:
-        - markdownlint
-        - prettier
-      paths:
-        - plugins/pyjoyment/skills/**
     # Configuration files of the tests, which are templates of Pyjo.Template
     # before they are JSON, TOML or YAML, as those of Mojolicious
     - linters:
-        - prettier
+        - biome
         - taplo
-        - yamlfmt
         - yamllint
       paths:
         - t/Pyjoyment/json_config_lite_app.json

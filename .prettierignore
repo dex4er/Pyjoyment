@@ -1,5 +1,0 @@
-# YAML is formatted by yamlfmt
-*.yaml
-*.yml
-# The skills for coding agents, which an agent reads as they are written
-plugins/pyjoyment/skills/
