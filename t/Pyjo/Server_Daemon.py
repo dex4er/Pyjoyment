@@ -170,6 +170,20 @@ with subtest('Transaction as a context manager'):
         ok(tx.kept_alive, 'kept alive')
         is_ok(tx.res.body, b'works!', 'right content')
 
+with subtest('Message of the listen location is flushed'):
+    # The values of stdout when it is flushed
+    class Stdout(io.StringIO):
+        def __init__(self):
+            super().__init__()
+            self.flushed = []
+
+        def flush(self):
+            self.flushed.append(self.getvalue())
+
+    with contextlib.redirect_stdout(Stdout()) as stdout, Pyjo.Server.Daemon.new(listen=['http://127.0.0.1']) as daemon:
+        port = daemon.start().ports()[0]
+    is_deeply_ok(stdout.flushed, [f'Web application available at http://127.0.0.1:{port}\n'], 'flushed')
+
 with subtest('Listen location of a URL object'):
     url = Pyjo.URL.new().set(scheme='http', host='127.0.0.1')
     with Pyjo.Server.Daemon.new(listen=[url], silent=True) as daemon:

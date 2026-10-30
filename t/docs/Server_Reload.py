@@ -71,15 +71,16 @@ def server(*args, **kwargs):
 def answers(port):
     deadline = time.monotonic() + 30
     while time.monotonic() < deadline:
+        # The connection is closed also when the request fails, as PyPy would close it only with its garbage collector
+        conn = http.client.HTTPConnection('127.0.0.1', port, timeout=10)
         try:
-            conn = http.client.HTTPConnection('127.0.0.1', port, timeout=10)
             conn.request('GET', '/')
-            status = conn.getresponse().status
-            conn.close()
-            if status == 200:
+            if conn.getresponse().status == 200:
                 return True
         except OSError:
             pass
+        finally:
+            conn.close()
         time.sleep(0.1)
     return False
 

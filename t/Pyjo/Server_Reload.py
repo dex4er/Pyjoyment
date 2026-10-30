@@ -141,10 +141,12 @@ def _reload(log, *args):
             stderr=subprocess.STDOUT,
         )
     reloads.append(process)
+    logs.append(log)
     return process
 
 
 reloads = []
+logs = []
 
 
 def _alive(pid):
@@ -176,14 +178,26 @@ def _wait_until(cb, timeout=30):
     return cb()
 
 
-# Retry until the expected response arrives (the listen socket stays open between restarts)
+# Retry until the expected response arrives (the listen socket stays open between restarts); when it does not, the
+# attempts, with their times and outcomes, a quick one with the outcome of the one before counted with it, and the log
+# of the last server tell why
 def _wait_for(port, text):
-    deadline = time.monotonic() + 30
-    while time.monotonic() < deadline:
+    start = time.monotonic()
+    attempts = []
+    while time.monotonic() < start + 30:
+        begin = time.monotonic()
         tx = ua.get(f'http://127.0.0.1:{port}/hello')
         if (tx.res.body or b'') == text.encode():
             return True
+        took = time.monotonic() - begin
+        outcome = f'{tx.res.code} {tx.res.body!r} {tx.error and tx.error.get("message")}'
+        if took < 1 and attempts and attempts[-1][2] == outcome:
+            attempts[-1][3] += 1
+        else:
+            attempts.append([begin - start, took, outcome, 1])
         time.sleep(0.1)
+    diag('\n'.join(f'at {at:.2f}s for {took:.2f}s, {n} times: {outcome}' for at, took, outcome, n in attempts))
+    diag(f'{logs[-1]}:\n{_slurp(logs[-1])}')
     return False
 
 
