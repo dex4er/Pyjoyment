@@ -905,7 +905,9 @@ class Pyjo_Server_Daemon(Pyjo.Server.object):
             url.host = '127.0.0.1'
         if not options.get('path') and not url.port:
             url.port = self.ports()[-1]
-        print(f'Web application available at {options.get("path") or url}')
+        # Not in Mojolicious: the message is flushed, as a pipe, as of a log or of a container, would keep it until the
+        # server ends, and lose it when the server is killed
+        print(f'Web application available at {options.get("path") or url}', flush=True)
 
     def _error(self, id: str, err: Any) -> None:
         self.app.log.error(str(err))
