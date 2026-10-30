@@ -1,0 +1,69 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.6.4/schema.json",
+  "files": {
+    "includes": [
+      "**",
+      // The skills for coding agents, which an agent reads as they are written
+      "!**/plugins/pyjoyment/skills",
+      // Libraries and stylesheets that Pyjoyment bundles as they are, from
+      // their own projects or from Mojolicious, so that a newer version
+      // replaces them without a diff of formatting, and the lock of npm, which
+      // npm writes
+      "!**/package-lock.json",
+      "!**/Pyjoyment/resources/public/pyjo/bootstrap",
+      "!**/Pyjoyment/resources/public/pyjo/highlight.js",
+      "!**/Pyjoyment/resources/public/pyjo/pyjo.css",
+      // The sources of the images, which rsvg-convert renders, drawn rather than
+      // written
+      "!**/*.svg",
+      // Files of the tests, which the tests read as they are, and the
+      // configuration files of the tests, which are templates of Pyjo.Template
+      // before they are JSON or YAML, as those of Mojolicious
+      "!**/t/Pyjoyment/public",
+      "!**/tt/external/public",
+      "!**/t/Pyjoyment/json_config_lite_app.json",
+      "!**/t/Pyjoyment/yaml_config_lite_app*.yml",
+      // Rewritten by trunk upgrade
+      "!**/.trunk"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineEnding": "lf",
+    "useEditorconfig": true
+  },
+  "markdown": {
+    "formatter": {
+      // The HTML of a page, as the logo of README.md, stays as it is written
+      "formatEmbeds": false
+    }
+  },
+  "yaml": {
+    "formatter": {
+      // The line length of the Python code, as an expression of GitHub Actions
+      // reads better on one line
+      "lineWidth": 120
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "nursery": {
+        // Markdown, where the rest of the rules of markdownlint are about
+        // formatting, which the formatter does; not useTopLevelHeading, as
+        // CLAUDE.md starts with the import of AGENTS.md
+        "useConsistentHeadingLevel": "error",
+        "useFencedCodeLanguage": "error",
+        "useSingleTopLevelHeading": "error"
+      },
+      "preset": "recommended"
+    }
+  },
+  "vcs": {
+    "clientKind": "git",
+    "enabled": true,
+    "useIgnoreFile": true
+  }
+}

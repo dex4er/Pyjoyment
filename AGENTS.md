@@ -1636,8 +1636,9 @@ back here.
 
 [Trunk](https://docs.trunk.io) runs the linters and formatters configured in
 `.trunk/trunk.yaml`: ruff for Python (lint, import order and formatting),
-prettier for Markdown, YAML and JSON, taplo for TOML, yamllint, markdownlint,
-actionlint, and shellcheck and shfmt for the shell scripts. shellcheck runs
+Biome for CSS, HTML, JavaScript, JSON, Markdown and YAML (lint and
+formatting), taplo for TOML, yamllint, actionlint, and shellcheck and shfmt
+for the shell scripts. shellcheck runs
 with all its checks but the ones that `.shellcheckrc` disables, and shfmt
 formats as `.editorconfig` says, with the branches of `case` indented: the
 definition of shfmt in `.trunk/trunk.yaml` runs it without the flags that
@@ -1645,6 +1646,24 @@ would make it ignore `.editorconfig`. actionlint is the one of the
 maintained fork kjanat/actionlint, whose releases continue those of
 rhysd/actionlint after 1.7.12: `downloads` in `.trunk/trunk.yaml` replaces the
 URLs of the plugin with those of the fork, whose files have the same names.
+Biome reads `biome.jsonc`, which leaves out the files that
+Pyjoyment keeps as they are, as the bundled libraries, the sources of the
+images and the files of the tests, so that the extension of Biome of an
+editor, which takes Biome from `node_modules`, checks the same files.
+The version of Biome is the one of `package.json`, which Renovate bumps
+together with the pinned one of `.trunk/trunk.yaml`, where `!` keeps it from
+`trunk upgrade`. Renovate cannot run `biome migrate`, so the workflow Biome
+Migrate migrates `biome.jsonc` on its branch and commits it with the token of
+the workflow, as Bundle Check does, as the author that `gitIgnoredAuthors`
+of `.renovaterc.json` names, so that Renovate keeps updating the branch, and
+starts the checks of the commit with `workflow_dispatch`; anywhere else, a
+`biome.jsonc` that the Biome of `package.json` would migrate fails the check.
+The definition of Biome in `.trunk/trunk.yaml` runs it without the
+`.gitignore` of the repository, which makes Biome panic in the sandbox of
+Trunk, and matches its report at every line, where the plugin of Trunk
+reports only the first issue of a batch. yamllint checks what Biome does not,
+as the duplicated keys.
+
 The `trunk` launcher is not pinned in
 `mise.toml` (mise only has it as an npm package); install it with
 `mise use -g trunk` or the installer from the Trunk documentation. The
@@ -1913,8 +1932,8 @@ matter of each skill, and a test of a skill, as `t/docs/skills_migration.py`,
 runs its code, which `blocks` of `t/lib/Skills.py` takes from its `SKILL.md`,
 so that an example that went stale does not teach an agent the wrong thing.
 `claude plugin validate .` and `claude plugin validate ./plugins/pyjoyment`
-check them as Claude Code reads them. The formatters and the linters of Markdown
-leave the skills out, in `.trunk/trunk.yaml` and `.prettierignore`, as an
+check them as Claude Code reads them. Biome leaves the skills out, in `biome.jsonc` and
+`.trunk/trunk.yaml`, as an
 agent reads a skill as it is written, and a formatter would wrap a span of
 code or a command across lines.
 
