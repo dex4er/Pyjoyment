@@ -311,6 +311,7 @@ This is the class hierarchy of the :mod:`Pyjoyment` distribution.
   - :mod:`Pyjo.Template`
   - :mod:`Pyjo.Test.Pyjo`
   - :mod:`Pyjo.URL`
+  - :mod:`Pyjo.URL.Template`
   - :mod:`Pyjo.Upload`
   - :mod:`Pyjo.UserAgent.CookieJar`
   - :mod:`Pyjo.UserAgent.Proxy`

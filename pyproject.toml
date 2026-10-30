@@ -329,6 +329,7 @@ strict = [
   "Pyjo/Transaction/HTTP.py",
   "Pyjo/Transaction/WebSocket.py",
   "Pyjo/URL/__init__.py",
+  "Pyjo/URL/Template.py",
   "Pyjo/Upload.py",
   "Pyjo/UserAgent/__init__.py",
   "Pyjo/UserAgent/CookieJar.py",
