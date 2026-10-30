@@ -1,0 +1,111 @@
+---
+name: deploy
+description: Run and deploy a Pyjoyment application. Use for its servers (daemon, prefork, prethread, the zero downtime of pyjo-hot, pyjo-reload in development), their options and PYJO_* variables, reverse proxies and TLS, graceful stops and the Health plugin for probes, and the generators of a pyproject.toml, a Dockerfile, the manifests of Kubernetes and the ZIP files of AWS Lambda, and WSGI, ASGI and FastCGI servers in front of it.
+---
+
+# Deployment
+
+An application of Pyjoyment serves HTTP and WebSockets with its own servers,
+which its commands start, `python app.py daemon` or `python -m MyApp
+prefork`. An option of a server has a variable of its own, `PYJO_` and its
+name, as `PYJO_WORKERS` for `--workers`, so the environment of a container
+configures it without its command line. The generators write the files of a
+deployment for the application: `pyproject.toml`, a `Dockerfile`, the
+manifests of Kubernetes, and the ZIP files of AWS Lambda.
+
+## The application
+
+```python
+# app.py
+import os
+
+from Pyjoyment.Lite import *
+
+
+# The secret of the sessions from the environment of the deployment, not from the code
+app.secrets = [os.environ.get('APP_SECRET', 'Change this secret')]
+
+# /livez and /healthz while the server answers, /readyz once the checks pass, for the probes of an orchestrator
+ready = {'db': True}
+plugin('Health', checks={'db': lambda c: ready['db']})
+
+
+@get('/')
+def index(c):
+    c.render(text=f'Hello from {app.mode}')
+
+
+app.start()
+```
+
+## Servers
+
+```sh
+pyjo-reload app.py                                 # development, restarts when the files change
+python app.py daemon -l 'http://*:8080'            # one process
+python app.py prefork -w 8 -l 'http://*:8080'      # eight worker processes, for code that blocks too
+python app.py prethread -w 8                       # eight worker threads, on every core with a free-threaded Python
+pyjo-hot app.py                                    # prefork, which HUP replaces with zero downtime
+PYJO_MODE=production PYJO_WORKERS=8 PYJO_LISTEN='http://*:8080' python app.py prefork
+python app.py prefork -p -l 'http://127.0.0.1:8080'           # behind a reverse proxy, X-Forwarded-For
+python app.py daemon -l 'https://*:443?cert=./server.crt&key=./server.key'
+```
+
+- `-m production` or `PYJO_MODE=production` hides the details of the
+  exception pages, and a plugin of configuration reads `myapp.production.yml`; `PORT` of a platform, as
+  Cloud Run or Knative, is the port when `-l` and `PYJO_LISTEN` are not given.
+- INT and TERM stop gracefully, waiting for the requests in progress up to
+  `--graceful-timeout` (25 seconds), and `--shutdown-delay` (`PYJO_SHUTDOWN_DELAY`)
+  keeps serving with a failing `/readyz` before, so that a load balancer moves
+  away first; QUIT stops at once, and HUP restarts the workers of `prefork`.
+- `-c` limits the connections of a worker, `-c 1` serves one request at a
+  time, for an application whose code blocks.
+
+## Containers, Kubernetes and AWS Lambda
+
+```sh
+python app.py generate pyproject                   # the project of uv, with the dependencies of the script
+python app.py generate dockerfile -p 8080          # Dockerfile and .dockerignore, prefork with a HEALTHCHECK of /livez
+python app.py generate kubernetes -i myapp         # kubernetes/base, dev and prod for Kustomize
+python app.py generate lambda-zip                  # the ZIP files of a function and of its layers
+docker build -t myapp . && docker run -p 8080:8080 myapp
+kubectl apply -k kubernetes/prod
+```
+
+- The `Dockerfile` runs `prefork` on `PORT`, with a `HEALTHCHECK` of
+  `/livez`; `--graceful-timeout` and `--user` adjust it, and `--target lambda`
+  makes an image of AWS Lambda.
+- `kubernetes/dev` runs the files of the project from a ConfigMap on the image
+  of uv, `kubernetes/prod` the image of `-i`, with the probes of `/livez` and
+  `/readyz` and the graceful stop of the pods.
+- On AWS Lambda the script ends with `handler = app.start()`: the runtime of
+  Python calls `app.handler`, and a custom runtime runs the script itself.
+
+## WSGI, ASGI and FastCGI servers
+
+```sh
+PYJO_WSGI=1 gunicorn app:application               # the script ends with application = app.start()
+PYJO_ASGI=1 uvicorn app:application
+PYJO_LISTEN='fcgi://127.0.0.1:9000' python app.py daemon    # FastCGI behind nginx or Caddy
+```
+
+- Through WSGI the event loop serves one request at a time of each worker of
+  the server, and WebSockets need the servers of Pyjoyment or ASGI.
+
+## Mistakes
+
+- `daemon` in production serves with one process, without restarting a
+  worker that stops; `prefork` restarts its workers.
+- `app.secrets` committed with the code signs the cookies of every
+  deployment: take it from the environment or the configuration.
+- `/readyz` with the checks of a database in the liveness probe restarts the
+  containers when the database is down: liveness is `/livez`.
+- A blocking request handler under `daemon` blocks every connection: more
+  workers of `prefork`, `-c 1`, or code that does not block.
+
+## Documentation
+
+- Cookbook, deployment: https://pyjoyment.readthedocs.io/en/latest/guides/cookbook.html
+- Pyjoyment.Plugin.Health: https://pyjoyment.readthedocs.io/en/latest/api/Pyjoyment_Plugin_Health.html
+- Pyjo.Server.Prefork: https://pyjoyment.readthedocs.io/en/latest/api/Pyjo_Server_Prefork.html
+- generate dockerfile: https://pyjoyment.readthedocs.io/en/latest/api/Pyjoyment_Command_Author_generate_dockerfile.html
