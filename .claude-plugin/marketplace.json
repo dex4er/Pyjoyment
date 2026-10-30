@@ -1,0 +1,15 @@
+{
+  "name": "pyjoyment",
+  "owner": {
+    "name": "Piotr Roszatycki",
+    "url": "https://github.com/dex4er"
+  },
+  "description": "Skills for coding agents that write applications with Pyjoyment",
+  "plugins": [
+    {
+      "name": "pyjoyment",
+      "source": "./plugins/pyjoyment",
+      "description": "Skills for writing applications with Pyjoyment, the real-time web framework for Python ported from Mojolicious"
+    }
+  ]
+}

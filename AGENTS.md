@@ -1888,6 +1888,31 @@ the record of how it got there (decisions taken, alternatives rejected, status
 lines). State the rule or the fact instead. The history belongs in the issue
 and the pull request.
 
+## Skills for Coding Agents
+
+The skills for the coding agents that write applications with Pyjoyment are
+the plugin `pyjoyment` of Claude Code in `plugins/pyjoyment`, a skill in each
+`skills/<name>/SKILL.md`, which the marketplace of
+`.claude-plugin/marketplace.json` of the repository lists, so that
+`/plugin install pyjoyment --marketplace dex4er/Pyjoyment` installs it. The
+plugin is not in the root of the repository, as Claude Code warns of the
+`CLAUDE.md` of the root of a plugin. It has no version, so that Claude Code
+updates it with each commit, instead of a version that a change of a skill
+would have to bump.
+
+A skill is the idioms, the mistakes, the commands and the links to the
+documentation of its subject, not a copy of a guide, as it goes into the
+context of an agent, and the description of each says when it applies, so
+that the skills do not overlap. Its front matter has only the fields of the
+format of Agent Skills, `name` and `description` above all, which other agents
+read too, as Claude Code ignores what it does not know, but other agents
+reject it. `t/docs/skills.py` checks the marketplace, the plugin and the front
+matter of each skill, and a test of a skill, as `t/docs/skills_migration.py`,
+runs its code, which `blocks` of `t/lib/Skills.py` takes from its `SKILL.md`,
+so that an example that went stale does not teach an agent the wrong thing.
+`claude plugin validate .` and `claude plugin validate ./plugins/pyjoyment`
+check them as Claude Code reads them.
+
 ## Commits and Pull Requests
 
 - Commit subjects are short and in the imperative or descriptive style of the
