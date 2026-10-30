@@ -49,6 +49,14 @@ MCP SDK, are in the dependency group `servers` of the project:
 uv run --group servers python examples/mount/mount_mcp.py daemon
 ```
 
+The application of `aws/` serves the bucket of `S3_BUCKET` with aiobotocore, the
+asynchronous AWS SDK, on the credentials and the region of the SDK, as of
+`AWS_PROFILE`:
+
+```sh
+AWS_PROFILE=myprofile S3_BUCKET=mybucket uv run --with aiobotocore python examples/aws/s3.py daemon
+```
+
 A script that needs a program which Pyjoyment does not run, as php-fpm for
 `mount_fastcgi_php.py`, says how to start it in its comment:
 
