@@ -81,7 +81,7 @@ of Mojolicious 9.49.
 import Pyjo.Base
 import Pyjo.Exception
 
-from Pyjo.Util import warn
+from Pyjo.Util import _call_hint, warn  # pyright: ignore[reportPrivateUsage]
 
 import collections
 import os
@@ -142,7 +142,12 @@ class Pyjo_EventEmitter(Pyjo.Base.object):
             if DEBUG:
                 warn(f'-- Emit {name} in {_name(type(self))} ({len(s)})')
             for cb in s:
-                cb(self, *args)
+                try:
+                    cb(self, *args)
+                except TypeError as e:
+                    # Not in Mojolicious: the arguments of a callback, which Perl does not check
+                    _call_hint(e, f'the callbacks of the event "{name}" get the emitter first')
+                    raise
         else:
             if DEBUG:
                 warn(f'-- Emit {name} in {_name(type(self))} (0)')

@@ -152,16 +152,24 @@ class Pyjoyment_Controller(Pyjo.Base.object):
     # Unlike Mojolicious: Mojo registers the helpers with Mojo::DynamicMethods, Python looks them up in the renderer of
     # the application when a method is not found
     def __getattr__(self, name: str) -> Any:
-        if not name.startswith('_') and (app := self._app() if self._app is not None else None) is not None:
-            if (helper := app.renderer.get_helper(name)) is not None:
-                return helper(self) if isinstance(helper, type) else functools.partial(helper, self)
+        app = self._app() if self._app is not None and not name.startswith('_') else None
+        if app is not None and (helper := app.renderer.get_helper(name)) is not None:
+            return helper(self) if isinstance(helper, type) else _Helper(helper, self)
         package = f'{type(self).__module__}.{type(self).__qualname__}'
 
         # The location of the caller, which croak adds to the message
         caller = sys._getframe(1)  # pyright: ignore[reportPrivateUsage]
         at = f'at {caller.f_code.co_filename} line {caller.f_lineno}'
+
+        # Not in Mojolicious: the attribute or the helper that the name most likely meant, as "req" for "request" of
+        # another framework
+        mean = ''
+        if app is not None:
+            names = [*dir(self), *(h.split('.')[0] for h in app.renderer.helpers)]
+            if (suggestion := Pyjo.Util._suggest(name, names)) is not None:  # pyright: ignore[reportPrivateUsage]
+                mean = f' Did you mean "{suggestion}"?'
         raise AttributeError(
-            f'Can\'t locate object method "{name}" via package "{package}" {at}.\n', name=name, obj=self
+            f'Can\'t locate object method "{name}" via package "{package}" {at}.{mean}\n', name=name, obj=self
         )
 
     @property
@@ -461,7 +469,12 @@ class Pyjoyment_Controller(Pyjo.Base.object):
             self.rendered(101)
 
         def event(tx: Any, *args: Any) -> Any:
-            return cb(self, *args)
+            try:
+                return cb(self, *args)
+            except TypeError as e:
+                # Not in Mojolicious: the arguments of a callback, which Perl does not check
+                Pyjo.Util._call_hint(e, f'the callbacks of the event "{name}" get the controller first')  # pyright: ignore[reportPrivateUsage]
+                raise
 
         return tx.on(name, event)
 
@@ -1186,6 +1199,22 @@ def _drain[C](c: C, cb: Callable[[C], Any] | None) -> Any:
         cb(c)
 
     return drain
+
+
+# A helper bound to the controller, whose missing attribute names the call of the helper, as c.ua.get_p(...) is a
+# common mistake for c.ua().get_p(...)
+class _Helper(functools.partial[Any]):
+    def __getattr__(self, name: str) -> Any:
+        if name.startswith('_'):
+            raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'", name=name, obj=self)
+        app = self.args[0].app
+        helpers: dict[str, Any] = app.renderer.helpers if app is not None else {}
+        helper = next((h for h, cb in helpers.items() if cb is self.func), getattr(self.func, '__name__', 'helper'))
+        raise AttributeError(
+            f'Helper "{helper}" has no attribute "{name}", call the helper first: {helper}().{name}',
+            name=name,
+            obj=self,
+        )
 
 
 def _hmac(data: str, secret: str) -> str:

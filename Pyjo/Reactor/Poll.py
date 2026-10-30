@@ -67,7 +67,7 @@ import Pyjo.Exception
 import Pyjo.Reactor
 
 from Pyjo.Reactor import Handle, IOCallback, TimerCallback
-from Pyjo.Util import md5_sum
+from Pyjo.Util import _call_hint, md5_sum  # pyright: ignore[reportPrivateUsage]
 
 import collections
 import random
@@ -365,6 +365,9 @@ class Pyjo_Reactor_Poll(Pyjo.Reactor.object):
         try:
             cb(self, *args)
         except Exception as e:
+            # Not in Mojolicious: the arguments of a callback, which Perl does not check
+            if isinstance(e, TypeError):
+                _call_hint(e, 'the callbacks of a reactor get the reactor first')
             # Unlike Mojolicious: the message of Python has no file and line, the exception keeps the frames
             err = Pyjo.Exception.new(e)
             err.message = f'{what} failed: {err.message}'

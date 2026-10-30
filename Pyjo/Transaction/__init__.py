@@ -64,7 +64,7 @@ import Pyjo.Message.Response
 from Pyjo.String.Unicode import split
 from Pyjo.Util import network_contains
 
-from typing import Self
+from typing import TYPE_CHECKING, Any, Self
 
 
 class Pyjo_Transaction(Pyjo.EventEmitter.object):
@@ -112,6 +112,16 @@ class Pyjo_Transaction(Pyjo.EventEmitter.object):
         # The state of the transaction, as the keys of Mojo's hash
         self._completed = False
         self._connection: str | None = None
+
+    if not TYPE_CHECKING:
+        # Not in Mojolicious: the transaction of a blocking request used as a decorator, as @ua.get(url) over a
+        # callback; out of the sight of type checkers, which would take a transaction for a callable
+        def __call__(self, *args: Any, **kwargs: Any) -> Any:
+            raise TypeError(
+                f"'{type(self).__name__}' object is not callable: a request without a callback is blocking and returns"
+                ' its transaction, a non-blocking one takes its callback as the last argument or cb=..., or is a promise'
+                ' of get_p(...)'
+            )
 
     @property
     def kept_alive(self) -> bool | None:

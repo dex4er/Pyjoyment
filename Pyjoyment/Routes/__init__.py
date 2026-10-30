@@ -402,8 +402,16 @@ def _render(c: 'Pyjoyment.Controller.object') -> None:
     stash = c.stash()
     if stash.get('mojo.rendered'):
         return
-    if not c.render_maybe() and not stash.get('mojo.routed'):
-        raise Pyjo.Exception.new('Route without action and nothing to render')
+    if not c.render_maybe():
+        if not stash.get('mojo.routed'):
+            raise Pyjo.Exception.new('Route without action and nothing to render')
+        # Not in Mojolicious: an action that returned its response, as a view of another framework, which would wait
+        # for a delayed response until the inactivity timeout
+        if returned := stash.get('pyjo.returned'):
+            raise Pyjo.Exception.new(
+                f'Action returned a {returned}, which is not a response: c.render(text=...) renders a text and '
+                'c.render(json=...) a JSON document'
+            )
 
 
 new = Pyjoyment_Routes.new

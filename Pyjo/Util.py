@@ -49,7 +49,7 @@ import unicodedata
 import warnings
 import zlib
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from gzip import compress as _gzip_compress
 from gzip import decompress as _gzip_decompress
 from types import FunctionType, ModuleType, TracebackType
@@ -3417,6 +3417,13 @@ ENTITIES = {
 }
 
 
+# A hint for the TypeError of the call of a callback itself, not of its body, which a function of Python raises when it
+# is called with other arguments than its parameters, where a sub of Perl takes any of @_
+def _call_hint(e: TypeError, hint: str) -> None:  # pyright: ignore[reportUnusedFunction]
+    if e.__traceback__ is not None and e.__traceback__.tb_next is None:
+        e.args = (f'{e}: {hint}', *e.args[1:])
+
+
 def _entity(point: str | None, name: str | None, attr: bool) -> str:
 
     # Code point
@@ -3535,6 +3542,17 @@ def _split(pattern: str, string: str) -> list[str]:
     while fields and fields[-1] == '':
         fields.pop()
     return fields
+
+
+# The name that a mistake of the name of an attribute most likely meant: one that the name starts with or that starts
+# with the name, of three letters at least, as "req" for "request", or else the closest one
+def _suggest(name: str, names: Iterable[str]) -> str | None:  # pyright: ignore[reportUnusedFunction]
+    import difflib
+
+    others = [n for n in names if n != name and not n.startswith('_')]
+    if prefixes := [n for n in others if len(n) > 2 and (name.startswith(n) or n.startswith(name))]:
+        return difflib.get_close_matches(name, prefixes, n=1, cutoff=0)[0]
+    return next(iter(difflib.get_close_matches(name, others, n=1)), None)
 
 
 # Perl's ucfirst

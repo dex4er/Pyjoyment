@@ -112,7 +112,7 @@ import Pyjo.IOLoop.Server
 import Pyjo.IOLoop.Stream
 import Pyjo.Reactor
 
-from Pyjo.Util import md5_sum, warn
+from Pyjo.Util import _call_hint, md5_sum, warn  # pyright: ignore[reportPrivateUsage]
 
 import atexit
 import builtins
@@ -914,7 +914,12 @@ class Pyjo_IOLoop(Pyjo.EventEmitter.object):
         callback = cb
 
         def timer(reactor: Pyjo.Reactor.object) -> None:
-            callback(ref())
+            try:
+                callback(ref())
+            except TypeError as e:
+                # Not in Mojolicious: the arguments of a callback, which Perl does not check
+                _call_hint(e, 'the callback of a timer gets the event loop')
+                raise
 
         return getattr(self.reactor, method)(after, timer)
 

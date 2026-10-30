@@ -825,6 +825,20 @@ otherwise, so that a newer Mojolicious does not bring the old behaviour back.
 Where the difference comes from a bug of Mojolicious, the bug also goes to
 the issue that collects them.
 
+A mistake that Python makes likely and Perl does not, as a helper without its
+call (`c.ua.get_p` for `c.ua().get_p`), the response that an action returns as
+a view of another framework, or a callback with other arguments than the ones
+it gets, which Perl does not check, has a hint in its message that names the
+fix, after the message of Mojolicious, which the tests of Mojolicious still
+match. The hint goes where the error is raised or logged already, so that a
+request that succeeds pays nothing: `_call_hint` of `Pyjo.Util` adds it to the
+`TypeError` of the call of a callback itself, not of its body, and `_suggest`
+names the attribute that a wrong name most likely meant, as `Did you mean
+"req"?` for `c.request`. A method that only gives a hint, as `__getattr__` of
+a promise, is defined under `if not TYPE_CHECKING:`, as type checkers would
+take any attribute of the class for one. A mistake that is valid code, which
+no error tells, is for the documentation and the guides of the coding agents.
+
 These markers are for what stays. What waits for a module that is not ported
 yet, as a method left out, a stand-in for a class of Mojolicious or a test
 that runs without a command, has a comment that starts with `# TODO:` and

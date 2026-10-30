@@ -503,6 +503,17 @@ with subtest('Exception in timer'):
     name = f'{type(loop.reactor).__module__}.{type(loop.reactor).__qualname__}'
     like_ok(stderr.getvalue(), rf'^{re.escape(name)}:.*Bye!', 'right error')
 
+    # Not in Mojolicious: the arguments of a callback, which Perl does not check
+    with contextlib.redirect_stderr(io.StringIO()) as stderr:
+        loop = Pyjo.IOLoop.new()
+        loop.timer(0, lambda: None)
+        loop.start()
+    like_ok(
+        stderr.getvalue(),
+        r'takes 0 positional arguments but 1 was given: the callback of a timer gets the event loop',
+        'hint',
+    )
+
 with subtest('Defaults'):
     is_ok(Pyjo.IOLoop.Client.new().reactor, Pyjo.IOLoop.singleton.reactor, 'right default')
     is_ok(Pyjo.IOLoop.Server.new().reactor, Pyjo.IOLoop.singleton.reactor, 'right default')

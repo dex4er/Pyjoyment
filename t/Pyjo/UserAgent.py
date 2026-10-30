@@ -777,4 +777,16 @@ def limit(*results):
 Pyjo.Promise.all(*txs).then(limit).wait()
 is_ok(len(result), 2, 'two active connections')
 
+# Not in Mojolicious: a blocking request used as a decorator, whose transaction is not a callback
+ua = Pyjo.UserAgent.new()
+try:
+
+    @ua.get('/')
+    def decorated(ua, tx):
+        pass
+
+except TypeError as e:
+    err = e
+like_ok(str(err), r"^'Pyjo_Transaction_HTTP' object is not callable: a request without a callback is blocking", 'hint')
+
 done_testing()

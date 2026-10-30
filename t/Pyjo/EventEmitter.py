@@ -260,4 +260,23 @@ with subtest('Events as an asynchronous iterator'):
     promise.wait()
     like_ok(errors[0], r'^boom', 'error raised')
 
+# Not in Mojolicious: the arguments of a callback, which Perl does not check
+with subtest('Arguments of a callback'):
+    e = Pyjo.EventEmitter.new()
+    e.on('foo', lambda: None)
+    err = eval_(lambda: e.emit('foo'))
+    like_ok(
+        str(err),
+        r'takes 0 positional arguments but 1 was given: the callbacks of the event "foo" get the emitter first$',
+        'hint',
+    )
+
+    def broken(e):
+        raise TypeError('broken body')
+
+    e = Pyjo.EventEmitter.new()
+    e.on('foo', broken)
+    err = eval_(lambda: e.emit('foo'))
+    is_ok(str(err), 'broken body', 'no hint for an error of the body')
+
 done_testing()

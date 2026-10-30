@@ -64,6 +64,7 @@ Ported from `Mojolicious::Plugin::EPRenderer
 """
 
 import Pyjo.Base
+import Pyjo.Exception
 import Pyjo.Template
 import Pyjoyment.Plugin.EPLRenderer
 
@@ -153,6 +154,15 @@ class Pyjoyment_Plugin_EPRenderer(Pyjoyment.Plugin.EPLRenderer.object):
                 Pyjoyment.Plugin.EPLRenderer._render(  # pyright: ignore[reportPrivateUsage]
                     renderer, c, output, options, cast(Pyjo.Template.object, mt), c.stash()
                 )
+            except Pyjo.Exception.object as e:
+                # Not in Mojolicious: a value of the stash that hides a helper, which Perl tells apart by its sigil
+                if 'object is not callable' in e.message and (
+                    hidden := [k for k, v in c.stash().items() if k in names and not callable(v)]
+                ):
+                    e.message += ''.join(
+                        f', the value "{k}" of the stash hides the helper {k}(), which c.{k}(...) calls' for k in hidden
+                    )
+                raise
             finally:
                 if saved is _MISSING:
                     module.__dict__.pop('_C', None)
@@ -166,16 +176,27 @@ class Pyjoyment_Plugin_EPRenderer(Pyjoyment.Plugin.EPLRenderer.object):
 _MISSING: Any = Pyjo.Base.object()
 
 
-def _helper(module: types.ModuleType, sub: Callable[..., Any]) -> Callable[..., Any]:
-    def helper(*args: Any, **kwargs: Any) -> Any:
-        return sub(module.__dict__['_C'](), *args, **kwargs)
+# A helper of the templates, which the controller of the template calls, and whose missing attribute names the call of
+# the helper, as ua.get_p(...) is a common mistake for ua().get_p(...)
+class _Helper:
+    __slots__ = ('_module', '_name', '_sub')
 
-    return helper
+    def __init__(self, module: types.ModuleType, name: str, sub: Callable[..., Any]) -> None:
+        self._module, self._name, self._sub = module, name, sub
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        return self._sub(self._module.__dict__['_C'](), *args, **kwargs)
+
+    def __getattr__(self, name: str) -> Any:
+        if name.startswith('_'):
+            raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'", name=name, obj=self)
+        message = f'Helper "{self._name}" has no attribute "{name}", call the helper first: {self._name}().{name}'
+        raise AttributeError(message, name=name, obj=self)
 
 
 def _helpers(module: types.ModuleType, helpers: dict[str, Callable[..., Any]], names: list[str]) -> None:
     for method in [method for method in helpers if re.fullmatch(r'\w+', method)]:
-        setattr(module, method, _helper(module, helpers[method]))
+        setattr(module, method, _Helper(module, method, helpers[method]))
         names.append(method)
 
 

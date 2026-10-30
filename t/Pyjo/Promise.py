@@ -605,4 +605,15 @@ with subtest('Wait for stopped loop'):
     promise.then(store(results)).wait()
     is_deeply_ok(results, ['wait'], 'promise resolved')
 
+# Not in Mojolicious: an attribute of the value taken from the promise itself, as of the result of a request of
+# get_p without await
+with subtest('Attribute of the value'):
+    promise = Pyjo.Promise.resolve(1)
+    try:
+        promise.result
+    except AttributeError as e:
+        err = e
+    like_ok(str(err), r"^'Pyjo_Promise' object has no attribute 'result', a promise gives its value to await", 'hint')
+    ok(not hasattr(promise, '_missing'), 'no private attribute')
+
 done_testing()
