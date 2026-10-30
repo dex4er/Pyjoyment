@@ -1049,6 +1049,11 @@ class Pyjo_Test_Pyjo(Pyjo.Base.object):
         """
         # Unlike Mojolicious: the error is interrupted by Pyjo.Test.Pyjo, where Mojo names Test::Mojo
         self._tx.res.error = {'message': 'Interrupted by Pyjo.Test.Pyjo'}
+
+        # Unlike Mojolicious: the connection is closed too, as the user agent finds the error only when it reads, so that
+        # a stream without events, which Mojo waits for until its next event or its inactivity timeout, ends at once
+        if (id := self._tx.connection) is not None and (stream := Pyjo.IOLoop.singleton.stream(id)) is not None:
+            stream.close_gracefully()
         while not self._sse_finished:
             Pyjo.IOLoop.one_tick()
         return self.test('ok', 1, 'closed SSE connection')
