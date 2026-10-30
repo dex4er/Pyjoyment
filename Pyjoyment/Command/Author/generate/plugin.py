@@ -19,7 +19,9 @@ for fully functional :mod:`Pyjoyment` plugins: a distribution with
 ``uv run python -m Pyjo.Prove -l -r t`` runs, as does ``uv run pytest``,
 with pytest of the dependency group ``dev``. The module of a plugin is in the
 namespace ``Pyjoyment.Plugin``, which the distribution adds to without the
-``__init__.py`` files of the namespace.
+``__init__.py`` files of the namespace. ``AGENTS.md``, which ``CLAUDE.md``
+imports, tells a coding agent how the plugin is made, tested and built, and
+where the skills of Pyjoyment are.
 
 This is a core command, that means it is always enabled and its code a good
 example for learning to build new commands, you're welcome to fork it.
@@ -110,6 +112,10 @@ class Pyjoyment_Command_Author_generate_plugin(Pyjoyment.Command.object):
         self.render_to_rel_file(
             'pyproject', f'{dir}/pyproject.toml', {'dir': dir, 'path': app, 'requirement': _requirement()}
         )
+
+        # Not in Mojolicious: the guide of the coding agents, AGENTS.md, which CLAUDE.md imports for Claude Code
+        self.render_to_rel_file('agents', f'{dir}/AGENTS.md', {'class_': class_, 'dir': dir, 'name': name, 'path': app})
+        self.render_to_rel_file('claude', f'{dir}/CLAUDE.md')
 
 
 new = Pyjoyment_Command_Author_generate_plugin.new
@@ -209,4 +215,53 @@ dev = ["pytest>=9", "pytest-xdist>=3"]
 [tool.pytest.ini_options]
 testpaths = ["t"]
 pythonpath = ["."]
+
+@@ agents
+# <%= dir %>
+
+A plugin of [Pyjoyment](https://pyjoyment.readthedocs.io/), the port of
+Mojolicious to Python, made with `pyjo generate plugin`, a distribution of its
+own. This file says how it is made, tested and built, for whoever changes it,
+a coding agent too.
+
+## Layout
+
+- `<%= path %>`: the plugin `<%= class_ %>`, whose `register` adds its
+  helpers, hooks and routes to an application, as `plugin('<%= name %>')`.
+- `t/basic.py`: its test, with an application of `Pyjoyment.Lite`.
+- `pyproject.toml`: the distribution, whose wheel has only the module, as the
+  packages of the namespace are the ones of Pyjoyment.
+
+## Commands
+
+```sh
+uv run python -m Pyjo.Prove -l -r t      # the tests
+uv run pytest                            # the tests with pytest
+uv build                                 # the wheel and the sdist in dist/
+```
+
+## Conventions
+
+- The directories of the namespace have no `__init__.py`, which would
+  replace the packages of Pyjoyment.
+- `register` runs once, at the start of the application, and what the
+  requests share is made there; nothing in a helper or a hook blocks the
+  event loop, as `time.sleep` or `requests`.
+- A change comes with a test in `t/`, where `Pyjo.Test.Pyjo` requests an
+  application without a server.
+
+## Skills
+
+The plugin of Claude Code for Pyjoyment has skills of its idioms, of plugins
+and distributions, of the tests and of the templates:
+
+```sh
+claude plugin install pyjoyment --marketplace dex4er/Pyjoyment
+```
+
+Other agents read their files, the `SKILL.md` of each skill, in
+https://github.com/dex4er/Pyjoyment/tree/main/plugins/pyjoyment/skills.
+
+@@ claude
+@AGENTS.md
 '''

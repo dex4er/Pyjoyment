@@ -373,6 +373,11 @@ ok(os.path.isdir(app.rel_file('my_app/public/assets').to_str()), 'assets directo
 ok(os.path.exists(app.rel_file('my_app/public/index.html').to_str()), 'static file exists')
 ok(os.path.exists(app.rel_file('my_app/templates/layouts/default.html.ep').to_str()), 'layout exists')
 ok(os.path.exists(app.rel_file('my_app/templates/example/welcome.html.ep').to_str()), 'template exists')
+# Not in Mojolicious: the guide of the coding agents, which CLAUDE.md imports
+agents = app.rel_file('my_app/AGENTS.md').slurp('UTF-8')
+like_ok(agents, r'uv run python -m MyApp daemon', 'AGENTS.md with the commands')
+like_ok(agents, r'claude plugin install pyjoyment --marketplace dex4er/Pyjoyment', 'AGENTS.md with the skills')
+is_ok(app.rel_file('my_app/CLAUDE.md').slurp('UTF-8'), '@AGENTS.md\n', 'CLAUDE.md imports AGENTS.md')
 # Not in Mojolicious: the application starts with the configuration of a test, which has no secrets, as Perl takes the
 # value of a missing key for undef
 code = "import Pyjo.Test.Pyjo; Pyjo.Test.Pyjo.new('MyApp', {'enable_weather': 1}).get_ok('/').status_is(200)"
@@ -763,6 +768,10 @@ like_ok(buffer.getvalue(), r'MyPlugin\.py', 'right output')
 ok(os.path.exists(app.rel_file('Pyjoyment-Plugin-MyPlugin/Pyjoyment/Plugin/MyPlugin.py').to_str()), 'class exists')
 ok(os.path.exists(app.rel_file('Pyjoyment-Plugin-MyPlugin/t/basic.py').to_str()), 'test exists')
 ok(os.path.exists(app.rel_file('Pyjoyment-Plugin-MyPlugin/pyproject.toml').to_str()), 'pyproject.toml exists')
+# Not in Mojolicious: the guide of the coding agents, which CLAUDE.md imports
+agents = app.rel_file('Pyjoyment-Plugin-MyPlugin/AGENTS.md').slurp('UTF-8')
+like_ok(agents, r"plugin\('MyPlugin'\)", 'AGENTS.md with the plugin')
+is_ok(app.rel_file('Pyjoyment-Plugin-MyPlugin/CLAUDE.md').slurp('UTF-8'), '@AGENTS.md\n', 'CLAUDE.md imports AGENTS.md')
 buffer = io.StringIO()
 with contextlib.redirect_stdout(buffer):
     plugin.run('-f', 'MyApp.Ext.Test')

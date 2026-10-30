@@ -18,7 +18,9 @@ the application in the directory of the project, which is its home, with
 ``pyproject.toml`` for its dependencies, so that
 ``uv run python -m MyApp daemon`` starts it and
 ``uv run python -m Pyjo.Prove -l -r t`` tests it, as does ``uv run pytest``,
-with pytest of the dependency group ``dev``.
+with pytest of the dependency group ``dev``, and ``AGENTS.md``, which
+``CLAUDE.md`` imports, tells a coding agent how the application is made, run
+and tested, and where the skills of Pyjoyment are.
 
 This is a core command, that means it is always enabled and its code a good
 example for learning to build new commands, you're welcome to fork it.
@@ -120,6 +122,11 @@ class Pyjoyment_Command_Author_generate_app(Pyjoyment.Command.object):
         # Templates
         self.render_to_rel_file('layout', f'{name}/templates/layouts/default.html.ep')
         self.render_to_rel_file('welcome', f'{name}/templates/example/welcome.html.ep')
+
+        # Not in Mojolicious: the guide of the coding agents, AGENTS.md, which CLAUDE.md imports for Claude Code
+        config = f'{decamelize(class_.replace(".", "::"))}.yml'
+        self.render_to_rel_file('agents', f'{name}/AGENTS.md', {'class_': class_, 'config': config, 'package': package})
+        self.render_to_rel_file('claude', f'{name}/CLAUDE.md')
 
 
 # Not in Mojolicious: the name of the class in its module, with underscores, as Pyjo_URL is of Pyjo.URL
@@ -235,4 +242,58 @@ done_testing()
 ---
 secrets:
   - <%= generate_secret() %>
+
+@@ agents
+# <%= class_ %>
+
+An application of [Pyjoyment](https://pyjoyment.readthedocs.io/), the port of
+Mojolicious to Python, made with `pyjo generate app`. This file says how it is
+made and run, for whoever changes it, a coding agent too.
+
+## Layout
+
+- `<%= package %>/__init__.py`: the application, whose `startup` loads the
+  configuration and sets up the routes, as `r.get('/').to('Example#welcome')`.
+- `<%= package %>/Controller/`: the controllers, a class for each, whose
+  methods are the actions.
+- `templates/`: the `ep` templates of the actions, as
+  `templates/example/welcome.html.ep`, and the layouts.
+- `public/`: the static files.
+- `<%= config %>`: the configuration, with the secrets of the sessions.
+- `t/`: the test scripts of `Pyjo.Test` and `Pyjo.Test.Pyjo`.
+
+## Commands
+
+```sh
+% for command, comment in ((f'python -m {class_} daemon', 'http://127.0.0.1:3000'), (f'python -m {class_} routes', 'the routes and their names'), (f'python -m {class_} get /', 'a request without a server'), ('python -m Pyjo.Prove -l -r t', 'the tests'), ('pytest', 'the tests with pytest')):
+<%= f'uv run {command}'.ljust(max(41, len(class_) + 36)) %># <%= comment %>
+% end
+```
+
+## Conventions
+
+- An action renders its response with `self.render(...)`, as
+  `self.render(json={...})`; what it returns is not the response.
+- One event loop serves every connection: an action that waits is an
+  `async def` that awaits promises, as `await self.ua().get_p(url)`, and
+  nothing blocks it, as `time.sleep` or `requests`.
+- A helper is called, `self.ua()`, not `self.ua`.
+- A change comes with a test in `t/`, where `Pyjo.Test.Pyjo` requests the
+  application without a server.
+
+## Skills
+
+The plugin of Claude Code for Pyjoyment has skills of its idioms, of the
+migration from Flask, FastAPI and Django, of the tests, the templates, the
+APIs and the deployment:
+
+```sh
+claude plugin install pyjoyment --marketplace dex4er/Pyjoyment
+```
+
+Other agents read their files, the `SKILL.md` of each skill, in
+https://github.com/dex4er/Pyjoyment/tree/main/plugins/pyjoyment/skills.
+
+@@ claude
+@AGENTS.md
 """

@@ -176,6 +176,8 @@ well organized Python project to maximize maintainability.
                     Example.py ## Controller class
             my_app.yml ## Configuration file
             pyproject.toml ## Project file with the dependencies
+            AGENTS.md ## Guide of coding agents
+            CLAUDE.md ## Import of AGENTS.md for Claude Code
             t ## Test directory
                 basic.py ## Random test
             public ## Static file directory (served automatically)
