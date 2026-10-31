@@ -1,0 +1,128 @@
+name: Release
+
+# Releases the version of a tag, pushed or created by Automated tag, which
+# starts it with workflow_dispatch, as a tag of the token of a workflow starts
+# no workflow. The job of the environment publishing creates the GitHub release
+# first and publishes on PyPI after it, so that the files on PyPI are the ones
+# of the release, with their attestations.
+on:
+  push:
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+*"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build
+
+    runs-on: ubuntu-26.04-arm
+    timeout-minutes: 10
+
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up mise
+        uses: jdx/mise-action@v5
+        with:
+          version: 2026.10.4 # datasource=github-releases depName=jdx/mise
+
+      - name: Check the version
+        run: |
+          uv lock --check
+          test "${GITHUB_REF_TYPE}" = tag
+          test "${GITHUB_REF_NAME}" = "$(uv version --short)"
+
+      - name: Set up Syft
+        id: syft
+        uses: anchore/sbom-action/download-syft@v0
+
+      # The JavaScript libraries that npm run bundle copies into the package,
+      # from package-lock.json without its development dependencies; uv.lock
+      # has only the dependency groups, which the package does not have.
+      - name: Create SBOM
+        run: |
+          "${SYFT}" scan dir:. \
+            --override-default-catalogers javascript-lock-cataloger \
+            --source-name pyjoyment \
+            --source-version "${GITHUB_REF_NAME}" \
+            --output "spdx-json=pyjoyment-${GITHUB_REF_NAME}.spdx.json"
+        env:
+          SYFT: ${{ steps.syft.outputs.cmd }}
+
+      # The sdist takes the SBOM as an artifact of hatchling.
+      - name: Build sdist and wheel
+        run: |
+          uv build
+          tar -tzf "dist/pyjoyment-${GITHUB_REF_NAME}.tar.gz" | grep -qx "pyjoyment-${GITHUB_REF_NAME}/pyjoyment-${GITHUB_REF_NAME}.spdx.json"
+
+      - name: Attest build provenance
+        uses: actions/attest@v4
+        with:
+          subject-path: |-
+            dist/*
+            pyjoyment-*.spdx.json
+
+      - name: Attest SBOM
+        uses: actions/attest@v4
+        with:
+          subject-path: dist/*
+          sbom-path: pyjoyment-${{ github.ref_name }}.spdx.json
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: release
+          path: |-
+            dist/
+            pyjoyment-*.spdx.json
+          if-no-files-found: error
+
+  publish:
+    name: publish
+
+    needs: build
+
+    # The image of the action of PyPI has no build for ARM.
+    runs-on: ubuntu-26.04
+    environment: publishing
+    timeout-minutes: 10
+
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: release
+
+      # gh uploads the files to a draft and publishes it after them, as an
+      # immutable release takes no files once it is published.
+      - name: Create release
+        run: |
+          prerelease=()
+          if [[ ${GITHUB_REF_NAME} =~ (a|b|rc)[0-9]+$ ]]; then
+            prerelease=(--prerelease)
+          fi
+          gh release create "${GITHUB_REF_NAME}" dist/* pyjoyment-*.spdx.json \
+            --verify-tag \
+            --generate-notes \
+            --title "${GITHUB_REF_NAME}" \
+            "${prerelease[@]}"
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+
+      # Trusted publishing, with the attestations of PEP 740 of each file.
+      - name: Publish on PyPI
+        uses: pypa/gh-action-pypi-publish@v1.14.3
