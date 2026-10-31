@@ -508,6 +508,36 @@ change of its subject needs, so that this file keeps the principles and what
 every change needs. A skill of the project has the same front matter as one
 of the plugin, which `t/docs/skills.py` checks too.
 
+## Releases
+
+A release is a tag of the version of `pyproject.toml`, without a `v`, as
+`0.1.0`. The workflow Automated version sets the version with `uv version`,
+a version or the components of its `--bump`, as `minor rc`, in the pull
+request of the branch `automated/version`. Automated tag tags the merge
+commit of that pull request when it is merged, or with a comment `/tag` of a
+maintainer on it, and starts Release on the tag with `workflow_dispatch`, as
+a tag of the token of a workflow starts no workflow; a tag that is pushed
+starts Release too. A development version, as `0.1.1.dev1`, is not tagged.
+
+Release builds the sdist and the wheel with an SBOM of SPDX, which Syft makes
+of `package-lock.json` only: the JavaScript libraries that `npm run bundle`
+copies into the package are all of others that the package has, and
+`uv.lock` has only the dependency groups, which the package does not install.
+The sdist takes the SBOM, which `.gitignore` ignores, as an artifact of
+hatchling. `actions/attest` attests the build provenance of the files and
+their SBOM. The job of the environment `publishing`, which the trusted
+publisher of PyPI names with `release.yaml`, creates the GitHub release first
+and publishes the files on PyPI after it, with the attestations of PEP 740.
+gh creates the release as a draft until its files are uploaded, as an
+immutable release takes no files once it is published. A release that failed
+is run again after its GitHub release is deleted. The action of PyPI
+runs on x86-64, as its image has no build for ARM.
+
+```sh
+gh attestation verify pyjoyment-0.1.0.tar.gz -R dex4er/Pyjoyment
+gh attestation verify pyjoyment-0.1.0.tar.gz -R dex4er/Pyjoyment --predicate-type https://spdx.dev/Document/v2.3
+```
+
 ## Commits and Pull Requests
 
 - Commit subjects are short and in the imperative or descriptive style of the
