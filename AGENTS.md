@@ -525,12 +525,18 @@ copies into the package are all of others that the package has, and
 `uv.lock` has only the dependency groups, which the package does not install.
 The sdist takes the SBOM, which `.gitignore` ignores, as an artifact of
 hatchling. `actions/attest` attests the build provenance of the files and
-their SBOM. The job of the environment `publishing`, which the trusted
-publisher of PyPI names with `release.yaml`, creates the GitHub release first
-and publishes the files on PyPI after it, with the attestations of PEP 740.
-A release that failed is run again after its GitHub release is deleted, which
-immutable releases would not allow, as the tag of a deleted one cannot be
-used again. The action of PyPI runs on x86-64, as its image has no build for
+their SBOM, and Release makes a draft of the GitHub release with them, whose
+notes, generated from the pull requests, are rewritten before it is
+published. A release that failed is run again after its GitHub release is
+deleted, which immutable releases would not allow, as the tag of a deleted
+one cannot be used again.
+
+The workflow PyPI, run manually, publishes the sdist and the wheel of the
+latest published release, or of the release of the tag of its input, on PyPI
+once their attestations of Release verify, with the attestations of PEP 740,
+in the environment `publishing`, which waits for an approval and takes `main`
+and tags only. The trusted publisher of PyPI names `pypi.yaml` and that
+environment. The action of PyPI runs on x86-64, as its image has no build for
 ARM.
 
 ```sh
