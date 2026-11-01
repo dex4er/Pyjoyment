@@ -2,7 +2,7 @@
 # A script of generate lite-app that ends with handler = app.start(), in an
 # image of "generate dockerfile --target lambda", whose command is the runtime
 # of the function itself, run by the emulator of the Runtime API, which the
-# image does not have, of the release of RIE_VERSION, as v1.37, or the latest
+# image does not have, of the release of RIE_VERSION, as 1.37, or the latest
 # one, and invoked with the events of HTTP requests, buffered and streaming.
 
 # shellcheck source=lib.sh
@@ -29,7 +29,7 @@ case $(docker info --format '{{.Architecture}}') in
   aarch64 | arm64) suffix=-arm64 ;;
   *) suffix='' ;;
 esac
-release=${RIE_VERSION:+download/${RIE_VERSION}}
+release=${RIE_VERSION:+download/v${RIE_VERSION}}
 curl --silent --show-error --fail --location --output "${work}/aws-lambda-rie" \
   "https://github.com/aws/aws-lambda-runtime-interface-emulator/releases/${release:-latest/download}/aws-lambda-rie${suffix}"
 chmod 755 "${work}/aws-lambda-rie"
