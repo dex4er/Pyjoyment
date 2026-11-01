@@ -13,6 +13,9 @@ __pycache__/
 /build/
 /dist/
 
+# The SBOM of a release, which the workflow Release creates for the sdist
+/pyjoyment-*.spdx.json
+
 # Virtual environments of uv, of the tests of the servers and of the benchmarks
 .venv
 .venv-*

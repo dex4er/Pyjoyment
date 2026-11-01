@@ -98,6 +98,8 @@ uwsgi = { UWSGI_EMBED_PLUGINS = "cgi" }
 packages = ["Pyjo", "Pyjoyment"]
 
 [tool.hatch.build.targets.sdist]
+# The SBOM of the workflow Release, which .gitignore ignores
+artifacts = ["/pyjoyment-*.spdx.json"]
 include = [
   "/Pyjo",
   "/Pyjoyment",
