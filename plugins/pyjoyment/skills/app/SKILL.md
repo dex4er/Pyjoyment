@@ -202,11 +202,11 @@ done_testing()
 ## Commands
 
 ```sh
-pyjo generate app MyApp                  # a new project in my_app
-uv run python -m MyApp daemon            # http://127.0.0.1:3000
-uv run python -m MyApp routes            # the routes, their names and controllers
-uv run pyjo-prove -l -r t                # the tests
-python myapp.py inflate                  # a script of Lite: its templates of __DATA__ into templates/
+uvx --from Pyjoyment pyjo generate app MyApp  # a new project in my_app, which depends on Pyjoyment of PyPI
+uv run python -m MyApp daemon                 # http://127.0.0.1:3000
+uv run python -m MyApp routes                 # the routes, their names and controllers
+uv run pyjo-prove -l -r t                     # the tests
+python myapp.py inflate                       # a script of Lite: its templates of __DATA__ into templates/
 ```
 
 ## Mistakes

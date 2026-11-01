@@ -15,6 +15,9 @@ Flask, so the habits of other frameworks run, but often do something else:
 - Everything runs on one event loop. Code that blocks, as `requests` or
   `time.sleep`, stops every connection while it waits.
 
+Pyjoyment comes from PyPI, `uv add Pyjoyment` or `pip install Pyjoyment`,
+and needs no other library.
+
 ## An application
 
 ```python

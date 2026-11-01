@@ -116,10 +116,10 @@ only-include = ["Pyjoyment/Plugin/Greeting.py"]
 ## Commands
 
 ```sh
-pyjo generate plugin Greeting              # the project Pyjoyment-Plugin-Greeting
-uv run pyjo-prove -l -r t                  # its tests, with the module of the checkout
-uv build                                   # the wheel and the sdist in dist/
-uv publish                                 # to PyPI
+uvx --from Pyjoyment pyjo generate plugin Greeting  # the project Pyjoyment-Plugin-Greeting
+uv run pyjo-prove -l -r t                          # its tests, with the module of the checkout
+uv build                                           # the wheel and the sdist in dist/
+uv publish                                         # to PyPI
 ```
 
 ## Mistakes

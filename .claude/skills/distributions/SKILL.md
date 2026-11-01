@@ -17,11 +17,13 @@ back here.
 - **The package.** A distribution adds a module to a namespace of Pyjoyment,
   `Pyjo.Reactor` or `Pyjoyment.Plugin`, which `extend_path` keeps open: its
   wheel has only the module (`only-include` of hatchling), without the
-  `__init__.py` of the packages, which are those of Pyjoyment. Until the
-  revival of Pyjoyment is on PyPI, `tool.uv.sources` takes Pyjoyment from its
-  Git repository, never from a path to the checkout next to it: uv applies the
-  sources of a dependency of Git, so whoever installs the distribution from Git
-  would get a subdirectory of its repository that does not exist. Its tests
+  `__init__.py` of the packages, which are those of Pyjoyment. It depends on
+  Pyjoyment of PyPI, of the release that has what it needs. One that needs a
+  change of Pyjoyment that is not released yet takes Pyjoyment from its Git
+  repository with `tool.uv.sources` until the release, never from a path to
+  the checkout next to it: uv applies the sources of a dependency of Git, so
+  whoever installs the distribution from Git would get a subdirectory of its
+  repository that does not exist. Its tests
   lay the checkout next to it over the one of Git with `uv run --with-editable
 ../Pyjoyment`, so that they test what is there.
 - **The tests.** Its CI checks out Pyjoyment next to it and runs the whole
