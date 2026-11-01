@@ -1,10 +1,11 @@
 name: Automated trunk upgrade
 
-# Runs trunk upgrade every day and keeps the changes in the pull request of
-# the branch automated/trunk-upgrade, which a comment /rerun on it runs again.
-# It works with the token of the workflow: a push and a pull request of that
-# token start no workflow, so the job starts Tests and Trunk Check on the
-# branch with workflow_dispatch, as Bundle Check does.
+# Runs trunk upgrade every day, and trunk fmt --all after it, as a new version
+# of a formatter can format the files otherwise, and keeps the changes in the
+# pull request of the branch automated/trunk-upgrade, which a comment /rerun on
+# it runs again. It works with the token of the workflow: a push and a pull
+# request of that token start no workflow, so the job starts Tests and Trunk
+# Check on the branch with workflow_dispatch, as Bundle Check does.
 on:
   issue_comment:
     types:
@@ -52,6 +53,9 @@ jobs:
           trunk upgrade --yes-to-all --no-progress --ci --color | tee .github/update.log
           sed -e '/Downloading Trunk/,/Unpacking Trunk... done/d' -e 's/\x1b\[[0-9;]*m//g' -e 's/^\(  \)\{0,1\}  /\1- /' .github/update.log > .github/pr_body.log
           perl -0777 -ne 'print join ", ", map {s/://gr} map {s/^- //r} grep {/^(-|cli) /} split "\n"' .github/pr_body.log > .github/pr_title.log
+
+      - name: Trunk fmt
+        run: trunk fmt --all --ci --no-progress
 
       - name: Check for changes
         run: |
