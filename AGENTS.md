@@ -325,13 +325,15 @@ A commit that only reformats code goes into `.git-blame-ignore-revs`, so that
 `git blame` and GitHub's blame view skip it. The trunk action
 `git-blame-ignore-revs` points `blame.ignoreRevsFile` at the file locally.
 
-The workflow Automated trunk upgrade runs `trunk upgrade` every day and keeps
-its changes in the pull request of the branch `automated/trunk-upgrade`, which
-a comment `/rerun` runs again; it works with the token of the workflow, and
-starts Tests and Trunk Check on the branch with `workflow_dispatch`, as Bundle
-Check does. A linter that the upgrade enables is kept or disabled there, with
-its configuration in the root of the repository, where the extensions of the
-editors find it, not in `.trunk/configs`.
+The workflow Automated trunk upgrade runs `trunk upgrade` every day, and
+`trunk fmt --all` after it, and keeps its changes in the pull request of the
+branch `automated/trunk-upgrade`, which a comment `/rerun` runs again. It
+works with the token of the workflow, whose push leaves the runs of
+`pull_request` waiting for an approval, so it starts Build, Tests and Trunk
+Check, which the ruleset of `main` requires, on the branch with
+`workflow_dispatch`, as Bundle Check does. A linter that the upgrade enables is
+kept or disabled there, with its configuration in the root of the repository,
+where the extensions of the editors find it, not in `.trunk/configs`.
 
 The linters are there to keep plain mistakes out, not to enforce PEP 8: the
 project bends Python's conventions on purpose, and a rule that fights its

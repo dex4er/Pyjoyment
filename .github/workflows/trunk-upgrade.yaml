@@ -3,9 +3,10 @@ name: Automated trunk upgrade
 # Runs trunk upgrade every day, and trunk fmt --all after it, as a new version
 # of a formatter can format the files otherwise, and keeps the changes in the
 # pull request of the branch automated/trunk-upgrade, which a comment /rerun on
-# it runs again. It works with the token of the workflow: a push and a pull
-# request of that token start no workflow, so the job starts Tests and Trunk
-# Check on the branch with workflow_dispatch, as Bundle Check does.
+# it runs again. It works with the token of the workflow, whose push leaves the
+# runs of pull_request waiting for an approval, so the job starts Build, Tests
+# and Trunk Check, the required checks, on the branch with workflow_dispatch,
+# as Bundle Check does.
 on:
   issue_comment:
     types:
@@ -97,6 +98,7 @@ jobs:
       - name: Run the checks of the commit
         if: env.changes == 'true'
         run: |-
+          gh workflow run build.yaml --ref "${BRANCH}"
           gh workflow run tests.yaml --ref "${BRANCH}"
           gh workflow run trunk-check.yaml --ref "${BRANCH}"
 
