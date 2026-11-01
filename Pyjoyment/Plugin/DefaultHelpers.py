@@ -598,9 +598,12 @@ import Pyjo.Promise
 import Pyjo.String.Bytes
 import Pyjo.String.HTML
 import Pyjo.String.Unicode
+import Pyjo.URL
+import Pyjo.UserAgent
 import Pyjoyment.Plugin
 
 from Pyjo.Util import dumper, random_bytes
+from Pyjoyment.Controller import Helper
 
 import functools
 import time
@@ -694,7 +697,7 @@ class Pyjoyment_Plugin_DefaultHelpers(Pyjoyment.Plugin.object):
         app.helper('ua', _ua)
 
 
-def _accepts(c: 'Controller', *formats: str) -> Any:
+def _accepts(c: 'Controller', *formats: str) -> list[str] | str | None:
     return c.app.renderer.accepts(c, *formats)
 
 
@@ -762,7 +765,7 @@ def _csrf_token(c: 'Controller') -> str:
     return mask.hex() + bytes(a ^ b for a, b in zip(mask, bytes.fromhex(session['csrf_token']), strict=False)).hex()
 
 
-def _current_route(c: 'Controller', *args: str) -> Any:
+def _current_route(c: 'Controller', *args: str) -> str | bool | None:
     if (route := c.match.endpoint) is None:
         return ''
     return route.name == args[0] if args else route.name
@@ -878,7 +881,7 @@ def _inactivity_timeout(c: 'Controller', timeout: float) -> 'Controller':
     return c
 
 
-def _include(c: 'Controller', *args: Any, **values: Any) -> Any:
+def _include(c: 'Controller', *args: Any, **values: Any) -> Pyjo.String.HTML.object | Pyjo.String.Bytes.object | None:
     return c.render_to_string(*args, **values)
 
 
@@ -897,7 +900,7 @@ def _json_not_found(c: 'Controller') -> Any:
     return c.render(json={'error': 'Not Found'}, status=404)
 
 
-def _log(c: 'Controller') -> Any:
+def _log(c: 'Controller') -> Pyjo.Log.object:
     stash = c.stash()
     if not stash.get('mojo.log'):
         # Not in Mojolicious: the request id as a field of its own of a message of JSON
@@ -1064,7 +1067,7 @@ def _stash_key(name: str) -> Callable[..., Any]:
     return helper
 
 
-def _url_with(c: 'Controller', *args: Any, **values: Any) -> Any:
+def _url_with(c: 'Controller', *args: Any, **values: Any) -> Pyjo.URL.object:
     url = c.url_for(*args, **values)
     url.query = c.req.url.query.clone()
     return url
@@ -1074,7 +1077,7 @@ def _u(c: 'Controller', *args: Any) -> Pyjo.String.Unicode.object:
     return Pyjo.String.Unicode.new(*args)
 
 
-def _ua(c: 'Controller') -> Any:
+def _ua(c: 'Controller') -> Pyjo.UserAgent.object:
     return c.app.ua
 
 
@@ -1095,6 +1098,103 @@ def _validation(c: 'Controller') -> 'Pyjoyment.Validator.Validation.object':
     v = c.app.validator.validation().set(input=hash, csrf_token=token)
     stash['mojo.validation'] = v
     return v
+
+
+# Not in Mojolicious: the types of the helpers, for type checkers, which Pyjoyment.Controller and Pyjoyment have
+class ProxyHelpers:
+    """
+    The types of the nested helpers ``proxy.*``, for type checkers.
+    """
+
+    get_p = Helper(functools.partial(_proxy_method_p, 'GET'))
+    post_p = Helper(functools.partial(_proxy_method_p, 'POST'))
+    start_p = Helper(_proxy_start_p)
+
+
+class ReplyHelpers:
+    """
+    The types of the nested helpers ``reply.*``, for type checkers.
+    """
+
+    asset = Helper(_asset)
+    file = Helper(_file)
+    static = Helper(_static)
+
+    exception = Helper(_exception)
+    not_found = Helper(_not_found)
+    http_exception = Helper(_http_exception)
+    http_not_found = Helper(_http_not_found)
+    html_exception = Helper(functools.partial(_development, 'exception'))
+    html_not_found = Helper(functools.partial(_development, 'not_found'))
+    json_exception = Helper(_json_exception)
+    json_not_found = Helper(_json_not_found)
+    txt_exception = Helper(_txt_exception)
+    txt_not_found = Helper(_txt_not_found)
+
+
+class TimingHelpers:
+    """
+    The types of the nested helpers ``timing.*``, for type checkers.
+    """
+
+    begin = Helper(_timing_begin)
+    elapsed = Helper(_timing_elapsed)
+    rps = Helper(_timing_rps)
+    server_timing = Helper(_timing_server_timing)
+
+
+class Helpers:
+    """
+    The types of the helpers of :mod:`Pyjoyment.Plugin.DefaultHelpers`, for
+    type checkers and editors, which :mod:`Pyjoyment.Controller` and
+    :mod:`Pyjoyment` have, while the helpers themselves are found in the
+    renderer of the application at run time. See
+    :class:`Pyjoyment.Controller.Helper`.
+    """
+
+    app = Helper(_app)
+    param = Helper(_alias('param'))
+    stash = Helper(_alias('stash'))
+    session = Helper(_alias('session'))
+    url_for = Helper(_alias('url_for'))
+    url_for_asset = Helper(_alias('url_for_asset'))
+    url_for_file = Helper(_alias('url_for_file'))
+
+    extends = Helper(_stash_key('extends'))
+    layout = Helper(_stash_key('layout'))
+    title = Helper(_stash_key('title'))
+
+    accepts = Helper(_accepts)
+    b = Helper(_b)
+    u = Helper(_u)
+    c = Helper(_c)
+    config = Helper(_config)
+
+    content = Helper(functools.partial(_content, False, False))
+    content_for = Helper(functools.partial(_content, True, False))
+    content_with = Helper(functools.partial(_content, False, True))
+
+    csrf_token = Helper(_csrf_token)
+    current_route = Helper(_current_route)
+    exception_format = Helper(_exception_format)
+    flash = Helper(_flash)
+    inactivity_timeout = Helper(_inactivity_timeout)
+    is_fresh = Helper(_is_fresh)
+    redirect_to = Helper(_redirect_to)
+    respond_to = Helper(_respond_to)
+    url_with = Helper(_url_with)
+    validation = Helper(_validation)
+
+    dumper = Helper(_dumper)
+    include = Helper(_include)
+
+    log = Helper(_log)
+
+    proxy: ProxyHelpers
+    reply: ReplyHelpers
+    timing: TimingHelpers
+
+    ua = Helper(_ua)
 
 
 new = Pyjoyment_Plugin_DefaultHelpers.new
