@@ -3,7 +3,7 @@ Pyjo.YAML - Minimal YAML loader and dumper
 ==========================================
 ::
 
-    from Pyjo.YAML import dump, dump_all, load, load_all
+    from Pyjo.YAML import dump, dump_all, load, load_all, y
 
     config = load(\"\"\"\\
     foo: bar
@@ -15,6 +15,9 @@ Pyjo.YAML - Minimal YAML loader and dumper
     documents = load_all('--- first\\n--- second\\n')
 
     string = dump({'foo': 'bar', 'list': ['one', 'two']})
+
+    string = y({'foo': 'bar'}, {'baz': 1})
+    documents = y(string)
 
 :mod:`Pyjo.YAML` loads and dumps the YAML that configuration files and
 workflows use, a subset of `YAML 1.2 <https://yaml.org>`_, which
@@ -30,8 +33,9 @@ standard library:
   quotes (with the escapes ``\\n``, ``\\t``, ``\\xHH``, ``\\uHHHH`` and the
   others of YAML),
   over several lines too, and the literal ``|`` and folded ``>`` block
-  scalars, with their empty lines, and the indicators ``-`` and ``+`` that
-  strip and keep the final line breaks;
+  scalars, with their empty lines, the indicators ``-`` and ``+`` that
+  strip and keep the final line breaks, and the indicator of the
+  indentation, as ``|2-``, of a block whose first line starts with a space;
 * comments, documents that ``---`` starts and ``...`` ends, a scalar after
   ``---`` and the directive ``%YAML``.
 
@@ -64,9 +68,8 @@ keys of the mapping itself. ::
     # {'base': {'a': 1, 'b': 1}, 'copy': {'a': 1, 'b': 2}}
     load('base: &base\\n  a: 1\\n  b: 1\\ncopy:\\n  <<: *base\\n  b: 2\\n')
 
-Other tags, complex keys and the indicator of the indentation of a block
-scalar are not supported, and raise an error, as do lines that the subset
-does not know.
+Other tags and complex keys are not supported, and raise an error, as do
+lines that the subset does not know.
 
 :func:`dump` writes what the loader reads, in the block style of
 configuration files: a :class:`dict` is a mapping, a :class:`list` and a
@@ -94,6 +97,7 @@ of Adam Kennedy and David Golden, which Mojolicious uses, whose regular
 expressions of scalars and keys it borrows, with thanks.
 """
 
+import Pyjo.Collection
 import Pyjo.Exception
 
 from Pyjo.Util import b64_encode
@@ -107,7 +111,7 @@ import math
 import re
 
 from collections.abc import Callable, Iterable
-from typing import Any, Literal, cast
+from typing import Any, Literal, cast, overload
 
 
 # The regular expressions of CPAN::Meta::YAML
@@ -277,6 +281,46 @@ def load_all(string: str) -> list[Any]:
     return _Loader(string).documents()
 
 
+# y(string) loads one string of YAML, where values of any other type are dumped, which the first overload types
+@overload
+def y(value: bytes | bytearray | str, /, *, sort_keys: bool = False) -> Pyjo.Collection.object[Any]: ...  # pyright: ignore[reportOverlappingOverload]
+
+
+@overload
+def y(*values: Any, sort_keys: bool = False) -> str: ...
+
+
+def y(*values: Any, sort_keys: bool = False) -> Any:
+    """::
+
+        documents = y(string)
+        string = y({'foo': 'bar'})
+        string = y({'foo': 'bar'}, {'baz': 1})
+        string = y({'foo': 'bar'}, sort_keys=True)
+
+    Load YAML, a string or ``UTF-8`` bytes, with :func:`load_all` into a
+    :mod:`Pyjo.Collection` of its documents, which has one for a single
+    document, or dump any other values, one or more, with :func:`dump_all`,
+    one document for each. ``sort_keys`` sorts the keys of the mappings of the
+    YAML that it dumps. ::
+
+        # 'foo: bar\\n'
+        y({'foo': 'bar'})
+
+        # '--- 1\\n--- 2\\n'
+        y(1, 2)
+
+        # [{'foo': 'bar'}]
+        y(b'foo: bar\\n')
+
+        # 'bar'
+        y('foo: bar\\n').first()['foo']
+    """
+    if len(values) == 1 and isinstance(value := values[0], (str, bytes, bytearray)):
+        return Pyjo.Collection.c(*load_all(value if isinstance(value, str) else bytes(value).decode('UTF-8')))
+    return dump_all(values, sort_keys=sort_keys)
+
+
 def _error(message: str) -> Pyjo.Exception.object:
     return Pyjo.Exception.new(f'YAML {message}')
 
@@ -390,13 +434,15 @@ class _Loader:
         return self.anchors[name]
 
     def block(self, string: str, indent: int | None) -> str:
-        if not (m := re.search(r'^([|>])([+-]?)\s*(?:#.*)?\Z', string)):
+        if not (m := re.search(r'^([|>])(?:([+-]?)([1-9]?)|([1-9])([+-]))\s*(?:#.*)?\Z', string)):
             raise _error(f"does not support a feature in line '{string}'")
+        style, chomping, indentation = m[1], m[2] or m[5], m[3] or m[4]
 
-        # The lines more indented than the key, with the empty ones among them
+        # The lines more indented than the key, with the empty ones among them, from the indentation of the collection
+        # and its indicator, which a block whose first line starts with a space needs
         lines = self.lines
         block: list[str] = []
-        depth: int | None = None
+        depth = max(indent or 0, 0) + int(indentation) if indentation else None
         while lines:
             if not lines[0].strip():
                 block.append('')
@@ -412,10 +458,10 @@ class _Loader:
 
         # The empty lines at the end, which the chomping indicator keeps, strips or clips to one line break
         trailing = len(block) - len(content := _rstrip_empty(block))
-        text = '\n'.join(content) if m[1] == '|' else _fold(content)
-        if m[2] == '-' or not content:
+        text = '\n'.join(content) if style == '|' else _fold(content)
+        if chomping == '-' or not content:
             return text
-        return text + '\n' * (1 + trailing if m[2] == '+' else 1)
+        return text + '\n' * (1 + trailing if chomping == '+' else 1)
 
     def documents(self) -> list[Any]:
         documents: list[Any] = []

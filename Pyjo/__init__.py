@@ -52,8 +52,13 @@ One-liners
 A collection of functions for fun Python one-liners, which
 ``from Pyjo import *`` imports, and with which ``python -m Pyjo`` runs its
 code: the value of an expression is printed, and the arguments after the code
-are in :data:`sys.argv`. Ten redirects will be followed by default, you can
-change this behavior with the ``PYJO_MAX_REDIRECTS`` environment variable. ::
+are in :data:`sys.argv`, whose module :mod:`sys` the code has without an
+import. ::
+
+    $ python -m Pyjo 'g(sys.argv[1]).code' example.com
+
+Ten redirects will be followed by default, you can change this behavior with
+the ``PYJO_MAX_REDIRECTS`` environment variable. ::
 
     $ PYJO_MAX_REDIRECTS=0 python -m Pyjo 'g("example.com").code'
 
@@ -116,7 +121,7 @@ __path__ = extend_path(__path__, __name__)
 
 # The functions of ojo, which the modules they use are imported for when they are called, so that a module of Pyjo
 # does not import them
-__all__ = ['a', 'b', 'c', 'd', 'f', 'g', 'h', 'i', 'j', 'l', 'n', 'o', 'p', 'q', 'r', 't', 'u', 'w', 'x', 'z']
+__all__ = ['a', 'b', 'c', 'd', 'f', 'g', 'h', 'i', 'j', 'l', 'n', 'o', 'p', 'q', 'r', 't', 'u', 'w', 'x', 'y', 'z']
 
 _agent: 'Pyjo.UserAgent.object | None' = None
 
@@ -165,7 +170,7 @@ def b(*parts: object) -> 'Pyjo.String.Bytes.object':
 
     Turn bytes into a :mod:`Pyjo.String.Bytes` object. ::
 
-        $ python -m Pyjo 'b(g("mojolicious.org").body).html_unescape().say()'
+        $ python -m Pyjo 'b(g("mojolicious.org").body).html_unescape()'
     """
     import Pyjo.String.Bytes
 
@@ -395,7 +400,7 @@ def u(*parts: object) -> 'Pyjo.String.Unicode.object':
 
     Turn string into a :mod:`Pyjo.String.Unicode` object. ::
 
-        $ python -m Pyjo 'u(g("mojolicious.org").text).html_unescape().say()'
+        $ python -m Pyjo 'u(g("mojolicious.org").text).html_unescape()'
     """
     import Pyjo.String.Unicode
 
@@ -429,6 +434,25 @@ def x(*args: Any) -> 'Pyjo.DOM.object':
     import Pyjo.DOM
 
     return Pyjo.DOM.new(*args)
+
+
+# Not in Mojolicious: YAML, as j is for JSON
+def y(*values: Any) -> Any:
+    """::
+
+        documents = y(string)
+        string = y({'foo': 'bar'})
+        string = y({'foo': 'bar'}, {'baz': 1})
+
+    Load YAML into a :mod:`Pyjo.Collection` of its documents, or dump values
+    to YAML, one document for each, with :func:`Pyjo.YAML.y`. ::
+
+        $ python -m Pyjo 'y(j(f("hello.json").slurp()))'
+        $ python -m Pyjo 'r(y(f("hello.yaml").slurp()).first())'
+    """
+    import Pyjo.YAML
+
+    return Pyjo.YAML.y(*values)
 
 
 # Not in Mojolicious: the builder of Pyjo.JSON.Schema, as z of zod, which imports the module when one of its methods is

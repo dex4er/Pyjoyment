@@ -1,5 +1,7 @@
+import Pyjo.Collection
+
 from Pyjo.Test import *
-from Pyjo.YAML import dump, dump_all, load, load_all
+from Pyjo.YAML import dump, dump_all, load, load_all, y
 
 import datetime
 import re
@@ -138,6 +140,25 @@ with subtest('Block scalars with empty lines and comments'):
     is_ok(load('k: >\n  a\n  b\n\n  c\n   d\n  e\n')['k'], 'a b\nc\n d\ne\n', 'folding')
     is_deeply_ok(load('foo: |\nbar: x\n'), {'foo': '', 'bar': 'x'}, 'empty block')
     is_deeply_ok(load('a:\n  run: |-\n    one\n\n    two\n  b: 1\n'), {'a': {'run': 'one\n\ntwo', 'b': 1}}, 'nested')
+with subtest('Block scalars with the indicator of the indentation'):
+    # The results of PyYAML; go-yaml writes them for the descriptions of the CRDs of Kubernetes that start with a space
+    is_ok(load('k: |2\n   a\n  b\n')['k'], ' a\nb\n', 'literal')
+    is_ok(load('k: |2-\n   a\n  b\n')['k'], ' a\nb', 'with the chomping indicator after it')
+    is_ok(load('k: |-2\n   a\n  b\n')['k'], ' a\nb', 'with the chomping indicator before it')
+    is_ok(load('k: |+2\n   a\n\n\nnext: 1\n')['k'], ' a\n\n\n', 'keep')
+    is_ok(load('k: >2\n   a\n  b\n  c\n')['k'], ' a\nb c\n', 'folded')
+    is_ok(load('k: |2 # comment\n   a\n')['k'], ' a\n', 'comment')
+    is_ok(load('k: |2\n\n   a\n')['k'], '\n a\n', 'leading empty line')
+    is_deeply_ok(load('a:\n  b: |2-\n     x\n    y\n  c: 1\n'), {'a': {'b': ' x\ny', 'c': 1}}, 'nested mapping')
+    is_deeply_ok(load('- |1\n  x\n'), [' x\n'], 'item')
+    is_deeply_ok(load('- k: |2\n     x\n    y\n'), [{'k': ' x\ny\n'}], 'mapping in an item')
+    is_deeply_ok(load('k:\n- |1\n  x\n'), {'k': [' x\n']}, 'sequence at the indentation of the key')
+    is_ok(load('--- |2\n   a\n  b\n'), ' a\nb\n', 'document')
+    throws_ok(lambda: load('k: |0\n  a\n'), re.compile(r'^YAML does not support a feature'), 'zero')
+    throws_ok(
+        lambda: load('k: |2+-\n  a\n'), re.compile(r'^YAML does not support a feature'), 'two chomping indicators'
+    )
+
 
 with subtest('Multi-line scalars'):
     is_deeply_ok(load('k: some\n  text\nnext: 1\n'), {'k': 'some text', 'next': 1}, 'plain')
@@ -253,7 +274,6 @@ with subtest('Errors'):
     throws_ok(lambda: load('foo: [a, b] c\n'), re.compile(r'^YAML found illegal characters after the flow'), 'after')
     throws_ok(lambda: load('foo: [a b c, ]x]\n'), re.compile(r'^YAML'), 'flow syntax')
     throws_ok(lambda: load('foo: "open\n'), re.compile(r'^YAML failed to find the end of the quoted scalar'), 'quote')
-    throws_ok(lambda: load('foo: |2\n  x\n'), re.compile(r'^YAML does not support a feature'), 'indentation indicator')
 
     # Not in CPAN::Meta::YAML: an unknown alias is an error, not a string
     throws_ok(lambda: load('foo: *alias\n'), re.compile(r"^YAML found an unknown alias '\*alias'"), 'alias')
@@ -459,6 +479,26 @@ with subtest('Dump the order of the keys'):
     is_ok(dump(value, sort_keys=True), "a:\n  c: 3\n  d:\n    - 'y': 2\n      z: 1\nb: 1\n", 'keys sorted')
     is_ok(dump_all([{'b': 1, 'a': 2}, {'d': 3, 'c': 4}], sort_keys=True), 'a: 2\nb: 1\n---\nc: 4\nd: 3\n', 'documents')
     is_ok(dump({2: 'two', 1: 'one'}, sort_keys=True), '1: one\n2: two\n', 'keys that are not strings')
+
+with subtest('y'):
+    is_ok(y((1, 2)), '- 1\n- 2\n', 'tuple')
+    is_ok(y({}), '--- {}\n', 'empty dict')
+    is_ok(y({'a': 1}, [2], 'three', None), 'a: 1\n---\n- 2\n--- three\n--- null\n', 'documents')
+    is_ok(y('one', 'two'), '--- one\n--- two\n', 'strings are documents of their own')
+    is_ok(y(), '', 'no documents')
+    is_ok(y({'b': 1}, {'a': 2}, sort_keys=True), 'b: 1\n---\na: 2\n', 'keys sorted in each document')
+    isa_ok(y('a: 1\n'), Pyjo.Collection.object, 'collection')
+    is_deeply_ok(y('a: 1\n'), [{'a': 1}], 'one document')
+    is_deeply_ok(y('---\na: 1\n'), [{'a': 1}], 'one document with its start')
+    is_deeply_ok(y('- 1\n- 2\n'), [[1, 2]], 'one document of a sequence')
+    is_deeply_ok(y('--- first\n--- second\n'), ['first', 'second'], 'documents')
+    is_deeply_ok(y(''), [], 'empty string')
+    is_deeply_ok(y('# comment\n'), [], 'comment')
+    is_deeply_ok(y(bytearray(b'- \xe2\x99\xa5\n')), [['\u2665']], 'bytearray of UTF-8')
+    is_deeply_ok(y(b'a: 1\n---\nb: 2\n').map(lambda d: list(d)[0]), ['a', 'b'], 'chained')
+    throws_ok(lambda: y('foo: !tag bar'), re.compile(r'^YAML does not support a feature'), 'error')
+    data = [{'b': [1, {'a': None}]}, 'two']
+    is_deeply_ok(y(y(*data)), data, 'round trip')
 
 with subtest('Dump round trip'):
     data = {

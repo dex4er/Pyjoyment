@@ -53,6 +53,13 @@ with subtest('JSON'):
     is_ok(j({'foo': 'bar'}), b'{"foo":"bar"}', 'right result')
     is_deeply_ok(j(b'{"foo":"bar"}'), {'foo': 'bar'}, 'right structure')
 
+# Not in Mojolicious: y, as j is for JSON
+with subtest('YAML'):
+    is_ok(y([1, 2]), '- 1\n- 2\n', 'right result')
+    is_deeply_ok(y('- 1\n- 2\n'), [[1, 2]], 'right structure')
+    is_ok(y({'foo': 'bar'}, {'baz': 1}), 'foo: bar\n---\nbaz: 1\n', 'right result')
+    is_deeply_ok(y(b'foo: bar\n---\nbaz: 1\n'), [{'foo': 'bar'}, {'baz': 1}], 'right structure')
+
 with subtest('ByteStream'):
     is_ok(u('<foo>').url_escape(), '%3Cfoo%3E', 'right result')
 
@@ -119,9 +126,12 @@ with subtest('python -m Pyjo'):
     is_ok(result.stdout, 'works\n', 'value of an expression printed')
     is_ok(result.returncode, 0, 'right exit status')
     is_ok(one_liner('None').stdout, '', 'nothing printed for None')
+    is_ok(one_liner('j({"a": 1})').stdout, '{"a":1}\n', 'bytes printed as they are')
+    is_ok(one_liner('bytearray(b"\\xff")').stdout, '\xff\n', 'bytes that are not UTF-8')
     is_ok(one_liner('print(c(1, 2, 3).join("-"))').stdout, '1-2-3\n', 'statement')
     is_ok(one_liner('z.object(a=z.int()).validate({"a": 1}).is_valid').stdout, 'True\n', 'builder of JSON Schema')
     is_ok(one_liner('import sys; print(sys.argv)', 'a', 'b').stdout, "['-c', 'a', 'b']\n", 'arguments')
+    is_ok(one_liner('sys.argv[1:]', 'a', 'b').stdout, "['a', 'b']\n", 'arguments of an expression')
     is_ok(one_liner('import os; print(os.environ["PYJO_LOG_LEVEL"])').stdout, 'fatal\n', 'silent')
     is_ok(
         one_liner('import os; print(os.environ["PYJO_LOG_LEVEL"])', PYJO_LOG_LEVEL='debug').stdout,

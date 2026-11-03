@@ -21,14 +21,16 @@ def main(argv: list[str] | None = None) -> None:
     # Silent one-liners
     os.environ.setdefault('PYJO_LOG_LEVEL', 'fatal')
 
-    namespace = {'__name__': '__main__', **{name: getattr(Pyjo, name) for name in Pyjo.__all__}}
+    # sys for the arguments of an expression in sys.argv, as @ARGV of perl -E, which an import would make a statement
+    namespace = {'__name__': '__main__', 'sys': sys, **{name: getattr(Pyjo, name) for name in Pyjo.__all__}}
     try:
         expression = compile(code, '<string>', 'eval')
     except SyntaxError:
         exec(compile(code, '<string>', 'exec'), namespace)
         return
     if (value := eval(expression, namespace)) is not None:
-        print(value)
+        # Bytes, as of j or a body, printed as Pyjo.String.Bytes prints them, where print would write their repr
+        print(Pyjo.b(value) if isinstance(value, (bytes, bytearray)) else value)
 
 
 if __name__ == '__main__':
