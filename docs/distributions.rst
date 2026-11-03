@@ -20,7 +20,7 @@ application uses it through :mod:`Pyjo.IOLoop`, as it uses
 of its own for it. A reactor passes the whole test suite of Pyjoyment.
 
 - `Pyjo.Reactor.Twisted - Low-level event reactor with Twisted support
-  <https://pyjoyment.readthedocs.io/projects/pyjo-reactor-twisted/en/latest/>`_
+  <https://pyjoyment.readthedocs.io/projects/pyjo-reactor-twisted/en/stable/>`_
 
 Layers of AWS Lambda
 --------------------
@@ -40,6 +40,6 @@ made with Pyjoyment: a route of an application of :mod:`Pyjoyment` and the user
 agent of :mod:`Pyjo.UserAgent`.
 
 - `Pyjo.MCP - Model Context Protocol for Pyjoyment
-  <https://pyjoyment.readthedocs.io/projects/pyjo-mcp/en/latest/>`_,
+  <https://pyjoyment.readthedocs.io/projects/pyjo-mcp/en/stable/>`_,
   with a `tutorial of its servers
-  <https://pyjoyment.readthedocs.io/projects/pyjo-mcp/en/latest/guides/tutorial.html>`_
+  <https://pyjoyment.readthedocs.io/projects/pyjo-mcp/en/stable/guides/tutorial.html>`_

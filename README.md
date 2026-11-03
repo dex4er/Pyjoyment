@@ -305,7 +305,7 @@ app.start()
 
 ### Model Context Protocol
 
-[Pyjo-MCP](https://pyjoyment.readthedocs.io/projects/pyjo-mcp/en/latest/) is
+[Pyjo-MCP](https://pyjoyment.readthedocs.io/projects/pyjo-mcp/en/stable/) is
 the [Model Context Protocol](https://modelcontextprotocol.io) made of the
 parts of Pyjoyment: its server is a route of an application, whose tools,
 prompts and resources are functions with the schemas of their type hints, its
@@ -416,8 +416,8 @@ often than Pyjoyment is released, is a distribution of its own, which adds a
 module to a namespace of Pyjoyment, as `Pyjo.Reactor` for a reactor,
 `Pyjoyment.Plugin` for a plugin or `Pyjo` for a protocol.
 
-- [Pyjo.MCP - Model Context Protocol for Pyjoyment](https://pyjoyment.readthedocs.io/projects/pyjo-mcp/en/latest/)
-- [Pyjo.Reactor.Twisted - Low-level event reactor with Twisted support](https://pyjoyment.readthedocs.io/projects/pyjo-reactor-twisted/en/latest/)
+- [Pyjo.MCP - Model Context Protocol for Pyjoyment](https://pyjoyment.readthedocs.io/projects/pyjo-mcp/en/stable/)
+- [Pyjo.Reactor.Twisted - Low-level event reactor with Twisted support](https://pyjoyment.readthedocs.io/projects/pyjo-reactor-twisted/en/stable/)
 
 ## Documentation
 

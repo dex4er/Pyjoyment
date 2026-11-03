@@ -230,7 +230,7 @@ in the docstring of the script, after the line ``_DATA__``:
 Model Context Protocol
 ~~~~~~~~~~~~~~~~~~~~~~
 
-`Pyjo-MCP <https://pyjoyment.readthedocs.io/projects/pyjo-mcp/en/latest/>`_ is
+`Pyjo-MCP <https://pyjoyment.readthedocs.io/projects/pyjo-mcp/en/stable/>`_ is
 the `Model Context Protocol <https://modelcontextprotocol.io>`_ made of the
 parts of Pyjoyment: its server is a route of an application, whose tools,
 prompts and resources are functions with the schemas of their type hints, its
