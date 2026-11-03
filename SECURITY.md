@@ -96,3 +96,47 @@ Not vulnerabilities in Pyjoyment:
 
 If the same problem exists in Mojolicious, which Pyjoyment is a port of, say
 so in the report.
+
+## False alarms
+
+Automated scanners report some code of Pyjoyment as a vulnerability because
+it matches a pattern, without checking where its input comes from. Pyjoyment
+runs code on purpose where the code is the input:
+
+- the one-liners of `python -m Pyjo`,
+- the command `eval`,
+- the configuration files of the plugin `Config`, which are Python,
+- the script of an application that a server loads,
+- the templates of `Pyjo.Template` and of the plugin `PyRenderer`.
+
+Each of them takes its code from the person who runs the command or from the
+files of the application, who can run any Python already, and none of them
+takes it from a request. An application that renders untrusted input as a
+template makes the same mistake as one that marks it as safe with `html()`.
+
+The reports below are known false alarms. A report of the same pattern is
+closed with a link to its entry here.
+
+### GCVE-110-VULN-PYPI-2026-000713
+
+[GCVE-110-VULN-PYPI-2026-000713](https://www.vulnetix.com/vdb/GCVE-110-VULN-PYPI-2026-000713)
+of the Vulnetix Vulnerability Database reports code injection (CWE-94) in the
+package on PyPI, found by static analysis that matched
+`exec(compile(code, '<string>', 'exec'), namespace)`.
+
+The call is in `Pyjo/__main__.py`, which runs a one-liner given on the command
+line, as `python -c` does:
+
+```sh
+python -m Pyjo 'g("mojolicious.org").dom().at("title").text'
+```
+
+Running that code is what the module is for. The code is the first argument
+of the command, written by the person who runs it on their own account, who
+can run the same code with `python -c`. Nothing of the servers, the routes or
+the handling of a request runs this module, so no input from the network
+reaches the call. The record itself states that it has not established
+whether untrusted input can reach the call.
+
+The record names one version, but every version has the same call, and it is
+not going to change.
