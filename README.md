@@ -1,6 +1,6 @@
 [![Home](https://img.shields.io/badge/%F0%9F%8F%A0-Pyjoyment-02a7a0)](https://github.com/pyjoyment/Pyjoyment)
 [![GitHub](https://img.shields.io/github/stars/pyjoyment/Pyjoyment?style=flat&label=GitHub%20%E2%AD%90&logo=github)](https://github.com/pyjoyment/Pyjoyment)
-[![Documentation](https://img.shields.io/badge/docs-Read_the_Docs-blue?logo=readthedocs&logoColor=white)](https://pyjoyment.readthedocs.io/en/latest/)
+[![Documentation](https://img.shields.io/badge/docs-Read_the_Docs-blue?logo=readthedocs&logoColor=white)](https://pyjoyment.readthedocs.io/en/stable/)
 [![DeepWiki](https://img.shields.io/badge/Ask-DeepWiki-blue)](https://deepwiki.com/pyjoyment/Pyjoyment)
 [![License](https://img.shields.io/github/license/pyjoyment/Pyjoyment.svg)](https://github.com/pyjoyment/Pyjoyment/blob/main/LICENSE)
 [![PyPI](https://img.shields.io/pypi/v/Pyjoyment?logo=pypi&logoColor=white)](https://pypi.org/project/Pyjoyment/)
