@@ -11,9 +11,21 @@ variable "region" {
 }
 
 variable "pyjoyment_layer" {
-  description = "The ARN of a published layer of Pyjoyment, in the place of function/dist/pyjoyment.zip"
+  description = "The ARN of a published layer of Pyjoyment, in the place of the public one or of function/dist/pyjoyment.zip"
   type        = string
   default     = null
+}
+
+variable "public_layers" {
+  description = "Take the public layers of Pyjoyment-Lambda-Layers, for a build with \"--function-only\", or the layers of function/dist"
+  type        = bool
+  default     = true
+}
+
+variable "python" {
+  description = "The version of Python of the public layers, as \"3.15\" or \"3.15t\""
+  type        = string
+  default     = "3.15"
 }
 
 variable "arch" {

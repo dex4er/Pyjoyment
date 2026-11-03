@@ -3,30 +3,51 @@
 # same for the same files, so that a new build changes only what has changed
 locals {
   dist = "${path.module}/function/dist"
+
+  # The layers of the build, whose ZIP files are hashed only then, as OpenTofu validates the resources that are not
+  # enabled too, and "--function-only" writes no layers
+  python_build    = !var.public_layers
+  pyjoyment_build = var.pyjoyment_layer == null && !var.public_layers
 }
 
+# The layer of Python, unless the function takes the public one
 resource "aws_lambda_layer_version" "python" {
   layer_name               = "${var.name}-python"
   filename                 = "${local.dist}/python.zip"
-  source_code_hash         = filebase64sha256("${local.dist}/python.zip")
+  source_code_hash         = local.python_build ? filebase64sha256("${local.dist}/python.zip") : null
   compatible_runtimes      = ["provided.al2023"]
   compatible_architectures = [var.arch]
+
+  lifecycle {
+    enabled = local.python_build
+  }
 }
 
 # The layer of Pyjoyment, in the site-packages of the Python of the function, unless the variable "pyjoyment_layer"
-# names one that is published already
+# names one that is published already or the function takes the public one
 resource "aws_lambda_layer_version" "pyjoyment" {
-  count = var.pyjoyment_layer == null ? 1 : 0
-
   layer_name               = "${var.name}-pyjoyment"
   filename                 = "${local.dist}/pyjoyment.zip"
-  source_code_hash         = filebase64sha256("${local.dist}/pyjoyment.zip")
+  source_code_hash         = local.pyjoyment_build ? filebase64sha256("${local.dist}/pyjoyment.zip") : null
   compatible_runtimes      = ["provided.al2023"]
   compatible_architectures = [var.arch]
+
+  lifecycle {
+    enabled = local.pyjoyment_build
+  }
 }
 
 locals {
-  pyjoyment_layer = var.pyjoyment_layer != null ? var.pyjoyment_layer : aws_lambda_layer_version.pyjoyment[0].arn
+  region = data.aws_region.current.region
+  python_layer = (
+    var.public_layers ? local.public_layers["${local.python_name}-${var.arch}"][local.region]
+    : aws_lambda_layer_version.python.arn
+  )
+  pyjoyment_layer = (
+    var.pyjoyment_layer != null ? var.pyjoyment_layer
+    : var.public_layers ? local.public_layers["pyjoyment-${local.python_name}"][local.region]
+    : aws_lambda_layer_version.pyjoyment.arn
+  )
 }
 
 resource "aws_iam_role" "function" {
@@ -62,7 +83,7 @@ resource "aws_lambda_function" "function" {
   handler          = "app.handler"
   filename         = "${local.dist}/function.zip"
   source_code_hash = filebase64sha256("${local.dist}/function.zip")
-  layers           = [aws_lambda_layer_version.python.arn, local.pyjoyment_layer]
+  layers           = [local.python_layer, local.pyjoyment_layer]
   memory_size      = 128
   timeout          = 10
 
