@@ -245,7 +245,7 @@ python myapp.py inflate                       # a script of Lite: its templates 
 
 ## Documentation
 
-- Growing: https://pyjoyment.readthedocs.io/en/latest/guides/growing.html
-- Routing: https://pyjoyment.readthedocs.io/en/latest/guides/routing.html
-- Pyjoyment: https://pyjoyment.readthedocs.io/en/latest/api/Pyjoyment.html
-- Pyjoyment.Controller: https://pyjoyment.readthedocs.io/en/latest/api/Pyjoyment_Controller.html
+- Growing: https://pyjoyment.readthedocs.io/en/stable/guides/growing.html
+- Routing: https://pyjoyment.readthedocs.io/en/stable/guides/routing.html
+- Pyjoyment: https://pyjoyment.readthedocs.io/en/stable/api/Pyjoyment.html
+- Pyjoyment.Controller: https://pyjoyment.readthedocs.io/en/stable/api/Pyjoyment_Controller.html

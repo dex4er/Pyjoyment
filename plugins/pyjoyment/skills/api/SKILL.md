@@ -151,6 +151,6 @@ app.start()
 
 ## Documentation
 
-- Pyjo.JSON.Schema: https://pyjoyment.readthedocs.io/en/latest/api/Pyjo_JSON_Schema.html
-- Pyjo.JSON.RPC: https://pyjoyment.readthedocs.io/en/latest/api/Pyjo_JSON_RPC.html
-- Rendering JSON: https://pyjoyment.readthedocs.io/en/latest/guides/rendering.html
+- Pyjo.JSON.Schema: https://pyjoyment.readthedocs.io/en/stable/api/Pyjo_JSON_Schema.html
+- Pyjo.JSON.RPC: https://pyjoyment.readthedocs.io/en/stable/api/Pyjo_JSON_RPC.html
+- Rendering JSON: https://pyjoyment.readthedocs.io/en/stable/guides/rendering.html

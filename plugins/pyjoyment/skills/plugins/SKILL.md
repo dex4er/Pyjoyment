@@ -135,6 +135,6 @@ uv publish                                         # to PyPI
 
 ## Documentation
 
-- Pyjoyment.Plugin: https://pyjoyment.readthedocs.io/en/latest/api/Pyjoyment_Plugin.html
-- Rendering, helper plugins: https://pyjoyment.readthedocs.io/en/latest/guides/rendering.html
-- Distributions: https://pyjoyment.readthedocs.io/en/latest/distributions.html
+- Pyjoyment.Plugin: https://pyjoyment.readthedocs.io/en/stable/api/Pyjoyment_Plugin.html
+- Rendering, helper plugins: https://pyjoyment.readthedocs.io/en/stable/guides/rendering.html
+- Distributions: https://pyjoyment.readthedocs.io/en/stable/distributions.html

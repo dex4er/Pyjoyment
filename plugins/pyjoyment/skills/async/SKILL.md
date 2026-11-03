@@ -182,6 +182,6 @@ app.start()
 
 ## Documentation
 
-- Cookbook, the real-time web: https://pyjoyment.readthedocs.io/en/latest/guides/cookbook.html
-- Pyjo.Promise: https://pyjoyment.readthedocs.io/en/latest/api/Pyjo_Promise.html
-- Pyjo.IOLoop.Subprocess: https://pyjoyment.readthedocs.io/en/latest/api/Pyjo_IOLoop_Subprocess.html
+- Cookbook, the real-time web: https://pyjoyment.readthedocs.io/en/stable/guides/cookbook.html
+- Pyjo.Promise: https://pyjoyment.readthedocs.io/en/stable/api/Pyjo_Promise.html
+- Pyjo.IOLoop.Subprocess: https://pyjoyment.readthedocs.io/en/stable/api/Pyjo_IOLoop_Subprocess.html

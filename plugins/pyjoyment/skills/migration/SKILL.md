@@ -167,9 +167,9 @@ is not a response`), a helper without its call (`Helper "ua" has no attribute
 
 ## Documentation
 
-- Tutorial: https://pyjoyment.readthedocs.io/en/latest/guides/tutorial.html
-- Routing: https://pyjoyment.readthedocs.io/en/latest/guides/routing.html
-- Rendering: https://pyjoyment.readthedocs.io/en/latest/guides/rendering.html
-- Testing: https://pyjoyment.readthedocs.io/en/latest/guides/testing.html
+- Tutorial: https://pyjoyment.readthedocs.io/en/stable/guides/tutorial.html
+- Routing: https://pyjoyment.readthedocs.io/en/stable/guides/routing.html
+- Rendering: https://pyjoyment.readthedocs.io/en/stable/guides/rendering.html
+- Testing: https://pyjoyment.readthedocs.io/en/stable/guides/testing.html
 - Mounting an application of another framework, to migrate it step by step:
-  https://pyjoyment.readthedocs.io/en/latest/guides/mounting.html
+  https://pyjoyment.readthedocs.io/en/stable/guides/mounting.html

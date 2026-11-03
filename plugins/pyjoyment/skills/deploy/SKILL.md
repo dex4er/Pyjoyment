@@ -118,7 +118,7 @@ PYJO_LISTEN='fcgi://127.0.0.1:9000' python app.py daemon    # FastCGI behind ngi
 
 ## Documentation
 
-- Cookbook, deployment: https://pyjoyment.readthedocs.io/en/latest/guides/cookbook.html
-- Pyjoyment.Plugin.Health: https://pyjoyment.readthedocs.io/en/latest/api/Pyjoyment_Plugin_Health.html
-- Pyjo.Server.Prefork: https://pyjoyment.readthedocs.io/en/latest/api/Pyjo_Server_Prefork.html
-- generate dockerfile: https://pyjoyment.readthedocs.io/en/latest/api/Pyjoyment_Command_Author_generate_dockerfile.html
+- Cookbook, deployment: https://pyjoyment.readthedocs.io/en/stable/guides/cookbook.html
+- Pyjoyment.Plugin.Health: https://pyjoyment.readthedocs.io/en/stable/api/Pyjoyment_Plugin_Health.html
+- Pyjo.Server.Prefork: https://pyjoyment.readthedocs.io/en/stable/api/Pyjo_Server_Prefork.html
+- generate dockerfile: https://pyjoyment.readthedocs.io/en/stable/api/Pyjoyment_Command_Author_generate_dockerfile.html

@@ -165,7 +165,7 @@ PYTHONDEVMODE=1 pyjo-prove -l -r t   # and the ResourceWarning of what a test le
 
 ## Documentation
 
-- Testing: https://pyjoyment.readthedocs.io/en/latest/guides/testing.html
-- Pyjo.Test.Pyjo: https://pyjoyment.readthedocs.io/en/latest/api/Pyjo_Test_Pyjo.html
-- Pyjo.Test: https://pyjoyment.readthedocs.io/en/latest/api/Pyjo_Test.html
-- The plugin of pytest: https://pyjoyment.readthedocs.io/en/latest/api/Pyjo_Test_pytest_plugin.html
+- Testing: https://pyjoyment.readthedocs.io/en/stable/guides/testing.html
+- Pyjo.Test.Pyjo: https://pyjoyment.readthedocs.io/en/stable/api/Pyjo_Test_Pyjo.html
+- Pyjo.Test: https://pyjoyment.readthedocs.io/en/stable/api/Pyjo_Test.html
+- The plugin of pytest: https://pyjoyment.readthedocs.io/en/stable/api/Pyjo_Test_pytest_plugin.html

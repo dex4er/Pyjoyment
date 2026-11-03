@@ -237,7 +237,7 @@ PYJO_MODE=production python app.py daemon
 
 ## Documentation
 
-- Tutorial: https://pyjoyment.readthedocs.io/en/latest/guides/tutorial.html
-- Routing: https://pyjoyment.readthedocs.io/en/latest/guides/routing.html
-- Rendering: https://pyjoyment.readthedocs.io/en/latest/guides/rendering.html
-- Pyjoyment.Lite: https://pyjoyment.readthedocs.io/en/latest/api/Pyjoyment_Lite.html
+- Tutorial: https://pyjoyment.readthedocs.io/en/stable/guides/tutorial.html
+- Routing: https://pyjoyment.readthedocs.io/en/stable/guides/routing.html
+- Rendering: https://pyjoyment.readthedocs.io/en/stable/guides/rendering.html
+- Pyjoyment.Lite: https://pyjoyment.readthedocs.io/en/stable/api/Pyjoyment_Lite.html

@@ -143,7 +143,7 @@ and the other methods of HTTP, `x` for the DOM, `j` for JSON.
   both, so that one that hangs or trickles ends.
 ## Documentation
 
-- Pyjo.UserAgent: https://pyjoyment.readthedocs.io/en/latest/api/Pyjo_UserAgent.html
-- Pyjo.DOM: https://pyjoyment.readthedocs.io/en/latest/api/Pyjo_DOM.html
-- Pyjo, the one-liners: https://pyjoyment.readthedocs.io/en/latest/api/Pyjo.html
-- Cookbook, user agent: https://pyjoyment.readthedocs.io/en/latest/guides/cookbook.html
+- Pyjo.UserAgent: https://pyjoyment.readthedocs.io/en/stable/api/Pyjo_UserAgent.html
+- Pyjo.DOM: https://pyjoyment.readthedocs.io/en/stable/api/Pyjo_DOM.html
+- Pyjo, the one-liners: https://pyjoyment.readthedocs.io/en/stable/api/Pyjo.html
+- Cookbook, user agent: https://pyjoyment.readthedocs.io/en/stable/guides/cookbook.html

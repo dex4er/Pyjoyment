@@ -105,5 +105,5 @@ plugin('Mount', {re.compile(r'/(?P<user>\w+)/blog(?P<path>/.*)?'): flask_app})
 
 ## Documentation
 
-- Mounting: https://pyjoyment.readthedocs.io/en/latest/guides/mounting.html
-- Pyjoyment.Plugin.Mount: https://pyjoyment.readthedocs.io/en/latest/api/Pyjoyment_Plugin_Mount.html
+- Mounting: https://pyjoyment.readthedocs.io/en/stable/guides/mounting.html
+- Pyjoyment.Plugin.Mount: https://pyjoyment.readthedocs.io/en/stable/api/Pyjoyment_Plugin_Mount.html

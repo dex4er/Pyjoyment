@@ -164,5 +164,5 @@ done_testing()
 
 ## Documentation
 
-- Pyjoyment: https://pyjoyment.readthedocs.io/en/latest/
-- The guides, ports of Mojolicious::Guides: https://pyjoyment.readthedocs.io/en/latest/guides/index.html
+- Pyjoyment: https://pyjoyment.readthedocs.io/en/stable/
+- The guides, ports of Mojolicious::Guides: https://pyjoyment.readthedocs.io/en/stable/guides/index.html

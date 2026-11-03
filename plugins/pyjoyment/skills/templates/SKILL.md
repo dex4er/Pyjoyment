@@ -176,7 +176,7 @@ app.start()
 
 ## Documentation
 
-- Rendering: https://pyjoyment.readthedocs.io/en/latest/guides/rendering.html
-- Tag helpers: https://pyjoyment.readthedocs.io/en/latest/api/Pyjoyment_Plugin_TagHelpers.html
-- Default helpers: https://pyjoyment.readthedocs.io/en/latest/api/Pyjoyment_Plugin_DefaultHelpers.html
-- PyRenderer: https://pyjoyment.readthedocs.io/en/latest/api/Pyjoyment_Plugin_PyRenderer.html
+- Rendering: https://pyjoyment.readthedocs.io/en/stable/guides/rendering.html
+- Tag helpers: https://pyjoyment.readthedocs.io/en/stable/api/Pyjoyment_Plugin_TagHelpers.html
+- Default helpers: https://pyjoyment.readthedocs.io/en/stable/api/Pyjoyment_Plugin_DefaultHelpers.html
+- PyRenderer: https://pyjoyment.readthedocs.io/en/stable/api/Pyjoyment_Plugin_PyRenderer.html

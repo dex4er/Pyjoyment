@@ -178,8 +178,8 @@ with (
 
 ## Documentation
 
-- Pyjo.IOLoop: https://pyjoyment.readthedocs.io/en/latest/api/Pyjo_IOLoop.html
-- Pyjo.IOLoop.Stream: https://pyjoyment.readthedocs.io/en/latest/api/Pyjo_IOLoop_Stream.html
-- Pyjo.IOLoop.Datagram: https://pyjoyment.readthedocs.io/en/latest/api/Pyjo_IOLoop_Datagram.html
-- Pyjo.IOLoop.ChildProcess: https://pyjoyment.readthedocs.io/en/latest/api/Pyjo_IOLoop_ChildProcess.html
-- Pyjo.Server.Daemon: https://pyjoyment.readthedocs.io/en/latest/api/Pyjo_Server_Daemon.html
+- Pyjo.IOLoop: https://pyjoyment.readthedocs.io/en/stable/api/Pyjo_IOLoop.html
+- Pyjo.IOLoop.Stream: https://pyjoyment.readthedocs.io/en/stable/api/Pyjo_IOLoop_Stream.html
+- Pyjo.IOLoop.Datagram: https://pyjoyment.readthedocs.io/en/stable/api/Pyjo_IOLoop_Datagram.html
+- Pyjo.IOLoop.ChildProcess: https://pyjoyment.readthedocs.io/en/stable/api/Pyjo_IOLoop_ChildProcess.html
+- Pyjo.Server.Daemon: https://pyjoyment.readthedocs.io/en/stable/api/Pyjo_Server_Daemon.html
