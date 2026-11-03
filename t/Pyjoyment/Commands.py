@@ -620,8 +620,8 @@ with subtest('generate lambda-zip'):
         'same files',
     )
 
-    # The same bytecode on another number of processors, which a free-threaded Python would give otherwise to the
-    # modules that a process compiles after others
+    # The same bytecode on another number of processors, which Python, as 3.15 and the free-threaded build, would give
+    # otherwise to the modules that a process compiles after others
     compiled = []
     for cpus in ('1', '4'):
         modules = Pyjo.File.tempdir()
