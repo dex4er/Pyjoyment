@@ -532,9 +532,12 @@ of the plugin, which `t/docs/skills.py` checks too.
 
 A release is a tag of the version of `pyproject.toml`, without a `v`, as
 `0.1.0`. The workflow Automated version sets the version with `uv version`,
-a version or the components of its `--bump`, as `minor rc`, in the pull
-request of the branch `automated/version`. Automated tag tags the merge
-commit of that pull request when it is merged, or with a comment `/tag` of a
+the components of its `--bump` from a list, as `patch dev` or `minor rc`, or
+the version of `manual`, in the pull request of the branch
+`automated/version`. After a release, a pre-release goes with the release
+that it comes before, as PEP 440 orders `0.2.0.dev1` before `0.2.0`, so `dev`
+alone after `0.2.0` fails. Automated tag tags the merge commit of that pull
+request when it is merged, or with a comment `/tag` of a
 maintainer on it, and starts Release on the tag with `workflow_dispatch`, as
 a tag of the token of a workflow starts no workflow; a tag that is pushed
 starts Release too. A development version, as `0.1.1.dev1`, is not tagged.
