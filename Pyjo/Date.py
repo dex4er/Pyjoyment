@@ -40,6 +40,7 @@ Classes
 
 import Pyjo.Base
 import Pyjo.String.Mixin
+import Pyjo.String.Unicode
 
 import calendar
 import re
@@ -116,6 +117,24 @@ class Pyjo_Date(Pyjo.Base.object, Pyjo.String.Mixin.object):
             datetime.fromtimestamp(float(Pyjo.Date.new(784111777)), UTC)
         """
         return float(self.epoch or 0)
+
+    # Not in Mojolicious: the format of strftime, as datetime of the standard library has it, in the place of the one of
+    # a string of Pyjo.String.Mixin
+    def __format__(self, format_spec: str) -> str:
+        """::
+
+            string = format(date, '%Y%m%d')
+            string = f'{date:%Y%m%dT%H%M%SZ}'
+
+        Format date with :meth:`strftime`, as :meth:`datetime.datetime.__format__`
+        does, or as :meth:`to_str` without a format. ::
+
+            # "19941106T084937Z"
+            f'{Pyjo.Date.new(784111777):%Y%m%dT%H%M%SZ}'
+        """
+        if not format_spec:
+            return self.to_str()
+        return self.strftime(format_spec).to_str()
 
     # Not in Mojolicious: the epoch for the standard library
     def __int__(self) -> int:
@@ -202,6 +221,24 @@ class Pyjo_Date(Pyjo.Base.object, Pyjo.String.Mixin.object):
         epoch = _timegm(float(s), int(mi), int(h), int(day), month, int(year))
         self.epoch = epoch + offset if epoch is not None and epoch + offset >= 0 else None
         return self
+
+    # Not in Mojolicious: strftime of datetime of the standard library, as a method that chains, which Collection.map
+    # calls by its name
+    def strftime(self, format: str) -> Pyjo.String.Unicode.object:
+        """::
+
+            string = date.strftime('%Y-%m-%d')
+
+        Format date in UTC with the directives of
+        :meth:`datetime.datetime.strftime`. ::
+
+            # "19941106T084937Z"
+            Pyjo.Date.new(784111777).strftime('%Y%m%dT%H%M%SZ')
+
+            # "1994, 2014"
+            Pyjo.Collection.c(Pyjo.Date.new(784111777), Pyjo.Date.new(1408567500)).map('strftime', '%Y').join(', ')
+        """
+        return Pyjo.String.Unicode.new(self.to_datetime().strftime(format))
 
     # Not in Mojolicious: datetime of the standard library
     def to_datetime(self) -> datetime:
